@@ -1,3 +1,27 @@
-# Flizy monorepo root
+# Flizy
 
-Site llms.txt is served from web/public/llms.txt when the Next app is deployed.
+> WhatsApp-native EVM wallet. Trusted sends. GIWA-first; more EVM chains planned.
+
+## Product
+
+Flizy is a WhatsApp + web system for sending crypto only to trusted destinations. Users create an account on the site, receive a permanent agent wallet, link WhatsApp with a one-time code, fund the agent wallet, and send via flizy commands.
+
+## Site
+
+- https://flizy.vercel.app/ : Product home
+- /how-it-works : Full user guide and commands
+- /docs : Why trusted addresses exist
+- /signup : Create account (strong password; no email verification code)
+- /login : Sign in
+- /dashboard : Agent wallet, PIN, trusted people, WhatsApp link code
+- /claim/:token : Claim funds waiting for non-users
+
+## Bot (WhatsApp)
+
+Shared bot number. Friends message that number. Commands use the flizy prefix. After link, flizy me shows the same agent wallet as the dashboard. Sends are signed from the user agent wallet on GIWA Sepolia (more EVM soon via chain registry).
+
+## When to read
+
+- README.md for architecture, diagrams, env, and roadmap
+- /how-it-works to onboard a human user
+- /docs when a send is rejected for destination policy
