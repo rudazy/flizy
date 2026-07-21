@@ -95,12 +95,15 @@ export default function SignupPage() {
             type="password"
             required
             minLength={8}
-            placeholder="At least 8 characters"
+            placeholder="e.g. MyPass1!"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
           />
-          <p className="mt-2 text-xs text-muted">Use a password you do not reuse elsewhere.</p>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            No email code is sent. Use a strong password: at least 8 characters, with a letter, a
+            number, and a special character (!@#$%…).
+          </p>
         </div>
         {error ? <div className="alert alert-error">{error}</div> : null}
         <button className="btn btn-primary w-full" type="submit" disabled={loading}>

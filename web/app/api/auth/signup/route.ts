@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
 import { hashPassword } from '../../../../lib/cryptoPin';
 import { setAccountCookie } from '../../../../lib/cookies';
+import { validatePassword } from '../../../../lib/passwordPolicy';
 
 export async function POST(req: Request) {
   try {
@@ -12,8 +13,12 @@ export async function POST(req: Request) {
     const password = String(body.password || '');
     const displayName = String(body.displayName || '').trim() || null;
 
-    if (!email || password.length < 8) {
-      return NextResponse.json({ error: 'Email and password (8+ chars) required' }, { status: 400 });
+    if (!email) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    }
+    const pw = validatePassword(password);
+    if (!pw.ok) {
+      return NextResponse.json({ error: pw.error }, { status: 400 });
     }
 
     const supabase = getSupabase();

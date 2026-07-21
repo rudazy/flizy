@@ -21,7 +21,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Ensure agent wallet exists (same derivation as bot)
+    // Set agent wallet once only (never rotate if already set)
     if (!account.agent_wallet_address) {
       const { Wallet, keccak256, toUtf8Bytes } = await import('ethers');
       const material = keccak256(toUtf8Bytes(`flizy:agent:v1:${account.id}`));
@@ -30,9 +30,20 @@ export async function GET() {
         .from('accounts')
         .update({ agent_wallet_address: w.address })
         .eq('id', account.id)
+        .is('agent_wallet_address', null)
         .select('id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth')
         .single();
-      if (!uErr && updated) account = updated;
+      if (!uErr && updated) {
+        account = updated;
+      } else {
+        // Re-read in case another request set it
+        const { data: again } = await supabase
+          .from('accounts')
+          .select('id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth')
+          .eq('id', accountId)
+          .single();
+        if (again) account = again;
+      }
     }
 
     const trusted = await listTrusted(accountId);

@@ -12,6 +12,7 @@ const { insertTransfer, logSubmitted, logReceipt } = require('./lib/transferLog'
 const { publicErrorMessage } = require('./lib/sanitize');
 const {
   getOrCreateAccountForSender,
+  getAccountByWaSender,
   consumeLinkCode,
 } = require('./lib/identity');
 const { stripFlizyPrefix, parseUnlockCommand, parseLockCommand } = require('./lib/prefix');
@@ -599,30 +600,70 @@ async function handleHow(message) {
   await message.reply(howOthersUseText());
 }
 
+/**
+ * Always show the permanent site agent wallet after link.
+ * Unlinked WhatsApp must not invent a second address.
+ */
+async function resolveLinkedSiteAccount(phone, account) {
+  const linked = await getAccountByWaSender(phone);
+  if (linked?.account?.email) {
+    return ensureAgentWallet(linked.account.id);
+  }
+  if (account?.email) {
+    return ensureAgentWallet(account.id);
+  }
+  return null;
+}
+
 async function handleMe(message, user, account) {
   try {
-    let acc = account;
-    if (acc?.id) {
-      acc = await ensureAgentWallet(acc.id);
+    const acc = await resolveLinkedSiteAccount(phoneFromUser(user, account), account);
+    // phone is on user.phone
+    const waId = user.phone;
+    if (!acc) {
+      await botReply(
+        message,
+        waId,
+        [
+          'Link your site account to see your permanent agent wallet.',
+          `Site: ${config.siteUrl}/dashboard`,
+          'Generate a code, then: flizy link CODE',
+          '',
+          `WhatsApp id: ${waId}`,
+        ].join('\n')
+      );
+      return;
     }
-    const lines = [
-      acc ? formatAccountWalletCard(acc, chain) : null,
-      `WhatsApp id: ${user.phone}`,
-      `Role: ${isAdminUser(user) ? 'admin' : 'user'}`,
-      '',
-      'Tip: flizy balance  |  flizy history',
-    ].filter(Boolean);
-    await message.reply(lines.join('\n'));
+    await botReply(
+      message,
+      waId,
+      [
+        'Your Flizy account',
+        acc.email ? `Email: ${acc.email}` : null,
+        acc.display_name ? `Name: ${acc.display_name}` : null,
+        `Agent wallet: ${acc.agent_wallet_address}`,
+        `WhatsApp id: ${waId}`,
+        '',
+        'Tip: flizy balance  |  flizy history',
+      ]
+        .filter(Boolean)
+        .join('\n')
+    );
   } catch (err) {
-    await message.reply(
+    await botReply(
+      message,
+      user.phone,
       [
         'Your Flizy account',
         `WhatsApp id: ${user.phone}`,
-        `Credit: ${formatEth(user.balance_eth)} ETH`,
-        `Role: ${isAdminUser(user) ? 'admin' : 'user'}`,
+        'Could not load wallet. Try flizy link CODE from the dashboard.',
       ].join('\n')
     );
   }
+}
+
+function phoneFromUser(user, account) {
+  return user?.phone || account?.phone || '';
 }
 
 async function handleDeposit(message, user, account) {
@@ -633,14 +674,15 @@ async function handleDeposit(message, user, account) {
     '',
   ];
   try {
-    if (account?.id) {
-      const acc = await ensureAgentWallet(account.id);
+    const acc = await resolveLinkedSiteAccount(user.phone, account);
+    if (acc?.agent_wallet_address) {
       lines.push(`Your agent wallet: ${acc.agent_wallet_address}`);
       lines.push(explorerAddressUrl(acc.agent_wallet_address));
       const bal = await provider.getBalance(acc.agent_wallet_address);
       lines.push(`Balance: ${formatEth(ethers.formatEther(bal))} ETH`);
     } else {
-      lines.push('Link your site account first: flizy link CODE');
+      lines.push(`Link your site account first: ${config.siteUrl}/dashboard`);
+      lines.push('Then: flizy link CODE');
     }
   } catch {
     lines.push('Could not load agent wallet. Try flizy me');
@@ -659,9 +701,16 @@ async function handleDeposit(message, user, account) {
 
 async function handleBalance(message, user, account) {
   try {
-    let acc = account;
-    if (acc?.id) {
-      acc = await ensureAgentWallet(acc.id);
+    const acc = await resolveLinkedSiteAccount(user.phone, account);
+    if (!acc) {
+      await message.reply(
+        [
+          'Link your site account to see your permanent agent wallet.',
+          `Site: ${config.siteUrl}/dashboard`,
+          'Generate a code, then: flizy link CODE',
+        ].join('\n')
+      );
+      return;
     }
     const credit = formatEth(acc?.balance_eth != null ? acc.balance_eth : user.balance_eth);
     let holdings = null;
@@ -847,14 +896,16 @@ async function handleCredit(message, adminUser, targetPhone, amountEth) {
 }
 
 async function handleSend(message, user, phone, amountEth, toRaw, isAddress, account) {
-  if (!account?.id) {
+  // Always spend from the permanent site-linked agent wallet (not a bot-only orphan).
+  const siteAcc = await resolveLinkedSiteAccount(phone, account);
+  if (!siteAcc?.id) {
     await message.reply(
       `Link your site account first.\nOpen ${config.siteUrl}/dashboard and send flizy link CODE`
     );
     return;
   }
 
-  const resolved = await resolveSendTarget(phone, toRaw, isAddress, account.id);
+  const resolved = await resolveSendTarget(phone, toRaw, isAddress, siteAcc.id);
   if (resolved.error) {
     await message.reply(resolved.error);
     return;
@@ -864,7 +915,7 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, acc
 
   // Trusted allowlist (site or flizy add wallet)
   if (config.enforceTrusted) {
-    const ok = await isTrustedAddress(account.id, checksumTo);
+    const ok = await isTrustedAddress(siteAcc.id, checksumTo);
     if (!ok) {
       await message.reply(rejectUntrustedMessage());
       return;
@@ -907,7 +958,7 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, acc
 
   let fromAddress;
   try {
-    const acc = await ensureAgentWallet(account.id);
+    const acc = await ensureAgentWallet(siteAcc.id);
     fromAddress = ethers.getAddress(acc.agent_wallet_address);
     const balanceWei = await provider.getBalance(fromAddress);
     const gasBuffer = ethers.parseEther(GAS_BUFFER_ETH);
@@ -933,7 +984,7 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, acc
   pendingSends.set(phone, {
     amountEth,
     to: checksumTo,
-    fromAccountId: account.id,
+    fromAccountId: siteAcc.id,
     fromAddress,
     createdAt: Date.now(),
   });
