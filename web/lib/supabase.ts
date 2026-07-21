@@ -23,7 +23,10 @@ export function getSupabase(): SupabaseClient {
 export function getSiteConfig() {
   return {
     botWhatsAppNumber: process.env.BOT_WHATSAPP_NUMBER || '',
-    siteUrl: (process.env.SITE_URL || 'http://localhost:3000').replace(/\/$/, ''),
+    siteUrl: (process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://flizy.vercel.app').replace(
+      /\/$/,
+      ''
+    ),
     linkCodeTtlMs: Number(process.env.LINK_CODE_TTL_MS || 10 * 60 * 1000),
   };
 }

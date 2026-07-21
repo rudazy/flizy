@@ -4,11 +4,12 @@ import { SiteFooter } from '../components/SiteFooter';
 import './globals.css';
 
 function siteOrigin() {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'http://localhost:3000';
+  const raw =
+    process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://flizy.vercel.app';
   try {
     return new URL(raw).origin;
   } catch {
-    return 'http://localhost:3000';
+    return 'https://flizy.vercel.app';
   }
 }
 
