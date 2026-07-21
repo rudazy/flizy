@@ -63,8 +63,19 @@ let botWhatsAppNumber = config.botWhatsAppNumber || '';
 // ---------------------------------------------------------------------------
 
 /**
+ * Chat id to send into (works when getChat() is broken — common with LID / WA Web).
+ * @param {import('whatsapp-web.js').Message} message
+ */
+function resolveOutboundChatId(message) {
+  if (message.fromMe) {
+    return message.to || message.from || null;
+  }
+  return message.from || message.to || null;
+}
+
+/**
  * Reply and remember body so fromMe echo is not treated as user input.
- * Prefer reply(); fall back to chat.sendMessage for some new contacts.
+ * Prefer reply(); never depend only on getChat (it often throws "n" on current WA Web).
  * @param {import('whatsapp-web.js').Message} message
  * @param {string} phone
  * @param {string} text
@@ -72,13 +83,35 @@ let botWhatsAppNumber = config.botWhatsAppNumber || '';
 async function botReply(message, phone, text) {
   const body = String(text);
   lastBotOutbound.set(phone, { body: body.trim(), at: Date.now() });
+
   try {
     return await message.reply(body);
   } catch (err) {
-    console.warn('message.reply failed, using chat.sendMessage:', err.message);
-    const chat = await message.getChat();
-    return chat.sendMessage(body);
+    console.warn('message.reply failed:', err && err.message ? err.message : err);
   }
+
+  const chatId = resolveOutboundChatId(message);
+  if (chatId && !isBlockedChatId(chatId)) {
+    try {
+      return await client.sendMessage(chatId, body);
+    } catch (err) {
+      console.warn('client.sendMessage failed:', err && err.message ? err.message : err);
+    }
+  }
+
+  try {
+    const chat = await message.getChat();
+    return await chat.sendMessage(body);
+  } catch (err) {
+    console.error(
+      'botReply all methods failed phone=',
+      phone,
+      'chatId=',
+      chatId,
+      err && err.message ? err.message : err
+    );
+  }
+  return null;
 }
 
 /**
@@ -1367,6 +1400,9 @@ function isBlockedChatId(chatId) {
  *  - Anyone messaging the bot number (fromMe=false) — this is how friends use Flizy
  *  - Message yourself only when operator tests on the same phone (fromMe=true)
  * Block groups, status, newsletters, and fromMe in other contacts' chats.
+ *
+ * getChat() often throws a bare "n" on current WhatsApp Web / LID chats — never
+ * require it for allow/deny of inbound friends, and allow self-chat without it.
  */
 async function isAllowedBotChat(message) {
   const chatId = message.fromMe ? message.to || message.from : message.from;
@@ -1375,34 +1411,53 @@ async function isAllowedBotChat(message) {
     return false;
   }
 
+  // Friends / other phones messaging the bot — do not call getChat first
+  if (!message.fromMe) {
+    if (String(chatId || '').includes('@g.us')) {
+      console.log(`[skip] group chat id ${chatId}`);
+      return false;
+    }
+    return true;
+  }
+
+  // fromMe: operator Message yourself only (never reply into other people's chats)
+  const botUser = normalizePhone(client.info?.wid?.user || botWhatsAppNumber || '');
+  const peer = peerPhone(message);
+  const idStr = String(chatId || '');
+  const fromN = normalizePhone(message.from);
+  const toN = normalizePhone(message.to);
+
+  // Classic Message yourself: from and to are the same account
+  if (fromN && toN && fromN === toN) {
+    return true;
+  }
+
+  const isSelfById =
+    (botUser && peer === botUser) ||
+    (botUser && idStr.includes(botUser)) ||
+    (botUser && fromN === botUser) ||
+    (botUser && toN === botUser);
+
+  if (isSelfById) {
+    return true;
+  }
+
   try {
     const chat = await message.getChat();
     if (chat.isGroup) {
       console.log(`[skip] group chat`);
       return false;
     }
-
-    // Friends / other phones messaging the bot WhatsApp number
-    if (!message.fromMe) {
-      return true;
-    }
-
-    // Outgoing: only Message yourself (operator testing), never hijack normal chats
     const title = `${chat.name || ''} ${chat.formattedTitle || ''}`.toLowerCase();
-    const botUser = normalizePhone(client.info?.wid?.user || botWhatsAppNumber || '');
-    const peer = peerPhone(message);
     const serialized = String(chat.id?._serialized || chat.id || '');
-
     const isSelfByName =
       title.includes('yourself') ||
       title.includes('(you)') ||
       title.includes('message yourself') ||
       /\byou\b/.test(title);
+    const isSelfBySerialized = botUser && serialized.includes(botUser);
 
-    const isSelfById =
-      (botUser && peer === botUser) || (botUser && serialized.includes(botUser));
-
-    if (isSelfByName || isSelfById) {
+    if (isSelfByName || isSelfBySerialized) {
       return true;
     }
 
@@ -1411,9 +1466,19 @@ async function isAllowedBotChat(message) {
     );
     return false;
   } catch (err) {
-    // If chat inspect fails: still allow inbound (friends); block ambiguous fromMe
-    console.warn('getChat failed:', err.message);
-    return !message.fromMe;
+    // getChat broken: still allow Message yourself if peer looks like our bot line
+    console.warn('getChat failed (fromMe):', err && err.message ? err.message : err);
+    if (botUser && peer && (peer === botUser || idStr.includes(botUser))) {
+      return true;
+    }
+    // Last resort for operator testing on linked device: allow short self-chat peers
+    // only when BOT_ALLOW_SELF_ON_GETCHAT_FAIL=1
+    if (process.env.BOT_ALLOW_SELF_ON_GETCHAT_FAIL === '1') {
+      console.warn('[allow] fromMe self fallback (BOT_ALLOW_SELF_ON_GETCHAT_FAIL=1) peer=', peer);
+      return true;
+    }
+    console.log(`[skip] fromMe getChat failed and peer not bot peer=${peer} chatId=${idStr}`);
+    return false;
   }
 }
 
@@ -1540,13 +1605,22 @@ async function handleIncomingMessage(message) {
     const earlyLink = parseLinkCommand(text);
     if (earlyLink) {
       try {
+        console.log(`[link] attempt phone=${phone} code=${earlyLink.code}`);
         const result = await consumeLinkCode(phone, earlyLink.code);
         if (!result.ok) {
           if (result.reason === 'expired') {
-            await message.reply('That link code expired. Generate a new one on the Flizy site.');
+            await botReply(
+              message,
+              phone,
+              'That link code expired. Generate a new one on the Flizy site.'
+            );
             return;
           }
-          await message.reply('Invalid link code. Open the Flizy site and generate a fresh link.');
+          await botReply(
+            message,
+            phone,
+            'Invalid link code. Open the Flizy site and generate a fresh link.'
+          );
           return;
         }
         // Ensure legacy users row + agent wallet on the site account
@@ -1563,6 +1637,9 @@ async function handleIncomingMessage(message) {
           })
           .eq('phone', phone);
 
+        console.log(
+          `[link] ok phone=${phone} account=${acc.id} wallet=${acc.agent_wallet_address}`
+        );
         await botReply(
           message,
           phone,
@@ -1589,7 +1666,7 @@ async function handleIncomingMessage(message) {
         );
       } catch (err) {
         console.error('link error:', publicErrorMessage(err));
-        await message.reply('Could not link right now. Try a new code from the site.');
+        await botReply(message, phone, 'Could not link right now. Try a new code from the site.');
       }
       return;
     }
