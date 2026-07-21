@@ -1,0 +1,43 @@
+# Secrets and local env (never commit)
+.env
+.env.local
+.env.*.local
+web/.env
+web/.env.local
+**/.env
+**/.env.local
+
+# Dependencies and build
+node_modules/
+web/node_modules/
+web/.next/
+.next/
+dist/
+out/
+
+# WhatsApp Web.js session (contains browser profile / auth)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Supabase local temp / link state (keep migrations + config.toml)
+supabase/.temp/
+supabase/.branches/
+
+# Agent session notes / local task logs
+tasks/
+
+# Logs / OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Optional local contracts build artifacts
+contracts/out/
+contracts/cache/
+contracts/lib/

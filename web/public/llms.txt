@@ -1,0 +1,19 @@
+# Flizy
+
+> WhatsApp-native EVM wallet. Trusted sends. GIWA-first.
+
+## Site
+
+- / : Product home and four-step overview
+- /how-it-works : Full user guide and commands
+- /docs : Why trusted addresses exist (security)
+- /signup : Create account
+- /login : Sign in
+- /dashboard : Wallet, PIN, trusted people, WhatsApp link code
+- /claim/:token : Claim funds waiting for non-users
+
+## When to read
+
+- Read /how-it-works to onboard a human user.
+- Read /docs when a WhatsApp send is rejected for destination policy.
+- Read /dashboard flows for link codes and trusted address management.

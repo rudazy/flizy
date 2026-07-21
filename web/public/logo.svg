@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" fill="none">
+  <rect x="0" y="4" width="32" height="32" rx="7" fill="#0b0a09" stroke="#2a241e"/>
+  <path d="M8 10h16v5H13v3.5h10v5H13v7.5H8V10z" fill="#e0b84a"/>
+  <circle cx="26" cy="28" r="2.5" fill="#c4893f"/>
+  <text x="44" y="27" font-family="ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="600" letter-spacing="0.14em" fill="#f2ebe1">FLIZY</text>
+</svg>

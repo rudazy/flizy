@@ -1,0 +1,3 @@
+# Flizy monorepo root
+
+Site llms.txt is served from web/public/llms.txt when the Next app is deployed.

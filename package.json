@@ -1,0 +1,26 @@
+{
+  "name": "flizy",
+  "version": "0.1.0",
+  "description": "WhatsApp-native crypto wallet and trading agent (GIWA-first EVM)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "web:start": "npm --prefix web run start",
+    "db:push": "npx supabase db push",
+    "db:link": "npx supabase link",
+    "link:create": "node scripts/create-link.js"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.3",
+    "dotenv": "^17.4.2",
+    "ethers": "^6.17.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.7"
+  }
+}

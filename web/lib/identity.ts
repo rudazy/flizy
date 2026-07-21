@@ -1,0 +1,23 @@
+import crypto from 'crypto';
+import { getSiteConfig, getSupabase } from './supabase';
+
+export async function createLinkCode(accountId: string) {
+  const supabase = getSupabase();
+  const { linkCodeTtlMs, botWhatsAppNumber } = getSiteConfig();
+  const code = crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 8);
+  const expiresAt = new Date(Date.now() + linkCodeTtlMs).toISOString();
+
+  const { error } = await supabase.from('link_codes').insert({
+    account_id: accountId,
+    code,
+    expires_at: expiresAt,
+  });
+  if (error) throw new Error(error.message);
+
+  const prefill = encodeURIComponent(`flizy link ${code}`);
+  const waDeepLink = botWhatsAppNumber
+    ? `https://wa.me/${botWhatsAppNumber}?text=${prefill}`
+    : `https://wa.me/?text=${prefill}`;
+
+  return { code, expiresAt, waDeepLink };
+}
