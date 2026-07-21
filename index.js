@@ -48,11 +48,54 @@ const pendingSends = new Map();
 /** @type {Map<string, { address: string, createdAt: number }>} */
 const pendingWalletAdds = new Map();
 
+/**
+ * Last bot outbound body per chat (Message yourself treats bot replies as fromMe).
+ * Used to ignore our own echoes so "name" prompt is not saved as the label.
+ * @type {Map<string, { body: string, at: number }>}
+ */
+const lastBotOutbound = new Map();
+
 let botWhatsAppNumber = config.botWhatsAppNumber || '';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Reply and remember body so fromMe echo is not treated as user input.
+ * Prefer reply(); fall back to chat.sendMessage for some new contacts.
+ * @param {import('whatsapp-web.js').Message} message
+ * @param {string} phone
+ * @param {string} text
+ */
+async function botReply(message, phone, text) {
+  const body = String(text);
+  lastBotOutbound.set(phone, { body: body.trim(), at: Date.now() });
+  try {
+    return await message.reply(body);
+  } catch (err) {
+    console.warn('message.reply failed, using chat.sendMessage:', err.message);
+    const chat = await message.getChat();
+    return chat.sendMessage(body);
+  }
+}
+
+/**
+ * True if this fromMe message is the bot's own recent reply (echo).
+ */
+function isBotEcho(phone, rawText, fromMe) {
+  if (!fromMe) return false;
+  const last = lastBotOutbound.get(phone);
+  if (!last) return false;
+  if (Date.now() - last.at > 20000) return false;
+  const a = String(rawText || '').trim();
+  const b = String(last.body || '').trim();
+  if (!a || !b) return false;
+  if (a === b) return true;
+  // Multi-line prompt: match first line
+  if (a.split(/\r?\n/)[0] === b.split(/\r?\n/)[0] && b.includes('\n')) return true;
+  return false;
+}
 
 function explorerTxUrl(hash) {
   return chainTxUrl(chain, hash);
@@ -1080,15 +1123,32 @@ async function handleLink(message, phone, code) {
       await message.reply('Invalid link code. Open the Flizy site and generate a fresh link.');
       return;
     }
-    await message.reply(
+    const acc = result.account?.id
+      ? await ensureAgentWallet(result.account.id)
+      : result.account;
+    await botReply(
+      message,
+      phone,
       [
-        'WhatsApp linked.',
-        `Account: ${result.account?.id || 'ok'}`,
-        `Sender id: ${phone}`,
+        'WhatsApp connected to Flizy.',
         '',
-        'You can use Flizy commands in this chat now.',
-        'Type help for the list.',
-      ].join('\n')
+        'Your Flizy account',
+        acc?.email ? `Email: ${acc.email}` : null,
+        acc?.display_name ? `Name: ${acc.display_name}` : null,
+        `Agent wallet: ${acc?.agent_wallet_address || 'pending'}`,
+        `WhatsApp id: ${phone}`,
+        '',
+        'Commands',
+        '  flizy me',
+        '  flizy balance',
+        '  flizy add wallet 0x...',
+        '  flizy send 0.0001 to john',
+        '  confirm',
+        '',
+        'Reply with flizy me to confirm.',
+      ]
+        .filter(Boolean)
+        .join('\n')
     );
   } catch (err) {
     console.error('link error:', publicErrorMessage(err));
@@ -1214,12 +1274,12 @@ client.on('ready', async () => {
 
   console.log('Flizy bot is ready!');
   console.log('');
-  console.log('=== How to call the bot ===');
-  console.log(`  Bot number: +${botWhatsAppNumber}`);
-  console.log('  A) Open WhatsApp → "Message yourself" (Bro / You) → type: help');
-  console.log(`  B) From another phone, message +${botWhatsAppNumber} → type: help`);
-  console.log('  Do NOT type Flizy commands inside other contacts\' chats.');
-  console.log('  Watch this window for lines starting with [msg] when it works.');
+  console.log('=== Multi-user model ===');
+  console.log(`  Bot WhatsApp (one account for everyone): +${botWhatsAppNumber}`);
+  console.log('  Friends must message THAT number (via site Dashboard → Open WhatsApp).');
+  console.log('  Message yourself is ONLY for you testing on the bot phone.');
+  console.log('  Each user is identified by their own WhatsApp id (not the bot number).');
+  console.log('  Watch for [msg] fromMe=false when a friend messages you.');
   console.log('');
   if (ADMIN_PHONES.size === 0) {
     console.warn('Tip: claimadmin <secret> in WhatsApp if you are not admin yet.');
@@ -1253,13 +1313,9 @@ function isBlockedChatId(chatId) {
 
 /**
  * Allow:
- *  - inbound 1:1 chats (friends messaging the bot number)
- *  - Message yourself / notes-to-self (fromMe)
- * Block groups, status, newsletters.
- *
- * Non-commands are already filtered before this runs, so casual texts never
- * get bot replies. fromMe Flizy commands are allowed in self-chat and also
- * as a fallback when WhatsApp labels Message yourself oddly (e.g. "Bro (You)").
+ *  - Anyone messaging the bot number (fromMe=false) — this is how friends use Flizy
+ *  - Message yourself only when operator tests on the same phone (fromMe=true)
+ * Block groups, status, newsletters, and fromMe in other contacts' chats.
  */
 async function isAllowedBotChat(message) {
   const chatId = message.fromMe ? message.to || message.from : message.from;
@@ -1275,12 +1331,12 @@ async function isAllowedBotChat(message) {
       return false;
     }
 
+    // Friends / other phones messaging the bot WhatsApp number
     if (!message.fromMe) {
-      // Anyone who messages the bot number (main multi-user path)
       return true;
     }
 
-    // fromMe: prefer self-chat detection, but do not hard-fail Message yourself
+    // Outgoing: only Message yourself (operator testing), never hijack normal chats
     const title = `${chat.name || ''} ${chat.formattedTitle || ''}`.toLowerCase();
     const botUser = normalizePhone(client.info?.wid?.user || botWhatsAppNumber || '');
     const peer = peerPhone(message);
@@ -1289,28 +1345,24 @@ async function isAllowedBotChat(message) {
     const isSelfByName =
       title.includes('yourself') ||
       title.includes('(you)') ||
-      title.includes(' message yourself') ||
-      /(^|\s)you(\s|$)/.test(title) ||
-      title.trim() === 'you';
+      title.includes('message yourself') ||
+      /\byou\b/.test(title);
 
     const isSelfById =
-      (botUser && peer === botUser) ||
-      (botUser && serialized.includes(botUser));
+      (botUser && peer === botUser) || (botUser && serialized.includes(botUser));
 
     if (isSelfByName || isSelfById) {
       return true;
     }
 
-    // Fallback: Message yourself often has a custom profile name ("Bro") and a
-    // LID peer that is NOT the E.164 bot number. Allow Flizy commands here so
-    // testing works; random non-commands never reach this function.
     console.log(
-      `[allow fromMe] treating as self/test chat title=${JSON.stringify(title)} peer=${peer}`
+      `[skip] fromMe outside Message yourself title=${JSON.stringify(chat.name)} peer=${peer}`
     );
-    return true;
+    return false;
   } catch (err) {
-    console.warn('getChat failed; allowing command anyway:', err.message);
-    return true;
+    // If chat inspect fails: still allow inbound (friends); block ambiguous fromMe
+    console.warn('getChat failed:', err.message);
+    return !message.fromMe;
   }
 }
 
@@ -1328,6 +1380,12 @@ async function handleIncomingMessage(message) {
     if (!phone || phone === 'status' || phone.length < 6) return;
 
     if (phone.startsWith('120363') && String(message.from || '').includes('@g.us')) {
+      return;
+    }
+
+    // Message yourself: bot replies are also fromMe — never treat them as user input
+    if (isBotEcho(phone, rawText, message.fromMe)) {
+      console.log(`[skip] bot echo phone=${phone}`);
       return;
     }
 
@@ -1360,7 +1418,9 @@ async function handleIncomingMessage(message) {
     }
 
     console.log(
-      `[msg] fromMe=${Boolean(message.fromMe)} phone=${phone} body=${JSON.stringify(rawText.slice(0, 120))}`
+      `[msg] fromMe=${Boolean(message.fromMe)} phone=${phone} body=${JSON.stringify(rawText.slice(0, 120))}${
+        message.fromMe ? ' (Message yourself / outbound)' : ' (friend or inbound to bot number)'
+      }`
     );
 
     // Finish "flizy add wallet" name step (bare reply like "john" is allowed)
@@ -1370,7 +1430,19 @@ async function handleIncomingMessage(message) {
 
       if (isCancelCommand(nameCandidate)) {
         pendingWalletAdds.delete(phone);
-        await message.reply('Cancelled.');
+        await botReply(message, phone, 'Cancelled.');
+        return;
+      }
+
+      // Never treat our own prompt text as a label
+      const lower = nameCandidate.trim().toLowerCase();
+      if (
+        lower === 'name' ||
+        lower.startsWith('send a name for this wallet') ||
+        lower.startsWith('added ') ||
+        lower.startsWith('type your own label')
+      ) {
+        console.log(`[skip] ignore prompt-like name phone=${phone}`);
         return;
       }
 
@@ -1386,8 +1458,11 @@ async function handleIncomingMessage(message) {
         isConfirmCommand(nameCandidate);
 
       if (!looksLikeNewCommand) {
-        if (!isValidTrustedName(nameCandidate)) {
-          await message.reply(
+        const chosen = nameCandidate.trim();
+        if (!isValidTrustedName(chosen)) {
+          await botReply(
+            message,
+            phone,
             'Name must start with a letter (a-z), then letters/numbers/_ only.\nExample: john\nOr: cancel'
           );
           return;
@@ -1396,13 +1471,13 @@ async function handleIncomingMessage(message) {
           const bridged = await getOrCreateAccountForSender(phone);
           const account = await ensureAgentWallet(bridged.account.id);
           await getOrCreateUser(phone);
-          await addTrusted(account.id, pendingAdd.address, nameCandidate.toLowerCase());
+          await addTrusted(account.id, pendingAdd.address, chosen.toLowerCase());
           pendingWalletAdds.delete(phone);
-          await message.reply(`added ${nameCandidate.toLowerCase()} \u2705`);
+          await botReply(message, phone, `added ${chosen.toLowerCase()} \u2705`);
         } catch (err) {
           console.error('add wallet name step:', publicErrorMessage(err));
           pendingWalletAdds.delete(phone);
-          await message.reply('Could not add wallet. Try again.');
+          await botReply(message, phone, 'Could not add wallet. Try again.');
         }
         return;
       }
@@ -1437,21 +1512,29 @@ async function handleIncomingMessage(message) {
           })
           .eq('phone', phone);
 
-        await message.reply(
+        await botReply(
+          message,
+          phone,
           [
-            'WhatsApp linked to your Flizy site account.',
+            'WhatsApp connected to Flizy.',
             '',
-            formatAccountWalletCard(acc, chain),
+            'Your Flizy account',
+            acc.email ? `Email: ${acc.email}` : null,
+            acc.display_name ? `Name: ${acc.display_name}` : null,
+            `Agent wallet: ${acc.agent_wallet_address || 'pending'}`,
             `WhatsApp id: ${phone}`,
             '',
-            'Next:',
-            '  flizy unlock <pin>   (if you set a PIN on the site)',
+            'Commands',
             '  flizy me',
             '  flizy balance',
-            '  flizy send 0.0001 to <trusted-name>',
+            '  flizy add wallet 0x...',
+            '  flizy send 0.0001 to john',
+            '  confirm',
             '',
-            `Trusted names: ${config.siteUrl}/dashboard`,
-          ].join('\n')
+            'Reply with flizy me to confirm.',
+          ]
+            .filter(Boolean)
+            .join('\n')
         );
       } catch (err) {
         console.error('link error:', publicErrorMessage(err));
@@ -1572,7 +1655,19 @@ async function handleIncomingMessage(message) {
       const checksum = ethers.getAddress(addWalletCmd.address);
       pendingSends.delete(phone);
       pendingWalletAdds.set(phone, { address: checksum, createdAt: Date.now() });
-      await message.reply('name');
+      // Prompt the USER for a label. Do not use a one-word reply like "name"
+      // (in Message yourself that echo was treated as the label).
+      await botReply(
+        message,
+        phone,
+        [
+          'What should we call this wallet?',
+          `Address: ${shortAddress(checksum)}`,
+          '',
+          'Reply with ONE word you choose (example: john)',
+          'Or: cancel',
+        ].join('\n')
+      );
       return;
     }
 
@@ -1625,12 +1720,31 @@ async function handleIncomingMessage(message) {
   }
 }
 
+/** Dedupe message / message_create double-fires */
+const seenMessageIds = new Set();
+function alreadyHandled(message) {
+  const id =
+    (message.id && message.id._serialized) ||
+    (message.id && message.id.id) ||
+    null;
+  if (!id) return false;
+  if (seenMessageIds.has(id)) return true;
+  seenMessageIds.add(id);
+  if (seenMessageIds.size > 800) {
+    seenMessageIds.clear();
+  }
+  return false;
+}
+
+// Inbound from friends (and some self events)
 client.on('message', (message) => {
+  if (alreadyHandled(message)) return;
   handleIncomingMessage(message);
 });
 
+// message_create: catches Message yourself (fromMe) + some inbound that "message" misses
 client.on('message_create', (message) => {
-  if (!message.fromMe) return;
+  if (alreadyHandled(message)) return;
   handleIncomingMessage(message);
 });
 

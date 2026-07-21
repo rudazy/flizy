@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { GIWA_BRIDGE_URL, GIWA_FAUCET_URL } from '../lib/botPublic';
 
-/** Display-only dial codes (educational). Not a real phone directory. */
 const COUNTRY_CODES = [
   { code: '+44', label: 'United Kingdom' },
   { code: '+1', label: 'United States / Canada' },
@@ -23,29 +22,45 @@ const COUNTRY_CODES = [
 ] as const;
 
 /**
- * Clean how-to block. Does not publish the operator's real WhatsApp number.
- * Country code picker is for understanding international format only.
+ * Clean multi-user guide. One shared bot WhatsApp; each user is a different chat.
  */
 export function HowToCallBot({ compact = false }: { compact?: boolean }) {
   const [dial, setDial] = useState('+44');
-
   const sampleDisplay = useMemo(() => `${dial}  ••• ••• ••••`, [dial]);
 
   return (
     <section className={compact ? 'space-y-5' : 'card space-y-6 p-5 sm:p-8'}>
-      {/* Header */}
       <div className="max-w-2xl">
         <p className="text-xs uppercase tracking-[0.18em] text-gold">How to call the bot</p>
         <h2 className="mt-2 font-sans text-xl tracking-wide text-paper sm:text-2xl">
-          Where to message Flizy
+          One bot. Many users.
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Same steps in every country. You need WhatsApp and a browser. Commands start with{' '}
-          <span className="text-paper">flizy</span>.
+          Flizy uses <span className="text-paper">one WhatsApp account as the bot</span>. Everyone
+          (you and your friends) messages that same bot. Each person is recognized by{' '}
+          <span className="text-paper">their own WhatsApp id</span>, not by sharing your phone.
         </p>
       </div>
 
-      {/* Number row: country code + masked sample (not a real line) */}
+      <div className="rounded border border-border bg-ink/50 p-4 text-sm leading-relaxed text-muted">
+        <p className="font-sans text-paper">If a friend signs up</p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>They create an account on this website (their email).</li>
+          <li>
+            On <span className="text-paper">their phone</span>, they open Dashboard → WhatsApp link
+            → Generate code → <span className="text-paper">Open WhatsApp</span>.
+          </li>
+          <li>They send the link message from their WhatsApp to the bot.</li>
+          <li>
+            The bot replies <span className="text-paper">in their chat</span> (not in yours).
+          </li>
+        </ol>
+        <p className="mt-3 text-xs">
+          Message yourself is only for the person who runs the bot on that phone. Friends must use
+          Open WhatsApp from the dashboard on their own device.
+        </p>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-[minmax(0,11rem)_1fr]">
         <div>
           <label className="label" htmlFor="dial-code">
@@ -65,37 +80,35 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
           </select>
         </div>
         <div>
-          <p className="label">Bot chat (example format)</p>
+          <label className="label">Number format (example only)</label>
           <div className="mono-box flex min-h-[44px] items-center text-base text-lime sm:text-lg">
             {sampleDisplay}
           </div>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
-            Example only. Your real bot chat opens from the dashboard after signup (number is not
-            listed on this public page).
+            Example format for any country. The live bot number is not shown on the public site.
+            Users open the bot from the dashboard after signup.
           </p>
         </div>
       </div>
 
-      {/* A / B / ! — single column, clear like the original */}
       <div className="space-y-4 border-t border-border pt-5">
         <div className="flex gap-3 sm:gap-4">
           <span className="w-5 shrink-0 font-sans text-lime">A</span>
           <div className="min-w-0">
-            <p className="text-sm text-paper">From your phone (any country)</p>
+            <p className="text-sm text-paper">Any user (recommended)</p>
             <p className="mt-1 text-sm leading-relaxed text-muted">
-              Sign up → Dashboard → WhatsApp link → <span className="text-paper">Open WhatsApp</span>.
-              That opens the bot chat for you. Then type{' '}
-              <span className="text-lime">flizy help</span>.
+              Sign up → Dashboard → WhatsApp link → Open WhatsApp → send the code. Chat stays between
+              that user and the bot.
             </p>
           </div>
         </div>
         <div className="flex gap-3 sm:gap-4">
           <span className="w-5 shrink-0 font-sans text-lime">B</span>
           <div className="min-w-0">
-            <p className="text-sm text-paper">If you host the bot on this device</p>
+            <p className="text-sm text-paper">Bot operator only</p>
             <p className="mt-1 text-sm leading-relaxed text-muted">
-              WhatsApp → <span className="text-paper">Message yourself</span>, then type{' '}
-              <span className="text-lime">flizy help</span>.
+              If this phone hosts the bot, you can test in Message yourself. Friends should not use
+              that — they use A on their own phones.
             </p>
           </div>
         </div>
@@ -104,13 +117,12 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
           <div className="min-w-0">
             <p className="text-sm text-paper">Do not</p>
             <p className="mt-1 text-sm leading-relaxed text-muted">
-              Type Flizy commands inside other people&apos;s chats or groups.
+              Type Flizy commands inside random contacts or groups. Only the bot chat counts.
             </p>
           </div>
         </div>
       </div>
 
-      {/* CTAs */}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Link href="/signup" className="btn btn-primary w-full justify-center sm:w-auto">
           Create account
@@ -120,15 +132,13 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
         </Link>
       </div>
 
-      {/* Fund — tight two cards */}
       <div className="border-t border-border pt-6">
         <p className="text-xs uppercase tracking-[0.18em] text-gold">Get test ETH</p>
         <h3 className="mt-2 font-sans text-base tracking-wide text-paper sm:text-lg">
           Fund your agent wallet
         </h3>
         <p className="mt-2 text-sm text-muted">
-          Copy your agent address from the dashboard, then use a faucet and/or bridge to GIWA
-          Sepolia.
+          Copy your agent address from the dashboard. Sends leave from that wallet.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <a
@@ -174,7 +184,6 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
 
-      {/* Commands — compact grid */}
       {!compact ? (
         <div className="border-t border-border pt-6">
           <p className="text-xs text-muted">Quick commands</p>
@@ -192,9 +201,6 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-muted">
-            After a pending send, bare <span className="text-paper">confirm</span> works too.
-          </p>
         </div>
       ) : null}
     </section>
