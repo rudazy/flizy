@@ -9,6 +9,10 @@ export async function GET(_req: Request, ctx: { params: { token: string } }) {
       amount_eth: claim.amount_eth,
       status: claim.status,
       chain_id: claim.chain_id,
+      // Do not expose full phone; optional masked later
+      to_wa_hint: claim.to_wa_hint
+        ? `…${String(claim.to_wa_hint).slice(-4)}`
+        : undefined,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Claim failed';

@@ -6,9 +6,12 @@ import { useParams } from 'next/navigation';
 export default function ClaimPage() {
   const params = useParams();
   const token = String(params.token || '');
-  const [data, setData] = useState<{ amount_eth?: string; status?: string; error?: string } | null>(
-    null
-  );
+  const [data, setData] = useState<{
+    amount_eth?: string;
+    status?: string;
+    error?: string;
+    to_wa_hint?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -30,11 +33,28 @@ export default function ClaimPage() {
           </p>
           <p className="text-muted">Status: {data.status}</p>
           <p className="text-muted">
-            Create a Flizy account and link WhatsApp to claim. This is the viral loop for non-users.
+            Funds are reserved for a specific WhatsApp number. They only unlock after that WhatsApp
+            is linked to a Flizy account (not email signup alone).
           </p>
-          <a href="/signup" className="btn btn-primary no-underline">
-            Signup to claim
-          </a>
+          {data.status === 'pending' ? (
+            <>
+              <p className="text-muted">
+                1. Create or log in to your Flizy account
+                <br />
+                2. Link WhatsApp from the dashboard
+                <br />
+                3. Message the bot: <span className="text-paper">flizy claim</span>
+              </p>
+              <a href="/signup" className="btn btn-primary no-underline">
+                Signup
+              </a>
+              <a href="/login" className="btn btn-ghost no-underline">
+                Log in
+              </a>
+            </>
+          ) : (
+            <p className="text-muted">This claim is {data.status}.</p>
+          )}
         </div>
       ) : null}
     </div>

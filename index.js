@@ -17,7 +17,13 @@ const {
 const { stripFlizyPrefix, parseUnlockCommand, parseLockCommand } = require('./lib/prefix');
 const { isSessionUnlocked, unlockWithPin, touchSession, lockSession } = require('./lib/session');
 const { addTrusted } = require('./lib/trusted');
-const { createClaim } = require('./lib/claims');
+const {
+  normalizeWaHint,
+  isPlausiblePhone,
+  listOutgoingPending,
+  listIncomingPending,
+  formatClaimsMenu,
+} = require('./lib/claims');
 const {
   ensureAgentWallet,
   formatAccountWalletCard,
@@ -29,7 +35,12 @@ const {
   buildSendPlan,
   formatPlanPreview,
   assertPlanFunded,
+  buildClaimPlan,
+  formatClaimPlanPreview,
   executeNativeSend,
+  executeClaimHold,
+  executeClaimRefund,
+  executeClaimPayout,
   formatSendReceipt,
 } = require('./lib/engine');
 
@@ -55,6 +66,12 @@ const pendingSends = new Map();
 
 /** @type {Map<string, { address: string, createdAt: number }>} */
 const pendingWalletAdds = new Map();
+
+/**
+ * Interactive claim menus: cancel outgoing or claim incoming.
+ * @type {Map<string, { mode: 'cancel'|'claim', claims: object[], createdAt: number }>}
+ */
+const pendingClaimMenus = new Map();
 
 /**
  * Last bot outbound body per chat (Message yourself treats bot replies as fromMe).
@@ -163,21 +180,54 @@ function formatEth(value) {
 }
 
 /**
- * send 0.01 to 0x...  |  send 0.01 to ama
- * @returns {{ amountEth: string, toRaw: string, isAddress: boolean } | null}
+ * send 0.01 to 0x... | send 0.01 to ama | send 0.01 to 2348012345678
+ * @returns {{ amountEth: string, toRaw: string, isAddress: boolean, isPhone: boolean } | null}
  */
 function parseSendCommand(text) {
   const addr = text.match(
     /send\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+to\s+(0x[a-fA-F0-9]{40})\b/i
   );
   if (addr) {
-    return { amountEth: addr[1], toRaw: addr[2], isAddress: true };
+    return { amountEth: addr[1], toRaw: addr[2], isAddress: true, isPhone: false };
+  }
+  const phone = text.match(
+    /send\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+to\s+(\+?\d{10,15})\b/i
+  );
+  if (phone) {
+    return {
+      amountEth: phone[1],
+      toRaw: phone[2],
+      isAddress: false,
+      isPhone: true,
+    };
   }
   const alias = text.match(
     /send\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+to\s+([a-zA-Z][a-zA-Z0-9_]{0,31})\b/i
   );
   if (alias) {
-    return { amountEth: alias[1], toRaw: alias[2], isAddress: false };
+    return { amountEth: alias[1], toRaw: alias[2], isAddress: false, isPhone: false };
+  }
+  return null;
+}
+
+/** flizy cancel claims | flizy cancel claims 234... | flizy cancel claims all */
+function parseCancelClaimsCommand(text) {
+  const m = String(text || '').trim().match(
+    /^cancel\s+claims?(?:\s+(\+?\d{6,20}|all))?\s*$/i
+  );
+  if (!m) return null;
+  const arg = m[1] ? String(m[1]).toLowerCase() : null;
+  return { filter: arg === 'all' ? null : arg };
+}
+
+/** flizy claims (list outgoing) | flizy claim / flizy claim incoming */
+function parseClaimsListCommand(text) {
+  const t = String(text || '').trim().toLowerCase();
+  if (t === 'claims' || t === 'claim list' || t === 'outgoing claims') {
+    return { kind: 'outgoing' };
+  }
+  if (t === 'claim' || t === 'claim incoming' || t === 'incoming claims' || t === 'my claims') {
+    return { kind: 'incoming' };
   }
   return null;
 }
@@ -231,6 +281,8 @@ function isFlizyCommandBody(body) {
     isConfirmCommand(t) ||
     isCancelCommand(t) ||
     Boolean(parseSendCommand(t)) ||
+    Boolean(parseCancelClaimsCommand(t)) ||
+    Boolean(parseClaimsListCommand(t)) ||
     Boolean(parseCreditCommand(t)) ||
     Boolean(parseClaimAdminCommand(t)) ||
     Boolean(parseSaveContactCommand(t)) ||
@@ -371,6 +423,11 @@ function pruneExpiredPending() {
   for (const [phone, pending] of pendingWalletAdds.entries()) {
     if (now - pending.createdAt > PENDING_TTL_MS) {
       pendingWalletAdds.delete(phone);
+    }
+  }
+  for (const [phone, menu] of pendingClaimMenus.entries()) {
+    if (now - menu.createdAt > PENDING_TTL_MS) {
+      pendingClaimMenus.delete(phone);
     }
   }
 }
@@ -581,8 +638,14 @@ function helpText(user) {
     '  flizy deposit',
     '  flizy add wallet 0x...',
     '  flizy send 0.01 to john',
+    '  flizy send 0.01 to 2348012345678',
     '  confirm',
     '  cancel',
+    '',
+    'Claims (phone not on Flizy yet):',
+    '  flizy send 0.01 to 234…  → hold until they link WA',
+    '  flizy cancel claims       → cancel anytime (1/2/3/All)',
+    '  flizy claim               → receive after you link WA',
     '',
     'Add wallet from chat:',
     '  flizy add wallet 0xYourAddress',
@@ -591,14 +654,14 @@ function helpText(user) {
     '  -> added',
     '',
     'Setup:',
-    '  1) Create account on the site (optional but recommended)',
-    '  2) flizy link CODE  or  flizy add wallet ...',
+    '  1) Create account on the site',
+    '  2) flizy link CODE',
     '  3) flizy send 0.0001 to john',
     '',
     `Site: ${config.siteUrl}`,
     `Chain: ${chain.name} (${chain.chainId})`,
     '',
-    'Testnet. Confirmed sends are irreversible.',
+    'On-chain sends are irreversible. Phone claims are cancellable until claimed.',
   ];
   return lines.join('\n');
 }
@@ -927,10 +990,7 @@ async function handleCredit(message, adminUser, targetPhone, amountEth) {
   }
 }
 
-/**
- * SEND path: Intent → Policy → Plan (preview). Confirm runs Execution + Receipt.
- */
-async function handleSend(message, user, phone, amountEth, toRaw, isAddress, account) {
+async function requireLinkedSite(message, phone, account) {
   const siteAcc = await resolveLinkedSiteAccount(phone, account);
   if (!siteAcc?.id) {
     await botReply(
@@ -943,39 +1003,166 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, acc
         'flizy link CODE',
       ].join('\n')
     );
+    return null;
+  }
+  return siteAcc;
+}
+
+async function actorSessionFlags(user, siteAcc, phone) {
+  let sessionUnlocked = true;
+  if (config.requireUnlock && siteAcc.unlock_pin_hash && !isAdminUser(user)) {
+    sessionUnlocked = await isSessionUnlocked(siteAcc.id, phone);
+  }
+  return {
+    accountId: siteAcc.id,
+    userId: user.id,
+    waSenderId: phone,
+    isAdmin: isAdminUser(user),
+    creditEth: Number(user.balance_eth || 0),
+    sessionUnlocked,
+    hasPin: Boolean(siteAcc.unlock_pin_hash),
+  };
+}
+
+/**
+ * SEND path: trusted/address on-chain OR phone claim hold.
+ */
+async function handleSend(message, user, phone, amountEth, toRaw, isAddress, isPhone, account) {
+  const siteAcc = await requireLinkedSite(message, phone, account);
+  if (!siteAcc) return;
+
+  // --- Phone: claim hold (or direct if that WA already linked) ---
+  if (isPhone) {
+    const toWa = normalizeWaHint(toRaw);
+    if (!isPlausiblePhone(toWa)) {
+      await botReply(
+        message,
+        phone,
+        'Invalid phone. Use country code digits.\nExample: flizy send 0.001 to 2348012345678'
+      );
+      return;
+    }
+    if (toWa === normalizeWaHint(phone)) {
+      await botReply(message, phone, 'You cannot send a claim to your own WhatsApp number.');
+      return;
+    }
+
+    const linkedPeer = await getAccountByWaSender(toWa);
+    if (linkedPeer?.account?.id && linkedPeer.account.email) {
+      // Already on Flizy with site account → direct to their agent wallet (no trusted required)
+      const peerAcc = await ensureAgentWallet(linkedPeer.account.id);
+      const toAddress = peerAcc.agent_wallet_address;
+      if (!toAddress) {
+        await botReply(message, phone, 'That user has no agent wallet yet. Try again later.');
+        return;
+      }
+      return handleSendResolved(message, user, phone, amountEth, {
+        address: ethers.getAddress(toAddress),
+        label: `+${toWa}`,
+      }, siteAcc, { skipTrusted: true });
+    }
+
+    // Not linked → claim plan (held until that WhatsApp links)
+    let amountNum;
+    try {
+      amountNum = Number(amountEth);
+      ethers.parseEther(String(amountEth));
+      if (!(amountNum > 0)) throw new Error('bad');
+    } catch {
+      await botReply(message, phone, 'Invalid amount.\nExample: flizy send 0.001 to 2348012345678');
+      return;
+    }
+    if (amountNum > config.maxSendEth) {
+      await botReply(message, phone, `Max per send is ${config.maxSendEth} ETH.`);
+      return;
+    }
+    if (config.requireUnlock && siteAcc.unlock_pin_hash && !isAdminUser(user)) {
+      const open = await isSessionUnlocked(siteAcc.id, phone);
+      if (!open) {
+        await botReply(message, phone, 'Session locked. Send:\nflizy unlock your-pin');
+        return;
+      }
+    }
+
+    const actor = await actorSessionFlags(user, siteAcc, phone);
+    const intent = createSendIntent({
+      actor,
+      amountEth,
+      toAddress: null,
+      toLabel: `+${toWa}`,
+      toRaw: toWa,
+      toIsAddress: false,
+      chainId: String(chain.chainId),
+    });
+
+    let fromAddress;
+    let fromBalanceEth;
+    try {
+      const acc = await ensureAgentWallet(siteAcc.id);
+      fromAddress = ethers.getAddress(acc.agent_wallet_address);
+      fromBalanceEth = ethers.formatEther(await provider.getBalance(fromAddress));
+    } catch (err) {
+      console.error('agent balance check failed:', publicErrorMessage(err));
+      await botReply(message, phone, 'Could not check your agent wallet. Try again shortly.');
+      return;
+    }
+
+    const plan = buildClaimPlan({
+      intent,
+      policy: { decision: 'ALLOW_WITH_CONFIRM', checks: {} },
+      chain: {
+        chainId: chain.chainId,
+        chainName: chain.name,
+        nativeSymbol: chain.nativeSymbol || 'ETH',
+      },
+      fromAddress,
+      toWaHint: toWa,
+      fromBalanceEth,
+    });
+
+    const funded = assertPlanFunded(
+      { input: { amount: amountEth }, route: { fromAddress } },
+      fromBalanceEth
+    );
+    if (!funded.ok) {
+      await botReply(
+        message,
+        phone,
+        [funded.message, explorerAddressUrl(fromAddress)].filter(Boolean).join('\n')
+      );
+      return;
+    }
+
+    pendingSends.set(phone, { plan, createdAt: Date.now() });
+    await botReply(message, phone, formatClaimPlanPreview(plan));
     return;
   }
 
+  // --- Address or trusted name ---
   const resolved = await resolveSendTarget(phone, toRaw, isAddress, siteAcc.id);
   if (resolved.error) {
     await botReply(message, phone, resolved.error);
     return;
   }
+  return handleSendResolved(message, user, phone, amountEth, resolved, siteAcc, {
+    skipTrusted: false,
+  });
+}
 
-  let sessionUnlocked = true;
-  if (config.requireUnlock && siteAcc.unlock_pin_hash && !isAdminUser(user)) {
-    sessionUnlocked = await isSessionUnlocked(siteAcc.id, phone);
-  }
-
+async function handleSendResolved(message, user, phone, amountEth, resolved, siteAcc, opts = {}) {
+  const actor = await actorSessionFlags(user, siteAcc, phone);
   const intent = createSendIntent({
-    actor: {
-      accountId: siteAcc.id,
-      userId: user.id,
-      waSenderId: phone,
-      isAdmin: isAdminUser(user),
-      creditEth: Number(user.balance_eth || 0),
-      sessionUnlocked,
-      hasPin: Boolean(siteAcc.unlock_pin_hash),
-    },
+    actor,
     amountEth,
     toAddress: resolved.address,
     toLabel: resolved.label,
-    toRaw,
-    toIsAddress: isAddress,
+    toIsAddress: true,
     chainId: String(chain.chainId),
   });
 
-  const policy = await evaluateSendPolicy(intent);
+  const policy = await evaluateSendPolicy(intent, {
+    enforceTrusted: opts.skipTrusted ? false : config.enforceTrusted,
+  });
   if (policy.decision === 'DENY') {
     await botReply(message, phone, policy.message || 'Not allowed.');
     return;
@@ -986,15 +1173,10 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, acc
   try {
     const acc = await ensureAgentWallet(siteAcc.id);
     fromAddress = ethers.getAddress(acc.agent_wallet_address);
-    const balanceWei = await provider.getBalance(fromAddress);
-    fromBalanceEth = ethers.formatEther(balanceWei);
+    fromBalanceEth = ethers.formatEther(await provider.getBalance(fromAddress));
   } catch (err) {
     console.error('agent balance check failed:', publicErrorMessage(err));
-    await botReply(
-      message,
-      phone,
-      'Could not check your agent wallet on-chain. Try again shortly.'
-    );
+    await botReply(message, phone, 'Could not check your agent wallet on-chain. Try again shortly.');
     return;
   }
 
@@ -1029,7 +1211,6 @@ async function handleConfirm(message, user, phone) {
   const pending = pendingSends.get(phone);
 
   if (!pending) {
-    // No pending: stay silent (do not spam "start with send...")
     return;
   }
 
@@ -1055,6 +1236,42 @@ async function handleConfirm(message, user, phone) {
     console.error('confirm re-fetch user:', err);
   }
 
+  if (plan.intent === 'CLAIM_HOLD') {
+    await botReply(message, phone, 'Holding funds for claim...');
+    const result = await executeClaimHold({
+      fromAccountId: plan.actor.accountId,
+      fromWaSender: phone,
+      toWaHint: plan.route.toWaHint || plan.input.toWaHint,
+      amountEth: plan.input.amount,
+      provider,
+      chain,
+      opsWallet: wallet,
+    });
+    if (!result.ok) {
+      await botReply(message, phone, result.error || 'Claim hold failed.');
+      return;
+    }
+    await botReply(
+      message,
+      phone,
+      [
+        'Claim held.',
+        `${plan.input.amount} ${plan.input.asset} reserved for ${plan.input.recipient}`,
+        '',
+        'They receive only after that WhatsApp links Flizy.',
+        'Cancel anytime: flizy cancel claims',
+        '',
+        'Share claim link (optional):',
+        result.claimUrl,
+        '',
+        result.explorerUrl || '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+    );
+    return;
+  }
+
   await botReply(message, phone, 'Executing transfer...');
 
   const result = await executeNativeSend({
@@ -1070,13 +1287,274 @@ async function handleConfirm(message, user, phone) {
 }
 
 async function handleCancel(message, phone) {
+  if (pendingClaimMenus.has(phone)) {
+    pendingClaimMenus.delete(phone);
+    await botReply(message, phone, 'Menu closed.');
+    return true;
+  }
   if (pendingSends.has(phone)) {
     pendingSends.delete(phone);
     await botReply(message, phone, 'Transfer plan cancelled. Nothing was sent.');
     return true;
   }
-  // No pending: stay silent so random "cancel" does not look like a bot chat
   return false;
+}
+
+/**
+ * flizy cancel claims [phone|all]
+ */
+async function handleCancelClaims(message, user, phone, account, filter) {
+  const siteAcc = await requireLinkedSite(message, phone, account);
+  if (!siteAcc) return;
+
+  const phoneFilter =
+    filter && filter !== 'all' && isPlausiblePhone(filter) ? normalizeWaHint(filter) : null;
+
+  let claims;
+  try {
+    claims = await listOutgoingPending(siteAcc.id, phoneFilter || undefined);
+  } catch (err) {
+    console.error('listOutgoingPending:', publicErrorMessage(err));
+    await botReply(message, phone, 'Could not load claims. Try again.');
+    return;
+  }
+
+  if (!claims.length) {
+    await botReply(
+      message,
+      phone,
+      phoneFilter
+        ? `No pending claims to +${phoneFilter}.`
+        : 'No pending claims.\nSend to a phone: flizy send 0.001 to 2348012345678'
+    );
+    return;
+  }
+
+  if (claims.length === 1) {
+    pendingClaimMenus.set(phone, {
+      mode: 'cancel',
+      claims,
+      createdAt: Date.now(),
+      awaitConfirmId: claims[0].id,
+    });
+    await botReply(
+      message,
+      phone,
+      [
+        'Cancel this claim?',
+        `+${claims[0].to_wa_hint}  ${claims[0].amount_eth} ETH`,
+        '',
+        'Reply: confirm',
+        'Or: cancel',
+      ].join('\n')
+    );
+    return;
+  }
+
+  pendingClaimMenus.set(phone, { mode: 'cancel', claims, createdAt: Date.now() });
+  await botReply(message, phone, formatClaimsMenu(claims, 'outgoing'));
+}
+
+async function handleClaimsList(message, user, phone, account, kind) {
+  if (kind === 'outgoing') {
+    return handleCancelClaims(message, user, phone, account, null);
+  }
+
+  // Incoming: only after this WA is the identity (always true for messager)
+  // Surface only when linked to site account (ownership of Flizy account)
+  const siteAcc = await resolveLinkedSiteAccount(phone, account);
+  if (!siteAcc?.id) {
+    await botReply(
+      message,
+      phone,
+      [
+        'Link WhatsApp to your Flizy account to see claims for this number.',
+        `Open ${config.siteUrl}/dashboard → generate code → flizy link CODE`,
+      ].join('\n')
+    );
+    return;
+  }
+
+  let claims;
+  try {
+    claims = await listIncomingPending(phone);
+  } catch (err) {
+    console.error('listIncomingPending:', publicErrorMessage(err));
+    await botReply(message, phone, 'Could not load claims. Try again.');
+    return;
+  }
+
+  if (!claims.length) {
+    await botReply(message, phone, 'No pending claims for this WhatsApp.');
+    return;
+  }
+
+  if (claims.length === 1) {
+    pendingClaimMenus.set(phone, {
+      mode: 'claim',
+      claims,
+      createdAt: Date.now(),
+      awaitConfirmId: claims[0].id,
+    });
+    await botReply(
+      message,
+      phone,
+      [
+        'Receive this claim?',
+        `${claims[0].amount_eth} ETH`,
+        '',
+        'Reply: confirm',
+        'Or: cancel',
+      ].join('\n')
+    );
+    return;
+  }
+
+  pendingClaimMenus.set(phone, { mode: 'claim', claims, createdAt: Date.now() });
+  await botReply(message, phone, formatClaimsMenu(claims, 'incoming'));
+}
+
+/**
+ * Menu reply: 1 | 2 | All | confirm (for single)
+ */
+async function handleClaimMenuReply(message, user, phone, account, text) {
+  const menu = pendingClaimMenus.get(phone);
+  if (!menu) return false;
+
+  const t = String(text || '').trim().toLowerCase();
+  if (isCancelCommand(t)) {
+    pendingClaimMenus.delete(phone);
+    await botReply(message, phone, 'Menu closed.');
+    return true;
+  }
+
+  // Single-claim confirm
+  if (menu.awaitConfirmId && isConfirmCommand(t)) {
+    pendingClaimMenus.delete(phone);
+    if (menu.mode === 'cancel') {
+      await runCancelOneClaim(message, phone, account, menu.awaitConfirmId);
+    } else {
+      await runPayoutOneClaim(message, user, phone, account, menu.awaitConfirmId);
+    }
+    return true;
+  }
+
+  let selected = [];
+  if (t === 'all') {
+    selected = menu.claims.slice();
+  } else if (/^\d+$/.test(t)) {
+    const idx = Number(t) - 1;
+    if (idx < 0 || idx >= menu.claims.length) {
+      await botReply(message, phone, `Pick 1–${menu.claims.length}, All, or cancel.`);
+      return true;
+    }
+    selected = [menu.claims[idx]];
+  } else {
+    return false;
+  }
+
+  pendingClaimMenus.delete(phone);
+
+  if (menu.mode === 'cancel') {
+    for (const c of selected) {
+      await runCancelOneClaim(message, phone, account, c.id);
+    }
+  } else {
+    for (const c of selected) {
+      await runPayoutOneClaim(message, user, phone, account, c.id);
+    }
+  }
+  return true;
+}
+
+async function runCancelOneClaim(message, phone, account, claimId) {
+  const siteAcc = await resolveLinkedSiteAccount(phone, account);
+  if (!siteAcc?.id) {
+    await botReply(message, phone, 'Link your site account first.');
+    return;
+  }
+  await botReply(message, phone, 'Refunding claim...');
+  const result = await executeClaimRefund({
+    claimId,
+    fromAccountId: siteAcc.id,
+    provider,
+    chain,
+    opsWallet: wallet,
+  });
+  if (!result.ok) {
+    await botReply(message, phone, result.error || 'Cancel failed.');
+    return;
+  }
+  await botReply(
+    message,
+    phone,
+    [
+      'Claim cancelled. Funds returned to your agent wallet.',
+      result.claim ? `Was for +${result.claim.to_wa_hint} (${result.claim.amount_eth} ETH)` : null,
+      result.explorerUrl || null,
+    ]
+      .filter(Boolean)
+      .join('\n')
+  );
+}
+
+async function runPayoutOneClaim(message, user, phone, account, claimId) {
+  const siteAcc = await resolveLinkedSiteAccount(phone, account);
+  if (!siteAcc?.id) {
+    await botReply(
+      message,
+      phone,
+      'Link WhatsApp to your Flizy account first to receive claims.\nflizy link CODE'
+    );
+    return;
+  }
+  await botReply(message, phone, 'Claiming funds...');
+  const result = await executeClaimPayout({
+    claimId,
+    toAccountId: siteAcc.id,
+    toWaSender: phone,
+    provider,
+    chain,
+    opsWallet: wallet,
+  });
+  if (!result.ok) {
+    await botReply(message, phone, result.error || 'Claim failed.');
+    return;
+  }
+  await botReply(
+    message,
+    phone,
+    [
+      'Claim received.',
+      `${result.claim.amount_eth} ETH → your agent wallet`,
+      result.explorerUrl || null,
+      '',
+      'Check: flizy balance',
+    ]
+      .filter(Boolean)
+      .join('\n')
+  );
+}
+
+async function notifyIncomingClaimsAfterLink(message, phone, accountId) {
+  try {
+    const claims = await listIncomingPending(phone);
+    if (!claims.length) return;
+    const total = claims.reduce((s, c) => s + Number(c.amount_eth || 0), 0);
+    await botReply(
+      message,
+      phone,
+      [
+        `You have ${claims.length} pending claim(s) for this WhatsApp (~${formatEth(total)} ETH).`,
+        'They were held until you linked.',
+        '',
+        'Receive: flizy claim',
+        'Or list: flizy claims (sender cancel uses: flizy cancel claims)',
+      ].join('\n')
+    );
+  } catch (err) {
+    console.warn('notifyIncomingClaimsAfterLink:', publicErrorMessage(err));
+  }
 }
 
 async function handleLink(message, phone, code) {
@@ -1121,6 +1599,7 @@ async function handleLink(message, phone, code) {
         .filter(Boolean)
         .join('\n')
     );
+    if (acc?.id) await notifyIncomingClaimsAfterLink(message, phone, acc.id);
   } catch (err) {
     console.error('link error:', publicErrorMessage(err));
     await message.reply('Could not link right now. Try a new code from the site.');
@@ -1395,14 +1874,21 @@ async function handleIncomingMessage(message) {
     pruneExpiredPending();
 
     const waitingForWalletName = pendingWalletAdds.has(phone);
+    const waitingForClaimMenu = pendingClaimMenus.has(phone);
 
-    // Ignore non-commands unless we are waiting for a trusted-wallet name
-    if (!isFlizyCommand(rawText) && !waitingForWalletName) {
+    // Ignore non-commands unless mid-flow (wallet name or claim menu pick)
+    if (!isFlizyCommand(rawText) && !waitingForWalletName && !waitingForClaimMenu) {
       return;
     }
 
     let text;
     if (isConfirmCommand(rawText) || isCancelCommand(rawText)) {
+      text = rawText.trim().toLowerCase();
+    } else if (
+      waitingForClaimMenu &&
+      !/^flizy\b/i.test(rawText) &&
+      (/^\d+$/.test(rawText.trim()) || /^all$/i.test(rawText.trim()))
+    ) {
       text = rawText.trim().toLowerCase();
     } else if (waitingForWalletName && !/^flizy\b/i.test(rawText)) {
       // bare name reply (e.g. john)
@@ -1410,7 +1896,7 @@ async function handleIncomingMessage(message) {
     } else {
       const stripped = stripFlizyPrefix(rawText, { requirePrefix: config.requireFlizyPrefix });
       if (!stripped.ok) {
-        if (waitingForWalletName) {
+        if (waitingForWalletName || waitingForClaimMenu) {
           text = rawText.trim();
         } else {
           return;
@@ -1551,6 +2037,7 @@ async function handleIncomingMessage(message) {
             .filter(Boolean)
             .join('\n')
         );
+        if (acc?.id) await notifyIncomingClaimsAfterLink(message, phone, acc.id);
       } catch (err) {
         console.error('link error:', publicErrorMessage(err));
         await botReply(message, phone, 'Could not link right now. Try a new code from the site.');
@@ -1710,19 +2197,51 @@ async function handleIncomingMessage(message) {
       return;
     }
 
+    // Claim cancel/receive menus (1, 2, All, confirm)
+    if (pendingClaimMenus.has(phone)) {
+      const handledMenu = await handleClaimMenuReply(message, user, phone, account, text);
+      if (handledMenu) return;
+    }
+
+    const cancelClaims = parseCancelClaimsCommand(text);
+    if (cancelClaims) {
+      await handleCancelClaims(message, user, phone, account, cancelClaims.filter);
+      return;
+    }
+
+    const claimsList = parseClaimsListCommand(text);
+    if (claimsList) {
+      await handleClaimsList(message, user, phone, account, claimsList.kind);
+      return;
+    }
+
     if (isCancelCommand(text)) {
       await handleCancel(message, phone);
       return;
     }
 
     if (isConfirmCommand(text)) {
+      // Single-claim confirm menus handled above; else transfer plan confirm
+      if (pendingClaimMenus.has(phone)) {
+        await handleClaimMenuReply(message, user, phone, account, text);
+        return;
+      }
       await handleConfirm(message, user, phone);
       return;
     }
 
     const send = parseSendCommand(text);
     if (send) {
-      await handleSend(message, user, phone, send.amountEth, send.toRaw, send.isAddress, account);
+      await handleSend(
+        message,
+        user,
+        phone,
+        send.amountEth,
+        send.toRaw,
+        send.isAddress,
+        send.isPhone,
+        account
+      );
       return;
     }
   } catch (err) {
