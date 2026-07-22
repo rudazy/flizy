@@ -37,7 +37,7 @@ export function SiteFooter() {
             Signup
           </Link>
           <Link href="/dashboard" className="text-muted no-underline hover:text-lime">
-            Dashboard
+            App
           </Link>
         </div>
       </div>

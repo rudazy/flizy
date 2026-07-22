@@ -17,6 +17,9 @@ export function SiteHeader() {
           <Link href="/docs" className="nav-link hidden sm:inline-flex">
             Security
           </Link>
+          <Link href="/dashboard" className="nav-link">
+            App
+          </Link>
           <Link href="/login" className="nav-link">
             Log in
           </Link>

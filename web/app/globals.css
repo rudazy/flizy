@@ -216,7 +216,20 @@ textarea {
 .page-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   flex-direction: column;
+}
+
+/* Installed PWA: slightly tighter shell */
+@media (display-mode: standalone) {
+  body {
+    background-attachment: scroll;
+  }
+}
+
+.app-bottom-nav {
+  /* iOS home indicator + Android gesture bar */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Mobile tap targets */

@@ -3,22 +3,23 @@ import { HowToCallBot } from '../components/HowToCallBot';
 
 export default function HomePage() {
   return (
-    <div className="fade-up space-y-16 md:space-y-24">
-      <section className="hero-grid relative -mx-6 px-6 py-16 md:py-24">
+    <div className="fade-up space-y-12 md:space-y-24">
+      <section className="hero-grid relative -mx-6 px-6 py-12 md:py-24">
         <div className="max-w-3xl">
-          <p className="badge badge-gold mb-6">GIWA-first EVM</p>
-          <h1 className="font-sans text-4xl font-semibold tracking-wide text-paper md:text-6xl md:leading-[1.08]">
+          <p className="badge badge-gold mb-5">GIWA-first EVM</p>
+          <h1 className="font-sans text-3xl font-semibold tracking-wide text-paper sm:text-4xl md:text-6xl md:leading-[1.08]">
             Send crypto on WhatsApp.
             <br />
             <span className="bg-gradient-to-r from-[#e8c45a] to-[#c4893f] bg-clip-text text-transparent">
               Only to people you trust.
             </span>
           </h1>
-          <p className="mt-8 max-w-xl text-base leading-relaxed text-muted md:text-lg">
+          <p className="mt-6 max-w-xl text-sm leading-relaxed text-muted md:mt-8 md:text-lg">
             Flizy is a WhatsApp wallet for real life. You manage trusted addresses and your unlock
             PIN here. On chat, you just send. A stolen phone cannot add a new destination.
           </p>
-          <div className="mt-10 flex flex-wrap gap-3">
+
+          <div className="mt-8 flex flex-wrap gap-2 md:mt-10 md:gap-3">
             <Link href="/signup" className="btn btn-primary">
               Create free account
             </Link>
@@ -26,13 +27,50 @@ export default function HomePage() {
               See how it works
             </Link>
           </div>
-          <p className="mt-6 text-xs text-muted">
-            No seed phrases in chat. No random drains to strangers.
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/login" className="btn btn-ghost text-sm">
+              Log in
+            </Link>
+            <Link href="/dashboard" className="btn btn-ghost text-sm">
+              Open app
+            </Link>
+          </div>
+          <p className="mt-5 text-xs text-muted">
+            No seed phrases in chat. Install from Chrome for a home-screen app.
           </p>
         </div>
       </section>
 
-      {/* Primary guide: call bot + fund (single clean card) */}
+      <section className="space-y-3 md:hidden">
+        {[
+          {
+            t: 'For you',
+            mark: 'Y',
+            d: 'Open a wallet, add trusted names, link WhatsApp once.',
+          },
+          {
+            t: 'For friends',
+            mark: 'F',
+            d: 'They only receive if you already saved their address.',
+          },
+          {
+            t: 'For agents',
+            mark: 'A',
+            d: 'Same agent wallet on site and chat — permanent, not rotated.',
+          },
+        ].map((card) => (
+          <div key={card.t} className="card flex items-start gap-3 p-4">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-ink font-sans text-xs text-lime">
+              {card.mark}
+            </span>
+            <div>
+              <p className="font-sans text-sm tracking-wide text-paper">{card.t}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{card.d}</p>
+            </div>
+          </div>
+        ))}
+      </section>
+
       <HowToCallBot />
 
       <section className="space-y-6">
@@ -65,7 +103,7 @@ export default function HomePage() {
 
       <section className="card overflow-hidden">
         <div className="grid md:grid-cols-2">
-          <div className="border-b border-border p-8 md:border-b-0 md:border-r md:p-10">
+          <div className="border-b border-border p-6 md:border-b-0 md:border-r md:p-10">
             <p className="text-xs uppercase tracking-[0.18em] text-gold">Example on WhatsApp</p>
             <div className="mt-6 space-y-3 font-mono text-sm">
               <p className="text-muted">You</p>
@@ -76,11 +114,11 @@ export default function HomePage() {
               <p className="mono-box text-lime">https://sepolia-explorer.giwa.io/tx/0x…</p>
             </div>
           </div>
-          <div className="flex flex-col justify-center p-8 md:p-10">
+          <div className="flex flex-col justify-center p-6 md:p-10">
             <h2 className="font-sans text-2xl tracking-wide text-paper">Ready when you are</h2>
             <p className="mt-4 text-sm leading-relaxed text-muted">
               Create an account, add one trusted address, link WhatsApp, and try a tiny test send on
-              GIWA Sepolia.
+              GIWA Sepolia. On Android Chrome, use Install app for a full-screen Flizy icon.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="btn btn-primary">

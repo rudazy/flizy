@@ -1,6 +1,5 @@
-import type { Metadata } from 'next';
-import { SiteHeader } from '../components/SiteHeader';
-import { SiteFooter } from '../components/SiteFooter';
+import type { Metadata, Viewport } from 'next';
+import { AppChrome } from '../components/AppChrome';
 import './globals.css';
 
 function siteOrigin() {
@@ -24,8 +23,17 @@ export const metadata: Metadata = {
   description:
     'Send crypto from WhatsApp to people you already trust. Manage trusted addresses and unlock PIN on the site. GIWA-first EVM.',
   applicationName: 'Flizy',
-  keywords: ['Flizy', 'WhatsApp', 'crypto', 'wallet', 'GIWA', 'trusted addresses', 'EVM'],
+  keywords: ['Flizy', 'WhatsApp', 'crypto', 'wallet', 'GIWA', 'trusted addresses', 'EVM', 'PWA'],
   authors: [{ name: 'Flizy' }],
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Flizy',
+  },
+  formatDetection: {
+    telephone: false,
+  },
   openGraph: {
     type: 'website',
     locale: 'en_US',
@@ -52,20 +60,31 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/icon-512.jpg', type: 'image/jpeg', sizes: '512x512' },
+      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
     ],
     apple: [{ url: '/apple-touch-icon.jpg', sizes: '180x180' }],
   },
   robots: { index: true, follow: true },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#0b0a09',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className="page-shell font-mono antialiased">
-        <SiteHeader />
-        <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 py-12 md:py-16">{children}</main>
-        <SiteFooter />
+        <AppChrome>{children}</AppChrome>
       </body>
     </html>
   );
