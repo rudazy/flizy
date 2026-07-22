@@ -1,0 +1,23 @@
+[Unit]
+Description=Flizy WhatsApp bot (execution layer client)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/flizy
+EnvironmentFile=/opt/flizy/.env
+# Load Node from common install paths if not in default PATH
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/flizy/index.js
+Restart=always
+RestartSec=5
+# Crash / OOM: keep restarting
+StartLimitIntervalSec=0
+# Soft security
+NoNewPrivileges=true
+# Logs: journalctl -u flizy -f
+
+[Install]
+WantedBy=multi-user.target

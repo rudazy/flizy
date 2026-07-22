@@ -13,7 +13,9 @@ export async function GET() {
     const supabase = getSupabase();
     let { data: account, error } = await supabase
       .from('accounts')
-      .select('id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth')
+      .select(
+        'id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth'
+      )
       .eq('id', accountId)
       .single();
 
@@ -31,7 +33,9 @@ export async function GET() {
         .update({ agent_wallet_address: w.address })
         .eq('id', account.id)
         .is('agent_wallet_address', null)
-        .select('id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth')
+        .select(
+          'id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth'
+        )
         .single();
       if (!uErr && updated) {
         account = updated;
@@ -39,7 +43,9 @@ export async function GET() {
         // Re-read in case another request set it
         const { data: again } = await supabase
           .from('accounts')
-          .select('id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth')
+          .select(
+            'id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth'
+          )
           .eq('id', accountId)
           .single();
         if (again) account = again;
@@ -79,6 +85,10 @@ export async function GET() {
         agent_wallet_address: account.agent_wallet_address,
         balance_eth: account.balance_eth ?? 0,
         has_pin: Boolean(account.unlock_pin_hash),
+        daily_send_limit_eth:
+          account.daily_send_limit_eth === null || account.daily_send_limit_eth === undefined
+            ? null
+            : account.daily_send_limit_eth,
       },
       trusted,
       link,

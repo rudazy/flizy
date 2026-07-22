@@ -15,6 +15,7 @@ export default function AccountPage() {
     addTrusted,
     removeTrusted,
     setUnlockPin,
+    setDailyLimit,
   } = useDashboard();
 
   const [addr, setAddr] = useState('');
@@ -23,6 +24,8 @@ export default function AccountPage() {
   const [removePassword, setRemovePassword] = useState('');
   const [removing, setRemoving] = useState<string | null>(null);
   const [pin, setPin] = useState('');
+  const [dailyLimit, setDailyLimitInput] = useState('');
+  const [limitPassword, setLimitPassword] = useState('');
 
   if (!data) return null;
 
@@ -54,6 +57,23 @@ export default function AccountPage() {
     const ok = await setUnlockPin(pin);
     if (ok) setPin('');
   }
+
+  async function onDailyLimit(e: React.FormEvent) {
+    e.preventDefault();
+    const raw = dailyLimit.trim();
+    const limit = raw === '' ? null : Number(raw);
+    if (raw !== '' && (!Number.isFinite(limit) || (limit as number) < 0)) {
+      setMsg('Enter a number >= 0, or leave empty to clear.');
+      return;
+    }
+    const ok = await setDailyLimit(limit, limitPassword);
+    if (ok) setLimitPassword('');
+  }
+
+  const currentLimit =
+    data.account.daily_send_limit_eth == null || data.account.daily_send_limit_eth === ''
+      ? 'App default (no extra daily cap unless env sets one)'
+      : `${data.account.daily_send_limit_eth} ETH / UTC day`;
 
   return (
     <div className="space-y-5">
@@ -199,6 +219,46 @@ export default function AccountPage() {
             </div>
           ) : null}
         </div>
+      </section>
+
+      {/* Daily limit — Policy Engine */}
+      <section className="card p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="font-sans text-sm tracking-wide text-paper">Daily send limit</p>
+            <p className="mt-1 text-xs text-muted">
+              Enforced in Policy (WhatsApp + any future client). UTC day. Per-tx max still applies.
+            </p>
+          </div>
+          <span className="badge">Policy</span>
+        </div>
+        <p className="mt-3 text-xs text-muted">Current: {currentLimit}</p>
+        <form onSubmit={onDailyLimit} className="mt-4 grid gap-3">
+          <div>
+            <label className="label">Limit (ETH / day)</label>
+            <input
+              className="input"
+              inputMode="decimal"
+              placeholder="e.g. 0.05 — empty clears"
+              value={dailyLimit}
+              onChange={(e) => setDailyLimitInput(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">Account password</label>
+            <input
+              className="input"
+              type="password"
+              required
+              value={limitPassword}
+              onChange={(e) => setLimitPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          <button className="btn btn-primary" type="submit" disabled={busy === 'limit'}>
+            {busy === 'limit' ? 'Saving...' : 'Save daily limit'}
+          </button>
+        </form>
       </section>
 
       {/* PIN */}

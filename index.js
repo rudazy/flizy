@@ -28,10 +28,12 @@ const {
   ensureAgentWallet,
   formatAccountWalletCard,
 } = require('./lib/agentWallet');
+const { getEscrowWallet, formatEscrowStatus } = require('./lib/escrowWallet');
 const { getWalletHoldings, formatHoldingsMessage } = require('./lib/holdings');
 const {
   createSendIntent,
   evaluateSendPolicy,
+  evaluateClaimHoldPolicy,
   buildSendPlan,
   formatPlanPreview,
   assertPlanFunded,
@@ -43,6 +45,15 @@ const {
   executeClaimPayout,
   formatSendReceipt,
 } = require('./lib/engine');
+const {
+  createPaymentRequest,
+  listOutgoingRequests,
+  listIncomingRequests,
+  cancelPaymentRequest,
+  markRequestPaid,
+  getPaymentRequestById,
+  formatRequestsMenu,
+} = require('./lib/paymentRequests');
 
 // ---------------------------------------------------------------------------
 // Config (Phase 0: chain registry + config-driven copy)
@@ -56,7 +67,10 @@ const ADMIN_PHONES = config.adminPhones;
 
 const supabase = getSupabase();
 const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
+/** Ops: gas / infra only — never hold user claim escrow */
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+/** Claim escrow: separate address (ESCROW_PRIVATE_KEY or derived) */
+const escrowWallet = getEscrowWallet(provider);
 
 /**
  * Pending confirmed sends: full Execution Plan (Intent → Policy → Plan).
@@ -68,8 +82,8 @@ const pendingSends = new Map();
 const pendingWalletAdds = new Map();
 
 /**
- * Interactive claim menus: cancel outgoing or claim incoming.
- * @type {Map<string, { mode: 'cancel'|'claim', claims: object[], createdAt: number }>}
+ * Interactive menus: claims + payment requests.
+ * @type {Map<string, { mode: string, claims?: object[], requests?: object[], createdAt: number, awaitConfirmId?: string }>}
  */
 const pendingClaimMenus = new Map();
 
@@ -232,6 +246,37 @@ function parseClaimsListCommand(text) {
   return null;
 }
 
+/**
+ * request 0.01 from 234… | request 0.01 from john | request 0.01 eth from john
+ */
+function parseRequestCommand(text) {
+  const phone = String(text || '').match(
+    /^request\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+from\s+(\+?\d{10,15})\s*$/i
+  );
+  if (phone) {
+    return { amountEth: phone[1], fromRaw: phone[2], isPhone: true };
+  }
+  const name = String(text || '').match(
+    /^request\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+from\s+([a-zA-Z][a-zA-Z0-9_]{0,31})\s*$/i
+  );
+  if (name) {
+    return { amountEth: name[1], fromRaw: name[2], isPhone: false };
+  }
+  return null;
+}
+
+/** flizy requests | flizy pay | flizy cancel requests */
+function parseRequestsCommand(text) {
+  const t = String(text || '').trim().toLowerCase();
+  if (t === 'requests' || t === 'my requests' || t === 'cancel requests') {
+    return { kind: t === 'cancel requests' ? 'cancel_out' : 'outgoing' };
+  }
+  if (t === 'pay' || t === 'pay request' || t === 'pay requests' || t === 'incoming requests') {
+    return { kind: 'incoming' };
+  }
+  return null;
+}
+
 /** save ama 0x... | add ama 0x... | contact ama 0x... */
 function parseSaveContactCommand(text) {
   const m = text.match(
@@ -276,6 +321,7 @@ function isFlizyCommandBody(body) {
     isHistoryCommand(t) ||
     isMeCommand(t) ||
     isPoolCommand(t) ||
+    isEscrowCommand(t) ||
     isUsersCommand(t) ||
     isContactsListCommand(t) ||
     isConfirmCommand(t) ||
@@ -283,6 +329,8 @@ function isFlizyCommandBody(body) {
     Boolean(parseSendCommand(t)) ||
     Boolean(parseCancelClaimsCommand(t)) ||
     Boolean(parseClaimsListCommand(t)) ||
+    Boolean(parseRequestCommand(t)) ||
+    Boolean(parseRequestsCommand(t)) ||
     Boolean(parseCreditCommand(t)) ||
     Boolean(parseClaimAdminCommand(t)) ||
     Boolean(parseSaveContactCommand(t)) ||
@@ -387,6 +435,11 @@ function isMeCommand(text) {
 function isPoolCommand(text) {
   const t = text.trim().toLowerCase();
   return t === 'pool' || t === 'hotwallet' || t === 'botbalance';
+}
+
+function isEscrowCommand(text) {
+  const t = text.trim().toLowerCase();
+  return t === 'escrow' || t === 'claims escrow' || t === 'claimescrow';
 }
 
 function isUsersCommand(text) {
@@ -647,6 +700,11 @@ function helpText(user) {
     '  flizy cancel claims       → cancel anytime (1/2/3/All)',
     '  flizy claim               → receive after you link WA',
     '',
+    'Requests (ask for money):',
+    '  flizy request 0.01 from 234…',
+    '  flizy pay                 → pay requests to you',
+    '  flizy requests            → cancel your open requests',
+    '',
     'Add wallet from chat:',
     '  flizy add wallet 0xYourAddress',
     '  (bot asks for a name)',
@@ -866,15 +924,35 @@ async function handlePool(message, user) {
     const pool = await getBotBalanceEth();
     await message.reply(
       [
-        'Hot wallet pool (on-chain)',
+        'Ops wallet (gas / infra — not claim escrow)',
         `${formatEth(pool)} ETH`,
         wallet.address,
         explorerAddressUrl(wallet.address),
+        '',
+        'Claim escrow: flizy escrow',
       ].join('\n')
     );
   } catch (err) {
     console.error('pool error:', err);
     await message.reply('Could not read pool balance.');
+  }
+}
+
+async function handleEscrow(message, user) {
+  if (!isAdminUser(user)) {
+    await message.reply('Escrow status is admin-only.');
+    return;
+  }
+  try {
+    const text = await formatEscrowStatus(provider);
+    await botReply(
+      message,
+      user.phone,
+      [text, explorerAddressUrl(escrowWallet.address)].join('\n')
+    );
+  } catch (err) {
+    console.error('escrow status:', publicErrorMessage(err));
+    await message.reply('Could not read escrow status.');
   }
 }
 
@@ -1063,27 +1141,6 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, isP
     }
 
     // Not linked → claim plan (held until that WhatsApp links)
-    let amountNum;
-    try {
-      amountNum = Number(amountEth);
-      ethers.parseEther(String(amountEth));
-      if (!(amountNum > 0)) throw new Error('bad');
-    } catch {
-      await botReply(message, phone, 'Invalid amount.\nExample: flizy send 0.001 to 2348012345678');
-      return;
-    }
-    if (amountNum > config.maxSendEth) {
-      await botReply(message, phone, `Max per send is ${config.maxSendEth} ETH.`);
-      return;
-    }
-    if (config.requireUnlock && siteAcc.unlock_pin_hash && !isAdminUser(user)) {
-      const open = await isSessionUnlocked(siteAcc.id, phone);
-      if (!open) {
-        await botReply(message, phone, 'Session locked. Send:\nflizy unlock your-pin');
-        return;
-      }
-    }
-
     const actor = await actorSessionFlags(user, siteAcc, phone);
     const intent = createSendIntent({
       actor,
@@ -1094,6 +1151,12 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, isP
       toIsAddress: false,
       chainId: String(chain.chainId),
     });
+
+    const policy = await evaluateClaimHoldPolicy(intent, { accountRow: siteAcc });
+    if (policy.decision === 'DENY') {
+      await botReply(message, phone, policy.message || 'Not allowed.');
+      return;
+    }
 
     let fromAddress;
     let fromBalanceEth;
@@ -1109,7 +1172,7 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, isP
 
     const plan = buildClaimPlan({
       intent,
-      policy: { decision: 'ALLOW_WITH_CONFIRM', checks: {} },
+      policy,
       chain: {
         chainId: chain.chainId,
         chainName: chain.name,
@@ -1162,6 +1225,7 @@ async function handleSendResolved(message, user, phone, amountEth, resolved, sit
 
   const policy = await evaluateSendPolicy(intent, {
     enforceTrusted: opts.skipTrusted ? false : config.enforceTrusted,
+    accountRow: siteAcc,
   });
   if (policy.decision === 'DENY') {
     await botReply(message, phone, policy.message || 'Not allowed.');
@@ -1191,6 +1255,9 @@ async function handleSendResolved(message, user, phone, amountEth, resolved, sit
     fromAddress,
     fromBalanceEth,
   });
+  if (opts.paymentRequestId) {
+    plan.paymentRequestId = opts.paymentRequestId;
+  }
 
   const funded = assertPlanFunded(plan, fromBalanceEth);
   if (!funded.ok) {
@@ -1202,7 +1269,11 @@ async function handleSendResolved(message, user, phone, amountEth, resolved, sit
     return;
   }
 
-  pendingSends.set(phone, { plan, createdAt: Date.now() });
+  pendingSends.set(phone, {
+    plan,
+    createdAt: Date.now(),
+    paymentRequestId: opts.paymentRequestId || null,
+  });
   await botReply(message, phone, formatPlanPreview(plan));
 }
 
@@ -1221,6 +1292,7 @@ async function handleConfirm(message, user, phone) {
   }
 
   const plan = pending.plan;
+  const paymentRequestId = pending.paymentRequestId || plan.paymentRequestId || null;
   pendingSends.delete(phone);
 
   if (!plan) {
@@ -1245,7 +1317,7 @@ async function handleConfirm(message, user, phone) {
       amountEth: plan.input.amount,
       provider,
       chain,
-      opsWallet: wallet,
+      escrowWallet,
     });
     if (!result.ok) {
       await botReply(message, phone, result.error || 'Claim hold failed.');
@@ -1282,6 +1354,14 @@ async function handleConfirm(message, user, phone) {
     setUserBalance,
     supabase,
   });
+
+  if (result.ok && paymentRequestId) {
+    try {
+      await markRequestPaid(paymentRequestId, plan.actor.accountId, result.txHash || null);
+    } catch (err) {
+      console.warn('markRequestPaid:', publicErrorMessage(err));
+    }
+  }
 
   await botReply(message, phone, formatSendReceipt(result, plan));
 }
@@ -1416,6 +1496,7 @@ async function handleClaimsList(message, user, phone, account, kind) {
 
 /**
  * Menu reply: 1 | 2 | All | confirm (for single)
+ * modes: cancel | claim | pay_request | cancel_request
  */
 async function handleClaimMenuReply(message, user, phone, account, text) {
   const menu = pendingClaimMenus.get(phone);
@@ -1428,27 +1509,33 @@ async function handleClaimMenuReply(message, user, phone, account, text) {
     return true;
   }
 
-  // Single-claim confirm
+  const list = menu.requests || menu.claims || [];
+
+  // Single-item confirm
   if (menu.awaitConfirmId && isConfirmCommand(t)) {
     pendingClaimMenus.delete(phone);
     if (menu.mode === 'cancel') {
       await runCancelOneClaim(message, phone, account, menu.awaitConfirmId);
-    } else {
+    } else if (menu.mode === 'claim') {
       await runPayoutOneClaim(message, user, phone, account, menu.awaitConfirmId);
+    } else if (menu.mode === 'pay_request') {
+      await startPayRequest(message, user, phone, account, menu.awaitConfirmId);
+    } else if (menu.mode === 'cancel_request') {
+      await runCancelOneRequest(message, phone, account, menu.awaitConfirmId);
     }
     return true;
   }
 
   let selected = [];
   if (t === 'all') {
-    selected = menu.claims.slice();
+    selected = list.slice();
   } else if (/^\d+$/.test(t)) {
     const idx = Number(t) - 1;
-    if (idx < 0 || idx >= menu.claims.length) {
-      await botReply(message, phone, `Pick 1–${menu.claims.length}, All, or cancel.`);
+    if (idx < 0 || idx >= list.length) {
+      await botReply(message, phone, `Pick 1–${list.length}, All, or cancel.`);
       return true;
     }
-    selected = [menu.claims[idx]];
+    selected = [list[idx]];
   } else {
     return false;
   }
@@ -1456,13 +1543,23 @@ async function handleClaimMenuReply(message, user, phone, account, text) {
   pendingClaimMenus.delete(phone);
 
   if (menu.mode === 'cancel') {
-    for (const c of selected) {
-      await runCancelOneClaim(message, phone, account, c.id);
+    for (const c of selected) await runCancelOneClaim(message, phone, account, c.id);
+  } else if (menu.mode === 'claim') {
+    for (const c of selected) await runPayoutOneClaim(message, user, phone, account, c.id);
+  } else if (menu.mode === 'pay_request') {
+    // Pay one at a time (each needs its own confirm plan)
+    if (selected.length > 1) {
+      await botReply(
+        message,
+        phone,
+        'Pay one request at a time. Reply with a single number, then confirm the plan.'
+      );
+      pendingClaimMenus.set(phone, { ...menu, createdAt: Date.now() });
+      return true;
     }
-  } else {
-    for (const c of selected) {
-      await runPayoutOneClaim(message, user, phone, account, c.id);
-    }
+    await startPayRequest(message, user, phone, account, selected[0].id);
+  } else if (menu.mode === 'cancel_request') {
+    for (const r of selected) await runCancelOneRequest(message, phone, account, r.id);
   }
   return true;
 }
@@ -1479,7 +1576,7 @@ async function runCancelOneClaim(message, phone, account, claimId) {
     fromAccountId: siteAcc.id,
     provider,
     chain,
-    opsWallet: wallet,
+    escrowWallet,
   });
   if (!result.ok) {
     await botReply(message, phone, result.error || 'Cancel failed.');
@@ -1515,7 +1612,7 @@ async function runPayoutOneClaim(message, user, phone, account, claimId) {
     toWaSender: phone,
     provider,
     chain,
-    opsWallet: wallet,
+    escrowWallet,
   });
   if (!result.ok) {
     await botReply(message, phone, result.error || 'Claim failed.');
@@ -1539,22 +1636,243 @@ async function runPayoutOneClaim(message, user, phone, account, claimId) {
 async function notifyIncomingClaimsAfterLink(message, phone, accountId) {
   try {
     const claims = await listIncomingPending(phone);
-    if (!claims.length) return;
-    const total = claims.reduce((s, c) => s + Number(c.amount_eth || 0), 0);
+    const requests = await listIncomingRequests(phone);
+    const parts = [];
+    if (claims.length) {
+      const total = claims.reduce((s, c) => s + Number(c.amount_eth || 0), 0);
+      parts.push(
+        `${claims.length} pending claim(s) (~${formatEth(total)} ETH). Receive: flizy claim`
+      );
+    }
+    if (requests.length) {
+      parts.push(`${requests.length} payment request(s). Pay: flizy pay`);
+    }
+    if (!parts.length) return;
     await botReply(
       message,
       phone,
-      [
-        `You have ${claims.length} pending claim(s) for this WhatsApp (~${formatEth(total)} ETH).`,
-        'They were held until you linked.',
-        '',
-        'Receive: flizy claim',
-        'Or list: flizy claims (sender cancel uses: flizy cancel claims)',
-      ].join('\n')
+      ['After link, waiting for you:', ...parts.map((p) => `• ${p}`)].join('\n')
     );
   } catch (err) {
     console.warn('notifyIncomingClaimsAfterLink:', publicErrorMessage(err));
   }
+}
+
+/**
+ * flizy request 0.01 from 234… | from john
+ */
+async function handleRequestMoney(message, user, phone, account, amountEth, fromRaw, isPhone) {
+  const siteAcc = await requireLinkedSite(message, phone, account);
+  if (!siteAcc) return;
+
+  let amountNum;
+  try {
+    amountNum = Number(amountEth);
+    ethers.parseEther(String(amountEth));
+    if (!(amountNum > 0)) throw new Error('bad');
+  } catch {
+    await botReply(message, phone, 'Invalid amount.\nExample: flizy request 0.001 from 2348012345678');
+    return;
+  }
+  if (amountNum > config.maxSendEth) {
+    await botReply(message, phone, `Max per request is ${config.maxSendEth} ETH.`);
+    return;
+  }
+
+  let fromWaHint = null;
+  let fromLabel = null;
+
+  if (isPhone) {
+    fromWaHint = normalizeWaHint(fromRaw);
+    if (!isPlausiblePhone(fromWaHint)) {
+      await botReply(message, phone, 'Invalid phone. Use country code digits.');
+      return;
+    }
+    if (fromWaHint === normalizeWaHint(phone)) {
+      await botReply(message, phone, 'You cannot request money from your own number.');
+      return;
+    }
+  } else {
+    fromLabel = String(fromRaw).toLowerCase();
+    // Best-effort: if trusted name exists, note it; still need a phone for WA delivery
+    const resolved = await resolveSendTarget(phone, fromLabel, false, siteAcc.id);
+    if (resolved.error) {
+      await botReply(
+        message,
+        phone,
+        [
+          `Unknown name "${fromLabel}".`,
+          'Request by WhatsApp number (best):',
+          '  flizy request 0.001 from 2348012345678',
+          'Or save a trusted name first, then use their phone number for requests.',
+        ].join('\n')
+      );
+      return;
+    }
+    // Name-only without phone: store label; payer won't get WA notify unless we have phone
+    await botReply(
+      message,
+      phone,
+      [
+        'Requests work best with a phone number so they see it after linking.',
+        `Use: flizy request ${amountEth} from 234…`,
+        '',
+        `(Name "${fromLabel}" is saved as a label only if you use a number.)`,
+      ].join('\n')
+    );
+    return;
+  }
+
+  try {
+    const row = await createPaymentRequest({
+      requesterAccountId: siteAcc.id,
+      requesterWa: phone,
+      fromWaHint,
+      fromLabel,
+      amountEth,
+      chainId: chain.chainId,
+    });
+    await botReply(
+      message,
+      phone,
+      [
+        'Payment request created.',
+        `Amount: ${amountEth} ETH`,
+        `From: +${fromWaHint}`,
+        '',
+        'They see it only after that WhatsApp links Flizy, then:',
+        '  flizy pay',
+        '',
+        'Cancel anytime: flizy requests',
+        `Id: ${String(row.id).slice(0, 8)}…`,
+      ].join('\n')
+    );
+  } catch (err) {
+    console.error('createPaymentRequest:', publicErrorMessage(err));
+    await botReply(message, phone, 'Could not create request. Try again.');
+  }
+}
+
+async function handleRequestsCommand(message, user, phone, account, kind) {
+  const siteAcc = await requireLinkedSite(message, phone, account);
+  if (!siteAcc) return;
+
+  if (kind === 'incoming') {
+    let rows;
+    try {
+      rows = await listIncomingRequests(phone);
+    } catch (err) {
+      console.error(publicErrorMessage(err));
+      await botReply(message, phone, 'Could not load requests.');
+      return;
+    }
+    if (!rows.length) {
+      await botReply(message, phone, formatRequestsMenu([], 'incoming'));
+      return;
+    }
+    if (rows.length === 1) {
+      pendingClaimMenus.set(phone, {
+        mode: 'pay_request',
+        requests: rows,
+        createdAt: Date.now(),
+        awaitConfirmId: rows[0].id,
+      });
+      await botReply(
+        message,
+        phone,
+        [
+          'Pay this request?',
+          `${rows[0].amount_eth} ETH`,
+          '',
+          'Reply: confirm',
+          'Or: cancel',
+        ].join('\n')
+      );
+      return;
+    }
+    pendingClaimMenus.set(phone, { mode: 'pay_request', requests: rows, createdAt: Date.now() });
+    await botReply(message, phone, formatRequestsMenu(rows, 'incoming'));
+    return;
+  }
+
+  // outgoing cancel
+  let rows;
+  try {
+    rows = await listOutgoingRequests(siteAcc.id);
+  } catch (err) {
+    console.error(publicErrorMessage(err));
+    await botReply(message, phone, 'Could not load requests.');
+    return;
+  }
+  if (!rows.length) {
+    await botReply(message, phone, formatRequestsMenu([], 'outgoing'));
+    return;
+  }
+  if (rows.length === 1) {
+    pendingClaimMenus.set(phone, {
+      mode: 'cancel_request',
+      requests: rows,
+      createdAt: Date.now(),
+      awaitConfirmId: rows[0].id,
+    });
+    await botReply(
+      message,
+      phone,
+      [
+        'Cancel this request?',
+        `${rows[0].amount_eth} ETH from +${rows[0].from_wa_hint || '?'}`,
+        '',
+        'Reply: confirm',
+        'Or: cancel',
+      ].join('\n')
+    );
+    return;
+  }
+  pendingClaimMenus.set(phone, { mode: 'cancel_request', requests: rows, createdAt: Date.now() });
+  await botReply(message, phone, formatRequestsMenu(rows, 'outgoing'));
+}
+
+async function startPayRequest(message, user, phone, account, requestId) {
+  const siteAcc = await requireLinkedSite(message, phone, account);
+  if (!siteAcc) return;
+  const req = await getPaymentRequestById(requestId);
+  if (!req || req.status !== 'pending') {
+    await botReply(message, phone, 'That request is no longer pending.');
+    return;
+  }
+  if (normalizeWaHint(req.from_wa_hint) !== normalizeWaHint(phone)) {
+    await botReply(message, phone, 'This request is for a different WhatsApp number.');
+    return;
+  }
+  const requesterAcc = await ensureAgentWallet(req.requester_account_id);
+  const toAddress = requesterAcc.agent_wallet_address;
+  if (!toAddress) {
+    await botReply(message, phone, 'Requester has no agent wallet yet.');
+    return;
+  }
+  await handleSendResolved(
+    message,
+    user,
+    phone,
+    String(req.amount_eth),
+    { address: ethers.getAddress(toAddress), label: 'request' },
+    siteAcc,
+    { skipTrusted: true, paymentRequestId: req.id }
+  );
+}
+
+async function runCancelOneRequest(message, phone, account, requestId) {
+  const siteAcc = await resolveLinkedSiteAccount(phone, account);
+  if (!siteAcc?.id) {
+    await botReply(message, phone, 'Link your site account first.');
+    return;
+  }
+  const result = await cancelPaymentRequest(requestId, siteAcc.id);
+  if (!result.ok) {
+    await botReply(message, phone, 'Could not cancel (already paid or not yours).');
+    return;
+  }
+  await botReply(message, phone, 'Request cancelled.');
 }
 
 async function handleLink(message, phone, code) {
@@ -1736,11 +2054,13 @@ client.on('ready', async () => {
   } else {
     console.log(`Admins: ${[...ADMIN_PHONES].join(', ')}`);
   }
-  console.log(`Bot wallet: ${wallet.address}`);
-  console.log(`Explorer:   ${explorerAddressUrl(wallet.address)}`);
+  console.log(`Ops wallet (gas/infra): ${wallet.address}`);
+  console.log(`Claim escrow:           ${escrowWallet.address}`);
+  console.log(`Explorer ops:           ${explorerAddressUrl(wallet.address)}`);
+  console.log(`Explorer escrow:        ${explorerAddressUrl(escrowWallet.address)}`);
   try {
     const bal = await getBotBalanceEth();
-    console.log(`Pool ETH:   ${bal}`);
+    console.log(`Ops ETH:    ${bal}`);
   } catch (err) {
     console.warn('Could not fetch balance at startup:', err.message);
   }
@@ -2143,6 +2463,11 @@ async function handleIncomingMessage(message) {
       return;
     }
 
+    if (isEscrowCommand(text)) {
+      await handleEscrow(message, user);
+      return;
+    }
+
     if (isUsersCommand(text)) {
       await handleUsers(message, user);
       return;
@@ -2212,6 +2537,26 @@ async function handleIncomingMessage(message) {
     const claimsList = parseClaimsListCommand(text);
     if (claimsList) {
       await handleClaimsList(message, user, phone, account, claimsList.kind);
+      return;
+    }
+
+    const reqCmd = parseRequestCommand(text);
+    if (reqCmd) {
+      await handleRequestMoney(
+        message,
+        user,
+        phone,
+        account,
+        reqCmd.amountEth,
+        reqCmd.fromRaw,
+        reqCmd.isPhone
+      );
+      return;
+    }
+
+    const requestsCmd = parseRequestsCommand(text);
+    if (requestsCmd) {
+      await handleRequestsCommand(message, user, phone, account, requestsCmd.kind);
       return;
     }
 

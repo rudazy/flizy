@@ -6,6 +6,8 @@ export type DashboardData = {
     agent_wallet_address?: string | null;
     balance_eth?: number | string;
     has_pin: boolean;
+    /** null = app default (or no daily cap if default is 0) */
+    daily_send_limit_eth?: number | string | null;
   };
   trusted: Array<{ address: string; label: string }>;
   link?: { code: string; waDeepLink: string; expiresAt: string } | null;

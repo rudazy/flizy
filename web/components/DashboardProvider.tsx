@@ -31,6 +31,7 @@ type DashboardContextValue = {
   }) => Promise<boolean>;
   removeTrusted: (address: string, password: string) => Promise<boolean>;
   setUnlockPin: (pin: string) => Promise<boolean>;
+  setDailyLimit: (limit: number | null, password: string) => Promise<boolean>;
   explorerBase: string;
 };
 
@@ -188,6 +189,35 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [load]
   );
 
+  const setDailyLimit = useCallback(
+    async (limit: number | null, password: string) => {
+      setBusy('limit');
+      setMsg('');
+      try {
+        const res = await fetch('/api/limits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ daily_send_limit_eth: limit, password }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed');
+        setMsg(
+          limit == null
+            ? 'Daily limit cleared (app default).'
+            : `Daily send limit set to ${limit} ETH (UTC day).`
+        );
+        await load();
+        return true;
+      } catch (err) {
+        setMsg(err instanceof Error ? err.message : 'Failed');
+        return false;
+      } finally {
+        setBusy('');
+      }
+    },
+    [load]
+  );
+
   const explorerBase =
     holdings?.holdings?.chain?.explorerBaseUrl || 'https://sepolia-explorer.giwa.io';
 
@@ -208,6 +238,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       addTrusted,
       removeTrusted,
       setUnlockPin,
+      setDailyLimit,
       explorerBase,
     }),
     [
@@ -224,6 +255,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       addTrusted,
       removeTrusted,
       setUnlockPin,
+      setDailyLimit,
       explorerBase,
     ]
   );
