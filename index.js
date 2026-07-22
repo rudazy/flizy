@@ -8,7 +8,6 @@ require('dotenv').config();
 const { config, requireEnv } = require('./lib/config');
 const { getDefaultChain, explorerTxUrl: chainTxUrl, explorerAddressUrl: chainAddressUrl } = require('./lib/chains');
 const { getSupabase } = require('./lib/supabase');
-const { insertTransfer, logSubmitted, logReceipt } = require('./lib/transferLog');
 const { publicErrorMessage } = require('./lib/sanitize');
 const {
   getOrCreateAccountForSender,
@@ -17,14 +16,22 @@ const {
 } = require('./lib/identity');
 const { stripFlizyPrefix, parseUnlockCommand, parseLockCommand } = require('./lib/prefix');
 const { isSessionUnlocked, unlockWithPin, touchSession, lockSession } = require('./lib/session');
-const { isTrustedAddress, rejectUntrustedMessage, addTrusted } = require('./lib/trusted');
+const { addTrusted } = require('./lib/trusted');
 const { createClaim } = require('./lib/claims');
 const {
   ensureAgentWallet,
-  getAgentSigner,
   formatAccountWalletCard,
 } = require('./lib/agentWallet');
 const { getWalletHoldings, formatHoldingsMessage } = require('./lib/holdings');
+const {
+  createSendIntent,
+  evaluateSendPolicy,
+  buildSendPlan,
+  formatPlanPreview,
+  assertPlanFunded,
+  executeNativeSend,
+  formatSendReceipt,
+} = require('./lib/engine');
 
 // ---------------------------------------------------------------------------
 // Config (Phase 0: chain registry + config-driven copy)
@@ -34,16 +41,16 @@ requireEnv(['SUPABASE_URL', 'SUPABASE_KEY', 'GIWA_RPC', 'PRIVATE_KEY']);
 
 const chain = getDefaultChain();
 const PENDING_TTL_MS = config.pendingTtlMs;
-const MAX_SEND_ETH = config.maxSendEth;
-const GAS_BUFFER_ETH = config.gasBufferEth;
 const ADMIN_PHONES = config.adminPhones;
-const REJECT_UNTRUSTED = config.rejectUntrustedCopy;
 
 const supabase = getSupabase();
 const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
 const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-/** @type {Map<string, { amountEth: string, to: string, createdAt: number }>} */
+/**
+ * Pending confirmed sends: full Execution Plan (Intent → Policy → Plan).
+ * @type {Map<string, { plan: object, createdAt: number }>}
+ */
 const pendingSends = new Map();
 
 /** @type {Map<string, { address: string, createdAt: number }>} */
@@ -445,14 +452,6 @@ async function setUserBalance(userId, newBalanceEth) {
     .single();
   if (error) throw new Error(`Balance update failed: ${error.message}`);
   return data;
-}
-
-async function recordTransfer(row) {
-  return insertTransfer({
-    ...row,
-    chain_id: chain.chainId,
-    kind: row.kind || 'transfer',
-  });
 }
 
 /**
@@ -928,113 +927,101 @@ async function handleCredit(message, adminUser, targetPhone, amountEth) {
   }
 }
 
+/**
+ * SEND path: Intent → Policy → Plan (preview). Confirm runs Execution + Receipt.
+ */
 async function handleSend(message, user, phone, amountEth, toRaw, isAddress, account) {
-  // Always spend from the permanent site-linked agent wallet (not a bot-only orphan).
   const siteAcc = await resolveLinkedSiteAccount(phone, account);
   if (!siteAcc?.id) {
-    await message.reply(
-      `Link your site account first.\nOpen ${config.siteUrl}/dashboard and send flizy link CODE`
+    await botReply(
+      message,
+      phone,
+      [
+        'Link your site account first.',
+        `Open ${config.siteUrl}/dashboard`,
+        'Generate a code, then send:',
+        'flizy link CODE',
+      ].join('\n')
     );
     return;
   }
 
   const resolved = await resolveSendTarget(phone, toRaw, isAddress, siteAcc.id);
   if (resolved.error) {
-    await message.reply(resolved.error);
-    return;
-  }
-  const checksumTo = resolved.address;
-  const label = resolved.label;
-
-  // Trusted allowlist (site or flizy add wallet)
-  if (config.enforceTrusted) {
-    const ok = await isTrustedAddress(siteAcc.id, checksumTo);
-    if (!ok) {
-      await message.reply(rejectUntrustedMessage());
-      return;
-    }
-  }
-
-  let amountWei;
-  try {
-    amountWei = ethers.parseEther(amountEth);
-  } catch {
-    await message.reply('Invalid amount. Example: flizy send 0.01 to john');
+    await botReply(message, phone, resolved.error);
     return;
   }
 
-  if (amountWei <= 0n) {
-    await message.reply('Amount must be greater than 0.');
-    return;
+  let sessionUnlocked = true;
+  if (config.requireUnlock && siteAcc.unlock_pin_hash && !isAdminUser(user)) {
+    sessionUnlocked = await isSessionUnlocked(siteAcc.id, phone);
   }
 
-  if (Number(amountEth) > MAX_SEND_ETH) {
-    await message.reply(`Max per send is ${MAX_SEND_ETH} ETH.`);
-    return;
-  }
+  const intent = createSendIntent({
+    actor: {
+      accountId: siteAcc.id,
+      userId: user.id,
+      waSenderId: phone,
+      isAdmin: isAdminUser(user),
+      creditEth: Number(user.balance_eth || 0),
+      sessionUnlocked,
+      hasPin: Boolean(siteAcc.unlock_pin_hash),
+    },
+    amountEth,
+    toAddress: resolved.address,
+    toLabel: resolved.label,
+    toRaw,
+    toIsAddress: isAddress,
+    chainId: String(chain.chainId),
+  });
 
-  const admin = isAdminUser(user);
-  const credit = Number(user.balance_eth || 0);
-
-  if (config.enforceCredit && !admin && credit < Number(amountEth)) {
-    await message.reply(
-      [
-        'Not enough spendable credit.',
-        `You have ${formatEth(credit)} ETH credit.`,
-        `Need ${formatEth(amountEth)} ETH.`,
-        '',
-        'Send: flizy deposit',
-      ].join('\n')
-    );
+  const policy = await evaluateSendPolicy(intent);
+  if (policy.decision === 'DENY') {
+    await botReply(message, phone, policy.message || 'Not allowed.');
     return;
   }
 
   let fromAddress;
+  let fromBalanceEth;
   try {
     const acc = await ensureAgentWallet(siteAcc.id);
     fromAddress = ethers.getAddress(acc.agent_wallet_address);
     const balanceWei = await provider.getBalance(fromAddress);
-    const gasBuffer = ethers.parseEther(GAS_BUFFER_ETH);
-    if (balanceWei < amountWei + gasBuffer) {
-      const bal = ethers.formatEther(balanceWei);
-      await message.reply(
-        [
-          'Not enough ETH in your agent wallet (amount + gas).',
-          `Have ${formatEth(bal)} ETH`,
-          `Need ~${amountEth} ETH + gas`,
-          `Fund: ${fromAddress}`,
-          explorerAddressUrl(fromAddress),
-        ].join('\n')
-      );
-      return;
-    }
+    fromBalanceEth = ethers.formatEther(balanceWei);
   } catch (err) {
     console.error('agent balance check failed:', publicErrorMessage(err));
-    await message.reply('Could not check your agent wallet on GIWA. Try again shortly.');
+    await botReply(
+      message,
+      phone,
+      'Could not check your agent wallet on-chain. Try again shortly.'
+    );
     return;
   }
 
-  pendingSends.set(phone, {
-    amountEth,
-    to: checksumTo,
-    fromAccountId: siteAcc.id,
+  const plan = buildSendPlan({
+    intent,
+    policy,
+    chain: {
+      chainId: chain.chainId,
+      chainName: chain.name,
+      nativeSymbol: chain.nativeSymbol || 'ETH',
+    },
     fromAddress,
-    createdAt: Date.now(),
+    fromBalanceEth,
   });
 
-  const toDisplay = label
-    ? `${label} (${shortAddress(checksumTo)})`
-    : shortAddress(checksumTo);
-  const lines = [
-    'Pending transfer',
-    `  Amount: ${amountEth} ETH`,
-    `  To: ${toDisplay}`,
-    `  From: ${shortAddress(fromAddress)} (your agent wallet)`,
-    '',
-    'Reply confirm (or flizy confirm) within 5 minutes.',
-    'Or: cancel',
-  ];
-  await message.reply(lines.join('\n'));
+  const funded = assertPlanFunded(plan, fromBalanceEth);
+  if (!funded.ok) {
+    await botReply(
+      message,
+      phone,
+      [funded.message, explorerAddressUrl(fromAddress)].filter(Boolean).join('\n')
+    );
+    return;
+  }
+
+  pendingSends.set(phone, { plan, createdAt: Date.now() });
+  await botReply(message, phone, formatPlanPreview(plan));
 }
 
 async function handleConfirm(message, user, phone) {
@@ -1048,18 +1035,15 @@ async function handleConfirm(message, user, phone) {
 
   if (Date.now() - pending.createdAt > PENDING_TTL_MS) {
     pendingSends.delete(phone);
-    await message.reply('Pending transfer expired. Start again with send ...');
+    await botReply(message, phone, 'Transfer plan expired. Start again with flizy send ...');
     return;
   }
 
+  const plan = pending.plan;
   pendingSends.delete(phone);
 
-  const { amountEth, to, fromAccountId } = pending;
-  let amountWei;
-  try {
-    amountWei = ethers.parseEther(amountEth);
-  } catch {
-    await message.reply('Pending amount was invalid. Start again.');
+  if (!plan) {
+    await botReply(message, phone, 'Nothing to confirm. Start with flizy send ...');
     return;
   }
 
@@ -1071,121 +1055,24 @@ async function handleConfirm(message, user, phone) {
     console.error('confirm re-fetch user:', err);
   }
 
-  const admin = isAdminUser(fresh);
-  const credit = Number(fresh.balance_eth || 0);
-  const amountNum = Number(amountEth);
+  await botReply(message, phone, 'Executing transfer...');
 
-  if (config.enforceCredit && !admin && credit < amountNum) {
-    await message.reply('Not enough credit to complete. Send flizy deposit for options.');
-    return;
-  }
-
-  let accountIdForTx = fromAccountId || null;
-  if (!accountIdForTx) {
-    try {
-      const bridged = await getOrCreateAccountForSender(phone);
-      accountIdForTx = bridged.account?.id || null;
-    } catch {
-      // optional
-    }
-  }
-
-  if (!accountIdForTx) {
-    await message.reply('No agent wallet linked. Open the site and flizy link CODE first.');
-    return;
-  }
-
-  const transferRow = await recordTransfer({
-    user_id: fresh.id,
-    account_id: accountIdForTx,
-    phone,
-    to_address: to,
-    amount_eth: amountEth,
-    status: 'pending',
+  const result = await executeNativeSend({
+    plan,
+    provider,
+    chain,
+    user: fresh,
+    setUserBalance,
+    supabase,
   });
 
-  try {
-    const network = await provider.getNetwork();
-    if (Number(network.chainId) !== chain.chainId) {
-      throw new Error(`Wrong chain id ${network.chainId}, expected ${chain.chainId}`);
-    }
-
-    // Always send from the user's site agent wallet (not the bot ops key)
-    await ensureAgentWallet(accountIdForTx);
-    const agentSigner = getAgentSigner(accountIdForTx, provider);
-
-    const balanceWei = await provider.getBalance(agentSigner.address);
-    const gasBuffer = ethers.parseEther(GAS_BUFFER_ETH);
-    if (balanceWei < amountWei + gasBuffer) {
-      await message.reply(
-        [
-          'Not enough ETH in your agent wallet.',
-          `Fund: ${agentSigner.address}`,
-          explorerAddressUrl(agentSigner.address),
-        ].join('\n')
-      );
-      return;
-    }
-
-    const tx = await agentSigner.sendTransaction({
-      to,
-      value: amountWei,
-    });
-
-    await logSubmitted(transferRow?.id, tx.hash);
-
-    const receipt = await tx.wait(1);
-    const ok = Boolean(receipt && receipt.status === 1);
-    const link = explorerTxUrl(tx.hash);
-
-    if (ok && config.enforceCredit && credit >= amountNum) {
-      await setUserBalance(fresh.id, credit - amountNum);
-      try {
-        await supabase
-          .from('accounts')
-          .update({ balance_eth: credit - amountNum })
-          .eq('id', accountIdForTx);
-      } catch {
-        // non-fatal
-      }
-    }
-
-    await logReceipt(transferRow?.id, {
-      ok,
-      txHash: tx.hash,
-      error: ok ? null : 'receipt status not successful',
-    });
-
-    if (!transferRow?.id) {
-      await insertTransfer({
-        user_id: fresh.id,
-        account_id: accountIdForTx,
-        phone,
-        to_address: to,
-        amount_eth: amountEth,
-        status: ok ? 'confirmed' : 'failed',
-        tx_hash: tx.hash,
-        chain_id: chain.chainId,
-        kind: 'transfer',
-        error: ok ? null : 'receipt status not successful',
-      });
-    }
-
-    await message.reply(link);
-  } catch (err) {
-    console.error('send tx error:', publicErrorMessage(err));
-    const reason = publicErrorMessage(err);
-    if (transferRow?.id) {
-      await logReceipt(transferRow.id, { ok: false, txHash: '', error: reason });
-    }
-    await message.reply('Failed.');
-  }
+  await botReply(message, phone, formatSendReceipt(result, plan));
 }
 
 async function handleCancel(message, phone) {
   if (pendingSends.has(phone)) {
     pendingSends.delete(phone);
-    await message.reply('Pending transfer cancelled. Credit unchanged.');
+    await botReply(message, phone, 'Transfer plan cancelled. Nothing was sent.');
     return true;
   }
   // No pending: stay silent so random "cancel" does not look like a bot chat
