@@ -1714,10 +1714,8 @@ async function handleConfirm(message, user, phone) {
         'They receive only after that WhatsApp links Flizy.',
         'Cancel anytime: flizy cancel claims',
         '',
-        'Share claim link (optional):',
+        'Share claim link:',
         result.claimUrl,
-        '',
-        result.explorerUrl || '',
       ]
         .filter(Boolean)
         .join('\n')
