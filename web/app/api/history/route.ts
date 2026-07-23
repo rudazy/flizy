@@ -123,44 +123,66 @@ export async function GET() {
     }
 
     const supabase = getSupabase();
-    const selectCols =
+    const selectFull =
       'id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id, kind, asset, token_address, counterparty_label, direction, amount_secondary, asset_secondary';
+    const selectCore =
+      'id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id, kind';
 
+    // Prefer account_id (swaps / site rows use this). Merge legacy phone-only rows.
     const { data: identities } = await supabase
       .from('whatsapp_identities')
       .select('wa_sender_id')
       .eq('account_id', accountId);
-
     const phones = (identities || []).map((i) => i.wa_sender_id).filter(Boolean);
 
-    let transferQuery = supabase
-      .from('transfers')
-      .select(selectCols)
-      .order('created_at', { ascending: false })
-      .limit(40);
-
-    if (phones.length > 0) {
-      transferQuery = transferQuery.or(
-        `account_id.eq.${accountId},phone.in.(${phones.join(',')})`
-      );
-    } else {
-      transferQuery = transferQuery.eq('account_id', accountId);
-    }
-
-    const { data: transfers, error: tErr } = await transferQuery;
-    let transferRows: Record<string, unknown>[] = (transfers || []) as Record<string, unknown>[];
-    if (tErr) {
-      // Older schema without new columns — fall back
-      const { data: byAccount } = await supabase
+    async function loadTransfers(select: string): Promise<{
+      rows: Record<string, unknown>[];
+      error: { message: string } | null;
+    }> {
+      const byAccount = await supabase
         .from('transfers')
-        .select(
-          'id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id, kind'
-        )
+        .select(select)
         .eq('account_id', accountId)
         .order('created_at', { ascending: false })
         .limit(40);
-      transferRows = (byAccount || []) as Record<string, unknown>[];
+
+      if (byAccount.error) {
+        return { rows: [], error: byAccount.error };
+      }
+
+      const map = new Map<string, Record<string, unknown>>();
+      for (const r of (byAccount.data || []) as unknown as Record<string, unknown>[]) {
+        map.set(String(r.id), r);
+      }
+
+      if (phones.length > 0) {
+        // Query each phone separately — avoids fragile .in() with LID special chars
+        for (const phone of phones.slice(0, 8)) {
+          const byPhone = await supabase
+            .from('transfers')
+            .select(select)
+            .eq('phone', phone)
+            .order('created_at', { ascending: false })
+            .limit(20);
+          if (byPhone.error) continue;
+          for (const r of (byPhone.data || []) as unknown as Record<string, unknown>[]) {
+            map.set(String(r.id), r);
+          }
+        }
+      }
+
+      const rows = Array.from(map.values()).sort(
+        (a, b) =>
+          new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime()
+      );
+      return { rows: rows.slice(0, 40), error: null };
     }
+
+    let loaded = await loadTransfers(selectFull);
+    if (loaded.error) {
+      loaded = await loadTransfers(selectCore);
+    }
+    const transferRows = loaded.rows;
 
     const { data: claimsOut } = await supabase
       .from('claims')

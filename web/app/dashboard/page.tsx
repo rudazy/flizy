@@ -224,6 +224,87 @@ export default function DashboardHomePage() {
         </div>
       </section>
 
+      {/* Fund agent wallet — faucet/bridge cannot use the Flizy smart wallet */}
+      <section id="fund" className="card scroll-mt-20 space-y-4 p-4 sm:p-5">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.14em] text-gold">Testnet funding</p>
+          <h2 className="mt-1.5 font-sans text-lg tracking-wide text-paper">
+            Fund your agent wallet
+          </h2>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            Google faucet and the GIWA bridge only work with a normal browser wallet
+            (MetaMask or Rabby). Your Flizy agent address is a smart wallet — it cannot claim
+            faucet ETH or drive the bridge by itself. Fund a regular wallet first, then send
+            GIWA Sepolia ETH to the address on Wallet.
+          </p>
+        </div>
+
+        <ol className="space-y-3">
+          {[
+            {
+              n: '1',
+              t: 'Open MetaMask or Rabby',
+              d: 'Use a regular EOA wallet in the browser. Add or switch to Ethereum Sepolia if needed.',
+            },
+            {
+              n: '2',
+              t: 'Claim Sepolia ETH from Google faucet',
+              d: 'Connect that wallet to the faucet and request test ETH. Do not paste your Flizy agent address into the faucet.',
+              href: 'https://cloud.google.com/application/web3/faucet',
+              linkLabel: 'Open Google faucet',
+            },
+            {
+              n: '3',
+              t: 'Bridge to GIWA Sepolia',
+              d: 'Use the GIWA bridge with the same MetaMask/Rabby wallet. Bridge Sepolia ETH onto GIWA Sepolia.',
+              href: 'https://bridge-giwa.vercel.app/',
+              linkLabel: 'Open GIWA bridge',
+            },
+            {
+              n: '4',
+              t: 'Send to your Flizy agent wallet',
+              d: 'On GIWA Sepolia, transfer ETH from MetaMask/Rabby to your agent address (Wallet tab → Copy address). Then use WhatsApp or Swap.',
+              href: '/dashboard/wallet',
+              linkLabel: 'Open wallet & copy address',
+            },
+          ].map((step) => (
+            <li
+              key={step.n}
+              className="flex gap-3 border-b border-border pb-3 last:border-0 last:pb-0"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-border bg-ink font-mono text-[11px] text-lime">
+                {step.n}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-sans text-sm tracking-wide text-paper">{step.t}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted">{step.d}</p>
+                {'href' in step && step.href ? (
+                  <a
+                    href={step.href}
+                    className="mt-2 inline-block text-xs text-lime no-underline hover:text-gold"
+                    target={step.href.startsWith('http') ? '_blank' : undefined}
+                    rel={step.href.startsWith('http') ? 'noreferrer' : undefined}
+                  >
+                    {step.linkLabel} →
+                  </a>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        {data.account.agent_wallet_address ? (
+          <div className="rounded-md border border-border bg-ink/50 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-[0.12em] text-muted">
+              Send GIWA ETH to this address
+            </p>
+            <p className="mt-1 break-all font-mono text-[11px] text-paper">
+              {data.account.agent_wallet_address}
+            </p>
+          </div>
+        ) : null}
+      </section>
+
       <section className="space-y-3">
         {[
           {

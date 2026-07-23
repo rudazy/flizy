@@ -90,7 +90,7 @@ export default function HomePage() {
             },
             {
               t: 'Your wallet sends',
-              d: 'From address is your agent wallet. Fund it via faucet or GIWA bridge.',
+              d: 'From address is your agent wallet. Fund it from MetaMask or Rabby after faucet + GIWA bridge.',
             },
           ].map((item) => (
             <div key={item.t} className="card card-hover p-5">
@@ -99,6 +99,63 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="card space-y-4 p-5 md:p-8">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-gold">Testnet</p>
+          <h2 className="mt-2 font-sans text-2xl tracking-wide text-paper">
+            How to fund (MetaMask / Rabby)
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
+            Faucets and bridges need a regular wallet. Your Flizy agent address is a smart wallet —
+            it cannot claim Google faucet ETH or operate the GIWA bridge. Use MetaMask or Rabby,
+            then send GIWA Sepolia ETH to your agent address from the app Wallet tab.
+          </p>
+        </div>
+        <ol className="grid gap-3 sm:grid-cols-2">
+          {[
+            {
+              n: '01',
+              t: 'MetaMask or Rabby',
+              d: 'Connect a normal browser wallet. Not your Flizy agent address.',
+            },
+            {
+              n: '02',
+              t: 'Google faucet',
+              d: 'Claim Sepolia test ETH into that wallet.',
+              href: 'https://cloud.google.com/application/web3/faucet',
+            },
+            {
+              n: '03',
+              t: 'GIWA bridge',
+              d: 'Bridge Sepolia ETH onto GIWA Sepolia with the same wallet.',
+              href: 'https://bridge-giwa.vercel.app/',
+            },
+            {
+              n: '04',
+              t: 'Send to Flizy',
+              d: 'Transfer GIWA ETH to your agent wallet address after you sign up.',
+              href: '/signup',
+            },
+          ].map((s) => (
+            <li key={s.n} className="rounded-md border border-border bg-ink/40 p-4">
+              <p className="font-mono text-[10px] text-lime">{s.n}</p>
+              <p className="mt-1 font-sans text-sm tracking-wide text-paper">{s.t}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{s.d}</p>
+              {'href' in s && s.href ? (
+                <a
+                  href={s.href}
+                  className="mt-2 inline-block text-xs text-lime no-underline hover:text-gold"
+                  target={s.href.startsWith('http') ? '_blank' : undefined}
+                  rel={s.href.startsWith('http') ? 'noreferrer' : undefined}
+                >
+                  Open →
+                </a>
+              ) : null}
+            </li>
+          ))}
+        </ol>
       </section>
 
       <section className="card overflow-hidden">

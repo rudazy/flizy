@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { AppTopBar } from '../../../components/AppTopBar';
 import { useDashboard } from '../../../components/DashboardProvider';
 import type { ActivityItem } from '../../../lib/dashboardTypes';
@@ -17,10 +18,11 @@ function typeBadge(type: ActivityItem['type']) {
 }
 
 function typeClass(type: ActivityItem['type']) {
-  if (type === 'receive') return 'text-lime border-lime/30';
-  if (type === 'swap') return 'text-gold border-gold/30';
-  if (type === 'claim') return 'text-paper border-border';
-  return 'text-muted border-border';
+  if (type === 'receive') return 'border-lime/35 bg-lime/10 text-lime';
+  if (type === 'swap') return 'border-gold/35 bg-gold/10 text-gold';
+  if (type === 'claim') return 'border-border bg-ink text-paper';
+  if (type === 'withdraw') return 'border-border bg-ink text-muted';
+  return 'border-border bg-ink text-muted';
 }
 
 function amountLine(row: ActivityItem) {
@@ -40,13 +42,59 @@ function fmtAmt(n: string | number) {
   return x.toLocaleString(undefined, { maximumFractionDigits: 6 });
 }
 
+function relativeTime(iso: string) {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '';
+  const sec = Math.round((Date.now() - t) / 1000);
+  if (sec < 60) return 'just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 86400 * 7) return `${Math.floor(sec / 86400)}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function secondaryLine(row: ActivityItem) {
+  if (row.type === 'swap') {
+    return row.label.startsWith('Swap') || row.label.includes('→')
+      ? row.label
+      : `Swap · ${row.status}`;
+  }
+  if (row.counterparty) {
+    const c = row.counterparty.startsWith('0x')
+      ? shortAddr(row.counterparty)
+      : row.counterparty;
+    if (row.type === 'claim') return row.label.includes(c) ? row.label : `${row.label}`;
+    return c;
+  }
+  return row.label;
+}
+
 export default function HistoryPage() {
   const { activity, history, explorerBase, refreshing, refreshAll } = useDashboard();
-  // Prefer unified activity feed when present; fall back to legacy transfer rows
-  const rows = activity.length > 0 ? activity : history.length === 0 ? [] : null;
+
+  const rows: ActivityItem[] =
+    activity.length > 0
+      ? activity
+      : history.map((row) => ({
+          id: row.id,
+          type: (row.kind === 'swap' ? 'swap' : 'transfer') as ActivityItem['type'],
+          direction: 'out' as const,
+          amount: row.amount_eth,
+          asset: row.asset || 'ETH',
+          status: row.status,
+          txHash: row.tx_hash,
+          createdAt: row.created_at,
+          label: `Sent ${row.amount_eth} ${row.asset || 'ETH'}`,
+          counterparty: row.to_address,
+        }));
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <AppTopBar
         title="History"
         actionLabel={refreshing ? '...' : 'Refresh'}
@@ -54,106 +102,84 @@ export default function HistoryPage() {
         actionBusy={refreshing}
       />
 
-      <section className="card p-4">
-        <p className="mb-1 text-sm text-muted">
-          Last 30 activity rows — sends, receives, claims, and swaps.
+      <div className="flex items-baseline justify-between gap-2 px-0.5">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
+          Activity
         </p>
-        <p className="mb-4 text-xs text-muted">
-          Same desk as WhatsApp <span className="text-paper">flizy history</span>. Scroll the list.
+        <p className="font-mono text-[11px] text-muted">
+          {rows.length === 0 ? 'Empty' : `${rows.length} of last 30`}
         </p>
+      </div>
 
-        {rows && rows.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border px-4 py-10 text-center">
-            <p className="font-sans text-sm text-paper">No activity yet</p>
-            <p className="mt-2 text-xs text-muted">
-              Send, swap, or claim on WhatsApp — rows show up here with explorer links.
-            </p>
+      {rows.length === 0 ? (
+        <section className="card p-5">
+          <p className="font-sans text-sm tracking-wide text-paper">No activity yet</p>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            Sends, claims, and swaps land here after confirm on WhatsApp or Swap.
+          </p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Link href="/dashboard/swap" className="btn btn-primary flex-1 text-sm no-underline">
+              Open Swap
+            </Link>
+            <Link href="/dashboard/wallet" className="btn btn-ghost flex-1 text-sm no-underline">
+              Wallet
+            </Link>
           </div>
-        ) : rows ? (
-          <div className="max-h-[min(70vh,640px)] overflow-y-auto overscroll-contain pr-1">
-            <ul className="space-y-0">
-              {rows.map((row) => (
-                <li
-                  key={row.id}
-                  className="border-b border-border py-4 text-sm first:pt-0 last:border-0 last:pb-0"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span
-                      className={`inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${typeClass(row.type)}`}
-                    >
-                      {typeBadge(row.type)}
-                    </span>
-                    <span className="badge">{row.status}</span>
-                  </div>
-                  <p
-                    className={`mt-2 font-sans text-base tracking-wide ${
-                      row.direction === 'in' ? 'text-lime' : 'text-paper'
-                    }`}
+          <p className="mt-3 font-mono text-[11px] text-muted">
+            WhatsApp: <span className="text-paper">flizy history</span>
+          </p>
+        </section>
+      ) : (
+        <section className="card overflow-hidden">
+          <ul className="divide-y divide-border">
+            {rows.map((row) => (
+              <li key={row.id} className="px-3.5 py-3 sm:px-4">
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-0.5 inline-flex shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${typeClass(row.type)}`}
                   >
-                    {amountLine(row)}
-                  </p>
-                  <p className="mt-1 text-xs text-muted">{row.label}</p>
-                  {row.counterparty && row.type !== 'swap' ? (
-                    <p className="text-xs text-muted">
-                      {row.counterparty.startsWith('0x')
-                        ? shortAddr(row.counterparty)
-                        : row.counterparty}
-                    </p>
-                  ) : null}
-                  <p className="text-xs text-muted">{new Date(row.createdAt).toLocaleString()}</p>
-                  {row.txHash ? (
-                    <a
-                      className="mt-2 inline-block text-xs text-lime no-underline hover:text-gold"
-                      href={`${explorerBase}/tx/${row.txHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View tx
-                    </a>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : history.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border px-4 py-10 text-center">
-            <p className="font-sans text-sm text-paper">No activity yet</p>
-            <p className="mt-2 text-xs text-muted">
-              After you send or swap, rows appear here with explorer links.
-            </p>
-          </div>
-        ) : (
-          <div className="max-h-[min(70vh,640px)] overflow-y-auto overscroll-contain pr-1">
-            <ul className="space-y-0">
-              {history.map((row) => (
-                <li
-                  key={row.id}
-                  className="border-b border-border py-4 text-sm first:pt-0 last:border-0 last:pb-0"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-sans text-base text-lime">
-                      {row.amount_eth} {row.asset || 'ETH'}
-                    </span>
-                    <span className="badge">{row.status}</span>
+                    {typeBadge(row.type)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p
+                        className={`font-sans text-[15px] tracking-wide ${
+                          row.direction === 'in' ? 'text-lime' : 'text-paper'
+                        }`}
+                      >
+                        {amountLine(row)}
+                      </p>
+                      <span className="shrink-0 font-mono text-[10px] text-muted">
+                        {relativeTime(row.createdAt)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-muted">{secondaryLine(row)}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted">
+                        {row.status}
+                      </span>
+                      {row.txHash ? (
+                        <a
+                          className="font-mono text-[10px] text-lime no-underline hover:text-gold"
+                          href={`${explorerBase}/tx/${row.txHash}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View tx
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs text-muted">To {shortAddr(row.to_address)}</p>
-                  <p className="text-xs text-muted">{new Date(row.created_at).toLocaleString()}</p>
-                  {row.tx_hash ? (
-                    <a
-                      className="mt-2 inline-block text-xs text-lime no-underline hover:text-gold"
-                      href={`${explorerBase}/tx/${row.tx_hash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View tx
-                    </a>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <p className="px-0.5 text-center font-mono text-[10px] text-muted">
+        Sends · claims · swaps · last 30
+      </p>
     </div>
   );
 }
