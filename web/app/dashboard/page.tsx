@@ -73,8 +73,14 @@ export default function DashboardHomePage() {
           </span>
         </h2>
         <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
-          Manage wallet, trusted names, and history here. On chat you just send.
+          Manage wallet, trusted names, and history here. Swap FLZ on the big Swap tab or on WhatsApp.
         </p>
+
+        <div className="mt-4">
+          <Link href="/dashboard/swap" className="btn btn-primary w-full py-3.5 text-base font-semibold no-underline">
+            Open Swap
+          </Link>
+        </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
           <div className="rounded-md border border-border bg-ink/70 p-3">

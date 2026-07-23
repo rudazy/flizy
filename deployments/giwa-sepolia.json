@@ -1,0 +1,36 @@
+{
+  "chainId": 91342,
+  "chainName": "GIWA Sepolia",
+  "explorer": "https://sepolia-explorer.giwa.io",
+  "deployedAt": "2026-07-23",
+  "treasury": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+  "feeBpsDefault": 30,
+  "feeBpsMax": 100,
+  "seed": {
+    "eth": "1.2",
+    "flz": "60000",
+    "priceFlzPerEth": "50000"
+  },
+  "contracts": {
+    "weth": "0x3a13399f2741122B63c7710B2A85346B97C6BFDf",
+    "flz": "0x308be8f71DA695f18E70D2243a446e1fD1566BA6",
+    "factory": "0xBB1d2c582E455B448660A199097A54DF29162BbF",
+    "router": "0x4055413A4757e069bbCAc481639EF2814224Faa0",
+    "feeRouter": "0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC",
+    "pairFlzWeth": "0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227"
+  },
+  "explorerLinks": {
+    "weth": "https://sepolia-explorer.giwa.io/address/0x3a13399f2741122B63c7710B2A85346B97C6BFDf",
+    "flz": "https://sepolia-explorer.giwa.io/address/0x308be8f71DA695f18E70D2243a446e1fD1566BA6",
+    "factory": "https://sepolia-explorer.giwa.io/address/0xBB1d2c582E455B448660A199097A54DF29162BbF",
+    "router": "https://sepolia-explorer.giwa.io/address/0x4055413A4757e069bbCAc481639EF2814224Faa0",
+    "feeRouter": "https://sepolia-explorer.giwa.io/address/0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC",
+    "pairFlzWeth": "https://sepolia-explorer.giwa.io/address/0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227"
+  },
+  "notes": [
+    "FLZ is a testnet demo token: 100000 supply, symbol FLZ, 18 decimals.",
+    "Protocol fee default 30 bps (0.30%), hard max 100 bps, paid to treasury.",
+    "Swaps go through feeRouter. Liquidity can use feeRouter.addLiquidityETH or V2 router.",
+    "Uniswap V2 style 0.30% pool fee remains on the pair (standard V2)."
+  ]
+}

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const TABS = [
+const LEFT_TABS = [
   {
     href: '/dashboard',
     label: 'Home',
@@ -16,6 +16,9 @@ const TABS = [
     match: (p: string) => p.startsWith('/dashboard/wallet'),
     icon: WalletIcon,
   },
+] as const;
+
+const RIGHT_TABS = [
   {
     href: '/dashboard/history',
     label: 'History',
@@ -30,63 +33,127 @@ const TABS = [
   },
 ] as const;
 
-function TabLinks({ compact }: { compact?: boolean }) {
+function CompactTab({
+  href,
+  label,
+  active,
+  Icon,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  Icon: (p: { active: boolean }) => JSX.Element;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 no-underline transition-colors ${
+        active ? 'text-lime' : 'text-muted hover:text-paper'
+      }`}
+      aria-current={active ? 'page' : undefined}
+    >
+      <Icon active={active} />
+      <span className="font-sans text-[10px] font-medium tracking-wide">{label}</span>
+    </Link>
+  );
+}
+
+function SwapPill({ compact }: { compact?: boolean }) {
+  const pathname = usePathname() || '';
+  const active = pathname.startsWith('/dashboard/swap');
+
+  if (!compact) {
+    return (
+      <Link
+        href="/dashboard/swap"
+        className={`rounded-md px-4 py-2 font-sans text-sm font-semibold no-underline transition-colors ${
+          active ? 'bg-lime text-ink' : 'bg-lime/90 text-ink hover:bg-lime'
+        }`}
+        aria-current={active ? 'page' : undefined}
+      >
+        Swap
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href="/dashboard/swap"
+      className="relative -mt-4 flex min-w-[72px] flex-col items-center justify-end no-underline"
+      aria-current={active ? 'page' : undefined}
+      aria-label="Swap"
+    >
+      <span
+        className={`flex h-14 w-14 items-center justify-center rounded-full border-2 shadow-glow transition-transform duration-150 active:scale-95 ${
+          active ? 'border-lime bg-lime text-ink' : 'border-[#3a322a] bg-lime text-ink'
+        }`}
+      >
+        <SwapIcon />
+      </span>
+      <span
+        className={`mt-1 font-sans text-[11px] font-semibold tracking-wide ${
+          active ? 'text-lime' : 'text-muted'
+        }`}
+      >
+        Swap
+      </span>
+    </Link>
+  );
+}
+
+/** Desktop horizontal tabs. */
+export function AppDesktopTabs() {
   const pathname = usePathname() || '';
   return (
-    <>
-      {TABS.map((tab) => {
+    <nav className="flex flex-wrap items-center gap-1 border-b border-border pb-3" aria-label="App sections">
+      {[...LEFT_TABS, ...RIGHT_TABS].map((tab) => {
         const active = tab.match(pathname);
-        const Icon = tab.icon;
         return (
           <Link
             key={tab.href}
             href={tab.href}
-            className={
-              compact
-                ? `flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 no-underline transition-colors ${
-                    active ? 'text-lime' : 'text-muted hover:text-paper'
-                  }`
-                : `rounded-md px-3 py-2 font-sans text-sm no-underline transition-colors ${
-                    active
-                      ? 'bg-lime/10 text-lime'
-                      : 'text-muted hover:bg-surface hover:text-paper'
-                  }`
-            }
+            className={`rounded-md px-3 py-2 font-sans text-sm no-underline transition-colors ${
+              active ? 'bg-lime/10 text-lime' : 'text-muted hover:bg-surface hover:text-paper'
+            }`}
             aria-current={active ? 'page' : undefined}
           >
-            {compact ? (
-              <>
-                <Icon active={active} />
-                <span className="font-sans text-[10px] font-medium tracking-wide">{tab.label}</span>
-              </>
-            ) : (
-              tab.label
-            )}
+            {tab.label}
           </Link>
         );
       })}
-    </>
-  );
-}
-
-/** Desktop horizontal tabs (place under the top bar). */
-export function AppDesktopTabs() {
-  return (
-    <nav className="flex gap-1 border-b border-border pb-3" aria-label="App sections">
-      <TabLinks />
+      <SwapPill />
     </nav>
   );
 }
 
-/** Mobile fixed bottom bar only. */
+/** Mobile fixed bottom bar: Home | Wallet | large Swap | History | Account */
 export function AppBottomNav() {
+  const pathname = usePathname() || '';
   return (
     <nav
       className="app-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-border bg-ink/95 backdrop-blur-md md:hidden"
       aria-label="App"
     >
-      <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)] pt-1">
-        <TabLinks compact />
+      <div className="mx-auto flex max-w-lg items-end justify-between px-1 pb-[env(safe-area-inset-bottom)] pt-1">
+        {LEFT_TABS.map((tab) => (
+          <CompactTab
+            key={tab.href}
+            href={tab.href}
+            label={tab.label}
+            active={tab.match(pathname)}
+            Icon={tab.icon}
+          />
+        ))}
+        <SwapPill compact />
+        {RIGHT_TABS.map((tab) => (
+          <CompactTab
+            key={tab.href}
+            href={tab.href}
+            label={tab.label}
+            active={tab.match(pathname)}
+            Icon={tab.icon}
+          />
+        ))}
       </div>
     </nav>
   );
@@ -146,6 +213,26 @@ function AccountIcon({ active }: { active: boolean }) {
         d="M5 19.5c1.5-3 4-4.5 7-4.5s5.5 1.5 7 4.5"
         stroke="currentColor"
         strokeWidth={active ? 2 : 1.5}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SwapIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M7 7h11l-2.5-2.5M17 17H6l2.5 2.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18 7v4M6 13v4"
+        stroke="currentColor"
+        strokeWidth="2"
         strokeLinecap="round"
       />
     </svg>

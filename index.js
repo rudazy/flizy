@@ -38,18 +38,24 @@ const { getEscrowWallet, formatEscrowStatus } = require('./lib/escrowWallet');
 const { getWalletHoldings, formatHoldingsMessage } = require('./lib/holdings');
 const {
   createSendIntent,
+  createSwapIntent,
   evaluateSendPolicy,
   evaluateClaimHoldPolicy,
+  evaluateSwapPolicy,
   buildSendPlan,
   formatPlanPreview,
   assertPlanFunded,
   buildClaimPlan,
   formatClaimPlanPreview,
+  buildSwapPlan,
+  formatSwapPlanPreview,
   executeNativeSend,
   executeClaimHold,
   executeClaimRefund,
   executeClaimPayout,
+  executeSwapPlan,
   formatSendReceipt,
+  formatSwapReceipt,
 } = require('./lib/engine');
 const {
   createPaymentRequest,
@@ -60,6 +66,13 @@ const {
   getPaymentRequestById,
   formatRequestsMenu,
 } = require('./lib/paymentRequests');
+const {
+  getDexConfig,
+  resolveToken,
+  tokenLabel,
+  quoteSwap,
+  getFlzPrice,
+} = require('./lib/dex');
 
 // ---------------------------------------------------------------------------
 // Config (Phase 0: chain registry + config-driven copy)
@@ -305,6 +318,29 @@ function parseSendCommand(text) {
   return null;
 }
 
+/**
+ * flizy buy 0.01 FLZ | flizy sell 10 FLZ | flizy swap 0.01 ETH for FLZ | flizy price FLZ
+ * @returns {{ kind: 'buy'|'sell'|'swap'|'price', amount?: string, tokenIn?: string, tokenOut?: string, symbol?: string } | null}
+ */
+function parseSwapCommand(text) {
+  const t = String(text || '').trim();
+  let m = t.match(/^price\s+([a-zA-Z0-9]+)\s*$/i);
+  if (m) return { kind: 'price', symbol: m[1] };
+
+  m = t.match(/^buy\s+([0-9]*\.?[0-9]+)\s+([a-zA-Z0-9]+)\s*$/i);
+  if (m) return { kind: 'buy', amount: m[1], tokenOut: m[2] };
+
+  m = t.match(/^sell\s+([0-9]*\.?[0-9]+)\s+([a-zA-Z0-9]+)\s*$/i);
+  if (m) return { kind: 'sell', amount: m[1], tokenIn: m[2] };
+
+  m = t.match(
+    /^swap\s+([0-9]*\.?[0-9]+)\s+([a-zA-Z0-9]+)\s+for\s+([a-zA-Z0-9]+)\s*$/i
+  );
+  if (m) return { kind: 'swap', amount: m[1], tokenIn: m[2], tokenOut: m[3] };
+
+  return null;
+}
+
 /** flizy cancel claims | flizy cancel claims 234... | flizy cancel claims all */
 function parseCancelClaimsCommand(text) {
   const m = String(text || '').trim().match(
@@ -408,6 +444,7 @@ function isFlizyCommandBody(body) {
     isConfirmCommand(t) ||
     isCancelCommand(t) ||
     Boolean(parseSendCommand(t)) ||
+    Boolean(parseSwapCommand(t)) ||
     Boolean(parseCancelClaimsCommand(t)) ||
     Boolean(parseClaimsListCommand(t)) ||
     Boolean(parseRequestCommand(t)) ||
@@ -776,6 +813,13 @@ function helpText(user) {
     '  confirm',
     '  cancel',
     '',
+    'Swap (agent wallet, fee disclosed before confirm):',
+    '  flizy buy 0.01 FLZ       → spend ETH for FLZ',
+    '  flizy sell 10 FLZ        → sell FLZ for ETH',
+    '  flizy swap 0.01 ETH for FLZ',
+    '  flizy price FLZ',
+    '  (add liquidity on the site only)',
+    '',
     'Claims (phone not on Flizy yet):',
     '  flizy send 0.01 to 234…  → hold until they link WA',
     '  flizy cancel claims       → cancel anytime (1/2/3/All)',
@@ -801,6 +845,7 @@ function helpText(user) {
     `Chain: ${chain.name} (${chain.chainId})`,
     '',
     'On-chain sends are irreversible. Phone claims are cancellable until claimed.',
+    'Swaps charge a protocol fee shown in the plan (plus network gas).',
   ];
   return lines.join('\n');
 }
@@ -1425,6 +1470,18 @@ async function handleConfirm(message, user, phone) {
     return;
   }
 
+  if (plan.intent === 'SWAP') {
+    await botReply(message, phone, 'Submitting swap...');
+    const result = await executeSwapPlan({ plan, provider, chain });
+    if (!result.ok) {
+      await botReply(message, phone, result.error || 'Swap failed.');
+      return;
+    }
+    await botReply(message, phone, 'Swap submitted. Waiting for confirmation...');
+    await botReply(message, phone, formatSwapReceipt(result, plan));
+    return;
+  }
+
   await botReply(message, phone, 'Executing transfer...');
 
   const result = await executeNativeSend({
@@ -1455,10 +1512,170 @@ async function handleCancel(message, phone) {
   }
   if (pendingSends.has(phone)) {
     pendingSends.delete(phone);
-    await botReply(message, phone, 'Transfer plan cancelled. Nothing was sent.');
+    await botReply(message, phone, 'Plan cancelled. Nothing was executed.');
     return true;
   }
   return false;
+}
+
+/**
+ * flizy buy / sell / swap / price
+ */
+async function handleSwapCommand(message, user, phone, account, parsed) {
+  if (parsed.kind === 'price') {
+    try {
+      const sym = String(parsed.symbol || 'FLZ').toUpperCase();
+      if (sym !== 'FLZ' && sym !== 'FLIZY') {
+        await botReply(message, phone, 'Price supported for FLZ.\nExample: flizy price FLZ');
+        return;
+      }
+      const px = await getFlzPrice(provider, chain.id);
+      await botReply(
+        message,
+        phone,
+        [
+          'FLZ price (pool)',
+          `1 ETH ≈ ${formatEth(px.flzPerEth)} FLZ`,
+          `1 FLZ ≈ ${formatEth(px.ethPerFlz)} ETH`,
+          `Reserves: ${formatEth(px.reserveWeth)} ETH / ${formatEth(px.reserveFlz)} FLZ`,
+          `Chain: ${chain.name}`,
+        ].join('\n')
+      );
+    } catch (err) {
+      console.error('price:', publicErrorMessage(err));
+      await botReply(message, phone, 'Could not read price. Try again shortly.');
+    }
+    return;
+  }
+
+  const siteAcc = await requireLinkedSite(message, phone, account);
+  if (!siteAcc) return;
+
+  const dex = getDexConfig(chain.id);
+  if (!dex.feeRouter || !dex.flz) {
+    await botReply(message, phone, 'Swap not configured on this chain yet.');
+    return;
+  }
+
+  let tokenInLabel;
+  let tokenOutLabel;
+  let tokenIn;
+  let tokenOut;
+  let amountStr = parsed.amount;
+
+  try {
+    if (parsed.kind === 'buy') {
+      // spend native ETH for tokenOut
+      tokenInLabel = 'ETH';
+      tokenOutLabel = tokenLabel(parsed.tokenOut, chain.id);
+      tokenIn = null;
+      tokenOut = resolveToken(parsed.tokenOut, chain.id);
+      if (tokenOut === null) {
+        await botReply(message, phone, 'Buy target must be a token (e.g. FLZ), not ETH.');
+        return;
+      }
+    } else if (parsed.kind === 'sell') {
+      tokenInLabel = tokenLabel(parsed.tokenIn, chain.id);
+      tokenOutLabel = 'ETH';
+      tokenIn = resolveToken(parsed.tokenIn, chain.id);
+      tokenOut = null;
+      if (tokenIn === null) {
+        await botReply(message, phone, 'Sell input must be a token (e.g. FLZ), not ETH.');
+        return;
+      }
+    } else {
+      tokenInLabel = tokenLabel(parsed.tokenIn, chain.id);
+      tokenOutLabel = tokenLabel(parsed.tokenOut, chain.id);
+      const rawIn = String(parsed.tokenIn || '').toUpperCase();
+      const rawOut = String(parsed.tokenOut || '').toUpperCase();
+      tokenIn = rawIn === 'ETH' || rawIn === 'NATIVE' ? null : resolveToken(parsed.tokenIn, chain.id);
+      tokenOut = rawOut === 'ETH' || rawOut === 'NATIVE' ? null : resolveToken(parsed.tokenOut, chain.id);
+    }
+  } catch (err) {
+    await botReply(message, phone, err.message || 'Unknown token.');
+    return;
+  }
+
+  let amountInWei;
+  try {
+    amountInWei = ethers.parseEther(String(amountStr));
+    if (amountInWei <= 0n) throw new Error('bad');
+  } catch {
+    await botReply(message, phone, 'Invalid amount.\nExample: flizy buy 0.01 FLZ');
+    return;
+  }
+
+  const unlocked = await isSessionUnlocked(siteAcc.id);
+  const intent = createSwapIntent({
+    actor: {
+      accountId: siteAcc.id,
+      waSenderId: phone,
+      isAdmin: Boolean(siteAcc.is_admin || user?.is_admin),
+      sessionUnlocked: unlocked,
+      hasPin: Boolean(siteAcc.unlock_pin_hash),
+    },
+    side: parsed.kind,
+    amountIn: amountStr,
+    tokenInLabel,
+    tokenOutLabel,
+    tokenIn,
+    tokenOut,
+    routerAddress: dex.feeRouter,
+    chainId: chain.id,
+    slippageBps: config.swapSlippageBps,
+  });
+
+  const policy = await evaluateSwapPolicy(intent);
+  if (policy.decision === 'DENY') {
+    await botReply(message, phone, policy.message || 'Swap not allowed.');
+    return;
+  }
+
+  let quote;
+  try {
+    quote = await quoteSwap({
+      provider,
+      amountIn: amountInWei,
+      tokenIn,
+      tokenOut,
+      chainKey: chain.id,
+      slippageBps: config.swapSlippageBps,
+    });
+  } catch (err) {
+    console.error('quoteSwap:', publicErrorMessage(err));
+    await botReply(
+      message,
+      phone,
+      'Could not quote swap (pool or amount issue). Try a smaller amount or flizy price FLZ.'
+    );
+    return;
+  }
+
+  const feePct = `${(quote.feeBps / 100).toFixed(2)}%`;
+  const slipPct = `${(quote.slippageBps / 100).toFixed(2)}%`;
+  const plan = buildSwapPlan({
+    intent,
+    policy,
+    chain: { chainId: chain.chainId, chainName: chain.name, nativeSymbol: chain.nativeSymbol },
+    fromAddress: siteAcc.agent_wallet_address,
+    amountInDisplay: formatEth(ethers.formatEther(amountInWei)),
+    amountOutDisplay: formatEth(ethers.formatEther(quote.amountOut)),
+    feeDisplay: formatEth(ethers.formatEther(quote.feeAmount)),
+    feePctDisplay: feePct,
+    slippagePctDisplay: slipPct,
+    tokenInLabel,
+    tokenOutLabel,
+    routerAddress: dex.feeRouter,
+    amountInWei: amountInWei.toString(),
+    amountOutMinWei: quote.amountOutMin.toString(),
+    inIsNative: quote.inIsNative,
+    outIsNative: quote.outIsNative,
+    tokenIn,
+    tokenOut,
+  });
+
+  pendingSends.set(phone, { plan, createdAt: Date.now() });
+  await botReply(message, phone, formatSwapPlanPreview(plan));
 }
 
 /**
@@ -2684,6 +2901,12 @@ async function handleIncomingMessage(message) {
         return;
       }
       await handleConfirm(message, user, phone);
+      return;
+    }
+
+    const swapCmd = parseSwapCommand(text);
+    if (swapCmd) {
+      await handleSwapCommand(message, user, phone, account, swapCmd);
       return;
     }
 
