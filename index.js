@@ -22,7 +22,13 @@ const {
   maskPhone,
 } = require('./lib/phone');
 const { stripFlizyPrefix, parseUnlockCommand, parseLockCommand } = require('./lib/prefix');
-const { isSessionUnlocked, unlockWithPin, touchSession, lockSession } = require('./lib/session');
+const {
+  isSessionUnlocked,
+  isSessionHardLocked,
+  unlockWithPin,
+  touchSession,
+  lockSession,
+} = require('./lib/session');
 const { addTrusted } = require('./lib/trusted');
 const {
   normalizeWaHint,
@@ -105,6 +111,12 @@ const pendingWalletAdds = new Map();
  * @type {Map<string, { mode: string, claims?: object[], requests?: object[], createdAt: number, awaitConfirmId?: string }>}
  */
 const pendingClaimMenus = new Map();
+
+/**
+ * Waiting for unlock password after `flizy unlock` (no secret on same line).
+ * @type {Map<string, { createdAt: number }>}
+ */
+const pendingUnlocks = new Map();
 
 /**
  * Last bot outbound body per chat (Message yourself treats bot replies as fromMe).
@@ -491,15 +503,15 @@ function shortAddress(addr) {
   }
 }
 
-/** Actions that do not need unlock session. */
-function isPublicCommandBody(body) {
+/**
+ * When hard-locked, only unlock (and unlock password reply) may run.
+ * Link still allowed so a locked user can re-bind if needed.
+ */
+function isAllowedWhenLocked(body) {
   return (
-    isHelpCommand(body) ||
-    isHowCommand(body) ||
-    isMeCommand(body) ||
-    Boolean(parseLinkCommand(body)) ||
     Boolean(parseUnlockCommand(body)) ||
-    Boolean(parseClaimAdminCommand(body))
+    Boolean(parseLinkCommand(body)) ||
+    parseLockCommand(body)
   );
 }
 
@@ -599,6 +611,11 @@ function pruneExpiredPending() {
   for (const [phone, menu] of pendingClaimMenus.entries()) {
     if (now - menu.createdAt > PENDING_TTL_MS) {
       pendingClaimMenus.delete(phone);
+    }
+  }
+  for (const [phone, wait] of pendingUnlocks.entries()) {
+    if (now - wait.createdAt > PENDING_TTL_MS) {
+      pendingUnlocks.delete(phone);
     }
   }
 }
@@ -813,6 +830,11 @@ function helpText(user) {
     '  confirm',
     '  cancel',
     '',
+    'Session lock (stop tampering if phone is shared):',
+    '  flizy lock            → lock now (no password)',
+    '  flizy unlock          → bot asks for password / PIN',
+    '  (while locked, other flizy commands are blocked)',
+    '',
     'Swap (agent wallet, fee disclosed before confirm):',
     '  flizy buy 0.01 FLZ       → spend ETH for FLZ',
     '  flizy sell 10 FLZ        → sell FLZ for ETH',
@@ -860,7 +882,8 @@ function welcomeText(user) {
     '',
     'Prefix every command with flizy',
     '  flizy help',
-    '  flizy unlock <pin>   (PIN set on site)',
+    '  flizy lock           (block bot until unlock)',
+    '  flizy unlock         (bot asks for password)',
     '  flizy send 0.001 to ama',
     '',
     `Site: ${config.siteUrl}`,
@@ -2521,9 +2544,15 @@ async function handleIncomingMessage(message) {
 
     const waitingForWalletName = pendingWalletAdds.has(phone);
     const waitingForClaimMenu = pendingClaimMenus.has(phone);
+    const waitingForUnlock = pendingUnlocks.has(phone);
 
-    // Ignore non-commands unless mid-flow (wallet name or claim menu pick)
-    if (!isFlizyCommand(rawText) && !waitingForWalletName && !waitingForClaimMenu) {
+    // Ignore non-commands unless mid-flow (wallet name, claim menu, unlock password)
+    if (
+      !isFlizyCommand(rawText) &&
+      !waitingForWalletName &&
+      !waitingForClaimMenu &&
+      !waitingForUnlock
+    ) {
       return;
     }
 
@@ -2709,41 +2738,120 @@ async function handleIncomingMessage(message) {
       return;
     }
 
-    // Unlock / lock (public)
-    const unlockCmd = parseUnlockCommand(text);
-    if (unlockCmd) {
-      const res = await unlockWithPin(account, phone, unlockCmd.pin);
+    // Interactive unlock password reply (plain text, or flizy unlock SECRET)
+    if (pendingUnlocks.has(phone)) {
+      const wait = pendingUnlocks.get(phone);
+      if (Date.now() - wait.createdAt > PENDING_TTL_MS) {
+        pendingUnlocks.delete(phone);
+        await botReply(message, phone, 'Unlock timed out. Send: flizy unlock');
+        return;
+      }
+      const unlockAgain = parseUnlockCommand(text);
+      if (unlockAgain && unlockAgain.pin == null) {
+        await botReply(
+          message,
+          phone,
+          'Reply with your account password or unlock PIN.\n(Send only the secret as the next message.)'
+        );
+        return;
+      }
+      const secret =
+        unlockAgain && unlockAgain.pin != null ? unlockAgain.pin : String(rawText || '').trim();
+      pendingUnlocks.delete(phone);
+      const res = await unlockWithPin(account, phone, secret);
       if (!res.ok && res.reason === 'no_pin') {
-        await message.reply(`No unlock PIN set. Set it on the site: ${config.siteUrl}/dashboard`);
+        await botReply(
+          message,
+          phone,
+          `No password or PIN on this account.\nSet a PIN on the site: ${config.siteUrl}/dashboard/account`
+        );
         return;
       }
       if (!res.ok) {
-        await message.reply('Unlock failed.');
+        await botReply(message, phone, 'Unlock failed. Wrong password or PIN.\nTry: flizy unlock');
         return;
       }
-      await message.reply('Session unlocked for 1 hour of activity.');
+      await botReply(
+        message,
+        phone,
+        'Session unlocked.\nCommands work again for about 1 hour of activity.\nLock anytime: flizy lock'
+      );
       return;
     }
 
+    // Unlock: prompt or one-shot secret
+    const unlockCmd = parseUnlockCommand(text);
+    if (unlockCmd) {
+      if (unlockCmd.pin == null || unlockCmd.pin === '') {
+        pendingUnlocks.set(phone, { createdAt: Date.now() });
+        await botReply(
+          message,
+          phone,
+          [
+            'Unlock Flizy on this WhatsApp.',
+            'Reply with your account password or unlock PIN.',
+            '(Send only the password as the next message.)',
+          ].join('\n')
+        );
+        return;
+      }
+      const res = await unlockWithPin(account, phone, unlockCmd.pin);
+      if (!res.ok && res.reason === 'no_pin') {
+        await botReply(
+          message,
+          phone,
+          `No password or PIN on this account.\nSet a PIN on the site: ${config.siteUrl}/dashboard/account`
+        );
+        return;
+      }
+      if (!res.ok) {
+        await botReply(message, phone, 'Unlock failed. Wrong password or PIN.');
+        return;
+      }
+      await botReply(
+        message,
+        phone,
+        'Session unlocked.\nCommands work again for about 1 hour of activity.\nLock anytime: flizy lock'
+      );
+      return;
+    }
+
+    // Lock (no password)
     if (parseLockCommand(text)) {
+      pendingUnlocks.delete(phone);
       await lockSession(account.id, phone);
-      await message.reply('Session locked.');
+      await botReply(
+        message,
+        phone,
+        [
+          'Session locked.',
+          'Other flizy commands will not run until you unlock.',
+          'Unlock: flizy unlock',
+          'Then reply with your password or PIN when asked.',
+        ].join('\n')
+      );
       return;
     }
 
-    // Session gate for sensitive actions
-    if (config.requireUnlock && !isPublicCommandBody(text) && !isAdminUser(user)) {
-      const open = await isSessionUnlocked(account.id, phone);
-      if (!open) {
-        // If no PIN configured yet, allow but nudge once
-        if (!account.unlock_pin_hash) {
-          // allow through until PIN is set on site
-        } else {
-          await message.reply('Session locked. Send: flizy unlock <pin>');
-          return;
+    // Hard lock gate: after flizy lock (or expired unlock session), only unlock/link allowed
+    if (!isAdminUser(user)) {
+      const hardLocked = await isSessionHardLocked(account.id, phone);
+      if (hardLocked && !isAllowedWhenLocked(text)) {
+        await botReply(
+          message,
+          phone,
+          'Session locked.\nSend: flizy unlock\nThen reply with your password or PIN.'
+        );
+        return;
+      }
+      try {
+        const { getSession } = require('./lib/session');
+        const row = await getSession(account.id, phone);
+        if (row && !row.is_locked && new Date(row.expires_at).getTime() > Date.now()) {
+          await touchSession(account.id, phone);
         }
-      } else {
-        await touchSession(account.id, phone);
+      } catch {
+        /* ignore */
       }
     }
 

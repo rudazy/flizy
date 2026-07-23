@@ -23,7 +23,7 @@ type DashboardContextValue = {
   refreshing: boolean;
   load: () => Promise<void>;
   refreshAll: () => Promise<void>;
-  generateLink: () => Promise<void>;
+  generateLink: () => Promise<{ code?: string; waDeepLink?: string; expiresAt?: string } | null | void>;
   addTrusted: (input: {
     address: string;
     label: string;
@@ -101,10 +101,16 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/link/create', { method: 'POST' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed');
-      setMsg('Link code ready. Open WhatsApp and send the message.');
+      setMsg('Link code ready. Tap Open WhatsApp to message the bot with the code.');
       await load();
+      // Open bot chat with prefilled "flizy link CODE" when possible
+      if (json.waDeepLink && typeof window !== 'undefined') {
+        window.open(json.waDeepLink, '_blank', 'noopener,noreferrer');
+      }
+      return json as { code?: string; waDeepLink?: string; expiresAt?: string };
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Failed');
+      return null;
     } finally {
       setBusy('');
     }
@@ -176,7 +182,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
-        setMsg('PIN saved. On WhatsApp: flizy unlock your-pin');
+        setMsg(
+          'Unlock PIN saved. On WhatsApp: flizy lock (no password) · flizy unlock then reply with this PIN or your account password.'
+        );
         await load();
         return true;
       } catch (err) {

@@ -40,18 +40,18 @@ export default function SignupPage() {
           Create your Flizy account
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-muted">
-          This is your control room. After signup you will add trusted people, set a PIN, and link
-          WhatsApp. Takes a few minutes.
+          After signup the dashboard gives you a button that opens the Flizy WhatsApp bot with your
+          link code already filled in. You never need the bot number saved in contacts.
         </p>
         <ol className="mt-8 space-y-3 text-sm text-muted">
           <li className="flex gap-3">
             <span className="text-lime">1</span> Account + agent wallet
           </li>
           <li className="flex gap-3">
-            <span className="text-lime">2</span> Trusted addresses
+            <span className="text-lime">2</span> Set unlock PIN (required for lock/unlock)
           </li>
           <li className="flex gap-3">
-            <span className="text-lime">3</span> Link WhatsApp and send
+            <span className="text-lime">3</span> Open WhatsApp bot with link code, then send
           </li>
         </ol>
       </div>

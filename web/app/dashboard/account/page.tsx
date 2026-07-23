@@ -10,6 +10,7 @@ export default function AccountPage() {
   const {
     data,
     busy,
+    msg,
     setMsg,
     generateLink,
     addTrusted,
@@ -55,7 +56,12 @@ export default function AccountPage() {
   async function onPin(e: React.FormEvent) {
     e.preventDefault();
     const ok = await setUnlockPin(pin);
-    if (ok) setPin('');
+    if (ok) {
+      setPin('');
+      setMsg(
+        'Unlock PIN saved. On WhatsApp: flizy lock (no password) · flizy unlock then reply with this PIN or your account password.'
+      );
+    }
   }
 
   async function onDailyLimit(e: React.FormEvent) {
@@ -78,29 +84,32 @@ export default function AccountPage() {
   return (
     <div className="space-y-5">
       <AppTopBar title="Account" />
+      {msg ? <div className="alert alert-ok text-sm">{msg}</div> : null}
 
       {/* WhatsApp */}
       <section className="card p-4">
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="font-sans text-sm tracking-wide text-paper">WhatsApp link</p>
-            <p className="mt-1 text-xs text-muted">Bind this account to the Flizy bot.</p>
+            <p className="mt-1 text-xs text-muted">
+              Opens the Flizy bot chat with your code already filled in. You do not need the bot number
+              saved.
+            </p>
           </div>
           <span className="badge badge-gold">{data.link ? 'Ready' : 'Needed'}</span>
         </div>
 
         <div className="mt-4 rounded border border-border bg-ink/80 p-3 text-xs text-muted">
-          Generate a code, open WhatsApp, send the message. Do not type commands in groups or other
-          people&apos;s chats.
+          Tap Open WhatsApp, send the prefilled message, then you are linked. Do not use groups.
         </div>
 
         <button
           type="button"
-          className="btn btn-primary mt-4 w-full sm:w-auto"
-          onClick={generateLink}
+          className="btn btn-primary mt-4 w-full py-3.5 text-base font-semibold"
+          onClick={() => generateLink()}
           disabled={busy === 'link'}
         >
-          {busy === 'link' ? 'Generating...' : 'Generate link code'}
+          {busy === 'link' ? 'Opening...' : data.link ? 'New code and open WhatsApp' : 'Generate code and open WhatsApp'}
         </button>
 
         {data.link ? (
@@ -110,16 +119,16 @@ export default function AccountPage() {
               Expires {new Date(data.link.expiresAt).toLocaleString()}
             </p>
             <div className="mono-box text-sm">flizy link {data.link.code}</div>
+            <a
+              href={data.link.waDeepLink}
+              className="btn btn-primary flex w-full items-center justify-center py-3.5 text-base font-semibold no-underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open WhatsApp bot
+            </a>
             <div className="flex flex-wrap gap-2">
               <CopyButton value={`flizy link ${data.link.code}`} label="Copy message" />
-              <a
-                href={data.link.waDeepLink}
-                className="btn btn-primary text-sm"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open WhatsApp
-              </a>
             </div>
           </div>
         ) : null}
@@ -261,16 +270,20 @@ export default function AccountPage() {
         </form>
       </section>
 
-      {/* PIN */}
-      <section className="card p-4">
+      {/* PIN (required for lock/unlock on WhatsApp) */}
+      <section className={`card p-4 ${data.account.has_pin ? '' : 'border-gold/40'}`}>
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="font-sans text-sm tracking-wide text-paper">Unlock PIN</p>
             <p className="mt-1 text-xs text-muted">
-              On WhatsApp: <span className="text-paper">flizy unlock 1234</span>
+              Required for <span className="text-paper">flizy unlock</span> after you lock. You can
+              also use your account password. On chat: <span className="text-paper">flizy lock</span>{' '}
+              then <span className="text-paper">flizy unlock</span>.
             </p>
           </div>
-          <span className="badge">{data.account.has_pin ? 'Set' : 'Optional'}</span>
+          <span className={`badge ${data.account.has_pin ? '' : 'badge-gold'}`}>
+            {data.account.has_pin ? 'Set' : 'Required'}
+          </span>
         </div>
         <form onSubmit={onPin} className="mt-4 flex flex-col gap-3 sm:flex-row">
           <input
@@ -281,11 +294,11 @@ export default function AccountPage() {
             maxLength={12}
             placeholder="4-12 digits"
             value={pin}
-            onChange={(e) => setPin(e.target.value)}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
             required
           />
           <button className="btn btn-primary" type="submit" disabled={busy === 'pin'}>
-            {busy === 'pin' ? 'Saving...' : 'Save PIN'}
+            {busy === 'pin' ? 'Saving...' : data.account.has_pin ? 'Update PIN' : 'Save PIN'}
           </button>
         </form>
       </section>
