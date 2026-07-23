@@ -23,8 +23,9 @@
 
 ## Liquidity
 
-- Adding liquidity is **site only** (Swap → Liquidity).
-- No protocol fee on add-liquidity; you still pay gas.
+- Adding and removing liquidity is **site only** (Swap → + Liquidity → Add / Remove).
+- No protocol fee on add or remove; you still pay gas.
+- Remove burns FLZ-LP from your agent wallet and returns proportional ETH + FLZ.
 
 ## Addresses
 

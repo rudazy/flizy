@@ -47,9 +47,17 @@ export default function SwapPage() {
   const [quoting, setQuoting] = useState(false);
   const [result, setResult] = useState<{ explorerUrl?: string; txHash?: string } | null>(null);
   const [showLiquidity, setShowLiquidity] = useState(false);
+  const [lpMode, setLpMode] = useState<'add' | 'remove'>('add');
   const [lpEth, setLpEth] = useState('0.05');
   const [lpFlz, setLpFlz] = useState('2500');
   const [lpBase, setLpBase] = useState<'ETH' | 'FLZ'>('ETH');
+  const [lpPercent, setLpPercent] = useState(100);
+  const [lpPosition, setLpPosition] = useState<{
+    lpBalanceFormatted: string;
+    ethShare: string;
+    flzShare: string;
+    poolShareBps: number;
+  } | null>(null);
 
   const side = tokenIn === 'ETH' ? 'buy' : 'sell';
 
@@ -93,15 +101,37 @@ export default function SwapPage() {
     }
   }, [amountIn, side, tokenIn, tokenOut]);
 
+  const loadLpPosition = useCallback(async () => {
+    try {
+      const res = await fetch('/api/swap/liquidity');
+      const data = await res.json();
+      if (!res.ok) {
+        setLpPosition(null);
+        return;
+      }
+      setLpPosition({
+        lpBalanceFormatted: data.lpBalanceFormatted || '0',
+        ethShare: data.ethShare || '0',
+        flzShare: data.flzShare || '0',
+        poolShareBps: data.poolShareBps || 0,
+      });
+    } catch {
+      setLpPosition(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadPrice();
   }, [loadPrice]);
 
   useEffect(() => {
-    if (showLiquidity) return;
+    if (showLiquidity) {
+      loadLpPosition();
+      return;
+    }
     const t = setTimeout(() => loadQuote(), 320);
     return () => clearTimeout(t);
-  }, [loadQuote, showLiquidity]);
+  }, [loadQuote, showLiquidity, loadLpPosition]);
 
   // Keep LP ratio loosely in sync with pool when editing one side
   useEffect(() => {
@@ -168,7 +198,12 @@ export default function SwapPage() {
       const res = await fetch('/api/swap/liquidity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amountEth: lpEth, amountToken: lpFlz, token: 'FLZ' }),
+        body: JSON.stringify({
+          action: 'add',
+          amountEth: lpEth,
+          amountToken: lpFlz,
+          token: 'FLZ',
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -177,12 +212,50 @@ export default function SwapPage() {
       }
       setResult({ explorerUrl: data.explorerUrl, txHash: data.txHash });
       loadPrice();
+      loadLpPosition();
     } catch {
       setError('Liquidity failed');
     } finally {
       setBusy(false);
     }
   }
+
+  async function runRemoveLiquidity(percent = lpPercent) {
+    setBusy(true);
+    setError('');
+    setResult(null);
+    try {
+      const res = await fetch('/api/swap/liquidity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'remove', percent }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Remove liquidity failed');
+        return;
+      }
+      setResult({ explorerUrl: data.explorerUrl, txHash: data.txHash });
+      loadPrice();
+      loadLpPosition();
+    } catch {
+      setError('Remove liquidity failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const removePreview = useMemo(() => {
+    if (!lpPosition) return null;
+    const lp = Number(lpPosition.lpBalanceFormatted);
+    if (!(lp > 0)) return null;
+    const frac = Math.min(100, Math.max(1, lpPercent)) / 100;
+    return {
+      eth: Number(lpPosition.ethShare) * frac,
+      flz: Number(lpPosition.flzShare) * frac,
+      lp: lp * frac,
+    };
+  }, [lpPosition, lpPercent]);
 
   const rateLine = useMemo(() => {
     if (!price) return null;
@@ -309,13 +382,35 @@ export default function SwapPage() {
         </section>
       ) : (
         <section className="card space-y-3 p-3 sm:p-4">
-          <div>
-            <p className="font-sans text-sm text-paper">Add liquidity</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              Deposit both sides of the ETH / FLZ pool. LP tokens go to your agent wallet. Site only.
-              No protocol fee on add (pool still has the standard 0.30% swap fee).
-            </p>
+          <div className="flex gap-1 rounded-md border border-border bg-ink/40 p-1">
+            <button
+              type="button"
+              className={`flex-1 rounded-md py-2 font-sans text-xs font-semibold transition-colors ${
+                lpMode === 'add' ? 'bg-lime text-ink' : 'text-muted hover:text-paper'
+              }`}
+              onClick={() => setLpMode('add')}
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              className={`flex-1 rounded-md py-2 font-sans text-xs font-semibold transition-colors ${
+                lpMode === 'remove' ? 'bg-lime text-ink' : 'text-muted hover:text-paper'
+              }`}
+              onClick={() => {
+                setLpMode('remove');
+                loadLpPosition();
+              }}
+            >
+              Remove
+            </button>
           </div>
+
+          <p className="text-xs leading-relaxed text-muted">
+            {lpMode === 'add'
+              ? 'Deposit ETH + FLZ. LP tokens go to your agent wallet. Site only. No protocol fee on add.'
+              : 'Burn LP tokens to withdraw ETH + FLZ to your agent wallet. Site only. No protocol fee on remove.'}
+          </p>
 
           {price ? (
             <div className="rounded-md border border-border bg-ink/50 px-3 py-2 font-mono text-[11px] text-muted">
@@ -325,59 +420,143 @@ export default function SwapPage() {
             </div>
           ) : null}
 
-          <TokenPanel
-            label="ETH"
-            token="ETH"
-            amount={lpEth}
-            editable
-            onAmountChange={(v) => {
-              setLpBase('ETH');
-              setLpEth(v);
-              const flzPerEth = Number(price?.flzPerEth || 0);
-              if (flzPerEth > 0 && Number(v) > 0) {
-                setLpFlz(String(Number((Number(v) * flzPerEth).toFixed(4))));
-              }
-            }}
-          />
+          {lpMode === 'add' ? (
+            <>
+              <TokenPanel
+                label="ETH"
+                token="ETH"
+                amount={lpEth}
+                editable
+                onAmountChange={(v) => {
+                  setLpBase('ETH');
+                  setLpEth(v);
+                  const flzPerEth = Number(price?.flzPerEth || 0);
+                  if (flzPerEth > 0 && Number(v) > 0) {
+                    setLpFlz(String(Number((Number(v) * flzPerEth).toFixed(4))));
+                  }
+                }}
+              />
 
-          <div className="flex justify-center">
-            <span className="font-mono text-xs text-muted">+</span>
-          </div>
+              <div className="flex justify-center">
+                <span className="font-mono text-xs text-muted">+</span>
+              </div>
 
-          <TokenPanel
-            label="FLZ"
-            token="FLZ"
-            amount={lpFlz}
-            editable
-            onAmountChange={(v) => {
-              setLpBase('FLZ');
-              setLpFlz(v);
-              const flzPerEth = Number(price?.flzPerEth || 0);
-              if (flzPerEth > 0 && Number(v) > 0) {
-                setLpEth(String(Number((Number(v) / flzPerEth).toFixed(6))));
-              }
-            }}
-          />
+              <TokenPanel
+                label="FLZ"
+                token="FLZ"
+                amount={lpFlz}
+                editable
+                onAmountChange={(v) => {
+                  setLpBase('FLZ');
+                  setLpFlz(v);
+                  const flzPerEth = Number(price?.flzPerEth || 0);
+                  if (flzPerEth > 0 && Number(v) > 0) {
+                    setLpEth(String(Number((Number(v) / flzPerEth).toFixed(6))));
+                  }
+                }}
+              />
 
-          <div className="rounded-md border border-border/80 bg-ink/40 px-3 py-2 font-mono text-[11px] text-muted">
-            <div className="flex justify-between gap-2">
-              <span>Pair</span>
-              <span className="text-paper">ETH / FLZ</span>
-            </div>
-            <div className="mt-1 flex justify-between gap-2">
-              <span>Also shown as</span>
-              <span className="text-paper">FLZ / ETH</span>
-            </div>
-          </div>
+              <div className="rounded-md border border-border/80 bg-ink/40 px-3 py-2 font-mono text-[11px] text-muted">
+                <div className="flex justify-between gap-2">
+                  <span>Pair</span>
+                  <span className="text-paper">ETH / FLZ</span>
+                </div>
+                <div className="mt-1 flex justify-between gap-2">
+                  <span>Also shown as</span>
+                  <span className="text-paper">FLZ / ETH</span>
+                </div>
+              </div>
 
-          <button
-            type="button"
-            className="btn btn-primary w-full py-3.5 text-base font-semibold"
-            disabled={busy || !(Number(lpEth) > 0) || !(Number(lpFlz) > 0)}
-            onClick={runLiquidity}
-          >
-            {busy ? 'Adding...' : 'Supply liquidity'}
-          </button>
+              <button
+                type="button"
+                className="btn btn-primary w-full py-3.5 text-base font-semibold"
+                disabled={busy || !(Number(lpEth) > 0) || !(Number(lpFlz) > 0)}
+                onClick={runLiquidity}
+              >
+                {busy ? 'Adding...' : 'Supply liquidity'}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="rounded-md border border-border bg-surface/80 px-3 py-3 font-mono text-xs">
+                <div className="flex justify-between gap-2 text-muted">
+                  <span>Your LP</span>
+                  <span className="text-paper">
+                    {lpPosition ? fmt(lpPosition.lpBalanceFormatted, 6) : '…'} FLZ-LP
+                  </span>
+                </div>
+                <div className="mt-1.5 flex justify-between gap-2 text-muted">
+                  <span>Pooled ETH</span>
+                  <span className="text-paper">{lpPosition ? fmt(lpPosition.ethShare, 6) : '…'}</span>
+                </div>
+                <div className="mt-1 flex justify-between gap-2 text-muted">
+                  <span>Pooled FLZ</span>
+                  <span className="text-paper">{lpPosition ? fmt(lpPosition.flzShare, 4) : '…'}</span>
+                </div>
+                {lpPosition && lpPosition.poolShareBps > 0 ? (
+                  <div className="mt-1 flex justify-between gap-2 text-muted">
+                    <span>Pool share</span>
+                    <span className="text-paper">{(lpPosition.poolShareBps / 100).toFixed(2)}%</span>
+                  </div>
+                ) : null}
+              </div>
+
+              <div>
+                <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-muted">
+                  Amount to remove
+                </p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[25, 50, 75, 100].map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setLpPercent(p)}
+                      className={`rounded-md border py-2 font-mono text-xs transition-colors ${
+                        lpPercent === p
+                          ? 'border-lime bg-lime/15 text-lime'
+                          : 'border-border text-muted hover:text-paper'
+                      }`}
+                    >
+                      {p === 100 ? 'Max' : `${p}%`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {removePreview ? (
+                <div className="rounded-md border border-border/80 bg-ink/50 px-3 py-2.5 font-mono text-[11px] text-muted">
+                  <div className="flex justify-between gap-2">
+                    <span>You receive (est.)</span>
+                    <span className="text-paper">{lpPercent}%</span>
+                  </div>
+                  <div className="mt-1.5 flex justify-between gap-2">
+                    <span>ETH</span>
+                    <span className="text-paper">~{fmt(removePreview.eth, 6)}</span>
+                  </div>
+                  <div className="mt-1 flex justify-between gap-2">
+                    <span>FLZ</span>
+                    <span className="text-paper">~{fmt(removePreview.flz, 4)}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted">No LP position yet. Supply liquidity first.</p>
+              )}
+
+              <button
+                type="button"
+                className="btn btn-primary w-full py-3.5 text-base font-semibold"
+                disabled={
+                  busy ||
+                  !lpPosition ||
+                  !(Number(lpPosition.lpBalanceFormatted) > 0) ||
+                  !(lpPercent > 0)
+                }
+                onClick={() => runRemoveLiquidity(lpPercent)}
+              >
+                {busy ? 'Removing...' : `Remove ${lpPercent}% liquidity`}
+              </button>
+            </>
+          )}
         </section>
       )}
 

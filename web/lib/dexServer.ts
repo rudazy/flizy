@@ -24,6 +24,15 @@ const ERC20_ABI = [
 const PAIR_ABI = [
   'function getReserves() view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)',
   'function token0() view returns (address)',
+  'function token1() view returns (address)',
+  'function totalSupply() view returns (uint256)',
+  'function balanceOf(address) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+];
+
+const V2_ROUTER_ABI = [
+  'function removeLiquidityETH(address token, uint liquidity, uint amountTokenMin, uint amountETHMin, address to, uint deadline) returns (uint amountToken, uint amountETH)',
 ];
 
 export type WebChain = {
@@ -273,6 +282,83 @@ export async function addLiquidityEth(args: {
   );
   const receipt = await tx.wait(1);
   if (!receipt || receipt.status !== 1) throw new Error('Add liquidity failed');
+  return { txHash: tx.hash, receipt };
+}
+
+/**
+ * Read LP position for an agent wallet (pair balance + underlying ETH/FLZ share).
+ */
+export async function getLpPosition(provider: ethers.Provider, ownerAddress: string) {
+  const d = getDexAddresses();
+  const pair = new ethers.Contract(d.pair, PAIR_ABI, provider);
+  const [lpBal, totalSupply, reserves, t0] = await Promise.all([
+    pair.balanceOf(ownerAddress) as Promise<bigint>,
+    pair.totalSupply() as Promise<bigint>,
+    pair.getReserves() as Promise<[bigint, bigint, number]>,
+    pair.token0() as Promise<string>,
+  ]);
+
+  const reserve0 = reserves[0];
+  const reserve1 = reserves[1];
+  const flzIs0 = ethers.getAddress(String(t0)) === d.flz;
+  const reserveFlz = flzIs0 ? reserve0 : reserve1;
+  const reserveWeth = flzIs0 ? reserve1 : reserve0;
+
+  let ethShare = 0n;
+  let flzShare = 0n;
+  if (totalSupply > 0n && lpBal > 0n) {
+    ethShare = (reserveWeth * lpBal) / totalSupply;
+    flzShare = (reserveFlz * lpBal) / totalSupply;
+  }
+
+  return {
+    pair: d.pair,
+    lpBalance: lpBal,
+    lpBalanceFormatted: ethers.formatEther(lpBal),
+    totalSupply: totalSupply.toString(),
+    ethShare: ethers.formatEther(ethShare),
+    flzShare: ethers.formatEther(flzShare),
+    ethShareWei: ethShare,
+    flzShareWei: flzShare,
+    poolShareBps: totalSupply > 0n ? Number((lpBal * 10000n) / totalSupply) : 0,
+  };
+}
+
+/**
+ * Remove LP for FLZ/WETH via the V2 router (allowlisted). No protocol fee on remove.
+ * @param liquidityWei amount of LP tokens to burn; omit or use max for full position
+ */
+export async function removeLiquidityEth(args: {
+  signer: ethers.Wallet;
+  liquidityWei: bigint;
+  amountTokenMin?: bigint;
+  amountEthMin?: bigint;
+  recipient?: string;
+}) {
+  const d = getDexAddresses();
+  if (args.liquidityWei <= 0n) throw new Error('Liquidity amount must be greater than 0');
+
+  const to = args.recipient || (await args.signer.getAddress());
+  const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+  const pair = new ethers.Contract(d.pair, PAIR_ABI, args.signer);
+  const bal: bigint = await pair.balanceOf(await args.signer.getAddress());
+  if (bal < args.liquidityWei) {
+    throw new Error('Not enough LP tokens in your agent wallet');
+  }
+
+  await ensureAllowance(pair, args.signer, d.dexRouter, args.liquidityWei);
+
+  const router = new ethers.Contract(d.dexRouter, V2_ROUTER_ABI, args.signer);
+  const tx = await router.removeLiquidityETH(
+    d.flz,
+    args.liquidityWei,
+    args.amountTokenMin ?? 0n,
+    args.amountEthMin ?? 0n,
+    to,
+    deadline
+  );
+  const receipt = await tx.wait(1);
+  if (!receipt || receipt.status !== 1) throw new Error('Remove liquidity failed');
   return { txHash: tx.hash, receipt };
 }
 
