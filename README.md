@@ -5,7 +5,7 @@
 <h1 align="center">Flizy</h1>
 
 <p align="center">
-  <strong>WhatsApp-native EVM wallet.</strong><br />
+  <strong>WhatsApp-native EVM wallet and swap.</strong><br />
   Trusted destinations only. GIWA-first. Built to expand across EVM.
 </p>
 
@@ -15,75 +15,207 @@
   <a href="https://flizy.vercel.app/how-it-works">How it works</a>
   ·
   <a href="https://flizy.vercel.app/docs">Security docs</a>
+  ·
+  <a href="docs/swap-fees.md">Swap fees</a>
 </p>
 
 ---
 
 ## What Flizy is
 
-Flizy lets people **send crypto from WhatsApp** without pasting seed phrases into chat. Each user has a permanent **agent wallet** tied to their site account. Money moves only to **trusted destinations** they approve on the web dashboard (or via controlled bot commands). The product launches on **GIWA Sepolia** and is designed so additional EVM chains can be added through the chain registry—not a rewrite.
+Flizy lets people **send and swap crypto from WhatsApp** (and the site) without pasting seed phrases into chat. Each user has a permanent **agent wallet** tied to their site account. Transfers move only to **trusted destinations** they approve. Swaps go only through **allowlisted DEX routers**. Phone claims hold funds in escrow until the recipient links WhatsApp. The product launches on **GIWA Sepolia** and is designed so additional EVM chains and tokens can be added through config, not a rewrite.
 
 | Layer | Role |
 |--------|------|
-| **Web site** | Signup, login, dashboard, trusted list, unlock PIN, WhatsApp link codes, claim pages |
-| **WhatsApp bot** | Commands (`flizy …`), confirm flows, balance, history, sends signed from the user’s agent wallet |
-| **Supabase** | Accounts, WhatsApp identities, link codes, trusted addresses, transfers, sessions |
-| **Contracts** | Smart wallet + CREATE2 factory (Foundry) for future on-chain allowlists and session keys |
-| **Ops wallet** | Bot pool key (`PRIVATE_KEY`) for infrastructure; **not** the user’s send address |
+| **Web site** | Signup, dashboard, trusted list, PIN, link codes, claim pages, **Swap + liquidity** |
+| **WhatsApp bot** | Commands (`flizy …`), plan/confirm, claims, requests, swaps from agent wallet |
+| **Supabase** | Accounts, WhatsApp identities (+ phone join key), trusted, transfers, claims, requests |
+| **DEX contracts** | Uniswap V2-style factory/router, fee router, WETH, FLZ token, FLZ/WETH pair (GIWA Sepolia) |
+| **Wallet contracts** | `FlizyWallet` + CREATE2 factory in repo (next custody phase; not required for current agent EOA) |
+| **Ops wallet** | Gas / infra + protocol fee treasury (`PRIVATE_KEY`); not the user’s send address |
+| **Escrow wallet** | Holds pending phone claims until claim or cancel |
 
 ---
 
-## Product diagram
+## Deployed contracts (GIWA Sepolia)
+
+**Network:** GIWA Sepolia · **Chain ID:** `91342`  
+**Explorer base:** [https://sepolia-explorer.giwa.io](https://sepolia-explorer.giwa.io)  
+**Full JSON:** [`deployments/giwa-sepolia.json`](deployments/giwa-sepolia.json)
+
+| Contract | Address | Explorer |
+|----------|---------|----------|
+| **WETH9** | `0x3a13399f2741122B63c7710B2A85346B97C6BFDf` | [View](https://sepolia-explorer.giwa.io/address/0x3a13399f2741122B63c7710B2A85346B97C6BFDf) |
+| **FLZ** (Flizy test token, 100k supply, 18 decimals) | `0x308be8f71DA695f18E70D2243a446e1fD1566BA6` | [View](https://sepolia-explorer.giwa.io/address/0x308be8f71DA695f18E70D2243a446e1fD1566BA6) |
+| **UniswapV2Factory** | `0xBB1d2c582E455B448660A199097A54DF29162BbF` | [View](https://sepolia-explorer.giwa.io/address/0xBB1d2c582E455B448660A199097A54DF29162BbF) |
+| **UniswapV2Router02** | `0x4055413A4757e069bbCAc481639EF2814224Faa0` | [View](https://sepolia-explorer.giwa.io/address/0x4055413A4757e069bbCAc481639EF2814224Faa0) |
+| **FlizyFeeRouter** (protocol fee, default 30 bps, max 100 bps) | `0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC` | [View](https://sepolia-explorer.giwa.io/address/0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC) |
+| **FLZ / WETH pair** | `0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227` | [View](https://sepolia-explorer.giwa.io/address/0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227) |
+
+**Treasury / fee destination (ops):** `0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B`  
+[View treasury](https://sepolia-explorer.giwa.io/address/0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B)
+
+**Seed liquidity (testnet):** 1.2 ETH + 60,000 FLZ (starting ~50,000 FLZ per 1 ETH).  
+**Source:** `contracts/src/dex/*` · deploy script `contracts/script/DeployDex.s.sol`
+
+### Contracts in repo (not required on-chain for current bot)
+
+| Contract | Path | Status |
+|----------|------|--------|
+| FlizyWallet | `contracts/src/FlizyWallet.sol` | Foundry tests; deploy when session-key custody ships |
+| FlizyWalletFactory | `contracts/src/FlizyWalletFactory.sol` | CREATE2 factory for future smart wallets |
+
+---
+
+## Product architecture
 
 ```mermaid
 flowchart TB
-  subgraph User
-    U[User on phone]
-    S[Flizy web site]
+  subgraph Clients
+    U[User phone]
+    S[flizy.vercel.app]
   end
 
   subgraph Flizy
-    W[WhatsApp bot<br/>one shared bot number]
-    DB[(Supabase<br/>accounts · trusted · transfers)]
-    AW[Agent wallet<br/>per account · permanent]
-    R[Chain registry<br/>GIWA first · more EVM soon]
+    W[WhatsApp bot<br/>index.js]
+    DB[(Supabase)]
+    POL[Policy engine<br/>trusted · limits · routers]
+    ENG[Intent → Plan → Confirm → Execute → Receipt]
+    AW[Agent wallet<br/>per account]
   end
 
-  subgraph Chain
-    G[GIWA Sepolia / future EVM]
+  subgraph OnChain["GIWA Sepolia"]
+    ESC[Claim escrow wallet]
+    FEE[FlizyFeeRouter]
+    V2[V2 Router + Factory]
+    PAIR[FLZ/WETH pair]
+    FLZ[FLZ token]
+    WETH[WETH9]
   end
 
-  U -->|signup / trusted list / PIN / link code| S
+  U -->|signup · trusted · PIN · link code · swap UI| S
   S --> DB
-  U -->|message bot: flizy link · me · send| W
+  U -->|flizy link · send · claim · swap| W
   W --> DB
-  W -->|sign from agent wallet| AW
-  AW --> R
-  R --> G
-  S -.->|same account after link| AW
+  W --> ENG
+  ENG --> POL
+  POL -->|transfer OK| AW
+  POL -->|swap router allowlist| AW
+  AW -->|native transfer| OnChain
+  AW -->|swap / add LP| FEE
+  FEE --> V2
+  V2 --> PAIR
+  PAIR --- FLZ
+  PAIR --- WETH
+  AW -->|claim hold| ESC
+  ESC -->|claim payout / cancel refund| AW
 ```
 
-### End-to-end flow
+### Component map
+
+```text
+                    +------------------------+
+                    |   flizy.vercel.app     |
+                    |  dashboard · swap UI   |
+                    |  liquidity add/remove  |
+                    +-----------+------------+
+                                |
+                                v
+                    +------------------------+
+                    |       Supabase         |
+                    | accounts · WA + phone  |
+                    | trusted · claims · txs |
+                    +-----------+------------+
+                                ^
+                                |
+  +----------+         +--------+--------+         +------------------+
+  | User WA  | ------> |  Flizy bot       | -----> | Agent wallets    |
+  | phones   |         |  Policy + Plan   | sign   | (per account)    |
+  +----------+         +--------+--------+         +--------+---------+
+                                |                           |
+                     ops / treasury / escrow                v
+                                                    GIWA Sepolia DEX
+                                                    FeeRouter → V2 → Pair
+```
+
+---
+
+## End-to-end flows
+
+### 1. Account link and trusted send
 
 ```mermaid
 sequenceDiagram
   participant U as User
-  participant Site as flizy.vercel.app
+  participant Site as Site
   participant Bot as WhatsApp bot
   participant Chain as GIWA Sepolia
 
-  U->>Site: Create account (email + strong password)
-  Site->>Site: Derive permanent agent wallet
-  U->>Site: Add trusted names / generate link code
+  U->>Site: Signup · agent wallet derived
+  U->>Site: Add trusted name · generate link code
   U->>Bot: flizy link CODE
-  Bot->>Site: Bind WhatsApp id to account
-  U->>Bot: flizy me / balance / deposit
-  Bot-->>U: Same agent address as dashboard
+  Note over Bot: Stores LID as identity<br/>captures phone for claims join
+  Bot->>Site: Bind WA to account
   U->>Bot: flizy send 0.001 to john
-  Bot-->>U: Pending transfer
+  Bot->>Bot: Intent → Policy trusted + limits → Plan
+  Bot-->>U: Transfer plan
   U->>Bot: confirm
-  Bot->>Chain: Sign tx from agent wallet
-  Bot-->>U: Explorer link
+  Bot->>Chain: Sign from agent wallet
+  Bot-->>U: Receipt + explorer link
+```
+
+### 2. Phone claim (escrow)
+
+```mermaid
+sequenceDiagram
+  participant S as Sender
+  participant Bot as WhatsApp bot
+  participant Esc as Claim escrow
+  participant R as Recipient
+
+  S->>Bot: flizy send 0.01 to 234…
+  Bot->>Bot: CLAIM_HOLD plan · confirm
+  Bot->>Esc: Hold ETH from sender agent wallet
+  Note over Bot: Claim row to_wa_hint = phone digits
+  R->>Site: Signup · flizy link CODE
+  Note over Bot: Phone stored on identity next to LID
+  R->>Bot: flizy claim
+  Bot->>Bot: Match claim by phone not LID
+  Bot->>Esc: Payout to recipient agent wallet
+  Bot-->>R: Receipt
+  Note over S: flizy cancel claims anytime while pending
+```
+
+### 3. Swap (WhatsApp or site)
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant Client as Bot or Site
+  participant Pol as Policy
+  participant Fee as FeeRouter
+  participant Pair as FLZ/WETH pair
+
+  U->>Client: buy / sell / swap amount
+  Client->>Pol: Swap intent router allowlist<br/>no trusted-contacts · no daily send limit
+  Pol-->>Client: ALLOW_WITH_CONFIRM
+  Client-->>U: Plan shows amount out · fee % · fee amount · slippage · chain
+  U->>Client: confirm / Confirm swap
+  Client->>Fee: swap via agent wallet
+  Fee->>Fee: Take protocol fee to treasury
+  Fee->>Pair: V2 swap remainder
+  Client-->>U: Receipt + explorer after confirmation
+```
+
+### 4. Liquidity (site only)
+
+```mermaid
+flowchart LR
+  A[Site Swap · + Liquidity] --> B{Add or Remove}
+  B -->|Add| C[Approve FLZ · FeeRouter.addLiquidityETH]
+  B -->|Remove| D[Approve FLZ-LP · V2 removeLiquidityETH]
+  C --> E[LP tokens on agent wallet]
+  D --> F[ETH + FLZ back to agent wallet]
 ```
 
 ---
@@ -92,85 +224,91 @@ sequenceDiagram
 
 ### Identity and accounts
 
-- Email signup and login on the site (no email verification code; **strong password required**: length, letter, number, special character).
-- Permanent **account** row in Supabase; agent wallet address is deterministic from account id (`flizy:agent:v1:{accountId}`) and is **not rotated**.
-- **WhatsApp link codes** from the dashboard; `flizy link CODE` binds the observed WhatsApp sender id (including LID) to that account.
-- Link-first design so messaging the bot before linking does not become a competing “orphan” wallet for `me` / balance / send after link.
+- Email signup / login; strong password policy.
+- Permanent account; agent wallet derived once (`flizy:agent:v1:{accountId}`), not rotated.
+- WhatsApp link codes; `flizy link CODE` binds observed sender id (**LID-first** identity).
+- **Phone join key** on `whatsapp_identities.wa_phone_e164` for claims/requests (normalized digits). LID stays identity; phone is only the claim address match.
 
-### Agent wallet (user funds)
+### Agent wallet
 
-- Each linked site account has one **agent wallet**.
-- Dashboard and WhatsApp (`flizy me`, `flizy balance`, `flizy deposit`) show the **same** address after link.
-- User funds that address (faucet / bridge / transfer). Sends are signed from **their** agent wallet, not the bot ops key.
+- Dashboard and WhatsApp show the same address after link.
+- User funds the agent wallet; sends and swaps sign from that wallet (not ops).
 
 ### Trusted destinations
 
-- Users maintain an allowlist of destination addresses (named contacts) on the site and/or via `flizy add wallet`.
-- When `ENFORCE_TRUSTED=true`, the bot rejects sends to addresses outside that list.
-- Goal: a stolen or hijacked chat cannot invent a new drain destination without site access (plus optional PIN unlock).
+- Site and `flizy add wallet` manage allowlist.
+- When `ENFORCE_TRUSTED=true`, transfers outside the list are denied by **Policy** (not the client UI alone).
+
+### Claims and payment requests
+
+- Send to a phone → escrow hold → recipient `flizy claim` after link.
+- `flizy cancel claims` anytime while pending.
+- `flizy request` / `flizy pay` use the same phone join key as claims.
+
+### Swap and FLZ
+
+- Site: Uniswap-style UI (pay / flip / receive), fee disclosure, **+ Liquidity** (add and remove).
+- WhatsApp: `flizy buy`, `sell`, `swap`, `price` with plan → confirm → receipt.
+- Protocol fee default **0.30%** (30 bps), hard max **1%**, paid to treasury; plus V2 pool fee. Details: [`docs/swap-fees.md`](docs/swap-fees.md).
+- Swaps do **not** use trusted-contacts checks and do **not** count against daily send limit.
 
 ### WhatsApp commands
 
-All product commands use the **`flizy` prefix** (configurable). Bare `confirm` / `cancel` work for pending transfers.
+All product commands use the **`flizy` prefix** (configurable). Bare `confirm` / `cancel` for pending plans.
 
 | Command | Purpose |
 |---------|---------|
-| `flizy help` | Command list and chain hint |
-| `flizy how` | How friends should use the bot number |
-| `flizy link CODE` | Bind this WhatsApp id to a site account |
-| `flizy me` | Account summary + permanent agent wallet |
-| `flizy balance` | Credit (if enabled) + on-chain holdings on agent wallet |
-| `flizy deposit` | Instructions + agent address to fund |
-| `flizy history` | Recent transfers |
-| `flizy add wallet 0x…` | Start trusted destination; bot asks for a name |
-| `flizy send AMOUNT to name` | Queue send to a trusted name |
-| `flizy send AMOUNT to 0x…` | Queue send to an address (still subject to trusted policy) |
-| `confirm` | Execute pending send |
-| `cancel` | Drop pending send |
-| `flizy unlock PIN` / `flizy lock` | Session gate when unlock PIN is set on site |
-| Admin helpers | `claimadmin`, `credit`, `pool`, `users` (ops only) |
+| `flizy help` | Command list |
+| `flizy link CODE` | Bind WhatsApp to site account |
+| `flizy me` / `balance` / `deposit` / `history` | Account and wallet |
+| `flizy add wallet 0x…` | Trusted destination flow |
+| `flizy send AMOUNT to name\|0x\|phone` | Transfer or phone claim hold |
+| `flizy claim` / `flizy cancel claims` | Receive or cancel phone claims |
+| `flizy request` / `pay` / `requests` | Payment requests |
+| `flizy buy AMOUNT FLZ` | Spend ETH for FLZ |
+| `flizy sell AMOUNT FLZ` | Sell FLZ for ETH |
+| `flizy swap AMOUNT ETH for FLZ` | Explicit pair swap |
+| `flizy price FLZ` | Pool spot price |
+| `confirm` / `cancel` | Execute or drop pending plan |
+| `flizy unlock PIN` / `lock` | Session when PIN is set |
 
 ### Web site surfaces
 
 | Route | Purpose |
 |-------|---------|
 | `/` | Product home |
-| `/how-it-works` | Full user guide |
-| `/docs` | Why trusted addresses exist |
-| `/signup` · `/login` | Account auth |
-| `/dashboard` | Agent wallet, PIN, trusted people, WhatsApp link code, Open WhatsApp |
-| `/claim/[token]` | Claim path for recipients who are not yet users |
+| `/how-it-works` · `/docs` | Guides |
+| `/signup` · `/login` | Auth |
+| `/dashboard` | Home, wallet, history, account, link code |
+| `/dashboard/swap` | Swap UI + liquidity add/remove |
+| `/claim/[token]` | Public claim status page |
 
-### Security model (product)
+### Security model
 
-- No private keys or seed phrases in WhatsApp messages.
-- Agent keys derived server-side from account id (testnet custody model); ops `PRIVATE_KEY` is separate.
-- Trusted-list enforcement on the bot path.
-- Optional session unlock PIN with TTL.
-- Password re-check for sensitive dashboard mutations (e.g. remove trusted).
-- Secrets only in environment variables (`.env` on bot host; Vercel env for site).
+- No private keys or seeds in WhatsApp.
+- Agent keys server-side (testnet custody); ops and escrow keys separate.
+- Policy-only money rules (trusted, limits, router allowlist).
+- Optional unlock PIN; secrets only in env (bot host + Vercel).
 
 ### Infrastructure
 
-- **Site:** Next.js App Router, deployed on Vercel (`web/` root directory).
-- **Bot:** Node.js + `whatsapp-web.js` (Puppeteer); intended always-on host (e.g. VPS + `screen` / process manager).
-- **Data:** Supabase migrations under `supabase/migrations/`.
-- **Contracts:** Foundry `FlizyWallet` + `FlizyWalletFactory` (CREATE2) for the next custody phase.
+- **Site:** Next.js (`web/`) on Vercel.
+- **Bot:** Node + `whatsapp-web.js`; systemd on VPS recommended (`deploy/flizy.service`).
+- **Data:** `supabase/migrations/`.
+- **Contracts:** Foundry under `contracts/` (DEX live; smart wallet next).
 
 ---
 
-## Multichain roadmap
+## Multichain and multi-token roadmap
 
-Flizy is **GIWA-first** today (`lib/chains.js` registry, default `giwa_sepolia` / chain id `91342`).
+Flizy is **GIWA-first** (`lib/chains.js`, default `giwa_sepolia` / `91342`).
 
 | Status | Scope |
 |--------|--------|
-| **Live** | GIWA Sepolia: RPC, explorer, native ETH sends via agent wallet |
-| **In repo** | Chain registry abstraction; per-chain env overrides for RPC / explorer / DEX placeholders |
-| **Soon** | Additional EVM networks registered the same way—config entry, not a bot rewrite |
-| **Later** | Per-chain agent deployment / factory deploy, DEX buy path when routers are configured |
-
-Adding a chain is intended to mean: register RPC + chain id + explorer (+ optional DEX), set `DEFAULT_CHAIN` or user-selected chain—not forking the product.
+| **Live** | GIWA Sepolia: agent sends, claims, requests, FLZ swap + LP |
+| **In repo** | Chain registry + DEX addresses (env or `deployments/*.json`) |
+| **Next tokens** | Token + pair registry (symbol → address → pair); UI picker; not a new AMM |
+| **More EVM** | Register RPC, explorer, fee router, tokens; same Policy/Plan path |
 
 ---
 
@@ -178,41 +316,17 @@ Adding a chain is intended to mean: register RPC + chain id + explorer (+ option
 
 | Path | Purpose |
 |------|---------|
-| `index.js` | WhatsApp bot entry |
-| `lib/` | Agent wallet, identity, trusted, session, holdings, chains, password policy, transfer log |
-| `web/` | Next.js site |
-| `contracts/` | Foundry smart wallet + factory |
-| `supabase/migrations/` | Database schema |
-| `docs/` | Extra product notes |
-| `.env.example` | Bot env template (no real secrets) |
-
----
-
-## Architecture (components)
-
-```text
-                    +------------------+
-                    |  flizy.vercel.app |
-                    |  Next.js (web/)   |
-                    +--------+---------+
-                             |
-                             v
-                    +------------------+
-                    |     Supabase     |
-                    | accounts, WA ids |
-                    | trusted, txs     |
-                    +--------+---------+
-                             ^
-                             |
-  +----------+        +------+-------+        +----------------+
-  |  User WA | -----> |  Flizy bot   | -----> | Agent wallets  |
-  |  phones  |        |  index.js    | sign   | (per account)  |
-  +----------+        |  whatsapp-web|        +--------+-------+
-                      +------+-------+                 |
-                             |                         v
-                      ops key only               EVM chain(s)
-                      (pool / infra)             GIWA → + more
-```
+| `index.js` | WhatsApp bot |
+| `lib/` | Identity, claims, phone, engine, dex, chains, agent wallet, escrow |
+| `lib/engine/` | Intent · Policy · Plan · Execute · Receipt |
+| `web/` | Next.js site + swap API |
+| `contracts/src/dex/` | WETH, FLZ, V2 factory/pair/router, fee router |
+| `contracts/src/` | FlizyWallet + factory |
+| `deployments/` | Live addresses (GIWA Sepolia) |
+| `supabase/migrations/` | Schema |
+| `docs/` | Swap fees, trusted addresses |
+| `deploy/` | systemd unit |
+| `.env.example` | Bot env template |
 
 ---
 
@@ -220,34 +334,30 @@ Adding a chain is intended to mean: register RPC + chain id + explorer (+ option
 
 ### Prerequisites
 
-- Node.js **22+** (required for current Supabase client / native WebSocket)
+- Node.js **18+** (22+ recommended)
 - Supabase project
-- WhatsApp account for the **bot number** (linked device QR)
-- Optional: Foundry for contracts
+- WhatsApp for the bot number (linked device)
+- Foundry optional (contracts)
 
 ### Bot (local or VPS)
 
 ```bash
-# clone and install
 cd /path/to/flizy
-cp .env.example .env   # or copy .env.example on Windows
-# edit .env: SUPABASE_URL, SUPABASE_KEY, GIWA_RPC, PRIVATE_KEY, BOT_WHATSAPP_NUMBER, SITE_URL
-
+cp .env.example .env
+# fill SUPABASE_*, GIWA_RPC, PRIVATE_KEY, BOT_WHATSAPP_NUMBER, SITE_URL
 npm install
 node index.js
 ```
 
-Scan the QR with the bot phone (Linked devices). Leave the process running on an always-on host (`screen -S flizy` recommended on Linux VPS).
+VPS with systemd:
 
-**Windows CMD** (dev only):
-
-```cmd
-cd /d C:\Users\Ludarep\flizy
-npm.cmd install
-node index.js
+```bash
+cd /opt/flizy && git pull && npm install --omit=dev
+sudo systemctl restart flizy
+journalctl -u flizy -f
 ```
 
-Do not run the same WhatsApp session on Windows and VPS at the same time.
+Do not run the same WhatsApp session on Windows and VPS at once.
 
 ### Site
 
@@ -257,7 +367,7 @@ npm install
 npm run dev
 ```
 
-Production: deploy `web/` to Vercel (framework Next.js). Set the same public site URL in bot `SITE_URL`.
+Production: deploy `web/` to Vercel.
 
 ### Database
 
@@ -265,7 +375,7 @@ Production: deploy `web/` to Vercel (framework Next.js). Set the same public sit
 npx supabase db push
 ```
 
-(or apply migrations from `supabase/migrations/` via your usual Supabase workflow)
+Or apply SQL from `supabase/migrations/`.
 
 ### Contracts
 
@@ -273,6 +383,8 @@ npx supabase db push
 cd contracts
 forge install foundry-rs/forge-std
 forge test
+# redeploy DEX only if needed:
+# node ../scripts/deploy-dex.js
 ```
 
 ---
@@ -283,26 +395,27 @@ forge test
 |----------|---------|
 | `SUPABASE_URL` / `SUPABASE_KEY` | Database (service role on bot) |
 | `GIWA_RPC` | GIWA Sepolia RPC |
-| `PRIVATE_KEY` | Bot **ops** hot wallet (not user agent keys) |
-| `BOT_WHATSAPP_NUMBER` | Digits for dashboard deep links (e.g. `234…`) |
-| `SITE_URL` | e.g. `https://flizy.vercel.app` |
-| `REQUIRE_FLIZY_PREFIX` | Require `flizy` on commands (default true) |
-| `ENFORCE_TRUSTED` | Block non-allowlisted destinations |
-| `ENFORCE_CREDIT` | Optional spendable credit gate |
-| `REQUIRE_UNLOCK` | Optional PIN session gate |
-| `DEFAULT_CHAIN` | Registry key (default `giwa_sepolia`) |
+| `PRIVATE_KEY` | Ops / treasury hot wallet |
+| `ESCROW_PRIVATE_KEY` | Optional dedicated claim escrow |
+| `BOT_WHATSAPP_NUMBER` | Digits for `wa.me` deep links |
+| `SITE_URL` | Public site URL |
+| `ENFORCE_TRUSTED` | Trusted-list on transfers |
+| `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes |
+| `CHAIN_GIWA_SEPOLIA_*` | Optional overrides for WETH, routers, FLZ, pair |
+| `FLIZY_TREASURY` | Fee destination (defaults to ops) |
 
-See `.env.example` for the full list. Never commit real `.env` files.
+See `.env.example`. Never commit real `.env` files.
 
 ---
 
 ## Hard rules
 
 - No secrets in WhatsApp, logs, or client bundles.
-- User-facing sends use the **agent wallet**, not the ops key, after site link.
-- Trusted destinations are first-class; untrusted sends are rejected when enforcement is on.
+- User sends and swaps use the **agent wallet**, not the ops key, after link.
+- Transfers: trusted destinations when enforcement is on.
+- Swaps: allowlisted routers only; fee disclosed before confirm.
+- Claims match on **normalized phone**, not LID alone.
 - Commands use the `flizy` prefix in production configuration.
-- Visual system: near-black surfaces, paper text, accent lime `#c8f135` or gold `#f5c842`—no blue chrome.
 
 ---
 
@@ -311,13 +424,16 @@ See `.env.example` for the full list. Never commit real `.env` files.
 | Area | State |
 |------|--------|
 | Site identity + dashboard + link codes | Live |
-| WhatsApp multi-user bot + agent wallet sends | Live (GIWA Sepolia) |
-| Trusted list enforcement | Live |
-| Password policy (no email verify) | Live |
-| Chain registry for more EVM | Ready; GIWA registered |
-| Smart wallet deploy on chain | Contracts in repo; deploy when ready |
-| DEX / buy commands | Helpers present; wire when router env known |
-| Always-on bot host | Operator-managed (e.g. Contabo + screen) |
+| WhatsApp multi-user bot + agent sends | Live (GIWA Sepolia) |
+| Trusted list + daily limits (Policy) | Live |
+| Phone claims + escrow + cancel | Live |
+| Payment requests | Live |
+| Phone join key for LID sessions | Live |
+| DEX + FLZ + fee router | **Live** on GIWA Sepolia |
+| Site swap + add/remove liquidity | Live |
+| WhatsApp buy / sell / swap / price | Live |
+| Smart wallet deploy | Contracts in repo; not required for current EOAs |
+| More tokens / more EVM | Registry-ready; FLZ is first listed asset |
 
 ---
 
@@ -325,4 +441,4 @@ See `.env.example` for the full list. Never commit real `.env` files.
 
 Private product repository. Site: [https://flizy.vercel.app](https://flizy.vercel.app).
 
-For operators: keep the bot process supervised, rotate compromised keys immediately, and treat `PRIVATE_KEY` and Supabase service keys as production secrets.
+Operators: supervise the bot process, rotate compromised keys immediately, and treat `PRIVATE_KEY`, escrow keys, and Supabase service keys as production secrets.
