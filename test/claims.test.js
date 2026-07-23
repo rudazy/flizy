@@ -15,9 +15,10 @@ const { buildClaimPlan, formatClaimPlanPreview } = require('../lib/engine/plan')
 const { createSendIntent } = require('../lib/engine/intent');
 
 describe('normalizeWaHint / isPlausiblePhone', () => {
-  it('strips plus and non-digits', () => {
+  it('strips plus, non-digits, and leading zeros', () => {
     assert.equal(normalizeWaHint('+234 801 234 5678'), '2348012345678');
     assert.equal(normalizeWaHint('2348012345678@c.us'), '2348012345678');
+    assert.equal(normalizeWaHint('02348012345678'), '2348012345678');
   });
 
   it('accepts plausible lengths', () => {

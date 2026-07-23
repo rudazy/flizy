@@ -13,13 +13,19 @@ const {
   getOrCreateAccountForSender,
   getAccountByWaSender,
   consumeLinkCode,
+  setIdentityPhone,
 } = require('./lib/identity');
+const {
+  normalizePhoneNumber,
+  isPlausiblePhone,
+  claimMatchKeys,
+  maskPhone,
+} = require('./lib/phone');
 const { stripFlizyPrefix, parseUnlockCommand, parseLockCommand } = require('./lib/prefix');
 const { isSessionUnlocked, unlockWithPin, touchSession, lockSession } = require('./lib/session');
 const { addTrusted } = require('./lib/trusted');
 const {
   normalizeWaHint,
-  isPlausiblePhone,
   listOutgoingPending,
   listIncomingPending,
   formatClaimsMenu,
@@ -177,12 +183,87 @@ function explorerAddressUrl(address) {
   return chainAddressUrl(chain, address);
 }
 
+/** Canonical phone / id digits (shared with claims join key). */
 function normalizePhone(from) {
-  return String(from || '')
-    .split('@')[0]
-    .trim()
-    .replace(/^\+/, '')
-    .replace(/\D/g, '');
+  return normalizePhoneNumber(from);
+}
+
+/**
+ * Best-effort real phone from WhatsApp message context.
+ * Prefers getContactLidAndPhone (pn alongside LID). Never invents a number.
+ * @param {import('whatsapp-web.js').Message} message
+ * @returns {Promise<string|null>} normalized digits or null
+ */
+async function extractPhoneFromWaMessage(message) {
+  const chatId = message.fromMe ? message.to || message.from : message.from;
+  if (!chatId) return null;
+
+  // LID + phone pair (whatsapp-web.js)
+  try {
+    if (typeof client.getContactLidAndPhone === 'function') {
+      const pairs = await client.getContactLidAndPhone([String(chatId)]);
+      const pn = pairs && pairs[0] && pairs[0].pn;
+      if (pn) {
+        const digits = normalizePhoneNumber(pn);
+        if (isPlausiblePhone(digits)) return digits;
+      }
+    }
+  } catch (err) {
+    console.warn('getContactLidAndPhone:', publicErrorMessage(err));
+  }
+
+  // Already a classic phone wid
+  if (String(chatId).includes('@c.us')) {
+    const digits = normalizePhoneNumber(chatId);
+    if (isPlausiblePhone(digits)) return digits;
+  }
+
+  try {
+    const contact = await message.getContact();
+    const serialized = String(contact?.id?._serialized || '');
+    const server = String(contact?.id?.server || '');
+    if (server === 'c.us' || serialized.includes('@c.us')) {
+      const digits = normalizePhoneNumber(contact.number || contact.id?.user || '');
+      if (isPlausiblePhone(digits)) return digits;
+    }
+  } catch (err) {
+    console.warn('getContact phone:', publicErrorMessage(err));
+  }
+
+  return null;
+}
+
+/**
+ * Resolve phone join key for claims/requests: extract from message, store on identity.
+ * LID (phone param) stays the identity key.
+ * @returns {Promise<{ waSenderId: string, waPhone: string|null }>}
+ */
+async function resolveClaimIdentity(message, waSenderId) {
+  let waPhone = null;
+  try {
+    waPhone = await extractPhoneFromWaMessage(message);
+  } catch (err) {
+    console.warn('extractPhoneFromWaMessage:', publicErrorMessage(err));
+  }
+
+  if (waPhone) {
+    try {
+      await setIdentityPhone(waSenderId, waPhone);
+    } catch (err) {
+      console.warn('setIdentityPhone:', publicErrorMessage(err));
+    }
+  } else {
+    try {
+      const bound = await getAccountByWaSender(waSenderId);
+      if (bound?.identity?.wa_phone_e164) {
+        waPhone = normalizePhoneNumber(bound.identity.wa_phone_e164);
+      }
+    } catch (err) {
+      console.warn('resolveClaimIdentity lookup:', publicErrorMessage(err));
+    }
+  }
+
+  return { waSenderId, waPhone: waPhone || null };
 }
 
 function formatEth(value) {
@@ -1457,7 +1538,21 @@ async function handleClaimsList(message, user, phone, account, kind) {
 
   let claims;
   try {
-    claims = await listIncomingPending(phone);
+    const identity = await resolveClaimIdentity(message, phone);
+    claims = await listIncomingPending(identity);
+    if (!claims.length && !identity.waPhone) {
+      await botReply(
+        message,
+        phone,
+        [
+          'No pending claims for this WhatsApp.',
+          '',
+          'Could not read your phone number from WhatsApp (LID-only session).',
+          'Claims are addressed by phone. Re-link after updating the bot, or ask the sender to confirm the number.',
+        ].join('\n')
+      );
+      return;
+    }
   } catch (err) {
     console.error('listIncomingPending:', publicErrorMessage(err));
     await botReply(message, phone, 'Could not load claims. Try again.');
@@ -1606,10 +1701,12 @@ async function runPayoutOneClaim(message, user, phone, account, claimId) {
     return;
   }
   await botReply(message, phone, 'Claiming funds...');
+  const identity = await resolveClaimIdentity(message, phone);
   const result = await executeClaimPayout({
     claimId,
     toAccountId: siteAcc.id,
     toWaSender: phone,
+    toWaPhone: identity.waPhone,
     provider,
     chain,
     escrowWallet,
@@ -1635,8 +1732,9 @@ async function runPayoutOneClaim(message, user, phone, account, claimId) {
 
 async function notifyIncomingClaimsAfterLink(message, phone, accountId) {
   try {
-    const claims = await listIncomingPending(phone);
-    const requests = await listIncomingRequests(phone);
+    const identity = await resolveClaimIdentity(message, phone);
+    const claims = await listIncomingPending(identity);
+    const requests = await listIncomingRequests(identity);
     const parts = [];
     if (claims.length) {
       const total = claims.reduce((s, c) => s + Number(c.amount_eth || 0), 0);
@@ -1760,7 +1858,8 @@ async function handleRequestsCommand(message, user, phone, account, kind) {
   if (kind === 'incoming') {
     let rows;
     try {
-      rows = await listIncomingRequests(phone);
+      const identity = await resolveClaimIdentity(message, phone);
+      rows = await listIncomingRequests(identity);
     } catch (err) {
       console.error(publicErrorMessage(err));
       await botReply(message, phone, 'Could not load requests.');
@@ -1840,8 +1939,17 @@ async function startPayRequest(message, user, phone, account, requestId) {
     await botReply(message, phone, 'That request is no longer pending.');
     return;
   }
-  if (normalizeWaHint(req.from_wa_hint) !== normalizeWaHint(phone)) {
-    await botReply(message, phone, 'This request is for a different WhatsApp number.');
+  const identity = await resolveClaimIdentity(message, phone);
+  const keys = claimMatchKeys(identity);
+  const reqHint = normalizeWaHint(req.from_wa_hint);
+  if (!keys.length || !keys.includes(reqHint)) {
+    await botReply(
+      message,
+      phone,
+      identity.waPhone
+        ? 'This request is for a different WhatsApp number.'
+        : 'Could not verify your phone for this request. Message the bot again, or re-link WhatsApp.'
+    );
     return;
   }
   const requesterAcc = await ensureAgentWallet(req.requester_account_id);
@@ -1877,7 +1985,8 @@ async function runCancelOneRequest(message, phone, account, requestId) {
 
 async function handleLink(message, phone, code) {
   try {
-    const result = await consumeLinkCode(phone, code);
+    const waPhone = await extractPhoneFromWaMessage(message);
+    const result = await consumeLinkCode(phone, code, waPhone);
     if (!result.ok) {
       if (result.reason === 'expired') {
         await message.reply('That link code expired. Generate a new one on the Flizy site.');
@@ -2298,8 +2407,11 @@ async function handleIncomingMessage(message) {
     const earlyLink = parseLinkCommand(text);
     if (earlyLink) {
       try {
-        console.log(`[link] attempt phone=${phone} code=${earlyLink.code}`);
-        const result = await consumeLinkCode(phone, earlyLink.code);
+        const waPhone = await extractPhoneFromWaMessage(message);
+        console.log(
+          `[link] attempt sender=${maskPhone(phone)} phone=${waPhone ? maskPhone(waPhone) : 'none'} code=${earlyLink.code}`
+        );
+        const result = await consumeLinkCode(phone, earlyLink.code, waPhone);
         if (!result.ok) {
           if (result.reason === 'expired') {
             await botReply(
@@ -2331,7 +2443,7 @@ async function handleIncomingMessage(message) {
           .eq('phone', phone);
 
         console.log(
-          `[link] ok phone=${phone} account=${acc.id} wallet=${acc.agent_wallet_address}`
+          `[link] ok sender=${maskPhone(phone)} phone=${waPhone ? maskPhone(waPhone) : 'none'} account=${acc.id} wallet=${acc.agent_wallet_address}`
         );
         await botReply(
           message,
