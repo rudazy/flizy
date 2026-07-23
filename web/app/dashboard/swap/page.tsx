@@ -14,6 +14,8 @@ type Quote = {
   fee: string;
   feeBps: number;
   feePct: string;
+  poolFeePct?: string;
+  allInPct?: string;
   slippagePct: string;
   tokenIn: string;
   tokenOut: string;
@@ -36,12 +38,15 @@ function fmt(n: string | number, max = 6) {
   return x.toLocaleString(undefined, { maximumFractionDigits: max });
 }
 
+type Balances = { eth: string; flz: string };
+
 export default function SwapPage() {
   const [tokenIn, setTokenIn] = useState<Token>('ETH');
   const [tokenOut, setTokenOut] = useState<Token>('FLZ');
   const [amountIn, setAmountIn] = useState('0.01');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [price, setPrice] = useState<PriceInfo | null>(null);
+  const [balances, setBalances] = useState<Balances>({ eth: '0', flz: '0' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [quoting, setQuoting] = useState(false);
@@ -60,6 +65,48 @@ export default function SwapPage() {
   } | null>(null);
 
   const side = tokenIn === 'ETH' ? 'buy' : 'sell';
+
+  const loadBalances = useCallback(async () => {
+    try {
+      const res = await fetch('/api/holdings');
+      const data = await res.json();
+      if (!res.ok) return;
+      const eth = data?.holdings?.native?.balance || '0';
+      const flzTok = (data?.holdings?.tokens || []).find(
+        (t: { symbol?: string }) => String(t.symbol || '').toUpperCase() === 'FLZ'
+      );
+      setBalances({
+        eth: String(eth),
+        flz: flzTok?.balance != null ? String(flzTok.balance) : '0',
+      });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const balanceFor = useCallback(
+    (token: Token) => (token === 'ETH' ? balances.eth : balances.flz),
+    [balances]
+  );
+
+  function setMaxIn() {
+    const raw = balanceFor(tokenIn);
+    let n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) {
+      setAmountIn('0');
+      return;
+    }
+    // Leave a gas buffer when paying with ETH
+    if (tokenIn === 'ETH') {
+      n = Math.max(0, n - 0.00008);
+    }
+    const s =
+      n >= 1
+        ? n.toFixed(6).replace(/\.?0+$/, '')
+        : n.toPrecision(6).replace(/\.?0+$/, '');
+    setAmountIn(s || '0');
+    setResult(null);
+  }
 
   const loadPrice = useCallback(async () => {
     try {
@@ -122,7 +169,8 @@ export default function SwapPage() {
 
   useEffect(() => {
     loadPrice();
-  }, [loadPrice]);
+    loadBalances();
+  }, [loadPrice, loadBalances]);
 
   useEffect(() => {
     if (showLiquidity) {
@@ -183,6 +231,7 @@ export default function SwapPage() {
       setResult({ explorerUrl: data.explorerUrl, txHash: data.txHash });
       loadPrice();
       loadQuote();
+      loadBalances();
     } catch {
       setError('Swap failed');
     } finally {
@@ -309,6 +358,8 @@ export default function SwapPage() {
             token={tokenIn}
             amount={amountIn}
             editable
+            balance={balanceFor(tokenIn)}
+            onMax={setMaxIn}
             onAmountChange={(v) => {
               setAmountIn(v);
               setResult(null);
@@ -334,6 +385,7 @@ export default function SwapPage() {
             amount={quote ? fmt(quote.amountOut, 6) : quoting ? '…' : '0'}
             editable={false}
             muted={!quote}
+            balance={balanceFor(tokenOut)}
           />
 
           {/* Details */}
@@ -353,6 +405,14 @@ export default function SwapPage() {
                   </span>
                 </div>
                 <div className="flex justify-between gap-2 text-muted">
+                  <span>Pool fee</span>
+                  <span className="text-paper">{quote.poolFeePct || '0.30%'}</span>
+                </div>
+                <div className="flex justify-between gap-2 text-muted">
+                  <span>All-in</span>
+                  <span className="text-lime">{quote.allInPct || '0.60%'} + gas</span>
+                </div>
+                <div className="flex justify-between gap-2 text-muted">
                   <span>Slippage</span>
                   <span className="text-paper">{quote.slippagePct}</span>
                 </div>
@@ -367,7 +427,10 @@ export default function SwapPage() {
                 </p>
               </>
             ) : (
-              <p className="text-muted">Fee is shown here before you confirm. Default protocol fee 0.30%.</p>
+              <p className="text-muted">
+                All-in about 0.60% (protocol 0.30% + pool 0.30%) plus network gas. Shown before you
+                confirm.
+              </p>
             )}
           </div>
 
@@ -587,6 +650,8 @@ function TokenPanel({
   amount,
   editable,
   muted,
+  balance,
+  onMax,
   onAmountChange,
 }: {
   label: string;
@@ -594,20 +659,48 @@ function TokenPanel({
   amount: string;
   editable: boolean;
   muted?: boolean;
+  balance?: string;
+  onMax?: () => void;
   onAmountChange?: (v: string) => void;
 }) {
+  const balN = balance != null ? Number(balance) : null;
+  const balLabel =
+    balN == null || !Number.isFinite(balN)
+      ? null
+      : balN === 0
+        ? '0'
+        : balN >= 1
+          ? balN.toLocaleString(undefined, { maximumFractionDigits: 4 })
+          : balN.toPrecision(4);
+
   return (
     <div className="rounded-md border border-border bg-surface/80 px-3 py-3 transition-colors focus-within:border-lime/35">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] uppercase tracking-wider text-muted">{label}</span>
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-md border border-border bg-ink px-2.5 py-1 font-sans text-xs font-semibold tracking-wide ${
-            token === 'ETH' ? 'text-paper' : 'text-lime'
-          }`}
-        >
-          <TokenDot token={token} />
-          {token}
-        </span>
+        <div className="flex items-center gap-2">
+          {balLabel != null ? (
+            <span className="font-mono text-[10px] text-muted">
+              Bal {balLabel}
+              {editable && onMax ? (
+                <button
+                  type="button"
+                  onClick={onMax}
+                  className="ml-1.5 rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-lime hover:border-lime/50"
+                >
+                  Max
+                </button>
+              ) : null}
+            </span>
+          ) : null}
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-md border border-border bg-ink px-2.5 py-1 font-sans text-xs font-semibold tracking-wide ${
+              token === 'ETH' ? 'text-paper' : 'text-lime'
+            }`}
+          >
+            <TokenDot token={token} />
+            {token}
+          </span>
+        </div>
       </div>
       {editable ? (
         <input

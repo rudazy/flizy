@@ -9,10 +9,12 @@
 2. **Pool fee (Uniswap V2 style):** **0.30%** inside the pair (standard constant-product AMM).
 3. **Network gas:** paid from your agent wallet in native ETH.
 
+**All-in trading cost (excluding gas): about 0.60%.** Always disclose the all-in figure, not only the protocol fee.
+
 ## Where the fee is shown
 
-- WhatsApp: every swap plan lists fee percentage and estimated fee amount before `confirm`.
-- Site Swap screen: fee line is always visible on the quote before you confirm.
+- WhatsApp: every swap plan lists protocol fee, pool fee, and all-in ~0.60% before `confirm`.
+- Site Swap screen: protocol fee, pool fee, and all-in on the quote before you confirm.
 - This document.
 
 ## What does not count

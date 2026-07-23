@@ -2,6 +2,119 @@ import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 
+export type ActivityItem = {
+  id: string;
+  type: 'transfer' | 'receive' | 'claim' | 'swap' | 'withdraw';
+  direction: 'in' | 'out';
+  amount: string | number;
+  asset: string;
+  amountSecondary?: string | null;
+  assetSecondary?: string | null;
+  counterparty?: string | null;
+  status: string;
+  txHash?: string | null;
+  createdAt: string;
+  label: string;
+};
+
+function shortAddr(addr: string) {
+  if (!addr || addr.length < 12) return addr;
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function mapTransferRow(row: Record<string, unknown>): ActivityItem {
+  const kind = String(row.kind || 'transfer').toLowerCase();
+  const direction = String(row.direction || 'out') === 'in' ? 'in' : 'out';
+  const asset = String(row.asset || 'ETH').toUpperCase();
+  const amount = row.amount_eth as string | number;
+  const to = row.to_address ? String(row.to_address) : '';
+  const labelExtra = row.counterparty_label ? String(row.counterparty_label) : null;
+
+  let type: ActivityItem['type'] = 'transfer';
+  if (kind === 'swap') type = 'swap';
+  else if (kind === 'withdraw' || kind === 'withdraw_token') type = 'withdraw';
+  else if (direction === 'in') type = 'receive';
+  else type = 'transfer';
+
+  let label = '';
+  if (type === 'swap') {
+    const outAmt = row.amount_secondary ? String(row.amount_secondary) : null;
+    const outAsset = row.asset_secondary ? String(row.asset_secondary) : null;
+    label = outAmt && outAsset ? `${amount} ${asset} → ${outAmt} ${outAsset}` : `Swap ${amount} ${asset}`;
+  } else if (type === 'receive') {
+    label = `Received ${amount} ${asset}`;
+  } else {
+    const dest = labelExtra || (to ? shortAddr(to) : '—');
+    label = `Sent ${amount} ${asset} → ${dest}`;
+  }
+
+  return {
+    id: String(row.id),
+    type,
+    direction,
+    amount,
+    asset,
+    amountSecondary: row.amount_secondary ? String(row.amount_secondary) : null,
+    assetSecondary: row.asset_secondary ? String(row.asset_secondary) : null,
+    counterparty: labelExtra || to || null,
+    status: String(row.status || 'unknown'),
+    txHash: row.tx_hash ? String(row.tx_hash) : null,
+    createdAt: String(row.created_at),
+    label,
+  };
+}
+
+function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityItem {
+  const status = String(row.status || 'pending');
+  const amount = row.amount_eth as string | number;
+  const isSender = row.from_account_id === accountId;
+  const hint = row.to_wa_hint ? `+${row.to_wa_hint}` : null;
+  let type: ActivityItem['type'] = 'claim';
+  let direction: 'in' | 'out' = 'out';
+  let label = '';
+  let txHash: string | null = null;
+
+  if (isSender) {
+    direction = 'out';
+    if (status === 'cancelled') {
+      label = `Claim cancelled · refund ${amount} ETH`;
+      txHash = row.refund_tx_hash ? String(row.refund_tx_hash) : null;
+      type = 'receive';
+      direction = 'in';
+    } else if (status === 'claimed') {
+      label = `Claim paid to ${hint || 'recipient'} · ${amount} ETH`;
+      txHash = row.claim_tx_hash ? String(row.claim_tx_hash) : row.hold_tx_hash ? String(row.hold_tx_hash) : null;
+      type = 'claim';
+    } else {
+      label = `Claim held for ${hint || 'recipient'} · ${amount} ETH`;
+      txHash = row.hold_tx_hash ? String(row.hold_tx_hash) : null;
+      type = 'claim';
+    }
+  } else {
+    // Recipient view
+    direction = 'in';
+    type = status === 'claimed' ? 'receive' : 'claim';
+    label =
+      status === 'claimed'
+        ? `Received claim · ${amount} ETH`
+        : `Incoming claim · ${amount} ETH (${status})`;
+    txHash = row.claim_tx_hash ? String(row.claim_tx_hash) : null;
+  }
+
+  return {
+    id: `claim_${row.id}`,
+    type,
+    direction,
+    amount,
+    asset: 'ETH',
+    counterparty: hint,
+    status,
+    txHash,
+    createdAt: String(row.claimed_at || row.created_at),
+    label,
+  };
+}
+
 export async function GET() {
   try {
     const accountId = getAccountIdFromCookie();
@@ -10,8 +123,9 @@ export async function GET() {
     }
 
     const supabase = getSupabase();
+    const selectCols =
+      'id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id, kind, asset, token_address, counterparty_label, direction, amount_secondary, asset_secondary';
 
-    // Prefer account_id; fall back to phones linked to this account
     const { data: identities } = await supabase
       .from('whatsapp_identities')
       .select('wa_sender_id')
@@ -19,32 +133,72 @@ export async function GET() {
 
     const phones = (identities || []).map((i) => i.wa_sender_id).filter(Boolean);
 
-    let query = supabase
+    let transferQuery = supabase
       .from('transfers')
-      .select('id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id')
+      .select(selectCols)
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(40);
 
     if (phones.length > 0) {
-      query = query.or(`account_id.eq.${accountId},phone.in.(${phones.join(',')})`);
+      transferQuery = transferQuery.or(
+        `account_id.eq.${accountId},phone.in.(${phones.join(',')})`
+      );
     } else {
-      query = query.eq('account_id', accountId);
+      transferQuery = transferQuery.eq('account_id', accountId);
     }
 
-    const { data, error } = await query;
-    if (error) {
-      // Fallback: account_id only (or empty)
-      const { data: byAccount, error: e2 } = await supabase
+    const { data: transfers, error: tErr } = await transferQuery;
+    let transferRows: Record<string, unknown>[] = (transfers || []) as Record<string, unknown>[];
+    if (tErr) {
+      // Older schema without new columns — fall back
+      const { data: byAccount } = await supabase
         .from('transfers')
-        .select('id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id')
+        .select(
+          'id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id, kind'
+        )
         .eq('account_id', accountId)
         .order('created_at', { ascending: false })
-        .limit(10);
-      if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
-      return NextResponse.json({ transfers: byAccount || [] });
+        .limit(40);
+      transferRows = (byAccount || []) as Record<string, unknown>[];
     }
 
-    return NextResponse.json({ transfers: data || [] });
+    const { data: claimsOut } = await supabase
+      .from('claims')
+      .select(
+        'id, from_account_id, to_account_id, to_wa_hint, amount_eth, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at'
+      )
+      .eq('from_account_id', accountId)
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+    const { data: claimsIn } = await supabase
+      .from('claims')
+      .select(
+        'id, from_account_id, to_account_id, to_wa_hint, amount_eth, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at'
+      )
+      .eq('to_account_id', accountId)
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+    const claimMap = new Map<string, Record<string, unknown>>();
+    for (const c of [...(claimsOut || []), ...(claimsIn || [])]) {
+      claimMap.set(String(c.id), c as Record<string, unknown>);
+    }
+
+    const items: ActivityItem[] = [
+      ...transferRows.map((r) => mapTransferRow(r as Record<string, unknown>)),
+      ...Array.from(claimMap.values()).map((c) => mapClaimRow(c, accountId)),
+    ];
+
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const activity = items.slice(0, 30);
+
+    // Backward-compatible transfers key for older clients
+    return NextResponse.json({
+      activity,
+      transfers: transferRows.slice(0, 30),
+      limit: 30,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'History failed';
     return NextResponse.json({ error: message }, { status: 500 });

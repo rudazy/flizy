@@ -9,11 +9,17 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { DashboardData, HoldingsData, TransferRow } from '../lib/dashboardTypes';
+import type {
+  ActivityItem,
+  DashboardData,
+  HoldingsData,
+  TransferRow,
+} from '../lib/dashboardTypes';
 
 type DashboardContextValue = {
   data: DashboardData | null;
   history: TransferRow[];
+  activity: ActivityItem[];
   holdings: HoldingsData | null;
   error: string;
   msg: string;
@@ -46,6 +52,7 @@ export function useDashboard() {
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [history, setHistory] = useState<TransferRow[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [holdings, setHoldings] = useState<HoldingsData | null>(null);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -70,6 +77,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     if (histRes.ok) {
       const h = await histRes.json();
       setHistory(h.transfers || []);
+      setActivity(h.activity || []);
     }
     if (holdRes.ok) {
       const ho = await holdRes.json();
@@ -233,6 +241,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     () => ({
       data,
       history,
+      activity,
       holdings,
       error,
       msg,
@@ -252,6 +261,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [
       data,
       history,
+      activity,
       holdings,
       error,
       msg,

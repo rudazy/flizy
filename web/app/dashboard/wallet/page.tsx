@@ -1,69 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
 import { AppTopBar } from '../../../components/AppTopBar';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
 
 export default function WalletPage() {
-  const { data, holdings, explorerBase, refreshing, refreshAll, setMsg, busy, setBusy } =
-    useDashboard();
-  const [showWithdraw, setShowWithdraw] = useState(false);
-  const [asset, setAsset] = useState('ETH');
-  const [amount, setAmount] = useState('');
-  const [to, setTo] = useState('');
-  const [password, setPassword] = useState('');
-  const [result, setResult] = useState<{ explorerUrl?: string } | null>(null);
-  const [err, setErr] = useState('');
-
-  const assets = useMemo(() => {
-    const list: { id: string; label: string; balance: string }[] = [];
-    if (holdings?.holdings?.native) {
-      list.push({
-        id: 'ETH',
-        label: `ETH (${Number(holdings.holdings.native.balance).toFixed(6)})`,
-        balance: holdings.holdings.native.balance,
-      });
-    } else {
-      list.push({ id: 'ETH', label: 'ETH', balance: '0' });
-    }
-    for (const t of holdings?.holdings?.tokens || []) {
-      if (!t.symbol) continue;
-      list.push({
-        id: t.symbol,
-        label: `${t.symbol} (${t.balance == null ? '?' : Number(t.balance).toPrecision(6)})`,
-        balance: t.balance || '0',
-      });
-    }
-    return list;
-  }, [holdings]);
+  const { data, holdings, explorerBase, refreshing, refreshAll } = useDashboard();
 
   if (!data) return null;
-
-  async function onWithdraw(e: React.FormEvent) {
-    e.preventDefault();
-    setErr('');
-    setResult(null);
-    setBusy('withdraw');
-    try {
-      const res = await fetch('/api/withdraw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ asset, amount, to, password }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Withdraw failed');
-      setResult({ explorerUrl: json.explorerUrl });
-      setPassword('');
-      setAmount('');
-      setMsg(`Withdrawn ${json.amount} ${json.asset}.`);
-      await refreshAll();
-    } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : 'Withdraw failed');
-    } finally {
-      setBusy('');
-    }
-  }
 
   return (
     <div className="space-y-5">
@@ -85,6 +29,18 @@ export default function WalletPage() {
           ) : (
             <p className="mt-2 font-sans text-2xl text-muted">No balance yet</p>
           )}
+          {(() => {
+            const flz = (holdings?.holdings?.tokens || []).find(
+              (t) => String(t.symbol || '').toUpperCase() === 'FLZ'
+            );
+            if (!flz || flz.balance == null) return null;
+            return (
+              <p className="mt-1 font-sans text-xl tracking-wide text-paper">
+                {Number(flz.balance).toPrecision(6)}{' '}
+                <span className="text-base text-muted">FLZ</span>
+              </p>
+            );
+          })()}
           <p className="mt-2 text-xs text-muted">
             Credit: <span className="text-paper">{data.account.balance_eth ?? 0}</span>
             {holdings?.holdings?.chain?.name
@@ -117,9 +73,12 @@ export default function WalletPage() {
           <div>
             <p className="label">How sending works</p>
             <p className="text-sm leading-relaxed text-muted">
-              Sends use <span className="text-paper">this agent wallet</span> as From. Fund it, add
-              trusted names under Account, then <span className="text-paper">flizy send</span> and
-              confirm on WhatsApp.
+              Sends leave from <span className="text-paper">this agent wallet</span> only via
+              WhatsApp, and only to addresses on your trusted list (or a linked peer / claim hold).
+              The site never sends to an arbitrary 0x. Fund the wallet, add trusted names under
+              Account, then on WhatsApp: <span className="text-paper">flizy send 0.01 to name</span>
+              {' · '}
+              <span className="text-paper">flizy send 10 FLZ to name</span> → confirm.
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <a
@@ -162,94 +121,6 @@ export default function WalletPage() {
                 {holdings?.holdings?.note || 'FLZ appears after you buy or receive tokens.'}
               </p>
             )}
-          </div>
-
-          {/* Tiny emergency withdraw (site-only, password required) */}
-          <div className="border-t border-border pt-3">
-            <button
-              type="button"
-              onClick={() => {
-                setShowWithdraw((v) => !v);
-                setErr('');
-                setResult(null);
-              }}
-              className="text-[10px] font-mono uppercase tracking-wider text-muted underline-offset-2 hover:text-lime hover:underline"
-            >
-              {showWithdraw ? 'Hide withdraw' : 'Withdraw'}
-            </button>
-
-            {showWithdraw ? (
-              <form onSubmit={onWithdraw} className="mt-3 space-y-2.5 rounded border border-border bg-ink/50 p-3">
-                <p className="text-[11px] leading-relaxed text-muted">
-                  Move funds out of the agent wallet if WhatsApp is unavailable. Requires your
-                  account password. On-chain and irreversible.
-                </p>
-                <div>
-                  <label className="label">Asset</label>
-                  <select
-                    className="input"
-                    value={asset}
-                    onChange={(e) => setAsset(e.target.value)}
-                  >
-                    {assets.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Amount</label>
-                  <input
-                    className="input"
-                    inputMode="decimal"
-                    placeholder="0.0"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">To address</label>
-                  <input
-                    className="input font-mono text-sm"
-                    placeholder="0x..."
-                    value={to}
-                    onChange={(e) => setTo(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">Account password</label>
-                  <input
-                    className="input"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                {err ? <p className="text-xs text-gold">{err}</p> : null}
-                {result?.explorerUrl ? (
-                  <a
-                    href={result.explorerUrl}
-                    className="block break-all text-xs text-lime"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {result.explorerUrl}
-                  </a>
-                ) : null}
-                <button
-                  type="submit"
-                  className="btn btn-ghost w-full py-2 text-xs"
-                  disabled={busy === 'withdraw'}
-                >
-                  {busy === 'withdraw' ? 'Sending...' : 'Confirm withdraw'}
-                </button>
-              </form>
-            ) : null}
           </div>
 
           <p className="text-xs text-muted">

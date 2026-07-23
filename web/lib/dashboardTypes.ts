@@ -13,6 +13,7 @@ export type DashboardData = {
   link?: { code: string; waDeepLink: string; expiresAt: string } | null;
 };
 
+/** Legacy transfer row shape */
 export type TransferRow = {
   id: string;
   amount_eth: string | number;
@@ -20,6 +21,24 @@ export type TransferRow = {
   status: string;
   tx_hash?: string | null;
   created_at: string;
+  kind?: string | null;
+  asset?: string | null;
+};
+
+/** Unified history desk item (last 30 of all types) */
+export type ActivityItem = {
+  id: string;
+  type: 'transfer' | 'receive' | 'claim' | 'swap' | 'withdraw';
+  direction: 'in' | 'out';
+  amount: string | number;
+  asset: string;
+  amountSecondary?: string | null;
+  assetSecondary?: string | null;
+  counterparty?: string | null;
+  status: string;
+  txHash?: string | null;
+  createdAt: string;
+  label: string;
 };
 
 export type HoldingsData = {

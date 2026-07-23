@@ -63,6 +63,9 @@ export async function GET(req: Request) {
     });
 
     const feePct = `${(quote.feeBps / 100).toFixed(2)}%`;
+    const poolFeeBps = 30;
+    const allInBps = quote.feeBps + poolFeeBps;
+    const allInPct = `${(allInBps / 100).toFixed(2)}%`;
     const slipPct = `${(quote.slippageBps / 100).toFixed(2)}%`;
     const inLabel = tokenLabel(tokenIn);
     const outLabel = tokenLabel(tokenOut);
@@ -74,13 +77,17 @@ export async function GET(req: Request) {
       fee: ethers.formatEther(quote.feeAmount),
       feeBps: quote.feeBps,
       feePct,
+      poolFeeBps,
+      poolFeePct: '0.30%',
+      allInBps,
+      allInPct,
       slippageBps: quote.slippageBps,
       slippagePct: slipPct,
       tokenIn: inLabel,
       tokenOut: outLabel,
       feeRouter: quote.feeRouter,
       chain: { id: chain.chainId, name: chain.name },
-      disclosure: `Protocol fee ${feePct} (~${ethers.formatEther(quote.feeAmount)} ${inLabel}) is taken before the swap. Network gas is extra.`,
+      disclosure: `All-in ~${allInPct}: protocol ${feePct} + pool 0.30%. Protocol takes ~${ethers.formatEther(quote.feeAmount)} ${inLabel} before the swap. Network gas is extra.`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Quote failed';

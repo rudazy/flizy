@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
+import { getDexAddresses } from '../../../lib/dexServer';
 
 export async function GET() {
   try {
@@ -19,7 +20,6 @@ export async function GET() {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Inline holdings fetch so web does not depend on broken parent require on Vercel
     const { ethers } = await import('ethers');
     const rpc = process.env.GIWA_RPC || 'https://sepolia-rpc.giwa.io';
     const chainId = Number(process.env.GIWA_CHAIN_ID || 91342);
@@ -28,6 +28,7 @@ export async function GET() {
       ''
     );
     const nativeSymbol = 'ETH';
+    const dex = getDexAddresses();
 
     let native = null;
     const tokens: Array<{
@@ -39,42 +40,56 @@ export async function GET() {
 
     if (account.agent_wallet_address && ethers.isAddress(account.agent_wallet_address)) {
       const provider = new ethers.JsonRpcProvider(rpc, chainId);
-      const bal = await provider.getBalance(account.agent_wallet_address);
+      const wallet = ethers.getAddress(account.agent_wallet_address);
+      const bal = await provider.getBalance(wallet);
       native = {
         symbol: nativeSymbol,
         balance: ethers.formatEther(bal),
         address: null as string | null,
       };
 
+      // Always include FLZ from deployed DEX addresses (not env-only)
+      const tracked: Array<{ address: string; symbol: string; decimals: number | null }> = [
+        { address: dex.flz, symbol: 'FLZ', decimals: 18 },
+      ];
       const raw = process.env.TRACKED_TOKENS || '';
-      const tracked = raw
+      for (const part of raw
         .split(',')
         .map((p) => p.trim())
-        .filter(Boolean);
+        .filter(Boolean)) {
+        const [address, symbol, decimals] = part.split(':');
+        if (!address || !ethers.isAddress(address)) continue;
+        const addr = ethers.getAddress(address);
+        if (tracked.some((t) => t.address.toLowerCase() === addr.toLowerCase())) continue;
+        tracked.push({
+          address: addr,
+          symbol: symbol || 'TOKEN',
+          decimals: decimals != null && decimals !== '' ? Number(decimals) : null,
+        });
+      }
+
       const erc20Abi = [
         'function balanceOf(address) view returns (uint256)',
         'function decimals() view returns (uint8)',
         'function symbol() view returns (string)',
       ];
-      for (const part of tracked) {
-        const [address, symbol, decimals] = part.split(':');
-        if (!address || !ethers.isAddress(address)) continue;
+      for (const t of tracked) {
         try {
-          const c = new ethers.Contract(address, erc20Abi, provider);
+          const c = new ethers.Contract(t.address, erc20Abi, provider);
           const [b, d, s] = await Promise.all([
-            c.balanceOf(account.agent_wallet_address),
-            decimals != null && decimals !== '' ? Promise.resolve(Number(decimals)) : c.decimals(),
-            symbol ? Promise.resolve(symbol) : c.symbol(),
+            c.balanceOf(wallet),
+            t.decimals != null ? Promise.resolve(t.decimals) : c.decimals(),
+            t.symbol ? Promise.resolve(t.symbol) : c.symbol(),
           ]);
           tokens.push({
             symbol: String(s),
-            address: ethers.getAddress(address),
+            address: t.address,
             balance: ethers.formatUnits(b, Number(d)),
           });
         } catch {
           tokens.push({
-            symbol: symbol || 'TOKEN',
-            address,
+            symbol: t.symbol || 'TOKEN',
+            address: t.address,
             balance: null,
             error: 'Could not read',
           });
@@ -91,7 +106,7 @@ export async function GET() {
         tokens,
         note:
           tokens.length === 0
-            ? 'Native balance shown. Extra tokens via TRACKED_TOKENS. Full DEX token list later.'
+            ? 'Native balance shown. FLZ appears once the agent wallet is funded and DEX is live.'
             : null,
       },
     });

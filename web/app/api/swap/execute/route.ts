@@ -66,26 +66,87 @@ export async function POST(req: Request) {
       tokenOut,
     });
 
-    const signer = deriveAgentWallet(accountId).connect(provider);
-    const result = await executeSwap({
-      signer,
-      amountIn,
-      tokenIn,
-      tokenOut,
-      amountOutMinWei: quote.amountOutMin,
-      recipient: signer.address,
-    });
+    const inLabel = tokenInRaw.toUpperCase() === 'ETH' ? 'ETH' : tokenInRaw.toUpperCase();
+    const outLabel = tokenOutRaw.toUpperCase() === 'ETH' ? 'ETH' : tokenOutRaw.toUpperCase();
+    const amountOutStr = ethers.formatEther(quote.amountOut);
 
-    return NextResponse.json({
-      ok: true,
-      txHash: result.txHash,
-      explorerUrl: explorerTxUrl(chain, result.txHash),
-      fee: ethers.formatEther(quote.feeAmount),
-      feeBps: quote.feeBps,
-      feePct: `${(quote.feeBps / 100).toFixed(2)}%`,
-      amountOut: ethers.formatEther(quote.amountOut),
-      disclosure: `Protocol fee ${(quote.feeBps / 100).toFixed(2)}% applied before swap.`,
-    });
+    // phone required on older schemas; 'site' marks dashboard-originated swaps
+    const logPayload: Record<string, unknown> = {
+      account_id: accountId,
+      phone: 'site',
+      to_address: dex.feeRouter,
+      amount_eth: amount,
+      status: 'pending',
+      chain_id: chain.chainId,
+      kind: 'swap',
+      asset: inLabel,
+      amount_secondary: amountOutStr,
+      asset_secondary: outLabel,
+      counterparty_label: `swap → ${outLabel}`,
+      direction: 'out',
+    };
+    let logRow: { id: string } | null = null;
+    {
+      const first = await supabase.from('transfers').insert(logPayload).select('id').maybeSingle();
+      if (first.error && /column|schema cache/i.test(first.error.message || '')) {
+        const { asset, amount_secondary, asset_secondary, counterparty_label, direction, ...core } =
+          logPayload;
+        void asset;
+        void amount_secondary;
+        void asset_secondary;
+        void counterparty_label;
+        void direction;
+        const retry = await supabase.from('transfers').insert(core).select('id').maybeSingle();
+        logRow = retry.data;
+      } else {
+        logRow = first.data;
+      }
+    }
+
+    try {
+      const signer = deriveAgentWallet(accountId).connect(provider);
+      const result = await executeSwap({
+        signer,
+        amountIn,
+        tokenIn,
+        tokenOut,
+        amountOutMinWei: quote.amountOutMin,
+        recipient: signer.address,
+      });
+
+      if (logRow?.id) {
+        await supabase
+          .from('transfers')
+          .update({ status: 'confirmed', tx_hash: result.txHash })
+          .eq('id', logRow.id);
+      }
+
+      const feePct = `${(quote.feeBps / 100).toFixed(2)}%`;
+      const allInPct = `${((quote.feeBps + 30) / 100).toFixed(2)}%`;
+
+      return NextResponse.json({
+        ok: true,
+        txHash: result.txHash,
+        explorerUrl: explorerTxUrl(chain, result.txHash),
+        fee: ethers.formatEther(quote.feeAmount),
+        feeBps: quote.feeBps,
+        feePct,
+        allInPct,
+        amountOut: amountOutStr,
+        disclosure: `All-in ~${allInPct} (protocol ${feePct} + pool 0.30%). Network gas extra.`,
+      });
+    } catch (swapErr) {
+      if (logRow?.id) {
+        await supabase
+          .from('transfers')
+          .update({
+            status: 'failed',
+            error: swapErr instanceof Error ? swapErr.message : 'swap failed',
+          })
+          .eq('id', logRow.id);
+      }
+      throw swapErr;
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Swap failed';
     return NextResponse.json({ error: message }, { status: 500 });

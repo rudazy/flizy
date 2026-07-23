@@ -2,10 +2,20 @@
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
 web/.env
 web/.env.local
+web/.env*.local
 **/.env
 **/.env.local
+**/.env.*.local
+*.pem
+*.key
+id_rsa
+id_ed25519
+credentials.json
+service-account*.json
 
 # Dependencies and build
 node_modules/
@@ -14,17 +24,23 @@ web/.next/
 .next/
 dist/
 out/
+*.tsbuildinfo
+web/tsconfig.tsbuildinfo
 
 # WhatsApp Web.js session (contains browser profile / auth)
 .wwebjs_auth/
 .wwebjs_cache/
+.wwebjs_auth/**
+.wwebjs_cache/**
 
 # Supabase local temp / link state (keep migrations + config.toml)
 supabase/.temp/
 supabase/.branches/
 
-# Agent session notes / local task logs
+# Agent session notes / local task logs (never public)
 tasks/
+tasks/**
+**/todo.md
 
 # Logs / OS
 *.log
@@ -37,7 +53,12 @@ Thumbs.db
 .vscode/
 *.swp
 
-# Optional local contracts build artifacts
+# Foundry: build + forge broadcast can include deploy receipts; keep addresses in deployments/
 contracts/out/
 contracts/cache/
+contracts/broadcast/
+contracts/cache/**
+contracts/broadcast/**
+# forge-std is vendored via submodule/path; do not require committing broadcast
+# contracts/lib/ may be present locally; prefer lockfile + install
 contracts/lib/

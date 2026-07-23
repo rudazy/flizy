@@ -300,34 +300,101 @@ function formatEth(value) {
 }
 
 /**
- * send 0.01 to 0x... | send 0.01 to ama | send 0.01 to 2348012345678
- * @returns {{ amountEth: string, toRaw: string, isAddress: boolean, isPhone: boolean } | null}
+ * send 0.01 to 0x... | send 0.01 to ama | send 0.01 eth to ama
+ * send 10 FLZ to ama | send 10 FLZ to 0x... (tokens → trusted only)
+ * @returns {{ amountEth: string, asset: string, toRaw: string, isAddress: boolean, isPhone: boolean } | null}
  */
 function parseSendCommand(text) {
-  const addr = text.match(
-    /send\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+to\s+(0x[a-fA-F0-9]{40})\b/i
+  const t = String(text || '').trim();
+
+  // Explicit asset: send 10 FLZ to ...
+  const assetAddr = t.match(
+    /^send\s+([0-9]*\.?[0-9]+)\s+([a-zA-Z][a-zA-Z0-9]{0,9})\s+to\s+(0x[a-fA-F0-9]{40})\b/i
+  );
+  if (assetAddr) {
+    return {
+      amountEth: assetAddr[1],
+      asset: normalizeSendAsset(assetAddr[2]),
+      toRaw: assetAddr[3],
+      isAddress: true,
+      isPhone: false,
+    };
+  }
+  const assetPhone = t.match(
+    /^send\s+([0-9]*\.?[0-9]+)\s+([a-zA-Z][a-zA-Z0-9]{0,9})\s+to\s+(\+?\d{10,15})\b/i
+  );
+  if (assetPhone) {
+    return {
+      amountEth: assetPhone[1],
+      asset: normalizeSendAsset(assetPhone[2]),
+      toRaw: assetPhone[3],
+      isAddress: false,
+      isPhone: true,
+    };
+  }
+  const assetAlias = t.match(
+    /^send\s+([0-9]*\.?[0-9]+)\s+([a-zA-Z][a-zA-Z0-9]{0,9})\s+to\s+([a-zA-Z][a-zA-Z0-9_]{0,31})\b/i
+  );
+  if (assetAlias) {
+    return {
+      amountEth: assetAlias[1],
+      asset: normalizeSendAsset(assetAlias[2]),
+      toRaw: assetAlias[3],
+      isAddress: false,
+      isPhone: false,
+    };
+  }
+
+  // Native ETH (optional "eth" word)
+  const addr = t.match(
+    /^send\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+to\s+(0x[a-fA-F0-9]{40})\b/i
   );
   if (addr) {
-    return { amountEth: addr[1], toRaw: addr[2], isAddress: true, isPhone: false };
+    return {
+      amountEth: addr[1],
+      asset: 'ETH',
+      toRaw: addr[2],
+      isAddress: true,
+      isPhone: false,
+    };
   }
-  const phone = text.match(
-    /send\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+to\s+(\+?\d{10,15})\b/i
+  const phone = t.match(
+    /^send\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+to\s+(\+?\d{10,15})\b/i
   );
   if (phone) {
     return {
       amountEth: phone[1],
+      asset: 'ETH',
       toRaw: phone[2],
       isAddress: false,
       isPhone: true,
     };
   }
-  const alias = text.match(
-    /send\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+to\s+([a-zA-Z][a-zA-Z0-9_]{0,31})\b/i
+  const alias = t.match(
+    /^send\s+([0-9]*\.?[0-9]+)\s*(?:eth)?\s+to\s+([a-zA-Z][a-zA-Z0-9_]{0,31})\b/i
   );
   if (alias) {
-    return { amountEth: alias[1], toRaw: alias[2], isAddress: false, isPhone: false };
+    return {
+      amountEth: alias[1],
+      asset: 'ETH',
+      toRaw: alias[2],
+      isAddress: false,
+      isPhone: false,
+    };
   }
   return null;
+}
+
+function normalizeSendAsset(raw) {
+  const s = String(raw || 'ETH').toUpperCase();
+  if (s === 'ETH' || s === 'NATIVE' || s === 'ETHER') return 'ETH';
+  if (s === 'FLIZY') return 'FLZ';
+  return s;
+}
+
+function isNativeSendAsset(asset) {
+  const s = String(asset || 'ETH').toUpperCase();
+  return s === 'ETH' || s === 'NATIVE' || s === 'ETHER';
 }
 
 /**
@@ -826,6 +893,7 @@ function helpText(user) {
     '  flizy deposit',
     '  flizy add wallet 0x...',
     '  flizy send 0.01 to john',
+    '  flizy send 10 FLZ to john',
     '  flizy send 0.01 to 2348012345678',
     '  confirm',
     '  cancel',
@@ -1034,32 +1102,119 @@ async function handleBalance(message, user, account) {
   }
 }
 
-async function handleHistory(message, phone) {
-  const { data, error } = await supabase
-    .from('transfers')
-    .select('amount_eth, to_address, status, tx_hash, created_at')
-    .eq('phone', phone)
-    .order('created_at', { ascending: false })
-    .limit(10);
+async function handleHistory(message, phone, account) {
+  const accountId = account?.id || null;
+  const selectCols =
+    'id, amount_eth, to_address, status, tx_hash, created_at, kind, asset, amount_secondary, asset_secondary, counterparty_label, direction';
 
+  let query = supabase
+    .from('transfers')
+    .select(selectCols)
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (accountId) {
+    query = query.or(`account_id.eq.${accountId},phone.eq.${phone}`);
+  } else {
+    query = query.eq('phone', phone);
+  }
+
+  let { data, error } = await query;
   if (error) {
+    // Older schema without new columns
+    const fallback = await supabase
+      .from('transfers')
+      .select('id, amount_eth, to_address, status, tx_hash, created_at, kind')
+      .eq(accountId ? 'account_id' : 'phone', accountId || phone)
+      .order('created_at', { ascending: false })
+      .limit(30);
+    data = fallback.data;
+    error = fallback.error;
+  }
+
+  const items = [];
+  for (const row of data || []) {
+    const kind = String(row.kind || 'transfer').toLowerCase();
+    const asset = String(row.asset || 'ETH').toUpperCase();
+    const amt = formatEth(row.amount_eth);
+    if (kind === 'swap') {
+      const out =
+        row.amount_secondary && row.asset_secondary
+          ? ` → ${formatEth(row.amount_secondary)} ${row.asset_secondary}`
+          : '';
+      items.push({
+        created: row.created_at,
+        line: `• Swap ${amt} ${asset}${out} [${row.status}]`,
+        tx: row.tx_hash,
+      });
+    } else {
+      const dest = row.counterparty_label || shortAddress(row.to_address);
+      const dir = String(row.direction || 'out') === 'in' ? 'Recv' : 'Send';
+      items.push({
+        created: row.created_at,
+        line: `• ${dir} ${amt} ${asset} → ${dest} [${row.status}]`,
+        tx: row.tx_hash,
+      });
+    }
+  }
+
+  if (accountId) {
+    try {
+      const { data: claimsOut } = await supabase
+        .from('claims')
+        .select(
+          'amount_eth, status, to_wa_hint, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at'
+        )
+        .eq('from_account_id', accountId)
+        .order('created_at', { ascending: false })
+        .limit(15);
+      for (const c of claimsOut || []) {
+        const hint = c.to_wa_hint ? `+${c.to_wa_hint}` : 'recipient';
+        items.push({
+          created: c.claimed_at || c.created_at,
+          line: `• Claim ${formatEth(c.amount_eth)} ETH → ${hint} [${c.status}]`,
+          tx: c.claim_tx_hash || c.refund_tx_hash || c.hold_tx_hash,
+        });
+      }
+      const { data: claimsIn } = await supabase
+        .from('claims')
+        .select('amount_eth, status, claim_tx_hash, created_at, claimed_at')
+        .eq('to_account_id', accountId)
+        .eq('status', 'claimed')
+        .order('claimed_at', { ascending: false })
+        .limit(15);
+      for (const c of claimsIn || []) {
+        items.push({
+          created: c.claimed_at || c.created_at,
+          line: `• Recv claim ${formatEth(c.amount_eth)} ETH [${c.status}]`,
+          tx: c.claim_tx_hash,
+        });
+      }
+    } catch (err) {
+      console.warn('history claims:', publicErrorMessage(err));
+    }
+  }
+
+  items.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+  const top = items.slice(0, 30);
+
+  if (error && top.length === 0) {
     console.error('history error:', error);
     await message.reply('Could not load history right now.');
     return;
   }
 
-  if (!data || data.length === 0) {
-    await message.reply('No transfers yet. Try: send 0.001 to 0x...');
+  if (top.length === 0) {
+    await message.reply(
+      'No activity yet.\nTry: flizy send 0.001 to john\nOr: flizy send 10 FLZ to john\nOr: flizy buy 0.01 FLZ'
+    );
     return;
   }
 
-  const lines = ['Last 10 transfers:'];
-  for (const row of data) {
-    const shortTo = shortAddress(row.to_address);
-    lines.push(
-      `• ${formatEth(row.amount_eth)} ETH → ${shortTo} [${row.status}]`
-    );
-    if (row.tx_hash) lines.push(`  ${explorerTxUrl(row.tx_hash)}`);
+  const lines = [`Last ${top.length} activity:`];
+  for (const row of top) {
+    lines.push(row.line);
+    if (row.tx) lines.push(`  ${explorerTxUrl(row.tx)}`);
   }
   await message.reply(lines.join('\n'));
 }
@@ -1254,9 +1409,36 @@ async function actorSessionFlags(user, siteAcc, phone) {
 /**
  * SEND path: trusted/address on-chain OR phone claim hold.
  */
-async function handleSend(message, user, phone, amountEth, toRaw, isAddress, isPhone, account) {
+async function handleSend(
+  message,
+  user,
+  phone,
+  amountEth,
+  toRaw,
+  isAddress,
+  isPhone,
+  account,
+  asset = 'ETH'
+) {
   const siteAcc = await requireLinkedSite(message, phone, account);
   if (!siteAcc) return;
+
+  const sendAsset = normalizeSendAsset(asset);
+  const native = isNativeSendAsset(sendAsset);
+
+  // Token claims to unlinked phones are not supported (escrow is ETH-only)
+  if (isPhone && !native) {
+    await botReply(
+      message,
+      phone,
+      [
+        `Claim holds are ETH only for now.`,
+        `To send ${sendAsset}, add their wallet under Account → Trusted, then:`,
+        `flizy send ${amountEth} ${sendAsset} to theirname`,
+      ].join('\n')
+    );
+    return;
+  }
 
   // --- Phone: claim hold (or direct if that WA already linked) ---
   if (isPhone) {
@@ -1283,10 +1465,18 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, isP
         await botReply(message, phone, 'That user has no agent wallet yet. Try again later.');
         return;
       }
-      return handleSendResolved(message, user, phone, amountEth, {
-        address: ethers.getAddress(toAddress),
-        label: `+${toWa}`,
-      }, siteAcc, { skipTrusted: true });
+      return handleSendResolved(
+        message,
+        user,
+        phone,
+        amountEth,
+        {
+          address: ethers.getAddress(toAddress),
+          label: `+${toWa}`,
+        },
+        siteAcc,
+        { skipTrusted: true, asset: sendAsset }
+      );
     }
 
     // Not linked → claim plan (held until that WhatsApp links)
@@ -1299,6 +1489,7 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, isP
       toRaw: toWa,
       toIsAddress: false,
       chainId: String(chain.chainId),
+      asset: 'ETH',
     });
 
     const policy = await evaluateClaimHoldPolicy(intent, { accountRow: siteAcc });
@@ -1358,10 +1549,34 @@ async function handleSend(message, user, phone, amountEth, toRaw, isAddress, isP
   }
   return handleSendResolved(message, user, phone, amountEth, resolved, siteAcc, {
     skipTrusted: false,
+    asset: sendAsset,
   });
 }
 
 async function handleSendResolved(message, user, phone, amountEth, resolved, siteAcc, opts = {}) {
+  const sendAsset = normalizeSendAsset(opts.asset || 'ETH');
+  const native = isNativeSendAsset(sendAsset);
+  let tokenAddress = null;
+  let tokenSymbol = null;
+  let tokenBalance = null;
+
+  if (!native) {
+    try {
+      tokenAddress = resolveToken(sendAsset, chain.id);
+    } catch {
+      tokenAddress = null;
+    }
+    if (!tokenAddress) {
+      await botReply(
+        message,
+        phone,
+        `Unknown token ${sendAsset}. Supported: ETH, FLZ.\nExample: flizy send 10 FLZ to john`
+      );
+      return;
+    }
+    tokenSymbol = tokenLabel(sendAsset, chain.id) || sendAsset;
+  }
+
   const actor = await actorSessionFlags(user, siteAcc, phone);
   const intent = createSendIntent({
     actor,
@@ -1370,11 +1585,13 @@ async function handleSendResolved(message, user, phone, amountEth, resolved, sit
     toLabel: resolved.label,
     toIsAddress: true,
     chainId: String(chain.chainId),
+    asset: native ? 'native' : sendAsset,
   });
 
   const policy = await evaluateSendPolicy(intent, {
     enforceTrusted: opts.skipTrusted ? false : config.enforceTrusted,
     accountRow: siteAcc,
+    nativeSymbol: chain.nativeSymbol || 'ETH',
   });
   if (policy.decision === 'DENY') {
     await botReply(message, phone, policy.message || 'Not allowed.');
@@ -1387,6 +1604,18 @@ async function handleSendResolved(message, user, phone, amountEth, resolved, sit
     const acc = await ensureAgentWallet(siteAcc.id);
     fromAddress = ethers.getAddress(acc.agent_wallet_address);
     fromBalanceEth = ethers.formatEther(await provider.getBalance(fromAddress));
+    if (tokenAddress) {
+      const erc20 = new ethers.Contract(
+        tokenAddress,
+        [
+          'function balanceOf(address) view returns (uint256)',
+          'function decimals() view returns (uint8)',
+        ],
+        provider
+      );
+      const [bal, dec] = await Promise.all([erc20.balanceOf(fromAddress), erc20.decimals()]);
+      tokenBalance = ethers.formatUnits(bal, Number(dec));
+    }
   } catch (err) {
     console.error('agent balance check failed:', publicErrorMessage(err));
     await botReply(message, phone, 'Could not check your agent wallet on-chain. Try again shortly.');
@@ -1403,12 +1632,15 @@ async function handleSendResolved(message, user, phone, amountEth, resolved, sit
     },
     fromAddress,
     fromBalanceEth,
+    tokenAddress,
+    tokenSymbol,
+    tokenBalance,
   });
   if (opts.paymentRequestId) {
     plan.paymentRequestId = opts.paymentRequestId;
   }
 
-  const funded = assertPlanFunded(plan, fromBalanceEth);
+  const funded = assertPlanFunded(plan, fromBalanceEth, config.gasBufferEth, { tokenBalance });
   if (!funded.ok) {
     await botReply(
       message,
@@ -2568,10 +2800,13 @@ async function handleIncomingMessage(message) {
     } else if (waitingForWalletName && !/^flizy\b/i.test(rawText)) {
       // bare name reply (e.g. john)
       text = rawText.trim();
+    } else if (waitingForUnlock && !/^flizy\b/i.test(rawText)) {
+      // Bare password / PIN reply after "flizy unlock" prompt (no flizy prefix)
+      text = rawText.trim();
     } else {
       const stripped = stripFlizyPrefix(rawText, { requirePrefix: config.requireFlizyPrefix });
       if (!stripped.ok) {
-        if (waitingForWalletName || waitingForClaimMenu) {
+        if (waitingForWalletName || waitingForClaimMenu || waitingForUnlock) {
           text = rawText.trim();
         } else {
           return;
@@ -2751,15 +2986,31 @@ async function handleIncomingMessage(message) {
         await botReply(
           message,
           phone,
-          'Reply with your account password or unlock PIN.\n(Send only the secret as the next message.)'
+          'Reply with your account password or unlock PIN.\n(Send only the secret as the next message — no flizy prefix.)'
         );
         return;
       }
-      const secret =
-        unlockAgain && unlockAgain.pin != null ? unlockAgain.pin : String(rawText || '').trim();
+      // Prefer stripped body / one-shot secret. Never use raw "flizy …" as the secret.
+      let secret;
+      if (unlockAgain && unlockAgain.pin != null) {
+        secret = unlockAgain.pin;
+      } else if (!/^flizy\b/i.test(rawText)) {
+        secret = rawText.trim();
+      } else {
+        secret = String(text || '').trim();
+      }
+      if (!account?.id) {
+        pendingUnlocks.delete(phone);
+        await botReply(
+          message,
+          phone,
+          'Link your site account first, then unlock.\nOpen the dashboard and send: flizy link CODE'
+        );
+        return;
+      }
       pendingUnlocks.delete(phone);
       const res = await unlockWithPin(account, phone, secret);
-      if (!res.ok && res.reason === 'no_pin') {
+      if (!res.ok && (res.reason === 'no_pin' || res.reason === 'no_account')) {
         await botReply(
           message,
           phone,
@@ -2768,7 +3019,16 @@ async function handleIncomingMessage(message) {
         return;
       }
       if (!res.ok) {
-        await botReply(message, phone, 'Unlock failed. Wrong password or PIN.\nTry: flizy unlock');
+        await botReply(
+          message,
+          phone,
+          [
+            'Unlock failed. Wrong password or PIN.',
+            'Use your site login password, or the unlock PIN from Account.',
+            'Try again: flizy unlock',
+            'Then send only the password (no flizy prefix).',
+          ].join('\n')
+        );
         return;
       }
       await botReply(
@@ -2782,6 +3042,14 @@ async function handleIncomingMessage(message) {
     // Unlock: prompt or one-shot secret
     const unlockCmd = parseUnlockCommand(text);
     if (unlockCmd) {
+      if (!account?.id) {
+        await botReply(
+          message,
+          phone,
+          'Link your site account first.\nOpen the dashboard and send: flizy link CODE'
+        );
+        return;
+      }
       if (unlockCmd.pin == null || unlockCmd.pin === '') {
         pendingUnlocks.set(phone, { createdAt: Date.now() });
         await botReply(
@@ -2789,14 +3057,14 @@ async function handleIncomingMessage(message) {
           phone,
           [
             'Unlock Flizy on this WhatsApp.',
-            'Reply with your account password or unlock PIN.',
-            '(Send only the password as the next message.)',
+            'Reply with your site login password or unlock PIN.',
+            'Send only the secret as the next message (no flizy prefix).',
           ].join('\n')
         );
         return;
       }
       const res = await unlockWithPin(account, phone, unlockCmd.pin);
-      if (!res.ok && res.reason === 'no_pin') {
+      if (!res.ok && (res.reason === 'no_pin' || res.reason === 'no_account')) {
         await botReply(
           message,
           phone,
@@ -2805,7 +3073,11 @@ async function handleIncomingMessage(message) {
         return;
       }
       if (!res.ok) {
-        await botReply(message, phone, 'Unlock failed. Wrong password or PIN.');
+        await botReply(
+          message,
+          phone,
+          'Unlock failed. Wrong password or PIN.\nUse site login password or Account unlock PIN.'
+        );
         return;
       }
       await botReply(
@@ -2819,7 +3091,25 @@ async function handleIncomingMessage(message) {
     // Lock (no password)
     if (parseLockCommand(text)) {
       pendingUnlocks.delete(phone);
-      await lockSession(account.id, phone);
+      if (!account?.id) {
+        await botReply(
+          message,
+          phone,
+          'Link your site account first, then lock.\nOpen the dashboard and send: flizy link CODE'
+        );
+        return;
+      }
+      try {
+        await lockSession(account.id, phone);
+      } catch (lockErr) {
+        console.error('lockSession failed:', publicErrorMessage(lockErr));
+        await botReply(
+          message,
+          phone,
+          'Could not lock session right now. Try again in a moment.'
+        );
+        return;
+      }
       await botReply(
         message,
         phone,
@@ -2827,7 +3117,7 @@ async function handleIncomingMessage(message) {
           'Session locked.',
           'Other flizy commands will not run until you unlock.',
           'Unlock: flizy unlock',
-          'Then reply with your password or PIN when asked.',
+          'Then reply with your password or PIN when asked (no flizy prefix).',
         ].join('\n')
       );
       return;
@@ -2886,7 +3176,7 @@ async function handleIncomingMessage(message) {
     }
 
     if (isHistoryCommand(text)) {
-      await handleHistory(message, phone);
+      await handleHistory(message, phone, account);
       return;
     }
 
@@ -3028,7 +3318,8 @@ async function handleIncomingMessage(message) {
         send.toRaw,
         send.isAddress,
         send.isPhone,
-        account
+        account,
+        send.asset || 'ETH'
       );
       return;
     }
