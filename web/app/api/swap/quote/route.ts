@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const { quoteSwap, resolveToken, tokenLabel, getDexConfig, getFlzPrice } = require('../../../../../lib/dex');
-const { getDefaultChain } = require('../../../../../lib/chains');
+import {
+  getWebChain,
+  getDexAddresses,
+  resolveToken,
+  tokenLabel,
+  quoteSwap,
+  getFlzPrice,
+} from '../../../../lib/dexServer';
 
 export async function GET(req: Request) {
   try {
@@ -18,12 +21,12 @@ export async function GET(req: Request) {
     const tokenOutRaw = url.searchParams.get('tokenOut') || 'FLZ';
     const side = url.searchParams.get('side') || '';
 
-    const chain = getDefaultChain();
+    const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
-    const dex = getDexConfig(chain.id);
+    const dex = getDexAddresses();
 
     if (side === 'price' || url.searchParams.get('price') === '1') {
-      const px = await getFlzPrice(provider, chain.id);
+      const px = await getFlzPrice(provider);
       return NextResponse.json({
         feeBps: dex.feeBpsDefault,
         price: px,
@@ -36,15 +39,15 @@ export async function GET(req: Request) {
     let tokenOut: string | null;
     if (side === 'buy') {
       tokenIn = null;
-      tokenOut = resolveToken(tokenOutRaw === 'ETH' ? 'FLZ' : tokenOutRaw, chain.id);
+      tokenOut = resolveToken(tokenOutRaw === 'ETH' ? 'FLZ' : tokenOutRaw);
     } else if (side === 'sell') {
-      tokenIn = resolveToken(tokenInRaw === 'ETH' ? 'FLZ' : tokenInRaw, chain.id);
+      tokenIn = resolveToken(tokenInRaw === 'ETH' ? 'FLZ' : tokenInRaw);
       tokenOut = null;
     } else {
       const inU = tokenInRaw.toUpperCase();
       const outU = tokenOutRaw.toUpperCase();
-      tokenIn = inU === 'ETH' ? null : resolveToken(tokenInRaw, chain.id);
-      tokenOut = outU === 'ETH' ? null : resolveToken(tokenOutRaw, chain.id);
+      tokenIn = inU === 'ETH' ? null : resolveToken(tokenInRaw);
+      tokenOut = outU === 'ETH' ? null : resolveToken(tokenOutRaw);
     }
 
     const amountIn = ethers.parseEther(String(amount));
@@ -57,11 +60,12 @@ export async function GET(req: Request) {
       amountIn,
       tokenIn,
       tokenOut,
-      chainKey: chain.id,
     });
 
     const feePct = `${(quote.feeBps / 100).toFixed(2)}%`;
     const slipPct = `${(quote.slippageBps / 100).toFixed(2)}%`;
+    const inLabel = tokenLabel(tokenIn);
+    const outLabel = tokenLabel(tokenOut);
 
     return NextResponse.json({
       amountIn: ethers.formatEther(amountIn),
@@ -72,12 +76,11 @@ export async function GET(req: Request) {
       feePct,
       slippageBps: quote.slippageBps,
       slippagePct: slipPct,
-      tokenIn: tokenLabel(tokenIn ?? 'ETH', chain.id),
-      tokenOut: tokenLabel(tokenOut ?? 'ETH', chain.id),
+      tokenIn: inLabel,
+      tokenOut: outLabel,
       feeRouter: quote.feeRouter,
       chain: { id: chain.chainId, name: chain.name },
-      disclosure:
-        `Protocol fee ${feePct} (~${ethers.formatEther(quote.feeAmount)} ${tokenLabel(tokenIn ?? 'ETH', chain.id)}) is taken before the swap. Network gas is extra.`,
+      disclosure: `Protocol fee ${feePct} (~${ethers.formatEther(quote.feeAmount)} ${inLabel}) is taken before the swap. Network gas is extra.`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Quote failed';

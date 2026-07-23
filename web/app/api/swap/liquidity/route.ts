@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const { addLiquidityEth, getDexConfig, resolveToken } = require('../../../../../lib/dex');
-const { getDefaultChain, explorerTxUrl } = require('../../../../../lib/chains');
-
-function deriveAgentWallet(accountId: string) {
-  const material = ethers.keccak256(ethers.toUtf8Bytes(`flizy:agent:v1:${accountId}`));
-  return new ethers.Wallet(material);
-}
+import {
+  getWebChain,
+  getDexAddresses,
+  resolveToken,
+  addLiquidityEth,
+  deriveAgentWallet,
+  explorerTxUrl,
+} from '../../../../lib/dexServer';
 
 /** Site-only: add ETH + FLZ liquidity from agent wallet. */
 export async function POST(req: Request) {
@@ -23,10 +21,10 @@ export async function POST(req: Request) {
     const amountToken = String(body.amountToken || body.amountFlz || '');
     const tokenRaw = String(body.token || 'FLZ');
 
-    const chain = getDefaultChain();
+    const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
-    const dex = getDexConfig(chain.id);
-    const tokenAddress = resolveToken(tokenRaw, chain.id);
+    const dex = getDexAddresses();
+    const tokenAddress = resolveToken(tokenRaw);
     if (!tokenAddress) {
       return NextResponse.json({ error: 'Token required (e.g. FLZ)' }, { status: 400 });
     }
@@ -37,7 +35,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid amounts' }, { status: 400 });
     }
 
-    // 2% min slip for LP
     const amountTokenMin = tokenWei - tokenWei / 50n;
     const amountEthMin = ethWei - ethWei / 50n;
 
@@ -49,7 +46,6 @@ export async function POST(req: Request) {
       amountEth: ethWei,
       amountTokenMin,
       amountEthMin,
-      chainKey: chain.id,
       recipient: signer.address,
     });
 
