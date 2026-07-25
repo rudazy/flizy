@@ -93,7 +93,7 @@ export default function WalletPage() {
 
           <div className="rounded-md border border-border bg-ink/40 px-3 py-3">
             <p className="text-xs leading-relaxed text-muted">
-              Sends leave only via WhatsApp to trusted addresses:{' '}
+              Sends leave only from chat (WhatsApp or Telegram) to trusted addresses:{' '}
               <span className="text-paper">flizy send 0.01 to name</span>
               {' · '}
               <span className="text-paper">flizy send 10 FLZ to name</span>.

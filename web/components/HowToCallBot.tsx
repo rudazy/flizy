@@ -22,7 +22,8 @@ const COUNTRY_CODES = [
 ] as const;
 
 /**
- * Clean multi-user guide. One shared bot WhatsApp; each user is a different chat.
+ * Multi-user guide. One shared bot per channel; each user is a different chat.
+ * The same account can be linked on WhatsApp and Telegram at the same time.
  */
 export function HowToCallBot({ compact = false }: { compact?: boolean }) {
   const [dial, setDial] = useState('+44');
@@ -36,9 +37,9 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
           One bot. Many users.
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Flizy uses <span className="text-paper">one WhatsApp account as the bot</span>. Everyone
-          (you and your friends) messages that same bot. Each person is recognized by{' '}
-          <span className="text-paper">their own WhatsApp id</span>, not by sharing your phone.
+          Flizy runs <span className="text-paper">one bot on WhatsApp and one on Telegram</span>.
+          Everyone (you and your friends) messages that same bot. Each person is recognized by{' '}
+          <span className="text-paper">their own chat id</span>, not by sharing your phone.
         </p>
       </div>
 
@@ -47,17 +48,41 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
         <ol className="mt-2 list-decimal space-y-1 pl-5">
           <li>They create an account on this website (their email).</li>
           <li>
-            On <span className="text-paper">their phone</span>, they open Dashboard → WhatsApp link
-            → Generate code → <span className="text-paper">Open WhatsApp</span>.
+            On <span className="text-paper">their phone</span>, they open Dashboard → Connect a chat
+            app → Generate code → <span className="text-paper">Open WhatsApp</span> or{' '}
+            <span className="text-paper">Open Telegram</span>.
           </li>
-          <li>They send the link message from their WhatsApp to the bot.</li>
+          <li>They send the link message from their own chat app to the bot.</li>
           <li>
             The bot replies <span className="text-paper">in their chat</span> (not in yours).
           </li>
         </ol>
         <p className="mt-3 text-xs">
-          Message yourself is only for the person who runs the bot on that phone. Friends must use
-          Open WhatsApp from the dashboard on their own device.
+          One code works on either app, and one account can hold both. Message yourself is only for
+          the person who runs the WhatsApp bot on that phone. Friends link from the dashboard on
+          their own device.
+        </p>
+      </div>
+
+      <div className="rounded border border-border bg-ink/50 p-4 text-sm leading-relaxed text-muted">
+        <p className="font-sans text-paper">Same account, two chat apps</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-gold">WhatsApp</p>
+            <p className="mt-1.5 font-mono text-xs text-lime">flizy send 0.001 to john</p>
+            <p className="mt-1.5 text-xs">Then reply confirm. Commands start with flizy.</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.18em] text-gold">Telegram</p>
+            <p className="mt-1.5 font-mono text-xs text-lime">/send 0.001 to john</p>
+            <p className="mt-1.5 text-xs">
+              Then tap Confirm. Share your number with /phone so claims sent to it reach you.
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs">
+          Same wallet, same trusted list, same limits, same history on both. A number belongs to
+          exactly one Flizy account.
         </p>
       </div>
 
@@ -97,8 +122,8 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
           <div className="min-w-0">
             <p className="text-sm text-paper">Any user (recommended)</p>
             <p className="mt-1 text-sm leading-relaxed text-muted">
-              Sign up → Dashboard → WhatsApp link → Open WhatsApp → send the code. Chat stays between
-              that user and the bot.
+              Sign up → Dashboard → Connect a chat app → Open WhatsApp or Telegram → send the code.
+              Chat stays between that user and the bot.
             </p>
           </div>
         </div>
@@ -186,18 +211,21 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
 
       {!compact ? (
         <div className="border-t border-border pt-6">
-          <p className="text-xs text-muted">Quick commands</p>
+          <p className="text-xs text-muted">
+            Quick commands (WhatsApp form shown, Telegram uses the same words with a slash)
+          </p>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {[
-              'flizy help',
-              'flizy me',
-              'flizy balance',
-              'flizy add wallet 0x…',
-              'flizy send 0.0001 to john',
-              'confirm',
-            ].map((c) => (
-              <div key={c} className="mono-box py-2 text-xs text-lime sm:text-sm">
-                {c}
+              ['flizy help', '/help'],
+              ['flizy me', '/me'],
+              ['flizy balance', '/balance'],
+              ['flizy add wallet 0x…', '/add wallet 0x…'],
+              ['flizy send 0.0001 to john', '/send 0.0001 to john'],
+              ['confirm', 'confirm or the button'],
+            ].map(([wa, tg]) => (
+              <div key={wa} className="mono-box py-2 text-xs text-lime sm:text-sm">
+                <span>{wa}</span>
+                <span className="ml-2 text-muted">· {tg}</span>
               </div>
             ))}
           </div>

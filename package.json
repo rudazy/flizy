@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --test test/**/*.test.js",
+    "start:telegram": "node telegram.js",
+    "test": "node --test \"test/*.test.js\"",
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
     "web:start": "npm --prefix web run start",

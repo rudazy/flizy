@@ -18,8 +18,8 @@ export default function DocsPage() {
 
       <p className="text-base leading-relaxed text-muted">
         Flizy only allows transfers to destinations you already trust. You manage that list on this
-        site, not in WhatsApp. If someone steals your phone or hijacks chat, they still cannot add a
-        new payout address from WhatsApp alone.
+        site, never from a chat app. If someone steals your phone or hijacks a chat, they still
+        cannot add a new payout address from WhatsApp or Telegram alone.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -28,12 +28,12 @@ export default function DocsPage() {
           <ul className="mt-3 space-y-2 text-sm text-muted">
             <li>Add or remove trusted wallets</li>
             <li>Set unlock PIN</li>
-            <li>Link or re-link WhatsApp</li>
+            <li>Link or re-link WhatsApp and Telegram</li>
             <li>See agent wallet and credit</li>
           </ul>
         </div>
         <div className="card p-5">
-          <h2 className="font-sans text-base text-gold">On WhatsApp</h2>
+          <h2 className="font-sans text-base text-gold">On WhatsApp or Telegram</h2>
           <ul className="mt-3 space-y-2 text-sm text-muted">
             <li>Send to trusted names</li>
             <li>Confirm pending transfers</li>
@@ -42,6 +42,12 @@ export default function DocsPage() {
           </ul>
         </div>
       </div>
+
+      <p className="text-base leading-relaxed text-muted">
+        The rules live in one place and every channel is checked against them. Adding Telegram did
+        not add a second rulebook: the same policy decides an untrusted destination, an over-limit
+        amount or a locked session, whichever app the message came from.
+      </p>
 
       <p className="text-base leading-relaxed text-muted">
         If a send is rejected in chat, open the dashboard, confirm the name and address, then try

@@ -129,11 +129,15 @@ export async function GET() {
       'id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id, kind';
 
     // Prefer account_id (swaps / site rows use this). Merge legacy phone-only rows.
+    // transfers.phone holds the identity transfer key: bare id for WhatsApp,
+    // namespaced (telegram:<id>) for every other channel.
     const { data: identities } = await supabase
-      .from('whatsapp_identities')
-      .select('wa_sender_id')
+      .from('channel_identities')
+      .select('channel, external_id')
       .eq('account_id', accountId);
-    const phones = (identities || []).map((i) => i.wa_sender_id).filter(Boolean);
+    const phones = (identities || [])
+      .filter((i) => i.external_id)
+      .map((i) => (i.channel === 'whatsapp' ? i.external_id : `${i.channel}:${i.external_id}`));
 
     async function loadTransfers(select: string): Promise<{
       rows: Record<string, unknown>[];

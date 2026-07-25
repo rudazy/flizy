@@ -1,7 +1,7 @@
 {
   "name": "Flizy",
   "short_name": "Flizy",
-  "description": "WhatsApp-native EVM wallet. Trusted sends only. GIWA-first.",
+  "description": "Chat-native EVM wallet for WhatsApp and Telegram. Trusted sends only. GIWA-first.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

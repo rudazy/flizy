@@ -10,7 +10,13 @@ export type DashboardData = {
     daily_send_limit_eth?: number | string | null;
   };
   trusted: Array<{ address: string; label: string }>;
-  link?: { code: string; waDeepLink: string; expiresAt: string } | null;
+  link?: {
+    code: string;
+    waDeepLink: string;
+    /** null when TELEGRAM_BOT_USERNAME is not configured */
+    telegramDeepLink?: string | null;
+    expiresAt: string;
+  } | null;
 };
 
 /** Legacy transfer row shape */

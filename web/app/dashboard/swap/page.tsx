@@ -634,7 +634,7 @@ export default function SwapPage() {
       ) : null}
 
       <p className="text-center font-mono text-[11px] text-muted">
-        WhatsApp: <span className="text-paper">flizy buy 0.01 FLZ</span>
+        In chat: <span className="text-paper">flizy buy 0.01 FLZ</span> or <span className="text-paper">/buy 0.01 FLZ</span>
         {' · '}
         <Link href="/dashboard/wallet" className="text-lime no-underline">
           Fund wallet

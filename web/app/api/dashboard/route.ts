@@ -66,7 +66,7 @@ export async function GET() {
 
     let link = null;
     if (linkRow) {
-      const { botWhatsAppNumber } = getSiteConfig();
+      const { botWhatsAppNumber, telegramBotUsername } = getSiteConfig();
       const prefill = encodeURIComponent(`flizy link ${linkRow.code}`);
       link = {
         code: linkRow.code,
@@ -74,6 +74,10 @@ export async function GET() {
         waDeepLink: botWhatsAppNumber
           ? `https://wa.me/${botWhatsAppNumber}?text=${prefill}`
           : `https://wa.me/?text=${prefill}`,
+        // Same code, any channel. Telegram fills it in via the start parameter.
+        telegramDeepLink: telegramBotUsername
+          ? `https://t.me/${telegramBotUsername}?start=${linkRow.code}`
+          : null,
       };
     }
 

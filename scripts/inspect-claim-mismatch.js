@@ -54,9 +54,9 @@ async function main() {
     )
   );
 
-  const { data: ids, error: e2 } = await sb
-    .from('whatsapp_identities')
-    .select('id,wa_sender_id,wa_phone_e164,account_id,linked_at')
+  const { data: rows, error: e2 } = await sb
+    .from('channel_identities')
+    .select('id,channel,external_id,phone_e164,account_id,linked_at')
     .order('linked_at', { ascending: false })
     .limit(15);
   if (e2) {
@@ -64,11 +64,18 @@ async function main() {
     return;
   }
 
+  const ids = (rows || []).map((r) => ({
+    ...r,
+    wa_sender_id: r.external_id,
+    wa_phone_e164: r.phone_e164,
+  }));
+
   console.log(
     'IDENTITIES',
     JSON.stringify(
       (ids || []).map((i) => ({
         id: i.id.slice(0, 8),
+        channel: i.channel,
         wa_sender_id: mask(i.wa_sender_id),
         sender_is_phone: looksLikePhone(i.wa_sender_id),
         sender_len: String(i.wa_sender_id || '').length,

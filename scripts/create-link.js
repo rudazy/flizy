@@ -19,9 +19,11 @@ async function main() {
   console.log('code:', link.code);
   console.log('expires_at:', link.expiresAt);
   console.log('wa_deep_link:', link.waDeepLink);
+  console.log('telegram_deep_link:', link.telegramDeepLink || '(set TELEGRAM_BOT_USERNAME)');
   console.log('');
-  console.log('Send this from your WhatsApp to the bot:');
-  console.log(`  flizy link ${link.code}`);
+  console.log('Redeem on either channel:');
+  console.log(`  WhatsApp: flizy link ${link.code}`);
+  console.log(`  Telegram: /link ${link.code}`);
   if (!config.botWhatsAppNumber) {
     console.log('(Set BOT_WHATSAPP_NUMBER in .env for a full wa.me URL.)');
   }

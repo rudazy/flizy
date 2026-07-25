@@ -40,7 +40,7 @@ export default function DashboardHomePage() {
       },
       {
         done: Boolean(data.link),
-        title: 'WhatsApp linked',
+        title: 'Chat app linked',
         body: data.link ? `Code ${data.link.code}` : 'Generate code and open bot',
         href: '/dashboard/account',
       },
@@ -81,7 +81,7 @@ export default function DashboardHomePage() {
 
       {welcome ? (
         <div className="alert alert-ok">
-          Welcome. Set your unlock PIN first, then connect WhatsApp. The bot opens with your link
+          Welcome. Set your unlock PIN first, then connect WhatsApp or Telegram. The bot opens with your link
           code already filled in.
         </div>
       ) : null}
@@ -139,9 +139,10 @@ export default function DashboardHomePage() {
       <section className="card space-y-3 border-lime/25 p-4 sm:p-5">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="font-sans text-sm tracking-wide text-paper">Connect WhatsApp</p>
+            <p className="font-sans text-sm tracking-wide text-paper">Connect a chat app</p>
             <p className="mt-1 text-xs leading-relaxed text-muted">
               Generates a one-time code and opens the Flizy bot chat with the message ready to send.
+              The same code works on Telegram, and both can point at this one account.
               Friends never need your personal number.
             </p>
           </div>
@@ -175,18 +176,28 @@ export default function DashboardHomePage() {
             Open bot link without regenerating
           </a>
         ) : null}
+        {data.link?.telegramDeepLink ? (
+          <a
+            href={data.link.telegramDeepLink}
+            className="btn btn-ghost flex w-full items-center justify-center py-3 text-sm no-underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open Telegram bot with this code
+          </a>
+        ) : null}
       </section>
 
       <section className="hero-grid relative rounded-md border border-border bg-surface/40 px-4 py-6 sm:px-6">
         <p className="badge badge-gold mb-4">Your control room</p>
         <h2 className="font-sans text-2xl font-semibold tracking-wide text-paper sm:text-3xl">
-          Send crypto on WhatsApp.
+          Send crypto from your chat app.
           <span className="mt-1 block bg-gradient-to-r from-[#e8c45a] to-[#c4893f] bg-clip-text text-transparent">
             Only to people you trust.
           </span>
         </h2>
         <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
-          Manage wallet, trusted names, and history here. Swap FLZ on the big Swap tab or on WhatsApp.
+          Manage wallet, trusted names, and history here. Swap FLZ on the Swap tab or from chat.
           Lock the bot with flizy lock if your phone is shared.
         </p>
 

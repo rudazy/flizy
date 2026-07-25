@@ -112,7 +112,7 @@ describe('unlockWithPin with mocked supabase', () => {
 
     // config mock not needed if already loadable
     const { unlockWithPin } = require('../lib/session');
-    const res = await unlockWithPin({ id: 'acc-1' }, '2348012345678', 'Secret1!');
+    const res = await unlockWithPin({ id: 'acc-1' }, 'whatsapp', '2348012345678', 'Secret1!');
     assert.equal(res.ok, true);
   });
 
@@ -156,7 +156,7 @@ describe('unlockWithPin with mocked supabase', () => {
 
     delete require.cache[sessionPath];
     const { unlockWithPin } = require('../lib/session');
-    const res = await unlockWithPin({ id: 'acc-1' }, '2348012345678', '48291');
+    const res = await unlockWithPin({ id: 'acc-1' }, 'whatsapp', '2348012345678', '48291');
     assert.equal(res.ok, true);
   });
 
@@ -194,8 +194,72 @@ describe('unlockWithPin with mocked supabase', () => {
 
     delete require.cache[sessionPath];
     const { unlockWithPin } = require('../lib/session');
-    const res = await unlockWithPin({ id: 'acc-1' }, '2348012345678', 'WrongPass1!');
+    const res = await unlockWithPin({ id: 'acc-1' }, 'whatsapp', '2348012345678', 'WrongPass1!');
     assert.equal(res.ok, false);
     assert.equal(res.reason, 'bad_pin');
+  });
+});
+
+describe('sessions are scoped per channel', () => {
+  let sessionPath;
+
+  beforeEach(() => {
+    sessionPath = require.resolve('../lib/session');
+    delete require.cache[sessionPath];
+    delete require.cache[require.resolve('../lib/supabase')];
+  });
+
+  /** Capture what lockSession/touchSession write. */
+  function mockSupabase(store) {
+    const supabasePath = require.resolve('../lib/supabase');
+    require.cache[supabasePath] = {
+      id: supabasePath,
+      filename: supabasePath,
+      loaded: true,
+      exports: {
+        getSupabase: () => ({
+          from() {
+            return {
+              select() {
+                return this;
+              },
+              eq(col, value) {
+                store.filters[col] = value;
+                return this;
+              },
+              maybeSingle: async () => ({
+                data: store.rows.find((r) =>
+                  Object.entries(store.filters).every(([k, v]) => String(r[k]) === String(v))
+                ) || null,
+                error: null,
+              }),
+              upsert: async (row) => {
+                store.rows.push(row);
+                store.written.push(row);
+                return { error: null };
+              },
+            };
+          },
+        }),
+      },
+    };
+  }
+
+  it('locking Telegram writes a Telegram-scoped row, leaving WhatsApp untouched', async () => {
+    const store = { rows: [], written: [], filters: {} };
+    mockSupabase(store);
+    const { lockSession, isSessionHardLocked } = require('../lib/session');
+
+    await lockSession('acc-1', 'telegram', '778899123');
+
+    assert.equal(store.written.length, 1);
+    assert.equal(store.written[0].channel, 'telegram');
+    assert.equal(store.written[0].external_id, '778899123');
+    assert.equal(store.written[0].is_locked, true);
+
+    store.filters = {};
+    assert.equal(await isSessionHardLocked('acc-1', 'telegram', '778899123'), true);
+    store.filters = {};
+    assert.equal(await isSessionHardLocked('acc-1', 'whatsapp', '2348012345678'), false);
   });
 });

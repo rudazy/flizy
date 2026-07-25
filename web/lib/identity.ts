@@ -1,9 +1,13 @@
 import crypto from 'crypto';
 import { getSiteConfig, getSupabase } from './supabase';
 
+/**
+ * One-time link code for binding a chat identity to this account.
+ * The same code works on any channel: only a logged-in account holder can make one.
+ */
 export async function createLinkCode(accountId: string) {
   const supabase = getSupabase();
-  const { linkCodeTtlMs, botWhatsAppNumber } = getSiteConfig();
+  const { linkCodeTtlMs, botWhatsAppNumber, telegramBotUsername } = getSiteConfig();
   const code = crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 8);
   const expiresAt = new Date(Date.now() + linkCodeTtlMs).toISOString();
 
@@ -19,5 +23,9 @@ export async function createLinkCode(accountId: string) {
     ? `https://wa.me/${botWhatsAppNumber}?text=${prefill}`
     : `https://wa.me/?text=${prefill}`;
 
-  return { code, expiresAt, waDeepLink };
+  const telegramDeepLink = telegramBotUsername
+    ? `https://t.me/${telegramBotUsername}?start=${code}`
+    : null;
+
+  return { code, expiresAt, waDeepLink, telegramDeepLink };
 }

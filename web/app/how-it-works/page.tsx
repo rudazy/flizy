@@ -5,7 +5,7 @@ import { HowToCallBot } from '../../components/HowToCallBot';
 export const metadata: Metadata = {
   title: 'How to use Flizy',
   description:
-    'Use Flizy from any country: create an account, fund your agent wallet, open the bot from the dashboard, send to trusted names.',
+    'Use Flizy from any country on WhatsApp or Telegram: create an account, fund your agent wallet, open the bot from the dashboard, send to trusted names.',
 };
 
 export default function HowItWorksPage() {
@@ -17,7 +17,8 @@ export default function HowItWorksPage() {
           How to use Flizy
         </h1>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-          One clean guide for every country. Setup on the website. Everyday sends on WhatsApp.
+          One clean guide for every country. Setup on the website. Everyday sends on WhatsApp or
+          Telegram, whichever you already use.
         </p>
       </div>
 

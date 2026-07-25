@@ -35,7 +35,7 @@ export default function LoginPage() {
     <div className="fade-up mx-auto max-w-md">
       <p className="text-xs uppercase tracking-[0.18em] text-gold">Welcome back</p>
       <h1 className="mt-3 font-sans text-3xl tracking-wide text-paper">Log in</h1>
-      <p className="mt-2 text-sm text-muted">Open your dashboard to manage trusted people and WhatsApp.</p>
+      <p className="mt-2 text-sm text-muted">Open your dashboard to manage trusted people, WhatsApp and Telegram.</p>
 
       <form onSubmit={onSubmit} className="card mt-8 space-y-5 p-6 md:p-8">
         <div>

@@ -28,5 +28,6 @@ export function getSiteConfig() {
       ''
     ),
     linkCodeTtlMs: Number(process.env.LINK_CODE_TTL_MS || 10 * 60 * 1000),
+    telegramBotUsername: (process.env.TELEGRAM_BOT_USERNAME || '').replace(/^@/, ''),
   };
 }

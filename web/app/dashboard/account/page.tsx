@@ -59,7 +59,7 @@ export default function AccountPage() {
     if (ok) {
       setPin('');
       setMsg(
-        'Unlock PIN saved. On WhatsApp: flizy lock (no password) · flizy unlock then reply with this PIN or your account password.'
+        'Unlock PIN saved. In chat: flizy lock or /lock (no password) · flizy unlock or /unlock, then reply with this PIN or your account password. Locking one chat app leaves the other as it is.'
       );
     }
   }
@@ -86,11 +86,11 @@ export default function AccountPage() {
       <AppTopBar title="Account" />
       {msg ? <div className="alert alert-ok text-sm">{msg}</div> : null}
 
-      {/* WhatsApp */}
+      {/* Chat apps */}
       <section className="card p-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="font-sans text-sm tracking-wide text-paper">WhatsApp link</p>
+            <p className="font-sans text-sm tracking-wide text-paper">Connect a chat app</p>
             <p className="mt-1 text-xs text-muted">
               Opens the Flizy bot chat with your code already filled in. You do not need the bot number
               saved.
@@ -101,6 +101,7 @@ export default function AccountPage() {
 
         <div className="mt-4 rounded border border-border bg-ink/80 p-3 text-xs text-muted">
           Tap Open WhatsApp, send the prefilled message, then you are linked. Do not use groups.
+          One code works on WhatsApp or Telegram, and both can point at this same account.
         </div>
 
         <button
@@ -127,6 +128,16 @@ export default function AccountPage() {
             >
               Open WhatsApp bot
             </a>
+            {data.link.telegramDeepLink ? (
+              <a
+                href={data.link.telegramDeepLink}
+                className="btn btn-ghost flex w-full items-center justify-center py-3 text-sm no-underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open Telegram bot
+              </a>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <CopyButton value={`flizy link ${data.link.code}`} label="Copy message" />
             </div>
@@ -146,7 +157,7 @@ export default function AccountPage() {
 
         <form onSubmit={onAddTrusted} className="mt-4 grid gap-3">
           <div>
-            <label className="label">Name (WhatsApp send target)</label>
+            <label className="label">Name (chat send target)</label>
             <input
               className="input"
               placeholder="nald, mum, junior"
@@ -236,7 +247,7 @@ export default function AccountPage() {
           <div>
             <p className="font-sans text-sm tracking-wide text-paper">Daily send limit</p>
             <p className="mt-1 text-xs text-muted">
-              Enforced in Policy (WhatsApp + any future client). UTC day. Per-tx max still applies.
+              Enforced in Policy for every channel, WhatsApp and Telegram alike. UTC day. Per-tx max still applies.
             </p>
           </div>
           <span className="badge">Policy</span>
@@ -270,7 +281,7 @@ export default function AccountPage() {
         </form>
       </section>
 
-      {/* PIN (required for lock/unlock on WhatsApp) */}
+      {/* PIN (required for lock/unlock in chat) */}
       <section className={`card p-4 ${data.account.has_pin ? '' : 'border-gold/40'}`}>
         <div className="flex items-center justify-between gap-2">
           <div>

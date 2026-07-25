@@ -1,0 +1,22 @@
+[Unit]
+Description=Flizy Telegram bot (execution layer client)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/flizy
+EnvironmentFile=/opt/flizy/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/flizy/telegram.js
+Restart=always
+RestartSec=5
+# Crash / OOM: keep restarting
+StartLimitIntervalSec=0
+# Soft security
+NoNewPrivileges=true
+# Logs: journalctl -u flizy-telegram -f
+
+[Install]
+WantedBy=multi-user.target

@@ -17,13 +17,23 @@ const origin = siteOrigin();
 export const metadata: Metadata = {
   metadataBase: new URL(origin),
   title: {
-    default: 'Flizy | WhatsApp wallet, trusted sends',
+    default: 'Flizy | Chat wallet for WhatsApp and Telegram, trusted sends',
     template: '%s | Flizy',
   },
   description:
-    'Send crypto from WhatsApp to people you already trust. Manage trusted addresses and unlock PIN on the site. GIWA-first EVM.',
+    'Send crypto from WhatsApp or Telegram to people you already trust. One account, both chats. Manage trusted addresses and unlock PIN on the site. GIWA-first EVM.',
   applicationName: 'Flizy',
-  keywords: ['Flizy', 'WhatsApp', 'crypto', 'wallet', 'GIWA', 'trusted addresses', 'EVM', 'PWA'],
+  keywords: [
+    'Flizy',
+    'WhatsApp',
+    'Telegram',
+    'crypto',
+    'wallet',
+    'GIWA',
+    'trusted addresses',
+    'EVM',
+    'PWA',
+  ],
   authors: [{ name: 'Flizy' }],
   manifest: '/manifest.webmanifest',
   appleWebApp: {
@@ -39,22 +49,23 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: origin,
     siteName: 'Flizy',
-    title: 'Flizy | Send crypto on WhatsApp. Not to strangers.',
+    title: 'Flizy | Send crypto from your chat app. Not to strangers.',
     description:
-      'WhatsApp-native wallet. Trusted destinations on the site. Unlock with a PIN. Built for GIWA and EVM.',
+      'Chat-native wallet for WhatsApp and Telegram. Trusted destinations on the site. Unlock with a PIN. Built for GIWA and EVM.',
     images: [
       {
         url: '/og.jpg',
         width: 1200,
         height: 630,
-        alt: 'Flizy: Send crypto on WhatsApp',
+        alt: 'Flizy: Send crypto from WhatsApp or Telegram',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Flizy | WhatsApp wallet, trusted sends',
-    description: 'Send crypto from WhatsApp only to addresses you already trust.',
+    title: 'Flizy | Chat wallet for WhatsApp and Telegram, trusted sends',
+    description:
+      'Send crypto from WhatsApp or Telegram, only to addresses you already trust.',
     images: ['/og.jpg'],
   },
   icons: {

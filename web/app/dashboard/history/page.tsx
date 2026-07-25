@@ -115,7 +115,7 @@ export default function HistoryPage() {
         <section className="card p-5">
           <p className="font-sans text-sm tracking-wide text-paper">No activity yet</p>
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            Sends, claims, and swaps land here after confirm on WhatsApp or Swap.
+            Sends, claims, and swaps land here after confirm on WhatsApp, Telegram or Swap.
           </p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <Link href="/dashboard/swap" className="btn btn-primary flex-1 text-sm no-underline">
@@ -126,7 +126,7 @@ export default function HistoryPage() {
             </Link>
           </div>
           <p className="mt-3 font-mono text-[11px] text-muted">
-            WhatsApp: <span className="text-paper">flizy history</span>
+            In chat: <span className="text-paper">flizy history</span> or <span className="text-paper">/history</span>
           </p>
         </section>
       ) : (

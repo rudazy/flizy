@@ -33,17 +33,22 @@ export default function ClaimPage() {
           </p>
           <p className="text-muted">Status: {data.status}</p>
           <p className="text-muted">
-            Funds are reserved for a specific WhatsApp number. They only unlock after that WhatsApp
-            is linked to a Flizy account (not email signup alone).
+            Funds are reserved for a specific phone number. They only unlock once that number is
+            proven on a Flizy account (not email signup alone). WhatsApp or Telegram both work.
           </p>
           {data.status === 'pending' ? (
             <>
               <p className="text-muted">
                 1. Create or log in to your Flizy account
                 <br />
-                2. Link WhatsApp from the dashboard
+                2. Link WhatsApp or Telegram from the dashboard
                 <br />
-                3. Message the bot: <span className="text-paper">flizy claim</span>
+                3. Message the bot: <span className="text-paper">flizy claim</span> (or{' '}
+                <span className="text-paper">/claim</span> on Telegram)
+                <br />
+                <span className="text-xs">
+                  On Telegram, share your number with /phone first so the claim can find you.
+                </span>
               </p>
               <a href="/signup" className="btn btn-primary no-underline">
                 Signup

@@ -7,7 +7,7 @@ export function SiteFooter() {
         <div>
           <p className="font-sans text-sm tracking-[0.16em] text-paper">FLIZY</p>
           <p className="mt-2 max-w-sm text-sm text-muted">
-            WhatsApp-native wallet. Trusted sends. Built for GIWA and EVM.
+            Chat wallet for WhatsApp and Telegram. Trusted sends. Built for GIWA and EVM.
           </p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-muted">

@@ -1,19 +1,34 @@
 # Flizy
 
-> WhatsApp-native EVM wallet. Trusted sends. GIWA-first.
+> Chat-native EVM wallet for WhatsApp and Telegram. Trusted sends. GIWA-first.
+
+Flizy gives every account a permanent agent wallet. Money commands run in the chat app the
+user already has, and the same account can be linked on WhatsApp and Telegram at once.
+Transfers only reach destinations the user approved on the site. Swaps only go through
+allowlisted DEX routers.
 
 ## Site
 
 - / : Product home and four-step overview
-- /how-it-works : Full user guide and commands
+- /how-it-works : Full user guide and commands for both chat apps
 - /docs : Why trusted addresses exist (security)
 - /signup : Create account
 - /login : Sign in
-- /dashboard : Wallet, PIN, trusted people, WhatsApp link code
+- /dashboard : Wallet, PIN, trusted people, link code for WhatsApp or Telegram
+- /dashboard/swap : Swap FLZ and ETH, add or remove liquidity
 - /claim/:token : Claim funds waiting for non-users
+
+## Channels
+
+- WhatsApp: commands are prefixed, for example `flizy send 0.01 to john`, then `confirm`.
+- Telegram: slash commands, for example `/send 0.01 to john`, confirm by button or by typing.
+- One site link code binds either channel. Identity is proven by that code, because only a
+  logged-in account holder can generate one.
+- Claims are addressed to a phone number, so they can be redeemed from either channel by
+  whoever owns that number. One phone belongs to exactly one account.
 
 ## When to read
 
-- Read /how-it-works to onboard a human user.
-- Read /docs when a WhatsApp send is rejected for destination policy.
+- Read /how-it-works to onboard a human user on WhatsApp or Telegram.
+- Read /docs when a send is rejected for destination policy.
 - Read /dashboard flows for link codes and trusted address management.

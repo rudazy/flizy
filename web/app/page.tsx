@@ -8,15 +8,16 @@ export default function HomePage() {
         <div className="max-w-3xl">
           <p className="badge badge-gold mb-5">GIWA-first EVM</p>
           <h1 className="font-sans text-3xl font-semibold tracking-wide text-paper sm:text-4xl md:text-6xl md:leading-[1.08]">
-            Send crypto on WhatsApp.
+            Send crypto from your chat app.
             <br />
             <span className="bg-gradient-to-r from-[#e8c45a] to-[#c4893f] bg-clip-text text-transparent">
               Only to people you trust.
             </span>
           </h1>
           <p className="mt-6 max-w-xl text-sm leading-relaxed text-muted md:mt-8 md:text-lg">
-            Flizy is a WhatsApp wallet for real life. You manage trusted addresses and your unlock
-            PIN here. On chat, you just send. A stolen phone cannot add a new destination.
+            Flizy is a chat wallet for real life, on WhatsApp and Telegram. One account, both
+            chats. You manage trusted addresses and your unlock PIN here. On chat, you just send.
+            A stolen phone cannot add a new destination.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-2 md:mt-10 md:gap-3">
@@ -46,7 +47,7 @@ export default function HomePage() {
           {
             t: 'For you',
             mark: 'Y',
-            d: 'Open a wallet, add trusted names, link WhatsApp once.',
+            d: 'Open a wallet, add trusted names, link WhatsApp or Telegram once.',
           },
           {
             t: 'For friends',
@@ -81,8 +82,8 @@ export default function HomePage() {
         <div className="grid gap-4 sm:grid-cols-3">
           {[
             {
-              t: 'WhatsApp native',
-              d: 'Link once from the dashboard. Chat the bot like any contact.',
+              t: 'WhatsApp and Telegram',
+              d: 'One link code, either chat app, the same account. Chat the bot like any contact.',
             },
             {
               t: 'Trusted list',
@@ -161,7 +162,7 @@ export default function HomePage() {
       <section className="card overflow-hidden">
         <div className="grid md:grid-cols-2">
           <div className="border-b border-border p-6 md:border-b-0 md:border-r md:p-10">
-            <p className="text-xs uppercase tracking-[0.18em] text-gold">Example on WhatsApp</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-gold">Example in chat</p>
             <div className="mt-6 space-y-3 font-mono text-sm">
               <p className="text-muted">You</p>
               <p className="mono-box text-paper">flizy send 0.001 to nald</p>
@@ -170,12 +171,17 @@ export default function HomePage() {
               <p className="mono-box text-paper">confirm</p>
               <p className="mono-box text-lime">https://sepolia-explorer.giwa.io/tx/0x…</p>
             </div>
+            <p className="mt-6 text-xs leading-relaxed text-muted">
+              On Telegram the same thing is <span className="font-mono">/send 0.001 to nald</span>,
+              and you confirm with a button.
+            </p>
           </div>
           <div className="flex flex-col justify-center p-6 md:p-10">
             <h2 className="font-sans text-2xl tracking-wide text-paper">Ready when you are</h2>
             <p className="mt-4 text-sm leading-relaxed text-muted">
-              Create an account, add one trusted address, link WhatsApp, and try a tiny test send on
-              GIWA Sepolia. On Android Chrome, use Install app for a full-screen Flizy icon.
+              Create an account, add one trusted address, link WhatsApp or Telegram, and try a tiny
+              test send on GIWA Sepolia. On Android Chrome, use Install app for a full-screen Flizy
+              icon.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="btn btn-primary">

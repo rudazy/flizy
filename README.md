@@ -5,7 +5,7 @@
 <h1 align="center">Flizy</h1>
 
 <p align="center">
-  <strong>WhatsApp-native EVM wallet and swap.</strong><br />
+  <strong>Chat-native EVM wallet and swap. WhatsApp and Telegram, one account.</strong><br />
   Trusted destinations only. GIWA-first. Built to expand across EVM.
 </p>
 
@@ -23,13 +23,14 @@
 
 ## What Flizy is
 
-Flizy lets people **send and swap crypto from WhatsApp** (and the site) without pasting seed phrases into chat. Each user has a permanent **agent wallet** tied to their site account. Transfers move only to **trusted destinations** they approve. Swaps go only through **allowlisted DEX routers**. Phone claims hold funds in escrow until the recipient links WhatsApp. The product launches on **GIWA Sepolia** and is designed so additional EVM chains and tokens can be added through config, not a rewrite.
+Flizy lets people **send and swap crypto from the chat app they already use** — WhatsApp or Telegram — and from the site, without pasting seed phrases into chat. Each user has a permanent **agent wallet** tied to their site account. Transfers move only to **trusted destinations** they approve. Swaps go only through **allowlisted DEX routers**. Phone claims hold funds in escrow until the recipient links Flizy. The product launches on **GIWA Sepolia** and is designed so additional EVM chains, tokens and chat channels can be added through config and adapters, not a rewrite.
 
 | Layer | Role |
 |--------|------|
 | **Web site** | Signup, dashboard, trusted list, PIN, link codes, claim pages, **Swap + liquidity** |
-| **WhatsApp bot** | Commands (`flizy …`), plan/confirm, claims, requests, swaps from agent wallet |
-| **Supabase** | Accounts, WhatsApp identities (+ phone join key), trusted, transfers, claims, requests |
+| **Chat clients** | WhatsApp (`flizy …`) and Telegram (`/…`). Adapters only: they build an Intent and hand it to the engine |
+| **Command router** | One command set shared by every channel (`lib/router.js`) |
+| **Supabase** | Accounts, channel identities (+ phone join key), trusted, transfers, claims, requests |
 | **DEX contracts** | Uniswap V2-style factory/router, fee router, WETH, FLZ token, FLZ/WETH pair (GIWA Sepolia) |
 | **Wallet contracts** | `FlizyWallet` + CREATE2 factory in repo (next custody phase; not required for current agent EOA) |
 | **Ops wallet** | Gas / infra + protocol fee treasury (`PRIVATE_KEY`); not the user’s send address |
@@ -43,20 +44,25 @@ Flizy lets people **send and swap crypto from WhatsApp** (and the site) without 
 **Explorer base:** [https://sepolia-explorer.giwa.io](https://sepolia-explorer.giwa.io)  
 **Full JSON:** [`deployments/giwa-sepolia.json`](deployments/giwa-sepolia.json)
 
-| Contract | Address | Explorer |
-|----------|---------|----------|
-| **WETH9** | `0x3a13399f2741122B63c7710B2A85346B97C6BFDf` | [View](https://sepolia-explorer.giwa.io/address/0x3a13399f2741122B63c7710B2A85346B97C6BFDf) |
-| **FLZ** (Flizy test token, 100k supply, 18 decimals) | `0x308be8f71DA695f18E70D2243a446e1fD1566BA6` | [View](https://sepolia-explorer.giwa.io/address/0x308be8f71DA695f18E70D2243a446e1fD1566BA6) |
-| **UniswapV2Factory** | `0xBB1d2c582E455B448660A199097A54DF29162BbF` | [View](https://sepolia-explorer.giwa.io/address/0xBB1d2c582E455B448660A199097A54DF29162BbF) |
-| **UniswapV2Router02** | `0x4055413A4757e069bbCAc481639EF2814224Faa0` | [View](https://sepolia-explorer.giwa.io/address/0x4055413A4757e069bbCAc481639EF2814224Faa0) |
-| **FlizyFeeRouter** (protocol fee, default 30 bps, max 100 bps) | `0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC` | [View](https://sepolia-explorer.giwa.io/address/0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC) |
-| **FLZ / WETH pair** | `0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227` | [View](https://sepolia-explorer.giwa.io/address/0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227) |
+| Contract | Address | Explorer | Source |
+|----------|---------|----------|--------|
+| **WETH9** | `0x3a13399f2741122B63c7710B2A85346B97C6BFDf` | [View](https://sepolia-explorer.giwa.io/address/0x3a13399f2741122B63c7710B2A85346B97C6BFDf) | Verified |
+| **FLZ** (Flizy test token, 100k supply, 18 decimals) | `0x308be8f71DA695f18E70D2243a446e1fD1566BA6` | [View](https://sepolia-explorer.giwa.io/address/0x308be8f71DA695f18E70D2243a446e1fD1566BA6) | Verified |
+| **UniswapV2Factory** | `0xBB1d2c582E455B448660A199097A54DF29162BbF` | [View](https://sepolia-explorer.giwa.io/address/0xBB1d2c582E455B448660A199097A54DF29162BbF) | Verified |
+| **UniswapV2Router02** | `0x4055413A4757e069bbCAc481639EF2814224Faa0` | [View](https://sepolia-explorer.giwa.io/address/0x4055413A4757e069bbCAc481639EF2814224Faa0) | Verified |
+| **FlizyFeeRouter** (protocol fee, default 30 bps, max 100 bps) | `0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC` | [View](https://sepolia-explorer.giwa.io/address/0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC) | Verified |
+| **FLZ / WETH pair** | `0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227` | [View](https://sepolia-explorer.giwa.io/address/0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227) | Verified |
 
 **Treasury / fee destination (ops):** `0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B`  
 [View treasury](https://sepolia-explorer.giwa.io/address/0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B)
 
 **Seed liquidity (testnet):** 1.2 ETH + 60,000 FLZ (starting ~50,000 FLZ per 1 ETH).  
 **Source:** `contracts/src/dex/*` · deploy script `contracts/script/DeployDex.s.sol`
+
+All six are source verified on the explorer as a full match, built with
+`v0.8.24+commit.e11b9ed9`, optimizer on at 200 runs, EVM version cancun. This is a
+Solidity 0.8 port of Uniswap V2, so Factory, Pair and Router02 all build on one compiler
+rather than the canonical 0.5.16 / 0.6.6 split.
 
 ### Contracts in repo (not required on-chain for current bot)
 
@@ -72,12 +78,13 @@ Flizy lets people **send and swap crypto from WhatsApp** (and the site) without 
 ```mermaid
 flowchart TB
   subgraph Clients
-    U[User phone]
+    WA[WhatsApp<br/>index.js]
+    TG[Telegram<br/>telegram.js]
     S[flizy.vercel.app]
   end
 
   subgraph Flizy
-    W[WhatsApp bot<br/>index.js]
+    R[Command router<br/>lib/router.js]
     DB[(Supabase)]
     POL[Policy engine<br/>trusted · limits · routers]
     ENG[Intent → Plan → Confirm → Execute → Receipt]
@@ -93,11 +100,11 @@ flowchart TB
     WETH[WETH9]
   end
 
-  U -->|signup · trusted · PIN · link code · swap UI| S
-  S --> DB
-  U -->|flizy link · send · claim · swap| W
-  W --> DB
-  W --> ENG
+  S -->|signup · trusted · PIN · link code · swap UI| DB
+  WA -->|flizy link · send · claim · swap| R
+  TG -->|/link · /send · /claim · /swap| R
+  R --> DB
+  R --> ENG
   ENG --> POL
   POL -->|transfer OK| AW
   POL -->|swap router allowlist| AW
@@ -121,22 +128,81 @@ flowchart TB
                     +-----------+------------+
                                 |
                                 v
-                    +------------------------+
-                    |       Supabase         |
-                    | accounts · WA + phone  |
-                    | trusted · claims · txs |
-                    +-----------+------------+
+                    +--------------------------+
+                    |        Supabase          |
+                    | accounts · identities    |
+                    | (channel, external id)   |
+                    | trusted · claims · txs   |
+                    +-----------+--------------+
                                 ^
                                 |
-  +----------+         +--------+--------+         +------------------+
-  | User WA  | ------> |  Flizy bot       | -----> | Agent wallets    |
-  | phones   |         |  Policy + Plan   | sign   | (per account)    |
-  +----------+         +--------+--------+         +--------+---------+
+  +------------+       +--------+--------+         +------------------+
+  | WhatsApp   | ----> |  Flizy engine   | ----->  | Agent wallets    |
+  | Telegram   |       |  Policy + Plan  |  sign   | (per account)    |
+  +------------+       +--------+--------+         +--------+---------+
                                 |                           |
                      ops / treasury / escrow                v
                                                     GIWA Sepolia DEX
                                                     FeeRouter → V2 → Pair
 ```
+
+### Clients
+
+Chat clients are adapters. They translate a message into a ctx and hand it to
+`lib/router`, which owns every command. Money rules live only in `lib/engine`.
+Adding a channel means adding an adapter, not a second copy of the product.
+
+```mermaid
+flowchart TB
+  WA["index.js<br/>WhatsApp · whatsapp-web.js"]
+  TG["lib/telegram/bot.js<br/>Telegram · Bot API polling"]
+  CTX["ctx<br/>channel · externalId · reply()"]
+  R["lib/router.js<br/>one command set"]
+  ENG["lib/engine/*<br/>Intent → Policy → Plan → Execute → Receipt"]
+  POL["Policy<br/>trusted · limits · session · routers"]
+
+  WA --> CTX
+  TG --> CTX
+  CTX --> R
+  R --> ENG
+  ENG --> POL
+  POL -->|ALLOW_WITH_CONFIRM or DENY| ENG
+```
+
+| | WhatsApp | Telegram |
+| --- | --- | --- |
+| Process | `node index.js` (`flizy.service`) | `node telegram.js` (`flizy-telegram.service`) |
+| Transport | whatsapp-web.js + headless Chromium | Bot API long polling, no browser |
+| Invocation | `flizy <command>` | `/command` (the `flizy ` prefix also works) |
+| Confirm | type `confirm` | inline button, or type `confirm` |
+| Phone for claims | read from WhatsApp contact metadata | one-tap contact share (`/phone`) |
+
+### Identity model
+
+An account can hold a WhatsApp identity and a Telegram identity at once. One phone maps to
+exactly one account across every channel, checked in the app for a clear message and
+enforced again by a database trigger.
+
+```mermaid
+flowchart LR
+  subgraph ACC["One Flizy account"]
+    A["accounts row<br/>agent wallet · trusted · limits · PIN"]
+  end
+
+  WA["channel_identities<br/>('whatsapp', LID)"] --> A
+  TG["channel_identities<br/>('telegram', user id)"] --> A
+  PH["phone_e164<br/>verified only"] -.->|claims and requests join here| A
+
+  CL["Claim addressed to a phone"] --> PH
+```
+
+Two rules do the heavy lifting:
+
+- The chat id identifies the **session**. The phone identifies the **claim address**. They
+  are never interchangeable, so a Telegram user id can never match a stranger's claim.
+- A phone is only accepted from a channel-verified source: WhatsApp contact metadata, or a
+  Telegram contact share where `contact.user_id` equals the sender. A typed number is never
+  a claim key.
 
 ---
 
@@ -148,50 +214,61 @@ flowchart TB
 sequenceDiagram
   participant U as User
   participant Site as Site
-  participant Bot as WhatsApp bot
+  participant Chat as Chat client<br/>WhatsApp or Telegram
+  participant R as Router + engine
   participant Chain as GIWA Sepolia
 
   U->>Site: Signup · agent wallet derived
   U->>Site: Add trusted name · generate link code
-  U->>Bot: flizy link CODE
-  Note over Bot: Stores LID as identity<br/>captures phone for claims join
-  Bot->>Site: Bind WA to account
-  U->>Bot: flizy send 0.001 to john
-  Bot->>Bot: Intent → Policy trusted + limits → Plan
-  Bot-->>U: Transfer plan
-  U->>Bot: confirm
-  Bot->>Chain: Sign from agent wallet
-  Bot-->>U: Receipt + explorer link
+  U->>Chat: flizy link CODE  /  /link CODE
+  Chat->>R: Intent
+  Note over R: Binds (channel, external id) to the account<br/>captures a verified phone for the claims join
+  R->>Site: Identity bound
+  U->>Chat: flizy send 0.001 to john  /  /send 0.01 to john
+  Chat->>R: Send intent
+  R->>R: Policy trusted + limits → Plan
+  R-->>U: Transfer plan (button or typed confirm)
+  U->>Chat: confirm
+  R->>Chain: Sign from agent wallet
+  R-->>U: Receipt + explorer link
 ```
+
+The client differs only in how the message arrives and how the confirm is tapped. The
+Intent, the Policy decision, the Plan and the receipt are the same objects either way.
 
 ### 2. Phone claim (escrow)
 
 ```mermaid
 sequenceDiagram
-  participant S as Sender
-  participant Bot as WhatsApp bot
+  participant S as Sender<br/>(either channel)
+  participant Bot as Router + engine
   participant Esc as Claim escrow
   participant R as Recipient
 
-  S->>Bot: flizy send 0.01 to 234…
+  S->>Bot: send 0.01 to 234…
   Bot->>Bot: CLAIM_HOLD plan · confirm
   Bot->>Esc: Hold ETH from sender agent wallet
   Note over Bot: Claim row to_wa_hint = phone digits
-  R->>Site: Signup · flizy link CODE
-  Note over Bot: Phone stored on identity next to LID
-  R->>Bot: flizy claim
-  Bot->>Bot: Match claim by phone not LID
+  Bot-->>R: Already on Flizy? notify on every linked channel
+  R->>Bot: Signup · link CODE
+  Note over Bot: Verified phone stored on the identity<br/>WhatsApp contact data, or Telegram contact share
+  R->>Bot: flizy claim  /  /claim
+  Bot->>Bot: Match on phone only, never on a chat id
   Bot->>Esc: Payout to recipient agent wallet
   Bot-->>R: Receipt
-  Note over S: flizy cancel claims anytime while pending
+  Note over S: cancel claims anytime while pending
 ```
 
-### 3. Swap (WhatsApp or site)
+A claim is addressed to a **phone number**, not to a channel. Whoever owns that number can
+redeem it from WhatsApp or Telegram, whichever they linked. If the number is not on Flizy
+yet, nobody is cold-messaged: the sender shares the claim link as before.
+
+### 3. Swap (any chat client or the site)
 
 ```mermaid
 sequenceDiagram
   participant U as User
-  participant Client as Bot or Site
+  participant Client as WhatsApp · Telegram · Site
   participant Pol as Policy
   participant Fee as FeeRouter
   participant Pair as FLZ/WETH pair
@@ -226,8 +303,10 @@ flowchart LR
 
 - Email signup / login; strong password policy.
 - Permanent account; agent wallet derived once (`flizy:agent:v1:{accountId}`), not rotated.
-- WhatsApp link codes; `flizy link CODE` binds observed sender id (**LID-first** identity).
-- **Phone join key** on `whatsapp_identities.wa_phone_e164` for claims/requests (normalized digits). LID stays identity; phone is only the claim address match.
+- One-time link codes; `flizy link CODE` (WhatsApp) or `/link CODE` (Telegram) binds a chat identity. Only a logged-in account holder can generate a code, which is what makes it identity proof.
+- Identity is **(channel, external id)** in `channel_identities`: WhatsApp is the observed sender id (**LID-first**), Telegram is the numeric user id. One account can hold both.
+- **Phone join key** on `channel_identities.phone_e164` for claims/requests (normalized digits). The chat id stays the identity; the phone is only the claim address match, and one phone maps to exactly one account across every channel.
+- Phone is only ever accepted from a channel-verified source: WhatsApp contact metadata, or a Telegram contact share where `contact.user_id` equals the sender. A typed number is never a claim key.
 
 ### Agent wallet
 
@@ -252,14 +331,15 @@ flowchart LR
 - Protocol fee default **0.30%** (30 bps), hard max **1%**, paid to treasury; plus V2 pool fee. Details: [`docs/swap-fees.md`](docs/swap-fees.md).
 - Swaps do **not** use trusted-contacts checks and do **not** count against daily send limit.
 
-### WhatsApp commands
+### Chat commands
 
-All product commands use the **`flizy` prefix** (configurable). Bare `confirm` / `cancel` for pending plans.
+WhatsApp uses the **`flizy` prefix** (configurable). Telegram uses `/command`,
+and also accepts the `flizy ` prefix. Bare `confirm` / `cancel` work on both.
 
 | Command | Purpose |
 |---------|---------|
 | `flizy help` | Command list |
-| `flizy link CODE` | Bind WhatsApp to site account |
+| `flizy link CODE` | Bind this chat to your site account |
 | `flizy me` / `balance` / `deposit` / `history` | Account and wallet |
 | `flizy add wallet 0x…` | Trusted destination flow |
 | `flizy send AMOUNT to name\|0x\|phone` | Transfer or phone claim hold |
@@ -270,7 +350,8 @@ All product commands use the **`flizy` prefix** (configurable). Bare `confirm` /
 | `flizy swap AMOUNT ETH for FLZ` | Explicit pair swap |
 | `flizy price FLZ` | Pool spot price |
 | `confirm` / `cancel` | Execute or drop pending plan |
-| `flizy unlock PIN` / `lock` | Session when PIN is set |
+| `flizy unlock PIN` / `lock` | Session when PIN is set (per channel) |
+| `/phone` | Telegram only: share your number so claims reach you |
 
 ### Web site surfaces
 
@@ -316,7 +397,12 @@ Flizy is **GIWA-first** (`lib/chains.js`, default `giwa_sepolia` / `91342`).
 
 | Path | Purpose |
 |------|---------|
-| `index.js` | WhatsApp bot |
+| `index.js` | WhatsApp client (adapter) |
+| `telegram.js` | Telegram client entrypoint (adapter) |
+| `lib/router.js` | Channel-agnostic command router: every command lives here once |
+| `lib/telegram/` | Bot API client and update loop |
+| `lib/notify.js` | Cross-channel notifications + outbox drain |
+| `lib/runtime.js` | Shared chain, provider, ops and escrow wallets |
 | `lib/` | Identity, claims, phone, engine, dex, chains, agent wallet, escrow |
 | `lib/engine/` | Intent · Policy · Plan · Execute · Receipt |
 | `web/` | Next.js site + swap API |
@@ -325,7 +411,7 @@ Flizy is **GIWA-first** (`lib/chains.js`, default `giwa_sepolia` / `91342`).
 | `deployments/` | Live addresses (GIWA Sepolia) |
 | `supabase/migrations/` | Schema |
 | `docs/` | Swap fees, trusted addresses |
-| `deploy/` | systemd unit |
+| `deploy/` | systemd units (WhatsApp + Telegram) |
 | `.env.example` | Bot env template |
 
 ---
@@ -349,13 +435,31 @@ npm install
 node index.js
 ```
 
+### Telegram client
+
+Separate process, same code, same database, same wallets:
+
+```bash
+cp .env.example .env
+# add TELEGRAM_BOT_TOKEN (from @BotFather) and TELEGRAM_BOT_USERNAME
+node telegram.js
+```
+
+Long polling, so no public URL and no inbound port. Only one process may poll a
+token at a time; a second poller makes Telegram answer 409 and both stall.
+
 VPS with systemd:
 
 ```bash
 cd /opt/flizy && git pull && npm install --omit=dev
-sudo systemctl restart flizy
+sudo systemctl restart flizy flizy-telegram
 journalctl -u flizy -f
+journalctl -u flizy-telegram -f
 ```
+
+Two units on purpose: WhatsApp drives headless Chromium and is the fragile half,
+and a Chromium crash must not take Telegram payments down with it. See
+[`deploy/README-systemd.md`](deploy/README-systemd.md).
 
 Do not run the same WhatsApp session on Windows and VPS at once.
 
@@ -398,6 +502,8 @@ forge test
 | `PRIVATE_KEY` | Ops / treasury hot wallet |
 | `ESCROW_PRIVATE_KEY` | Optional dedicated claim escrow |
 | `BOT_WHATSAPP_NUMBER` | Digits for `wa.me` deep links |
+| `TELEGRAM_BOT_TOKEN` | Telegram client. Never commit it, never log it |
+| `TELEGRAM_BOT_USERNAME` | Bot username (no `@`) for `t.me/…?start=CODE` links. Also set on Vercel for the dashboard button |
 | `SITE_URL` | Public site URL |
 | `ENFORCE_TRUSTED` | Trusted-list on transfers |
 | `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes |
@@ -410,12 +516,13 @@ See `.env.example`. Never commit real `.env` files.
 
 ## Hard rules
 
-- No secrets in WhatsApp, logs, or client bundles.
+- No secrets in any chat, logs, or client bundles. That includes the Telegram bot token.
 - User sends and swaps use the **agent wallet**, not the ops key, after link.
 - Transfers: trusted destinations when enforcement is on.
 - Swaps: allowlisted routers only; fee disclosed before confirm.
-- Claims match on **normalized phone**, not LID alone.
-- Commands use the `flizy` prefix in production configuration.
+- Claims match on **normalized phone**, never on a chat id alone. A Telegram user id is not a phone number.
+- One phone maps to exactly one account, across every channel.
+- Chat clients are adapters. A client never enforces a money rule; Policy does.
 
 ---
 
@@ -425,6 +532,8 @@ See `.env.example`. Never commit real `.env` files.
 |------|--------|
 | Site identity + dashboard + link codes | Live |
 | WhatsApp multi-user bot + agent sends | Live (GIWA Sepolia) |
+| Telegram client on the same engine | Built; needs migration applied + service started |
+| Channel-agnostic identity (WhatsApp + Telegram on one account) | Built; needs migration applied |
 | Trusted list + daily limits (Policy) | Live |
 | Phone claims + escrow + cancel | Live |
 | Payment requests | Live |
