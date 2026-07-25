@@ -3,19 +3,37 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { PasswordField } from '../../components/PasswordField';
+import { validatePassword } from '../../lib/passwordPolicy';
 
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Live mismatch hint once the user has started the second field
+  const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError('');
+
+    // Check here as well as on the server so the user is told before a round trip
+    const policy = validatePassword(password);
+    if (!policy.ok) {
+      setError(policy.error);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
     try {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
@@ -87,28 +105,31 @@ export default function SignupPage() {
             autoComplete="email"
           />
         </div>
-        <div>
-          <label className="label" htmlFor="password">
-            Password
-          </label>
-          <input
-            id="password"
-            className="input"
-            type="password"
-            required
-            minLength={8}
-            placeholder="e.g. MyPass1!"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-          <p className="mt-2 text-xs leading-relaxed text-muted">
-            No email code is sent. Use a strong password: at least 8 characters, with a letter, a
-            number, and a special character (!@#$%…).
-          </p>
-        </div>
+        <PasswordField
+          id="password"
+          label="Password"
+          value={password}
+          onChange={setPassword}
+          required
+          minLength={8}
+          placeholder="e.g. MyPass1!"
+          autoComplete="new-password"
+          hint="No email code is sent. Use a strong password: at least 8 characters, with a letter, a number, and a special character (!@#$%…)."
+        />
+        <PasswordField
+          id="confirm-password"
+          label="Retype password"
+          value={confirmPassword}
+          onChange={setConfirmPassword}
+          required
+          minLength={8}
+          placeholder="Type it again"
+          autoComplete="new-password"
+          problem={mismatch ? 'Passwords do not match yet.' : undefined}
+          hint="Both entries must match exactly."
+        />
         {error ? <div className="alert alert-error">{error}</div> : null}
-        <button className="btn btn-primary w-full" type="submit" disabled={loading}>
+        <button className="btn btn-primary w-full" type="submit" disabled={loading || mismatch}>
           {loading ? 'Creating account...' : 'Create account'}
         </button>
         <p className="text-center text-sm text-muted">

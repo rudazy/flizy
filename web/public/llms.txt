@@ -1,11 +1,12 @@
 # Flizy
 
-> Chat-native EVM wallet for WhatsApp and Telegram. Trusted sends. GIWA-first.
+> Send crypto from WhatsApp or Telegram, only to destinations approved in advance. GIWA-first, testnet.
 
-Flizy gives every account a permanent agent wallet. Money commands run in the chat app the
-user already has, and the same account can be linked on WhatsApp and Telegram at once.
-Transfers only reach destinations the user approved on the site. Swaps only go through
-allowlisted DEX routers.
+Money commands run in the chat app the user already has, and the same account can be linked
+on WhatsApp and Telegram at once. Transfers only reach destinations the user approved on the
+site, so a stolen phone cannot add a new payout address. Swaps only go through allowlisted
+DEX routers, with fees disclosed before confirmation. Currently running on GIWA Sepolia
+testnet with source-verified contracts.
 
 ## Site
 
