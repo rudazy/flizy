@@ -346,7 +346,25 @@ client.on('ready', async () => {
 
   // This process owns the WhatsApp session, so it delivers WhatsApp notifications
   registerChannelSender(CHANNEL, sendToIdentity);
-  startOutboxDrain(CHANNEL);
+  startOutboxDrain(CHANNEL, config.outboxDrainMs);
+
+  // Telegram delivery is a stateless HTTPS call, so this process can push a
+  // cross-channel notice the instant it happens instead of leaving it in the
+  // outbox for the Telegram service to pick up. Sender only: draining stays
+  // with the Telegram process so a queued message is never delivered twice.
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    try {
+      const { TelegramApi } = require('./lib/telegram/api');
+      const telegramApi = new TelegramApi(process.env.TELEGRAM_BOT_TOKEN);
+      registerChannelSender(CHANNELS.TELEGRAM, (externalId, body) =>
+        telegramApi.sendMessage(String(externalId), String(body))
+      );
+      console.log('Telegram notifications: direct (token present in this process).');
+    } catch (err) {
+      // Falling back to the outbox is correct, not fatal
+      console.warn('[notify] telegram sender unavailable:', publicErrorMessage(err));
+    }
+  }
 
   console.log('Flizy WhatsApp client is ready.');
   console.log('');

@@ -110,6 +110,52 @@ describe('Telegram input normalization', () => {
   });
 });
 
+/**
+ * Telegram is slash native. Every command the bot advertises in its menu has to
+ * work when typed or tapped as "/command", with no "flizy" in front of it. If a
+ * command is added to the menu without a parser behind it, this fails.
+ */
+describe('every advertised Telegram command works as a bare slash command', () => {
+  const ctx = telegramCtx();
+
+  /** Sample arguments for the commands that take them. */
+  const ARGS = {
+    link: 'A7K2QX99',
+    send: '0.01 to john',
+    request: '0.01 from 2348012345678',
+    buy: '0.01 FLZ',
+    sell: '10 FLZ',
+    swap: '0.01 ETH for FLZ',
+    price: 'FLZ',
+  };
+
+  for (const { command } of router.commandMenu()) {
+    const body = `${command}${ARGS[command] ? ` ${ARGS[command]}` : ''}`;
+    it(`/${body}`, () => {
+      const normalized = router.normalizeInput(ctx, `/${body}`);
+      assert.ok(normalized, `/${body} was ignored`);
+      assert.equal(normalized.text, body, 'slash must be stripped, nothing else changed');
+      assert.equal(
+        router.isFlizyCommandBody(normalized.text),
+        true,
+        `/${body} is advertised but no parser recognises it`
+      );
+    });
+  }
+
+  it('needs no flizy prefix for any of them', () => {
+    for (const { command } of router.commandMenu()) {
+      assert.ok(router.isFlizyCommand(ctx, `/${command}`), `/${command} should wake the bot`);
+    }
+  });
+
+  it('also accepts commands that are not in the menu', () => {
+    for (const body of ['how', 'requests', 'cancel claims', 'contacts']) {
+      assert.equal(router.normalizeInput(ctx, `/${body}`).text, body);
+    }
+  });
+});
+
 describe('WhatsApp input normalization is unchanged', () => {
   const ctx = whatsappCtx();
 
@@ -245,6 +291,9 @@ describe('end to end through the shared router', () => {
     const welcome = first.map((s) => s.text).join('\n');
     assert.match(welcome, /Welcome to Flizy/);
     assert.match(welcome, /\/send 0\.001 to ama/);
+    // A first message of /help must still answer the question it asked: the
+    // greeting on its own left a new user with no command list.
+    assert.match(welcome, /\/send 0\.01 to john/, 'first /help must include the command list');
 
     // Second time the user is known, so the full command list comes through
     const second = [];

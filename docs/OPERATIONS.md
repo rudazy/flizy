@@ -172,6 +172,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `TELEGRAM_BOT_TOKEN` | Telegram client. Never commit it, never log it |
 | `TELEGRAM_BOT_USERNAME` | Bot username, no `@`, for `t.me/…?start=CODE` links. Also set on Vercel |
 | `TELEGRAM_POLL_TIMEOUT_SEC` | Long poll wait, default 30 |
+| `OUTBOX_DRAIN_MS` | Notification outbox poll, default 5000. Worst case delay for a cross-channel notice |
 | `SITE_URL` | Public site URL |
 | `ADMIN_PHONES` / `ADMIN_SETUP_SECRET` | Admin bootstrap |
 | `ENFORCE_TRUSTED` | Approved-destination enforcement on transfers |

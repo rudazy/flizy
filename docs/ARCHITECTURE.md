@@ -118,6 +118,12 @@ Two rules do the heavy lifting:
 - `transfers.phone` holds an identity transfer key: the bare id for WhatsApp so historic
   rows still match, and a namespaced `telegram:<id>` for other channels so a chat id can
   never collide with somebody's phone number.
+- **A phone column never receives a transfer key.** `normalizePhoneNumber` rejects any value
+  containing a letter rather than salvaging its digits, because stripping the namespace off
+  `telegram:5566778899` would forge a plausible number out of a chat user id. That forged
+  number could then match an `ADMIN_PHONES` entry or a stranger's pending claim. Columns
+  rendered back to a user as a phone (`claims.from_wa_sender`, `payment_requests.requester_wa`)
+  additionally store `null` unless the value passes `isPlausiblePhone`.
 - Sessions are keyed `(account_id, channel, external_id)`. Locking one chat app leaves the
   other untouched.
 - Agent wallets are derived once per account from `flizy:agent:v1:{accountId}` and are never
@@ -220,8 +226,13 @@ flowchart LR
 
 `lib/notify.js` fans a message out to every identity on an account. A process delivers
 inline for channels it owns and queues the rest in a `notifications` outbox table, which the
-owning process drains. Telegram delivery is a stateless HTTPS call so any process can send
-it; WhatsApp needs the live web session, so only the WhatsApp process registers as a sender.
+owning process drains every `OUTBOX_DRAIN_MS`.
+
+Telegram delivery is a stateless HTTPS call, so **both** processes register a Telegram
+sender when `TELEGRAM_BOT_TOKEN` is present, and a WhatsApp-originated notice reaches a
+Telegram user immediately rather than waiting for a poll. Only the Telegram process
+registers the *drain*, so a queued message is never delivered twice. WhatsApp needs the live
+web session, so that direction still queues.
 
 Used when a claim is held for a number that already belongs to a Flizy account, and when a
 payment request is created. Numbers that are not on Flizy are never cold-messaged: the

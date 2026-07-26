@@ -40,6 +40,29 @@ describe('normalizePhoneNumber', () => {
     assert.equal(normalizePhoneNumber('2348012345678@s.whatsapp.net'), expected);
   });
 
+  /**
+   * A namespaced identity key is not a phone. Salvaging its digits would forge
+   * a plausible number out of a chat user id, which can then collide with a
+   * real person: an ADMIN_PHONES entry, or a stranger's pending claim.
+   */
+  it('refuses to turn a channel-prefixed identity key into a number', () => {
+    assert.equal(normalizePhoneNumber('telegram:5566778899'), '');
+    assert.equal(normalizePhoneNumber('telegram:2348012345678'), '');
+    assert.equal(isPlausiblePhone('telegram:2348012345678'), false);
+  });
+
+  it('refuses any value carrying a letter', () => {
+    assert.equal(normalizePhoneNumber('signal:2348012345678'), '');
+    assert.equal(normalizePhoneNumber('abc2348012345678'), '');
+    assert.equal(normalizePhoneNumber('john'), '');
+  });
+
+  it('still accepts every real phone shape after that guard', () => {
+    assert.equal(normalizePhoneNumber('2348012345678@c.us'), expected);
+    assert.equal(normalizePhoneNumber('+234 801-234-5678'), expected);
+    assert.equal(normalizePhoneNumber('02348012345678'), expected);
+  });
+
   it('collapses all variants to the same value', () => {
     const variants = [
       '2348012345678',

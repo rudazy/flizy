@@ -74,9 +74,13 @@ third channel is an adapter, not a second product.
    destination, network and fees. Nothing moves until you confirm.
 5. **Get a receipt** with an explorer link.
 
-You can also send to a **phone number** that is not on Flizy yet. The funds go into escrow,
-the recipient gets a claim link, and you can cancel any time until they claim it. When they
-join and prove that number, the money is theirs.
+You can also send to a **phone number**. The funds go into escrow and you can cancel any
+time until they are claimed. If that number is already on Flizy, the owner is notified in
+their chat app straight away and claims it there. If it is not, you share a claim link, and
+the money becomes theirs once they join and prove the number.
+
+Money never lands in someone's wallet unannounced, and a number that is not on Flizy is
+never messaged out of the blue.
 
 ---
 

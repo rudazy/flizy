@@ -17,7 +17,7 @@ testnet with source-verified contracts.
 - /login : Sign in
 - /dashboard : Wallet, PIN, trusted people, link code for WhatsApp or Telegram
 - /dashboard/swap : Swap FLZ and ETH, add or remove liquidity
-- /claim/:token : Claim funds waiting for non-users
+- /claim/:token : Claim funds reserved for a phone number
 
 ## Channels
 
@@ -27,6 +27,10 @@ testnet with source-verified contracts.
   logged-in account holder can generate one.
 - Claims are addressed to a phone number, so they can be redeemed from either channel by
   whoever owns that number. One phone belongs to exactly one account.
+- Sending to a phone number always reserves the funds, whether or not that number is
+  already on Flizy. If it is, the owner is notified in their chat app immediately and
+  claims it there. Money never arrives in a wallet unannounced, and a number that is not
+  on Flizy is never messaged out of the blue. The sender can cancel until it is claimed.
 
 ## When to read
 
