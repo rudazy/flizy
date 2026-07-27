@@ -5,7 +5,7 @@ import { getDexAddresses } from '../../../lib/dexServer';
 
 export async function GET() {
   try {
-    const accountId = getAccountIdFromCookie();
+    const accountId = await getAccountIdFromCookie();
     if (!accountId) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     }

@@ -2,10 +2,15 @@ import { NextResponse } from 'next/server';
 import { getSupabase, getSiteConfig } from '../../../lib/supabase';
 import { listTrusted } from '../../../lib/trusted';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
+import { deriveAgentAddress, deriveLegacyAddressV1 } from '../../../lib/agentWallet';
+import { toPublicAccount } from '../../../lib/publicAccount';
+
+const ACCOUNT_COLS =
+  'id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth';
 
 export async function GET() {
   try {
-    const accountId = getAccountIdFromCookie();
+    const accountId = await getAccountIdFromCookie();
     if (!accountId) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     }
@@ -13,9 +18,7 @@ export async function GET() {
     const supabase = getSupabase();
     let { data: account, error } = await supabase
       .from('accounts')
-      .select(
-        'id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth'
-      )
+      .select(ACCOUNT_COLS)
       .eq('id', accountId)
       .single();
 
@@ -23,29 +26,27 @@ export async function GET() {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Set agent wallet once only (never rotate if already set)
-    if (!account.agent_wallet_address) {
-      const { Wallet, keccak256, toUtf8Bytes } = await import('ethers');
-      const material = keccak256(toUtf8Bytes(`flizy:agent:v1:${account.id}`));
-      const w = new Wallet(material);
-      const { data: updated, error: uErr } = await supabase
-        .from('accounts')
-        .update({ agent_wallet_address: w.address })
-        .eq('id', account.id)
-        .is('agent_wallet_address', null)
-        .select(
-          'id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth'
-        )
-        .single();
+    // Set the agent wallet once. An address our own v1 code wrote is moved
+    // forward to the v2 address the signer actually controls; anything else is
+    // left alone because funds may be sitting on it.
+    const expected = deriveAgentAddress(accountId);
+    const stored = account.agent_wallet_address;
+    const isLegacyPointer = Boolean(stored) && stored === deriveLegacyAddressV1(accountId);
+
+    if (!stored || isLegacyPointer) {
+      let write = supabase.from('accounts').update({ agent_wallet_address: expected });
+      write = stored
+        ? write.eq('id', accountId).eq('agent_wallet_address', stored)
+        : write.eq('id', accountId).is('agent_wallet_address', null);
+
+      const { data: updated, error: uErr } = await write.select(ACCOUNT_COLS).single();
       if (!uErr && updated) {
         account = updated;
       } else {
-        // Re-read in case another request set it
+        // Re-read in case another request got there first
         const { data: again } = await supabase
           .from('accounts')
-          .select(
-            'id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth'
-          )
+          .select(ACCOUNT_COLS)
           .eq('id', accountId)
           .single();
         if (again) account = again;
@@ -82,18 +83,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      account: {
-        id: account.id,
-        email: account.email,
-        display_name: account.display_name,
-        agent_wallet_address: account.agent_wallet_address,
-        balance_eth: account.balance_eth ?? 0,
-        has_pin: Boolean(account.unlock_pin_hash),
-        daily_send_limit_eth:
-          account.daily_send_limit_eth === null || account.daily_send_limit_eth === undefined
-            ? null
-            : account.daily_send_limit_eth,
-      },
+      account: toPublicAccount(account),
       trusted,
       link,
     });

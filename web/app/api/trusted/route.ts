@@ -25,7 +25,7 @@ async function requirePassword(accountId: string, password: string) {
 
 export async function POST(req: Request) {
   try {
-    const accountId = getAccountIdFromCookie();
+    const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     const body = await req.json();
     const password = String(body.password || '');
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const accountId = getAccountIdFromCookie();
+    const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     const body = await req.json();
     const password = String(body.password || '');

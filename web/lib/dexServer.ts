@@ -132,10 +132,9 @@ export function explorerTxUrl(chain: WebChain, txHash: string) {
   return `${chain.explorerBaseUrl}/tx/${txHash}`;
 }
 
-export function deriveAgentWallet(accountId: string) {
-  const material = ethers.keccak256(ethers.toUtf8Bytes(`flizy:agent:v1:${accountId}`));
-  return new ethers.Wallet(material);
-}
+// Derivation lives in one place for the whole web package (lib/agentWallet.ts),
+// re-exported here so existing DEX call sites keep their import path.
+export { deriveAgentWallet } from './agentWallet';
 
 export async function readFeeBps(provider: ethers.Provider): Promise<number> {
   const d = getDexAddresses();

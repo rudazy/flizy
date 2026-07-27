@@ -4,7 +4,7 @@ import { getAccountIdFromCookie } from '../../../../lib/cookies';
 
 export async function POST() {
   try {
-    const accountId = getAccountIdFromCookie();
+    const accountId = await getAccountIdFromCookie();
     if (!accountId) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     }

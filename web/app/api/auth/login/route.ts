@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
 import { verifyPassword } from '../../../../lib/cryptoPin';
-import { setAccountCookie } from '../../../../lib/cookies';
+import { createSession } from '../../../../lib/cookies';
+import { toPublicAccount } from '../../../../lib/publicAccount';
 
 export async function POST(req: Request) {
   try {
@@ -23,9 +24,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    setAccountCookie(data.id);
+    await createSession(data.id);
     return NextResponse.json({
-      account: { id: data.id, email: data.email, display_name: data.display_name },
+      account: toPublicAccount({ email: data.email, display_name: data.display_name }),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Login failed';

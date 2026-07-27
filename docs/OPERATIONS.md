@@ -166,6 +166,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `SUPABASE_URL` / `SUPABASE_KEY` | Database (service role on the bot host) |
 | `SUPABASE_DB_PASSWORD` | Direct Postgres connection for migration scripts |
 | `GIWA_RPC` | GIWA Sepolia RPC endpoint |
+| `WALLET_DERIVATION_SECRET` | Required, min 32 chars. Keys every agent wallet. Same value on the VPS and on Vercel. See below |
 | `PRIVATE_KEY` | Ops / treasury hot wallet |
 | `ESCROW_PRIVATE_KEY` | Optional dedicated claim escrow key |
 | `BOT_WHATSAPP_NUMBER` | Digits for `wa.me` deep links |
@@ -188,6 +189,26 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 
 Treat `PRIVATE_KEY`, escrow keys and Supabase service keys as production secrets. Rotate
 immediately if one is exposed.
+
+### `WALLET_DERIVATION_SECRET`
+
+Every per-account agent wallet key is `keccak256(HMAC-SHA256(secret, "flizy:agent:v2:" + account id))`.
+The secret is what stops an account id from being key material on its own.
+
+Three rules:
+
+1. **Same value everywhere.** The bot (`/opt/flizy/.env`) and the site (Vercel project env)
+   must hold the identical string. Different values mean an account resolves to one address
+   in chat and a different one on the site, and funds land where the other half cannot see them.
+2. **Changing it changes every agent wallet address.** Treat a change as a migration, not a
+   config edit. Sweep funds off the old addresses first with `scripts/sweep-agent-wallets.js`.
+3. **Missing or under 32 characters is fatal on purpose.** Both processes refuse to start or
+   derive rather than fall back to the old id-only derivation.
+
+The derivation is implemented twice, in `lib/agentWallet.js` (bot) and `web/lib/agentWallet.ts`
+(site), because the web bundle cannot import root `lib/`. `test/agentWallet.test.js` and
+`test/webAgentWallet.test.js` pin the same vector on both sides, so drift fails the suite.
+Do not edit one without the other.
 
 ---
 

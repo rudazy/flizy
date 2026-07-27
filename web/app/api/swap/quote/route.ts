@@ -12,7 +12,7 @@ import {
 
 export async function GET(req: Request) {
   try {
-    const accountId = getAccountIdFromCookie();
+    const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
     const url = new URL(req.url);

@@ -1,6 +1,7 @@
 export type DashboardData = {
   account: {
-    id: string;
+    // No id. The account id is agent wallet key material and never leaves the
+    // server. See web/lib/publicAccount.ts.
     email?: string | null;
     display_name?: string | null;
     agent_wallet_address?: string | null;

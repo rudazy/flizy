@@ -15,7 +15,7 @@ import {
 /** Site-only: current LP position for the logged-in agent wallet. */
 export async function GET() {
   try {
-    const accountId = getAccountIdFromCookie();
+    const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
     const chain = getWebChain();
@@ -48,7 +48,7 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
-    const accountId = getAccountIdFromCookie();
+    const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
     const body = await req.json();

@@ -117,7 +117,7 @@ function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityI
 
 export async function GET() {
   try {
-    const accountId = getAccountIdFromCookie();
+    const accountId = await getAccountIdFromCookie();
     if (!accountId) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     }

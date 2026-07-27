@@ -16,6 +16,11 @@ const assert = require('node:assert/strict');
 const { ethers } = require('ethers');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+const { VECTOR_SECRET } = require('./helpers/derivationVector');
+
+// Agent wallet derivation refuses to run without a secret, by design. These
+// paths derive an address, so give them the test fixture one.
+process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
 
 const SENDER_WA = '2348011110000';
 const RECIPIENT_PHONE = '2348022220000';

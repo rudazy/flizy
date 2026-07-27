@@ -9,6 +9,11 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+const { VECTOR_SECRET } = require('./helpers/derivationVector');
+
+// Agent wallet derivation refuses to run without a secret, by design. Linking
+// derives an address, so give it the test fixture one.
+process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
 
 let fake = createFakeSupabase();
 mockSupabaseModule({ from: (table) => fake.client.from(table) });
