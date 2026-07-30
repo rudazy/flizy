@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
+import { apiErrorBody } from '../../../lib/apiError';
+
+const ROUTE = 'GET /api/history';
 
 export type ActivityItem = {
   id: string;
@@ -226,7 +229,6 @@ export async function GET() {
       limit: 30,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'History failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

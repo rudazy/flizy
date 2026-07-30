@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 import { getDexAddresses } from '../../../lib/dexServer';
+import { apiErrorBody } from '../../../lib/apiError';
+
+const ROUTE = 'GET /api/holdings';
 
 export async function GET() {
   try {
@@ -111,7 +114,8 @@ export async function GET() {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Holdings failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // An RPC failure here used to hand the client the provider URL and the
+    // failing call. Both belong in the journal only.
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

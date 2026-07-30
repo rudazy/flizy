@@ -5,6 +5,9 @@ import { createSession } from '../../../../lib/cookies';
 import { validatePassword } from '../../../../lib/passwordPolicy';
 import { deriveAgentAddress } from '../../../../lib/agentWallet';
 import { toPublicAccount } from '../../../../lib/publicAccount';
+import { apiErrorBody } from '../../../../lib/apiError';
+
+const ROUTE = 'POST /api/auth/signup';
 
 export async function POST(req: Request) {
   try {
@@ -37,10 +40,14 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
+      // Reading the constraint is ours to do; the client gets the sentence we
+      // wrote for it, not the constraint name.
       if (String(error.message).includes('duplicate') || error.code === '23505') {
         return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // No email in the log line: an identifier that is also PII is not worth it
+      // when the error itself already says which constraint or column failed.
+      return NextResponse.json(apiErrorBody(ROUTE, error), { status: 500 });
     }
 
     // Same derivation as bot lib/agentWallet.js, via the shared web module
@@ -51,13 +58,12 @@ export async function POST(req: Request) {
       .select('email, display_name, agent_wallet_address, balance_eth')
       .single();
     if (wErr) {
-      return NextResponse.json({ error: wErr.message }, { status: 500 });
+      return NextResponse.json(apiErrorBody(ROUTE, wErr, { accountId: data.id }), { status: 500 });
     }
 
     await createSession(data.id);
     return NextResponse.json({ account: toPublicAccount(withWallet) });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Signup failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

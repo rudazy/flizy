@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSupabase } from '../../../lib/supabase';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { verifyPassword } from '../../../lib/cryptoPin';
+import { apiErrorBody } from '../../../lib/apiError';
+
+const ROUTE = 'POST /api/limits';
 
 export async function POST(req: Request) {
   try {
@@ -49,11 +52,12 @@ export async function POST(req: Request) {
       .from('accounts')
       .update({ daily_send_limit_eth: daily })
       .eq('id', accountId);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json(apiErrorBody(ROUTE, error, { accountId }), { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, daily_send_limit_eth: daily });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Limit update failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

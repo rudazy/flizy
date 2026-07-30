@@ -12,6 +12,9 @@ import {
   explorerTxUrl,
   assertSwapAllowed,
 } from '../../../../lib/dexServer';
+import { apiErrorBody } from '../../../../lib/apiError';
+
+const ROUTE = 'POST /api/swap/execute';
 
 export async function POST(req: Request) {
   try {
@@ -148,7 +151,8 @@ export async function POST(req: Request) {
       throw swapErr;
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Swap failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Covers the rethrown swap failure above. The full revert reason is written
+    // to the transfers row and the journal; the client is told a swap failed.
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

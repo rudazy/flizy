@@ -246,7 +246,8 @@ These are enforced in code review and by tests:
 | `contracts/src/dex/` | WETH, FLZ, V2 factory/pair/router, fee router |
 | `contracts/src/` | FlizyWallet and factory |
 | `deployments/` | Live addresses and verification record (GIWA Sepolia) |
-| `supabase/migrations/` | Schema |
+| `supabase/migrations/` | Schema, applied in timestamp order |
+| `scripts/sql/` | Destructive one-off SQL, never applied in order, run by hand only |
 | `docs/` | Operations, architecture, swap fees, trusted addresses |
 | `deploy/` | systemd units (WhatsApp and Telegram) |
 | `test/` | Node test suite |

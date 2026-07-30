@@ -4,6 +4,9 @@ import { listTrusted } from '../../../lib/trusted';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { deriveAgentAddress, deriveLegacyAddressV1 } from '../../../lib/agentWallet';
 import { toPublicAccount } from '../../../lib/publicAccount';
+import { apiErrorBody } from '../../../lib/apiError';
+
+const ROUTE = 'GET /api/dashboard';
 
 const ACCOUNT_COLS =
   'id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth';
@@ -88,7 +91,6 @@ export async function GET() {
       link,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Dashboard failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

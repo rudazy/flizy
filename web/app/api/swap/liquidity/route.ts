@@ -11,6 +11,10 @@ import {
   deriveAgentWallet,
   explorerTxUrl,
 } from '../../../../lib/dexServer';
+import { apiErrorBody } from '../../../../lib/apiError';
+
+const ROUTE_GET = 'GET /api/swap/liquidity';
+const ROUTE_POST = 'POST /api/swap/liquidity';
 
 /** Site-only: current LP position for the logged-in agent wallet. */
 export async function GET() {
@@ -36,8 +40,7 @@ export async function GET() {
       hasPosition: position.lpBalance > 0n,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Position failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(apiErrorBody(ROUTE_GET, err), { status: 500 });
   }
 }
 
@@ -144,7 +147,8 @@ export async function POST(req: Request) {
       note: 'Liquidity added. LP tokens are in your agent wallet.',
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Liquidity failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // The deliberate 400s above ("No LP tokens to remove", "Invalid amounts")
+    // are user-facing on purpose and are untouched.
+    return NextResponse.json(apiErrorBody(ROUTE_POST, err), { status: 500 });
   }
 }

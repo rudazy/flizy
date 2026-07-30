@@ -1,4 +1,5 @@
 import { getSupabase } from './supabase';
+import { ClientError } from './apiError';
 
 function isAddress(value: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(value);
@@ -24,7 +25,8 @@ export async function listTrusted(accountId: string) {
 }
 
 export async function addTrusted(accountId: string, address: string, label: string) {
-  if (!isAddress(address)) throw new Error('Invalid address');
+  // ClientError: written for whoever typed it, so the route may pass it through.
+  if (!isAddress(address)) throw new ClientError('Invalid address');
   // Preserve original casing for display; uniqueness is case-insensitive via app checks
   const normalized = '0x' + address.slice(2);
   const supabase = getSupabase();
@@ -45,7 +47,8 @@ export async function addTrusted(accountId: string, address: string, label: stri
 }
 
 export async function removeTrusted(accountId: string, address: string) {
-  if (!isAddress(address)) throw new Error('Invalid address');
+  // ClientError: written for whoever typed it, so the route may pass it through.
+  if (!isAddress(address)) throw new ClientError('Invalid address');
   const normalized = '0x' + address.slice(2);
   const supabase = getSupabase();
   const { error } = await supabase

@@ -3,6 +3,9 @@ import { getSupabase } from '../../../../lib/supabase';
 import { verifyPassword } from '../../../../lib/cryptoPin';
 import { createSession } from '../../../../lib/cookies';
 import { toPublicAccount } from '../../../../lib/publicAccount';
+import { apiErrorBody } from '../../../../lib/apiError';
+
+const ROUTE = 'POST /api/auth/login';
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +22,13 @@ export async function POST(req: Request) {
       .eq('email', email)
       .maybeSingle();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // An account lookup that fails must not describe the accounts table to
+    // whoever is trying to log in.
+    if (error) {
+      return NextResponse.json(apiErrorBody(ROUTE, error), { status: 500 });
+    }
+    // Deliberately identical whether the email is unknown or the password is
+    // wrong: this one stays as written.
     if (!data?.password_hash || !verifyPassword(password, data.password_hash)) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
@@ -29,7 +38,6 @@ export async function POST(req: Request) {
       account: toPublicAccount({ email: data.email, display_name: data.display_name }),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Login failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

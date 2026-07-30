@@ -1,5 +1,5 @@
-import crypto from 'crypto';
 import { getSiteConfig, getSupabase } from './supabase';
+import { generateLinkCode } from './linkCode';
 
 /**
  * One-time link code for binding a chat identity to this account.
@@ -8,7 +8,7 @@ import { getSiteConfig, getSupabase } from './supabase';
 export async function createLinkCode(accountId: string) {
   const supabase = getSupabase();
   const { linkCodeTtlMs, botWhatsAppNumber, telegramBotUsername } = getSiteConfig();
-  const code = crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 8);
+  const code = generateLinkCode();
   const expiresAt = new Date(Date.now() + linkCodeTtlMs).toISOString();
 
   const { error } = await supabase.from('link_codes').insert({

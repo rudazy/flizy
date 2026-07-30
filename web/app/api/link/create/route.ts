@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createLinkCode } from '../../../../lib/identity';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
+import { apiErrorBody } from '../../../../lib/apiError';
+
+const ROUTE = 'POST /api/link/create';
 
 export async function POST() {
   try {
@@ -11,7 +14,6 @@ export async function POST() {
     const link = await createLinkCode(accountId);
     return NextResponse.json(link);
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Link create failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

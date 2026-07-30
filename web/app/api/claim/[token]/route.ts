@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getClaimByToken } from '../../../../lib/claims';
+import { apiErrorBody } from '../../../../lib/apiError';
+
+const ROUTE = 'GET /api/claim/[token]';
 
 export async function GET(_req: Request, ctx: { params: { token: string } }) {
   try {
@@ -15,7 +18,9 @@ export async function GET(_req: Request, ctx: { params: { token: string } }) {
         : undefined,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Claim failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // This route is reachable without logging in, from a link that gets pasted
+    // around, so it is the cheapest place to probe. The token is the credential
+    // for that claim and never goes in the log.
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

@@ -9,6 +9,9 @@ import {
   quoteSwap,
   getFlzPrice,
 } from '../../../../lib/dexServer';
+import { apiErrorBody } from '../../../../lib/apiError';
+
+const ROUTE = 'GET /api/swap/quote';
 
 export async function GET(req: Request) {
   try {
@@ -90,7 +93,6 @@ export async function GET(req: Request) {
       disclosure: `All-in ~${allInPct}: protocol ${feePct} + pool 0.30%. Protocol takes ~${ethers.formatEther(quote.feeAmount)} ${inLabel} before the swap. Network gas is extra.`,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Quote failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

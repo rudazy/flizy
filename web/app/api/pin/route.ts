@@ -3,6 +3,9 @@ import { getSupabase } from '../../../lib/supabase';
 import { hashPin } from '../../../lib/cryptoPin';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { clearChatPinLockout, requirePassword } from '../../../lib/passwordGate';
+import { apiErrorBody } from '../../../lib/apiError';
+
+const ROUTE = 'POST /api/pin';
 
 /**
  * Set or replace the chat unlock PIN.
@@ -41,12 +44,15 @@ export async function POST(req: Request) {
       .from('accounts')
       .update({ unlock_pin_hash })
       .eq('id', accountId);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // The gate responses above (400 no password, 401 wrong password) are
+    // deliberate copy and stay word for word identical to /api/trusted.
+    if (error) {
+      return NextResponse.json(apiErrorBody(ROUTE, error, { accountId }), { status: 500 });
+    }
 
     const lockoutCleared = await clearChatPinLockout(supabase, accountId);
     return NextResponse.json({ ok: true, lockout_cleared: lockoutCleared });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'PIN update failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

@@ -3,6 +3,10 @@ import { addTrusted, removeTrusted } from '../../../lib/trusted';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 import { verifyPassword } from '../../../lib/cryptoPin';
+import { apiErrorBodyAllowingClientError } from '../../../lib/apiError';
+
+const ROUTE_POST = 'POST /api/trusted';
+const ROUTE_DELETE = 'DELETE /api/trusted';
 
 async function requirePassword(accountId: string, password: string) {
   if (!password) {
@@ -37,8 +41,9 @@ export async function POST(req: Request) {
     const row = await addTrusted(accountId, String(body.address || ''), String(body.label || ''));
     return NextResponse.json({ trusted: row });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Add trusted failed';
-    return NextResponse.json({ error: message }, { status: 400 });
+    // "Invalid address" survives; a Supabase failure does not. Status stays 400
+    // for both so the HTTP shape is unchanged.
+    return NextResponse.json(apiErrorBodyAllowingClientError(ROUTE_POST, err), { status: 400 });
   }
 }
 
@@ -56,7 +61,6 @@ export async function DELETE(req: Request) {
     await removeTrusted(accountId, String(body.address || ''));
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Remove trusted failed';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(apiErrorBodyAllowingClientError(ROUTE_DELETE, err), { status: 400 });
   }
 }
