@@ -102,8 +102,10 @@ export default function AccountPage() {
         </div>
 
         <div className="mt-4 rounded border border-border bg-ink/80 p-3 text-xs text-muted">
-          Tap Open WhatsApp, send the prefilled message, then you are linked. Do not use groups.
-          One code works on WhatsApp or Telegram, and both can point at this same account.
+          Generate a code, then open the chat app you want to link and send the prefilled
+          message. Do not use groups. A code works <strong className="text-paper">once</strong>:
+          to link the second chat app, come back and generate another one. Both end up on this
+          same account.
         </div>
 
         <button
@@ -112,7 +114,7 @@ export default function AccountPage() {
           onClick={() => generateLink()}
           disabled={busy === 'link'}
         >
-          {busy === 'link' ? 'Opening...' : data.link ? 'New code and open WhatsApp' : 'Generate code and open WhatsApp'}
+          {busy === 'link' ? 'Generating...' : data.link ? 'Generate a new code' : 'Generate code'}
         </button>
 
         {data.link ? (
@@ -122,22 +124,28 @@ export default function AccountPage() {
               Expires {new Date(data.link.expiresAt).toLocaleString()}
             </p>
             <div className="mono-box text-sm">flizy link {data.link.code}</div>
+            <p className="text-xs text-muted">
+              Use one of these. Whichever you open first spends the code.
+            </p>
+            {/* Equal weight on purpose. Styling WhatsApp as the primary action and
+                Telegram as a ghost link read as "Telegram is the afterthought",
+                when in fact picking either one burns the code for the other. */}
             <a
               href={data.link.waDeepLink}
               className="btn btn-primary flex w-full items-center justify-center py-3.5 text-base font-semibold no-underline"
               target="_blank"
               rel="noreferrer"
             >
-              Open WhatsApp bot
+              Link WhatsApp with this code
             </a>
             {data.link.telegramDeepLink ? (
               <a
                 href={data.link.telegramDeepLink}
-                className="btn btn-ghost flex w-full items-center justify-center py-3 text-sm no-underline"
+                className="btn btn-primary flex w-full items-center justify-center py-3.5 text-base font-semibold no-underline"
                 target="_blank"
                 rel="noreferrer"
               >
-                Open Telegram bot
+                Link Telegram with this code
               </a>
             ) : null}
             <div className="flex flex-wrap gap-2">

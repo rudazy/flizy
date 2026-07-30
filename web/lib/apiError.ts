@@ -37,6 +37,20 @@ export function clientMessage(err: unknown): string {
   return err instanceof ClientError ? err.message : CLIENT_ERROR_MESSAGE;
 }
 
+/**
+ * Next's "this route read cookies, so it cannot be static" signal.
+ *
+ * It is thrown through route handlers during the build as control flow, not as a
+ * failure. A catch-all that swallows it turns a framework mechanism into a
+ * logged 500 and fills the build output with errors that are not errors, so it
+ * has to be rethrown rather than reported.
+ */
+function isNextDynamicUsage(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { digest?: unknown; name?: unknown };
+  return e.digest === 'DYNAMIC_SERVER_USAGE' || e.name === 'DynamicServerError';
+}
+
 const SECRET_PATTERNS: RegExp[] = [
   /0x[a-fA-F0-9]{64}/g, // private keys / long hex secrets
   /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, // JWT-ish
@@ -87,6 +101,10 @@ export function logApiError(
   err: unknown,
   context: Record<string, string | number | null | undefined> = {}
 ): void {
+  // Rethrown, not logged. See isNextDynamicUsage. This propagates back out of
+  // the route's catch block, which is where Next expects it.
+  if (isNextDynamicUsage(err)) throw err;
+
   const extra = Object.entries(context)
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
     .map(([k, v]) => `${k}=${v}`)

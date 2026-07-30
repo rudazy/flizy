@@ -202,9 +202,11 @@ describe('link codes bind any channel', () => {
     assert.ok(burned.used_at);
     assert.equal(burned.used_by_channel, 'telegram');
 
+    // 'used', not 'invalid': a spent code is one we really issued, so it is
+    // reported as spent and never counted as a guess.
     const again = await consumeLinkCode(CHANNELS.TELEGRAM, TG_ID, 'AAAA1111');
     assert.equal(again.ok, false);
-    assert.equal(again.reason, 'invalid');
+    assert.equal(again.reason, 'used');
   });
 
   it('rejects an expired code', async () => {

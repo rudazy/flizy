@@ -180,3 +180,32 @@ describe('no route sends a raw error message', () => {
     assert.deepEqual(missing, []);
   });
 });
+
+describe("Next's dynamic-usage signal is control flow, not an error", () => {
+  it('rethrows it instead of logging a fake 500', async () => {
+    // Thrown through route handlers during the build when a route reads cookies.
+    // Swallowing it filled the build output with errors that were not errors.
+    const dynamic = Object.assign(new Error('Dynamic server usage: cookies'), {
+      digest: 'DYNAMIC_SERVER_USAGE',
+    });
+    const { lines } = await capturing(async () => {
+      assert.throws(() => apiError.apiErrorBody('GET /api/dashboard', dynamic), /Dynamic server usage/);
+    });
+    assert.equal(lines.length, 0);
+  });
+
+  it('recognises it by name as well as digest', async () => {
+    const byName = new Error('no cookies in static render');
+    byName.name = 'DynamicServerError';
+    await capturing(async () => {
+      assert.throws(() => apiError.apiErrorBody('GET /api/history', byName));
+    });
+  });
+
+  it('still handles an ordinary error normally', async () => {
+    const { result } = await capturing(() =>
+      apiError.apiErrorBody('GET /api/dashboard', new Error('real failure'))
+    );
+    assert.equal(result.error, apiError.CLIENT_ERROR_MESSAGE);
+  });
+});

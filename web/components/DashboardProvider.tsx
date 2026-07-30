@@ -59,16 +59,29 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    setError('');
+  /**
+   * Account, trusted list and link code only. Split out from load() because the
+   * link code has to be re-read on its own: it is single use and can be spent in
+   * a chat app while this tab sits open, and re-reading balances and on-chain
+   * holdings every time the tab regains focus would be wasteful.
+   */
+  const loadAccount = useCallback(async () => {
     const res = await fetch('/api/dashboard');
     const json = await res.json();
     if (!res.ok) {
       setError(json.error || 'Not logged in');
       setData(null);
-      return;
+      return false;
     }
+    setError('');
     setData(json);
+    return true;
+  }, []);
+
+  const load = useCallback(async () => {
+    setError('');
+    const ok = await loadAccount();
+    if (!ok) return;
 
     const [histRes, holdRes] = await Promise.all([
       fetch('/api/history'),
@@ -83,7 +96,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const ho = await holdRes.json();
       setHoldings(ho);
     }
-  }, []);
+  }, [loadAccount]);
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
@@ -102,6 +115,27 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     load();
   }, [load]);
 
+  /**
+   * Re-read the account whenever this tab comes back to the front.
+   *
+   * Linking always leaves the page: you go to WhatsApp or Telegram, spend the
+   * code there, and come back. The code on screen is single use, so once it is
+   * spent the buttons beside it are pointing at something dead while still
+   * looking live. Coming back to the tab is exactly the moment to find out.
+   */
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const recheck = () => {
+      if (document.visibilityState === 'visible') loadAccount();
+    };
+    document.addEventListener('visibilitychange', recheck);
+    window.addEventListener('focus', recheck);
+    return () => {
+      document.removeEventListener('visibilitychange', recheck);
+      window.removeEventListener('focus', recheck);
+    };
+  }, [loadAccount]);
+
   const generateLink = useCallback(async () => {
     setBusy('link');
     setMsg('');
@@ -109,12 +143,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/link/create', { method: 'POST' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed');
-      setMsg('Link code ready. Tap Open WhatsApp to message the bot with the code.');
-      await load();
-      // Open bot chat with prefilled "flizy link CODE" when possible
-      if (json.waDeepLink && typeof window !== 'undefined') {
-        window.open(json.waDeepLink, '_blank', 'noopener,noreferrer');
-      }
+      // Deliberately does not open a chat app. This used to open WhatsApp by
+      // itself, which chose the channel for the user: the code is single use, so
+      // sending that prefilled message spent it, and the Telegram button beside
+      // it was then pointing at a dead code. Let the user pick.
+      setMsg('Link code ready. It works once, on whichever chat app you open first.');
+      await loadAccount();
       return json as { code?: string; waDeepLink?: string; expiresAt?: string };
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Failed');
@@ -122,7 +156,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     } finally {
       setBusy('');
     }
-  }, [load]);
+  }, [loadAccount]);
 
   const addTrusted = useCallback(
     async (input: { address: string; label: string; password: string }) => {

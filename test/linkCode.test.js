@@ -291,10 +291,44 @@ describe('a correct code still links, and expiry is enforced', () => {
     assert.equal(attemptRow(), undefined);
   });
 
-  it('refuses a code that was already used', async () => {
+  it('refuses a code that was already used, and says so', async () => {
+    // Not 'invalid': it was a real code, so the user gets told it is spent
+    // rather than sent hunting for a typo.
     seed([validCode('ABCDEFGHJK', { used_at: new Date().toISOString() })]);
     const r = await identity.consumeLinkCode(CHANNEL, EXTERNAL_ID, 'ABCDEFGHJK');
     assert.equal(r.ok, false);
+    assert.equal(r.reason, 'used');
+  });
+});
+
+describe('a spent code is not a guess', () => {
+  beforeEach(() => seed([validCode('ABCDEFGHJK')]));
+
+  it('reports used, not invalid, and names the channel that spent it', async () => {
+    // Exactly what the dashboard causes: one single-use code rendered with both
+    // a WhatsApp and a Telegram button.
+    const first = await identity.consumeLinkCode('whatsapp', '2348012345678', 'ABCDEFGHJK');
+    assert.equal(first.ok, true);
+
+    const second = await identity.consumeLinkCode(CHANNEL, EXTERNAL_ID, 'ABCDEFGHJK');
+    assert.equal(second.ok, false);
+    assert.equal(second.reason, 'used');
+    assert.equal(second.usedByChannel, 'whatsapp');
+  });
+
+  it('does not push a legitimate retry up the lockout ladder', async () => {
+    await identity.consumeLinkCode('whatsapp', '2348012345678', 'ABCDEFGHJK');
+    for (let i = 0; i < 8; i += 1) {
+      const r = await identity.consumeLinkCode(CHANNEL, EXTERNAL_ID, 'ABCDEFGHJK');
+      assert.equal(r.reason, 'used');
+    }
+    // Re-clicking your own stale link is not brute force
+    assert.equal(attemptRow(), undefined);
+  });
+
+  it('still counts a code that never existed', async () => {
+    const r = await identity.consumeLinkCode(CHANNEL, EXTERNAL_ID, 'ZZZZZZZZZZ');
     assert.equal(r.reason, 'invalid');
+    assert.equal(attemptRow().failed_attempts, 1);
   });
 });
