@@ -42,6 +42,19 @@ tasks/
 tasks/**
 **/todo.md
 
+# Private / non-public materials (never ship to the public repo)
+.video-analysis/
+.video-analysis/**
+docs/INVESTOR-MAP.md
+docs/*investor*
+docs/*INVESTOR*
+docs/ENGINEER-ONBOARDING.md
+# Local screen captures and demo edit intermediates
+*.mp4
+Captures/
+.video-edit/
+flizy-demo-edit/
+
 # Logs / OS
 *.log
 npm-debug.log*

@@ -3,12 +3,11 @@ import { AppChrome } from '../components/AppChrome';
 import './globals.css';
 
 function siteOrigin() {
-  const raw =
-    process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://flizy.vercel.app';
+  const raw = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://flizy.app';
   try {
     return new URL(raw).origin;
   } catch {
-    return 'https://flizy.vercel.app';
+    return 'https://flizy.app';
   }
 }
 
@@ -63,6 +62,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
+    site: '@Flizyapp',
+    creator: '@Flizyapp',
     title: 'Flizy | Chat wallet for WhatsApp and Telegram, trusted sends',
     description:
       'Send crypto from WhatsApp or Telegram, only to addresses you already trust.',

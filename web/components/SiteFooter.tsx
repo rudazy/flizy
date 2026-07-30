@@ -33,6 +33,14 @@ export function SiteFooter() {
           <Link href="/docs" className="text-muted no-underline hover:text-lime">
             Security
           </Link>
+          <a
+            href="https://x.com/Flizyapp"
+            className="text-muted no-underline hover:text-lime"
+            target="_blank"
+            rel="noreferrer"
+          >
+            X
+          </a>
           <Link href="/signup" className="text-muted no-underline hover:text-lime">
             Signup
           </Link>

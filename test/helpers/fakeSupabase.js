@@ -115,6 +115,22 @@ class Query {
     return this;
   }
 
+  /**
+   * PostgREST upsert semantics, which the session code depends on: on a
+   * conflict only the columns present in the payload are written, so a column
+   * the caller did not name keeps its value. A fake that replaced the whole row
+   * would hide exactly the bug lib/session.js relies on not having.
+   */
+  upsert(row, options = {}) {
+    this.op = 'upsert';
+    this.payload = row;
+    this.conflictCols = String(options.onConflict || 'id')
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean);
+    return this;
+  }
+
   delete() {
     this.op = 'delete';
     return this;
@@ -138,6 +154,25 @@ class Query {
       const created = rows.map((row) => ({ id: newId(this.table), ...row }));
       this.rows.push(...created);
       return { data: created, error: null };
+    }
+
+    if (this.op === 'upsert') {
+      const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
+      const out = [];
+      for (const row of rows) {
+        const existing = this.rows.find((r) =>
+          this.conflictCols.every((c) => String(r[c] ?? '') === String(row[c] ?? ''))
+        );
+        if (existing) {
+          Object.assign(existing, row);
+          out.push(existing);
+        } else {
+          const created = { id: newId(this.table), ...row };
+          this.rows.push(created);
+          out.push(created);
+        }
+      }
+      return { data: out, error: null };
     }
 
     if (this.op === 'update') {

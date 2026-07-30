@@ -10,11 +10,13 @@
 </p>
 
 <p align="center">
-  <a href="https://flizy.vercel.app">Live site</a>
+  <a href="https://flizy.app">flizy.app</a>
   ·
-  <a href="https://flizy.vercel.app/how-it-works">How it works</a>
+  <a href="https://flizy.app/how-it-works">How it works</a>
   ·
-  <a href="https://flizy.vercel.app/docs">Security</a>
+  <a href="https://flizy.app/docs">Security</a>
+  ·
+  <a href="https://x.com/Flizyapp">X</a>
   ·
   <a href="docs/ARCHITECTURE.md">Architecture</a>
   ·
@@ -22,7 +24,7 @@
 </p>
 
 <p align="center">
-  <em>Running on GIWA Sepolia testnet. Contracts are deployed and source verified.</em>
+  <em>Live at <a href="https://flizy.app">flizy.app</a> · GIWA Sepolia testnet · Contracts source verified</em>
 </p>
 
 ---
@@ -91,7 +93,7 @@ never messaged out of the blue.
 | **Approved destinations** | Transfers reach addresses on your list only. The list is managed on the site behind your password, never from chat |
 | **Plan then confirm** | Every money action shows a plan first. Amount, destination, network, fees. Nothing executes without an explicit confirm |
 | **Fees disclosed up front** | Swap plans show the protocol fee percentage, the fee amount and slippage before you confirm |
-| **Per-channel lock** | Lock a chat app instantly. Unlocking needs your PIN or account password |
+| **Per-channel lock** | Lock a chat app instantly. Unlocking needs your PIN or account password, and wrong attempts start blocking unlock for longer and longer. Setting a new PIN on the site, behind your password, clears the block |
 | **Limits** | Per-transaction maximum and a daily cap, enforced centrally |
 | **Separated keys** | User funds, operational gas and claim escrow use different keys |
 | **Verified contracts** | Every deployed contract is source verified on the public explorer |
@@ -148,53 +150,72 @@ Also in the repository, not yet required on chain:
 ## System design
 
 ```mermaid
-flowchart LR
-  U["User"]
-  C["Chat client<br/>WhatsApp or Telegram"]
-  W["Web dashboard"]
-  P["Policy<br/>approved destinations · limits · lock"]
-  E["Execute<br/>plan · confirm · sign"]
-  CH["GIWA chain"]
+flowchart TB
+  subgraph clients["Clients"]
+    WA["WhatsApp"]
+    TG["Telegram"]
+    WEB["flizy.app<br/>dashboard · PIN · trusted list"]
+  end
 
-  U --> C
-  U --> W
-  C --> P
-  W --> P
-  P -->|allowed| E
-  P -.->|denied, with reason| U
-  E --> CH
-  CH -->|receipt| U
+  subgraph engine["Flizy engine"]
+    R["Router<br/>intent from chat or web"]
+    P["Policy<br/>approved destinations · limits · lock · PIN"]
+    X["Execute<br/>plan · confirm · sign"]
+  end
+
+  CH["GIWA Sepolia<br/>agent wallet · receipt"]
+
+  WA --> R
+  TG --> R
+  WEB --> R
+  R --> P
+  P -->|allowed| X
+  P -.->|denied with reason| clients
+  X --> CH
+  CH -->|explorer receipt| clients
 ```
 
-Every path to money passes through the same policy check. The website is where rules are
-written; chat is where they are spent within.
+Every path to money passes through the same policy check. **[flizy.app](https://flizy.app)**
+is where trust and PIN are managed; chat is where you send within those rules.
 
 ### Sending
 
 ```mermaid
 flowchart LR
-  A["You: send 0.01 to john"] --> B{"Is john an<br/>approved destination?"}
+  A["Chat: send 0.01 to john"] --> B{"Is john an<br/>approved destination?"}
   B -->|no| C["Declined, with the reason"]
-  B -->|yes| D{"Within your<br/>limits, unlocked?"}
+  B -->|yes| D{"Within limits<br/>and unlocked?"}
   D -->|no| C
   D -->|yes| E["Plan: amount, destination,<br/>network, fees"]
   E --> F["You confirm"]
   F --> G["Signed and broadcast"]
-  G --> H["Receipt with explorer link"]
+  G --> H["Receipt on explorer"]
 ```
 
 ### Sending to a phone number
 
 ```mermaid
 flowchart LR
-  A["You: send 0.01 to a phone number"] --> B["Funds held in escrow"]
-  B --> C{"Is that number<br/>already on Flizy?"}
-  C -->|yes| D["They are notified in their chat app"]
-  C -->|no| E["You share a claim link"]
+  A["Chat: send 0.01 to a phone"] --> B["Funds held for claim"]
+  B --> C{"Number already<br/>on Flizy?"}
+  C -->|yes| D["Notify them in chat"]
+  C -->|no| E["Share claim link<br/>flizy.app/claim/..."]
   D --> F["They prove the number and claim"]
   E --> F
-  F --> G["Funds released to them"]
-  B -.->|any time before claim| H["You cancel and get it back"]
+  F --> G["Funds released to their agent wallet"]
+  B -.->|before claim| H["You cancel and recover"]
+```
+
+### Link once, use both chats
+
+```mermaid
+flowchart LR
+  S["Sign up on flizy.app"] --> T["Add trusted destinations<br/>set unlock PIN"]
+  T --> L["Generate link code"]
+  L --> WA["Open WhatsApp with code"]
+  L --> TG["Open Telegram with code"]
+  WA --> ONE["One account · one balance · one history"]
+  TG --> ONE
 ```
 
 Detailed implementation diagrams, the adapter model and the identity internals are in
@@ -222,15 +243,15 @@ Bare `confirm` and `cancel` work on both.
 | `lock` · `unlock PIN` | Session control, per channel |
 | `/phone` | Telegram only: share your number so claims reach you |
 
-### On the site
+### On the site ([flizy.app](https://flizy.app))
 
 | Route | Purpose |
 |-------|---------|
-| `/` | Product home |
-| `/how-it-works` · `/docs` | Guides and security |
-| `/signup` · `/login` | Account |
-| `/dashboard` | Wallet, history, approved destinations, PIN, link codes |
-| `/dashboard/swap` | Swap and liquidity |
+| [flizy.app](https://flizy.app/) | Product home |
+| [/how-it-works](https://flizy.app/how-it-works) · [/docs](https://flizy.app/docs) | Guides and security |
+| [/signup](https://flizy.app/signup) · [/login](https://flizy.app/login) | Account |
+| [/dashboard](https://flizy.app/dashboard) | Wallet, history, approved destinations, PIN, link codes |
+| [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap and liquidity |
 | `/claim/[token]` | Public claim status page |
 
 Swapping is available in chat and on the site. The protocol fee is **0.30%** by default with
@@ -278,4 +299,4 @@ Full setup, deployment and configuration reference: [docs/OPERATIONS.md](docs/OP
 
 ## License and contact
 
-Private product repository. Live at [flizy.vercel.app](https://flizy.vercel.app).
+Private product repository. Live at [flizy.app](https://flizy.app). On X: [@Flizyapp](https://x.com/Flizyapp).

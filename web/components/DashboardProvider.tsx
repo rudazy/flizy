@@ -36,7 +36,7 @@ type DashboardContextValue = {
     password: string;
   }) => Promise<boolean>;
   removeTrusted: (address: string, password: string) => Promise<boolean>;
-  setUnlockPin: (pin: string) => Promise<boolean>;
+  setUnlockPin: (pin: string, password: string) => Promise<boolean>;
   setDailyLimit: (limit: number | null, password: string) => Promise<boolean>;
   explorerBase: string;
 };
@@ -179,19 +179,19 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   );
 
   const setUnlockPin = useCallback(
-    async (pin: string) => {
+    async (pin: string, password: string) => {
       setBusy('pin');
       setMsg('');
       try {
         const res = await fetch('/api/pin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin }),
+          body: JSON.stringify({ pin, password }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
         setMsg(
-          'Unlock PIN saved. On WhatsApp: flizy lock (no password) · flizy unlock then reply with this PIN or your account password.'
+          'Unlock PIN saved. On WhatsApp: flizy lock (no password) · flizy unlock then reply with this PIN or your account password. Any unlock block from wrong attempts is cleared.'
         );
         await load();
         return true;

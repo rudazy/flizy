@@ -10,7 +10,7 @@ are in the [README](../README.md). Deployment and configuration are in
 
 ```text
                     +------------------------+
-                    |   flizy.vercel.app     |
+                    |   flizy.app            |
                     |  dashboard · swap UI   |
                     |  liquidity add/remove  |
                     +-----------+------------+

@@ -14,6 +14,7 @@ export default function DashboardHomePage() {
     useDashboard();
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
+  const [pinPassword, setPinPassword] = useState('');
 
   const checklist = useMemo(() => {
     if (!data) return [];
@@ -63,10 +64,11 @@ export default function DashboardHomePage() {
       setMsg('PIN must be 4-12 digits.');
       return;
     }
-    const ok = await setUnlockPin(pin);
+    const ok = await setUnlockPin(pin, pinPassword);
     if (ok) {
       setPin('');
       setPin2('');
+      setPinPassword('');
     }
   }
 
@@ -94,7 +96,8 @@ export default function DashboardHomePage() {
               <p className="font-sans text-sm tracking-wide text-paper">Set unlock PIN</p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
                 Required. After <span className="text-paper">flizy lock</span>, you unlock with this
-                PIN (or your account password). 4-12 digits.
+                PIN (or your account password). 4-12 digits. Your account password confirms the
+                change.
               </p>
             </div>
             <span className="badge badge-gold shrink-0">Required</span>
@@ -122,6 +125,15 @@ export default function DashboardHomePage() {
               placeholder="Confirm PIN"
               value={pin2}
               onChange={(e) => setPin2(e.target.value.replace(/\D/g, ''))}
+              required
+            />
+            <input
+              className="input sm:col-span-2"
+              type="password"
+              autoComplete="current-password"
+              placeholder="Your account password"
+              value={pinPassword}
+              onChange={(e) => setPinPassword(e.target.value)}
               required
             />
             <button

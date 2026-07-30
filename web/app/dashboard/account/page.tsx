@@ -25,6 +25,7 @@ export default function AccountPage() {
   const [removePassword, setRemovePassword] = useState('');
   const [removing, setRemoving] = useState<string | null>(null);
   const [pin, setPin] = useState('');
+  const [pinPassword, setPinPassword] = useState('');
   const [dailyLimit, setDailyLimitInput] = useState('');
   const [limitPassword, setLimitPassword] = useState('');
 
@@ -55,11 +56,12 @@ export default function AccountPage() {
 
   async function onPin(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await setUnlockPin(pin);
+    const ok = await setUnlockPin(pin, pinPassword);
     if (ok) {
       setPin('');
+      setPinPassword('');
       setMsg(
-        'Unlock PIN saved. In chat: flizy lock or /lock (no password) · flizy unlock or /unlock, then reply with this PIN or your account password. Locking one chat app leaves the other as it is.'
+        'Unlock PIN saved. In chat: flizy lock or /lock (no password) · flizy unlock or /unlock, then reply with this PIN or your account password. Locking one chat app leaves the other as it is. Any block from wrong unlock attempts is now cleared.'
       );
     }
   }
@@ -289,25 +291,42 @@ export default function AccountPage() {
             <p className="mt-1 text-xs text-muted">
               Required for <span className="text-paper">flizy unlock</span> after you lock. You can
               also use your account password. On chat: <span className="text-paper">flizy lock</span>{' '}
-              then <span className="text-paper">flizy unlock</span>.
+              then <span className="text-paper">flizy unlock</span>. Too many wrong attempts in chat
+              blocks unlock for a while; setting the PIN here clears that block.
             </p>
           </div>
           <span className={`badge ${data.account.has_pin ? '' : 'badge-gold'}`}>
             {data.account.has_pin ? 'Set' : 'Required'}
           </span>
         </div>
-        <form onSubmit={onPin} className="mt-4 flex flex-col gap-3 sm:flex-row">
-          <input
-            className="input"
-            type="password"
-            inputMode="numeric"
-            minLength={4}
-            maxLength={12}
-            placeholder="4-12 digits"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-            required
-          />
+        <form onSubmit={onPin} className="mt-4 grid gap-3">
+          <div>
+            <label className="label">New PIN</label>
+            <input
+              className="input"
+              type="password"
+              inputMode="numeric"
+              autoComplete="new-password"
+              minLength={4}
+              maxLength={12}
+              placeholder="4-12 digits"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+              required
+            />
+          </div>
+          <div>
+            <label className="label">Your account password</label>
+            <input
+              className="input"
+              type="password"
+              placeholder="Confirm it is you"
+              value={pinPassword}
+              onChange={(e) => setPinPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+          </div>
           <button className="btn btn-primary" type="submit" disabled={busy === 'pin'}>
             {busy === 'pin' ? 'Saving...' : data.account.has_pin ? 'Update PIN' : 'Save PIN'}
           </button>

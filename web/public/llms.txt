@@ -10,14 +10,15 @@ testnet with source-verified contracts.
 
 ## Site
 
-- / : Product home and four-step overview
-- /how-it-works : Full user guide and commands for both chat apps
-- /docs : Why trusted addresses exist (security)
-- /signup : Create account
-- /login : Sign in
-- /dashboard : Wallet, PIN, trusted people, link code for WhatsApp or Telegram
-- /dashboard/swap : Swap FLZ and ETH, add or remove liquidity
-- /claim/:token : Claim funds reserved for a phone number
+- https://flizy.app/ : Product home and four-step overview
+- https://flizy.app/how-it-works : Full user guide and commands for both chat apps
+- https://flizy.app/docs : Why trusted addresses exist (security)
+- https://flizy.app/signup : Create account
+- https://flizy.app/login : Sign in
+- https://flizy.app/dashboard : Wallet, PIN, trusted people, link code for WhatsApp or Telegram
+- https://flizy.app/dashboard/swap : Swap FLZ and ETH, add or remove liquidity
+- https://flizy.app/claim/:token : Claim funds reserved for a phone number
+- https://x.com/Flizyapp : Official X account
 
 ## Channels
 

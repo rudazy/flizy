@@ -23,7 +23,8 @@ engineering rules the code is held to. Product overview lives in the
 ```bash
 cd /path/to/flizy
 cp .env.example .env
-# fill SUPABASE_*, GIWA_RPC, PRIVATE_KEY, BOT_WHATSAPP_NUMBER, SITE_URL
+# fill SUPABASE_*, GIWA_RPC, PRIVATE_KEY, BOT_WHATSAPP_NUMBER
+# SITE_URL=https://flizy.app
 npm install
 node index.js
 ```
@@ -174,7 +175,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `TELEGRAM_BOT_USERNAME` | Bot username, no `@`, for `t.me/…?start=CODE` links. Also set on Vercel |
 | `TELEGRAM_POLL_TIMEOUT_SEC` | Long poll wait, default 30 |
 | `OUTBOX_DRAIN_MS` | Notification outbox poll, default 5000. Worst case delay for a cross-channel notice |
-| `SITE_URL` | Public site URL |
+| `SITE_URL` | Public site URL. Production: `https://flizy.app` (also set `NEXT_PUBLIC_SITE_URL` on Vercel) |
 | `ADMIN_PHONES` / `ADMIN_SETUP_SECRET` | Admin bootstrap |
 | `ENFORCE_TRUSTED` | Approved-destination enforcement on transfers |
 | `ENFORCE_CREDIT` | Require internal credit before a send |

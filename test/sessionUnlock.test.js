@@ -7,6 +7,7 @@ const { describe, it, mock, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { hashPassword, hashPin, verifyPassword, verifyPin } = require('../lib/cryptoPin');
 const { parseUnlockCommand, parseLockCommand, stripFlizyPrefix } = require('../lib/prefix');
+const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
 
 describe('cryptoPin', () => {
   it('password round-trip', () => {
@@ -55,6 +56,14 @@ describe('unlockWithPin with mocked supabase', () => {
   let sessionPath;
   let originalCache;
 
+  /** Load lib/session against a fresh in-memory database. */
+  function loadSession(seed) {
+    const fake = createFakeSupabase(seed);
+    mockSupabaseModule(fake.client);
+    delete require.cache[sessionPath];
+    return { fake, session: require('../lib/session') };
+  }
+
   beforeEach(() => {
     // Fresh load with mocked supabase
     sessionPath = require.resolve('../lib/session');
@@ -69,132 +78,61 @@ describe('unlockWithPin with mocked supabase', () => {
   });
 
   it('accepts site password after re-fetch', async () => {
-    const passwordHash = hashPassword('Secret1!');
-    const pinHash = hashPin('9999');
-    const rows = {
-      accounts: {
-        id: 'acc-1',
-        password_hash: passwordHash,
-        unlock_pin_hash: pinHash,
-      },
-      sessions: null,
-    };
+    const { fake, session } = loadSession({
+      accounts: [
+        {
+          id: 'acc-1',
+          password_hash: hashPassword('Secret1!'),
+          unlock_pin_hash: hashPin('9999'),
+        },
+      ],
+      sessions: [],
+    });
 
-    const supabasePath = require.resolve('../lib/supabase');
-    require.cache[supabasePath] = {
-      id: supabasePath,
-      filename: supabasePath,
-      loaded: true,
-      exports: {
-        getSupabase: () => ({
-          from(table) {
-            return {
-              select() {
-                return this;
-              },
-              eq() {
-                return this;
-              },
-              maybeSingle: async () => {
-                if (table === 'accounts') return { data: rows.accounts, error: null };
-                return { data: rows.sessions, error: null };
-              },
-              single: async () => ({ data: rows.accounts, error: null }),
-              upsert: async (row) => {
-                rows.sessions = { ...row, is_locked: false };
-                return { error: null };
-              },
-            };
-          },
-        }),
-      },
-    };
-
-    // config mock not needed if already loadable
-    const { unlockWithPin } = require('../lib/session');
-    const res = await unlockWithPin({ id: 'acc-1' }, 'whatsapp', '2348012345678', 'Secret1!');
+    const res = await session.unlockWithPin(
+      { id: 'acc-1' },
+      'whatsapp',
+      '2348012345678',
+      'Secret1!'
+    );
     assert.equal(res.ok, true);
+    assert.equal(fake.db.tables.sessions[0].is_locked, false);
   });
 
   it('accepts unlock PIN', async () => {
-    const passwordHash = hashPassword('Secret1!');
-    const pinHash = hashPin('48291');
-    const supabasePath = require.resolve('../lib/supabase');
-    require.cache[supabasePath] = {
-      id: supabasePath,
-      filename: supabasePath,
-      loaded: true,
-      exports: {
-        getSupabase: () => ({
-          from(table) {
-            return {
-              select() {
-                return this;
-              },
-              eq() {
-                return this;
-              },
-              maybeSingle: async () => {
-                if (table === 'accounts') {
-                  return {
-                    data: {
-                      id: 'acc-1',
-                      password_hash: passwordHash,
-                      unlock_pin_hash: pinHash,
-                    },
-                    error: null,
-                  };
-                }
-                return { data: null, error: null };
-              },
-              upsert: async () => ({ error: null }),
-            };
-          },
-        }),
-      },
-    };
+    const { session } = loadSession({
+      accounts: [
+        {
+          id: 'acc-1',
+          password_hash: hashPassword('Secret1!'),
+          unlock_pin_hash: hashPin('48291'),
+        },
+      ],
+      sessions: [],
+    });
 
-    delete require.cache[sessionPath];
-    const { unlockWithPin } = require('../lib/session');
-    const res = await unlockWithPin({ id: 'acc-1' }, 'whatsapp', '2348012345678', '48291');
+    const res = await session.unlockWithPin({ id: 'acc-1' }, 'whatsapp', '2348012345678', '48291');
     assert.equal(res.ok, true);
   });
 
   it('rejects wrong secret', async () => {
-    const passwordHash = hashPassword('Secret1!');
-    const supabasePath = require.resolve('../lib/supabase');
-    require.cache[supabasePath] = {
-      id: supabasePath,
-      filename: supabasePath,
-      loaded: true,
-      exports: {
-        getSupabase: () => ({
-          from() {
-            return {
-              select() {
-                return this;
-              },
-              eq() {
-                return this;
-              },
-              maybeSingle: async () => ({
-                data: {
-                  id: 'acc-1',
-                  password_hash: passwordHash,
-                  unlock_pin_hash: null,
-                },
-                error: null,
-              }),
-              upsert: async () => ({ error: null }),
-            };
-          },
-        }),
-      },
-    };
+    const { session } = loadSession({
+      accounts: [
+        {
+          id: 'acc-1',
+          password_hash: hashPassword('Secret1!'),
+          unlock_pin_hash: null,
+        },
+      ],
+      sessions: [],
+    });
 
-    delete require.cache[sessionPath];
-    const { unlockWithPin } = require('../lib/session');
-    const res = await unlockWithPin({ id: 'acc-1' }, 'whatsapp', '2348012345678', 'WrongPass1!');
+    const res = await session.unlockWithPin(
+      { id: 'acc-1' },
+      'whatsapp',
+      '2348012345678',
+      'WrongPass1!'
+    );
     assert.equal(res.ok, false);
     assert.equal(res.reason, 'bad_pin');
   });
