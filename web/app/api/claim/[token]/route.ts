@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getClaimByToken } from '../../../../lib/claims';
+import { publicRecipientLabel } from '../../../../lib/claimRecipient';
 import { apiErrorBody } from '../../../../lib/apiError';
 
 const ROUTE = 'GET /api/claim/[token]';
@@ -12,9 +13,14 @@ export async function GET(_req: Request, ctx: { params: { token: string } }) {
       amount_eth: claim.amount_eth,
       status: claim.status,
       chain_id: claim.chain_id,
-      // Do not expose full phone; optional masked later
+      // Never the full phone, and never the raw platform id. A phone is masked
+      // to the last 4; a platform claim shows the handle the sender typed, which
+      // is what lets the recipient recognize the claim as theirs.
+      recipient: publicRecipientLabel(claim),
+      recipient_kind: claim.to_channel ? 'platform' : 'phone',
+      // Kept so an already-deployed page keeps rendering while it catches up.
       to_wa_hint: claim.to_wa_hint
-        ? `…${String(claim.to_wa_hint).slice(-4)}`
+        ? `...${String(claim.to_wa_hint).slice(-4)}`
         : undefined,
     });
   } catch (err) {
