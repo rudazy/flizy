@@ -3,8 +3,9 @@
  *
  * Delivery is keyed by (channel, external_id), and external ids are numeric on
  * every channel. When an unknown channel resolved to WhatsApp, a notification
- * addressed to, say, a GitHub id could be handed to the WhatsApp sender and
- * land in whichever chat those digits happened to match. Unknown is now refused.
+ * addressed to some other platform's id could be handed to the WhatsApp sender
+ * and land in whichever chat those digits happened to match. Unknown is now
+ * refused outright.
  *
  * lib/notify is also documented as never throwing, because a failed
  * notification must not break the money move that triggered it. So the refusal
@@ -26,6 +27,12 @@ const notify = require('../lib/notify');
 
 const ACCOUNT = 'acc-guard';
 const WA_ID = '2348011110000';
+const TG_ID = '55667788';
+
+/** A channel this system does not have. Deliberately not a platform channel. */
+const UNKNOWN_CHANNEL = 'signal';
+
+/** Numeric id shaped like a WhatsApp LID, which is the collision that mattered. */
 const FOREIGN_ID = '216123456789017';
 
 /** Records every delivery a channel sender is asked to make. */
@@ -38,7 +45,7 @@ function recordingSender(log, channel) {
 describe('registerChannelSender', () => {
   it('refuses to wire a sender for a channel that does not exist', () => {
     assert.throws(
-      () => notify.registerChannelSender('github', async () => {}),
+      () => notify.registerChannelSender(UNKNOWN_CHANNEL, async () => {}),
       /unknown channel/i
     );
   });
@@ -68,7 +75,7 @@ describe('deliver', () => {
   it('refuses an unknown channel instead of sending it as WhatsApp', async () => {
     const outcome = await notify.deliver({
       accountId: ACCOUNT,
-      channel: 'github',
+      channel: UNKNOWN_CHANNEL,
       externalId: FOREIGN_ID,
       body: 'you have money waiting',
     });
@@ -83,7 +90,7 @@ describe('deliver', () => {
     const outcome = await notify.deliver({
       accountId: ACCOUNT,
       channel: 'telegram',
-      externalId: '55667788',
+      externalId: TG_ID,
       body: 'claim waiting',
     });
     assert.equal(outcome, 'queued');
@@ -91,10 +98,25 @@ describe('deliver', () => {
     assert.equal(fake.db.tables.notifications[0].channel, 'telegram');
   });
 
+  it('queues a platform channel rather than refusing it', async () => {
+    // github is a known channel now, so it is accepted and parked in the outbox
+    // for a process that owns it. No such process exists yet, which is fine:
+    // nothing creates a github identity to notify.
+    const outcome = await notify.deliver({
+      accountId: ACCOUNT,
+      channel: 'github',
+      externalId: FOREIGN_ID,
+      body: 'claim waiting',
+    });
+    assert.equal(outcome, 'queued');
+    assert.equal(fake.db.tables.notifications[0].channel, 'github');
+    assert.equal(log.length, 0, 'it must not be delivered over WhatsApp');
+  });
+
   it('does not queue an unknown channel either', async () => {
     await notify.deliver({
       accountId: ACCOUNT,
-      channel: 'github',
+      channel: UNKNOWN_CHANNEL,
       externalId: FOREIGN_ID,
       body: 'you have money waiting',
     });
@@ -126,8 +148,8 @@ describe('notifyAccount', () => {
       accounts: [{ id: ACCOUNT, display_name: 'Guard', balance_eth: 0, is_admin: false }],
       channel_identities: [
         { id: 'ci-1', account_id: ACCOUNT, channel: 'whatsapp', external_id: WA_ID, phone_e164: WA_ID },
-        // A row written by a future channel, or by hand, before this code knows it.
-        { id: 'ci-2', account_id: ACCOUNT, channel: 'github', external_id: FOREIGN_ID, phone_e164: null },
+        // A row written by hand, or by a channel this build does not know.
+        { id: 'ci-2', account_id: ACCOUNT, channel: UNKNOWN_CHANNEL, external_id: FOREIGN_ID, phone_e164: null },
       ],
     });
 
