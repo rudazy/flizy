@@ -50,6 +50,14 @@ docs/*investor*
 docs/*INVESTOR*
 docs/ENGINEER-ONBOARDING.md
 docs/username-send-phase1.md
+# Product OS / strategy (private). Architecture + ops stay public when useful.
+docs/NORTH-STAR.md
+docs/PRODUCT-STRATEGY.md
+docs/ROADMAP.md
+docs/DECISIONS.md
+docs/README.md
+docs/demo-scripts/
+docs/demo-scripts/**
 # Local screen captures and demo edit intermediates
 *.mp4
 Captures/

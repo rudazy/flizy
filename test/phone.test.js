@@ -10,6 +10,7 @@ const {
   normalizePhoneNumber,
   isPlausiblePhone,
   claimMatchKeys,
+  claimMatchKeysForAccount,
   maskPhone,
 } = require('../lib/phone');
 const { listIncomingPending, normalizeWaHint } = require('../lib/claims');
@@ -109,6 +110,31 @@ describe('claimMatchKeys', () => {
   it('returns empty when nothing usable', () => {
     assert.deepEqual(claimMatchKeys({}), []);
     assert.deepEqual(claimMatchKeys({ waSenderId: '', waPhone: null }), []);
+  });
+});
+
+describe('claimMatchKeysForAccount', () => {
+  it('includes phones stored on other identities of the same account', () => {
+    // Telegram session with no phone on this row, but WhatsApp row has it.
+    const keys = claimMatchKeysForAccount({
+      waSenderId: '',
+      waPhone: null,
+      identities: [
+        { channel: 'telegram', external_id: '5566778899', phone_e164: null },
+        { channel: 'whatsapp', external_id: 'lid-xyz', phone_e164: '2348012345678' },
+      ],
+    });
+    assert.deepEqual(keys, ['2348012345678']);
+  });
+
+  it('unions active phone with identity phones', () => {
+    const keys = claimMatchKeysForAccount({
+      waPhone: '2348011111111',
+      identities: [{ phone_e164: '2348022222222' }],
+    });
+    assert.equal(keys.length, 2);
+    assert.ok(keys.includes('2348011111111'));
+    assert.ok(keys.includes('2348022222222'));
   });
 });
 

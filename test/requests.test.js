@@ -4,7 +4,9 @@ const { formatRequestsMenu } = require('../lib/paymentRequests');
 
 describe('formatRequestsMenu', () => {
   it('incoming empty', () => {
-    assert.match(formatRequestsMenu([], 'incoming'), /No payment requests/);
+    const t = formatRequestsMenu([], 'incoming');
+    assert.match(t, /No payment requests/);
+    assert.match(t, /\/phone/);
   });
   it('lists pay menu', () => {
     const t = formatRequestsMenu(

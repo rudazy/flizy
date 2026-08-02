@@ -13,6 +13,7 @@ export default function AccountPage() {
     busy,
     msg,
     setMsg,
+    setBusy,
     generateLink,
     addTrusted,
     removeTrusted,
@@ -31,6 +32,24 @@ export default function AccountPage() {
   const [limitPassword, setLimitPassword] = useState('');
 
   if (!data) return null;
+
+  async function onSignOut() {
+    setBusy('logout');
+    setMsg('');
+    try {
+      const res = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setMsg(json.error || 'Could not sign out. Try again.');
+        return;
+      }
+      window.location.href = '/login';
+    } catch {
+      setMsg('Could not sign out. Try again.');
+    } finally {
+      setBusy('');
+    }
+  }
 
   async function onAddTrusted(e: React.FormEvent) {
     e.preventDefault();
@@ -352,9 +371,19 @@ export default function AccountPage() {
           required to add or remove trusted wallets. Install this app from Chrome for faster access
           without browser chrome.
         </p>
-        <a href="/docs" className="btn btn-ghost mt-3 text-sm">
-          Security docs
-        </a>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a href="/docs" className="btn btn-ghost text-sm no-underline">
+            Security docs
+          </a>
+          <button
+            type="button"
+            className="btn btn-ghost text-sm"
+            onClick={() => void onSignOut()}
+            disabled={busy === 'logout'}
+          >
+            {busy === 'logout' ? 'Signing out…' : 'Sign out'}
+          </button>
+        </div>
       </section>
     </div>
   );

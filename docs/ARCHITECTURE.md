@@ -1,8 +1,11 @@
 # Architecture
 
-Implementation detail for contributors. The product overview and the conceptual diagrams
-are in the [README](../README.md). Deployment and configuration are in
-[OPERATIONS.md](OPERATIONS.md).
+Implementation detail for contributors. The product overview and conceptual diagrams are in
+the [README](../README.md). Deployment and configuration: [OPERATIONS.md](OPERATIONS.md).
+
+**Hard rule:** clients are adapters. Policy is the only money/safety enforcement. The engine
+is the product. Product strategy and roadmap notes stay private (local `docs/` / `tasks/`), not
+in the public tree.
 
 ---
 
@@ -237,6 +240,108 @@ web session, so that direction still queues.
 Used when a claim is held for a number that already belongs to a Flizy account, and when a
 payment request is created. Numbers that are not on Flizy are never cold-messaged: the
 sender shares a claim link instead.
+
+---
+
+## Engine pipeline (Intent → Policy → Route → Execute → Receipt)
+
+Canonical money path lives under `lib/engine/`. Clients and HTTP handlers must not invent a
+parallel path.
+
+| Step | Responsibility | Primary code |
+|------|----------------|--------------|
+| **Intent** | Structured “what the user wants” | `lib/engine/intent.js` |
+| **Policy** | Allow / deny / confirm; trusted, limits, session, routers | `lib/engine/policy.js` |
+| **Plan** | Human-readable preview before money moves | `lib/engine/plan.js` |
+| **Route** | Which backend (agent wallet, escrow, DEX, later partner) | policy + execute helpers, `lib/chains.js`, `lib/dex.js` |
+| **Execute** | Sign and settle | `lib/engine/executeTransfer.js`, `executeClaim.js`, `executeSwap.js` |
+| **Receipt** | Status, hash/ref, explorer, notify | `lib/engine/receipt.js`, transfer log, claim rows |
+
+Target shape for any new money move:
+
+```ts
+execute({
+  actor,
+  intent,   // send | claim | swap | request | pay | …
+  asset?,
+  amount?,
+  currency?,
+  recipient?, // name | phone | platform id | address (advanced)
+  meta?,
+})
+```
+
+Caller does not choose ERC-20 vs bank vs Uniswap. Route does.
+
+---
+
+## Wallets and keys
+
+| Wallet | Role |
+|--------|------|
+| **Agent wallet** | Per-account funds for normal sends; derived once per account, never rotated for address stability |
+| **Ops** (`PRIVATE_KEY`) | Infra / gas only — not user escrow |
+| **Escrow** (`ESCROW_PRIVATE_KEY` or derived) | Pending claim liability only |
+
+Invariant:
+
+```text
+escrow_on_chain_balance >= sum(pending claims amount)  (+ gas for next payout)
+```
+
+Hold: agent → escrow. Cancel: escrow → sender agent. Claim: escrow → recipient agent.
+
+Smart wallet contracts (`contracts/src/FlizyWallet*.sol`) exist in-repo for a future on-chain
+allowlist / session-key path. They are **not** live custody today. Production custody upgrade
+is roadmap Stage 7 — not an architecture rewrite of the engine.
+
+---
+
+## HTTP API (web)
+
+Next.js App Router under `web/app/api/`. Each route is a **client** of domain logic (web
+mirrors of pure helpers, or shared rules). Money rules still belong in Policy/engine, not in
+the route handler body beyond orchestration.
+
+Representative surfaces:
+
+| Area | Routes (illustrative) |
+|------|------------------------|
+| Auth | signup, login, GitHub OAuth start/callback |
+| Session / PIN | pin, dashboard cookie session |
+| Identity | `/api/identity`, link code create |
+| Money | claim token, withdraw, swap quote/execute, trusted |
+| Read | dashboard, history, holdings, limits |
+
+Errors: prefer `web/lib/apiError.ts` patterns — no secret leakage, fail closed.
+
+---
+
+## Future authenticated Engine API
+
+Not shipped as a public product yet (roadmap Stage 6). Target:
+
+- Auth’d, scoped keys call the same Intent → Policy → Plan → Execute → Receipt pipeline
+- Delegated caps (e.g. trade under limit; withdraw denied by default)
+- Webhooks for plan / receipt
+- AI and third parties are adapters on this API, never second engines
+
+Until then, do not grow ad-hoc server actions that bypass Policy.
+
+---
+
+## Security (technical)
+
+- Trusted destinations mutated only with password on web; chat cannot expand allowlist
+- Session lock per `(account, channel, external_id)`; PIN ladder / lockout tables
+- Daily and per-tx limits in Policy
+- Channel and external id normalization fail closed; phones never forged from chat ids
+- Claim match keys: verified phone or platform id — not display handles
+- Separated agent / ops / escrow keys
+- Link codes and OAuth binds: attempt limiting / lockout ladders where secrets are guessable
+- No secrets in client error bodies or logs
+
+Allowlist product rules: [trusted-addresses.md](trusted-addresses.md).
 
 ---
 
