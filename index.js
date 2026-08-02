@@ -266,16 +266,32 @@ function buildCtx(message, externalId) {
 
 /**
  * Outbound for notifications (no inbound message to reply to).
+ * Tries @lid then @c.us when the stored id is phone-shaped — modern LIDs look
+ * like 15-digit "phones" and only @lid delivers.
  * @param {string} externalId
  * @param {string} body
  */
 async function sendToIdentity(externalId, body) {
+  const { whatsappOutboundChatIds } = require('./lib/whatsappChatId');
   const id = String(externalId || '').split('@')[0];
   if (!id) throw new Error('missing recipient id');
-  const chatId = isPlausiblePhone(id) ? `${id}@c.us` : `${id}@lid`;
-  if (isBlockedChatId(chatId)) throw new Error('blocked chat id');
+  const candidates = whatsappOutboundChatIds(externalId).filter((c) => !isBlockedChatId(c));
+  if (!candidates.length) throw new Error('blocked or missing chat id');
+
   lastBotOutbound.set(`${CHANNEL}:${id}`, { body: String(body).trim(), at: Date.now() });
-  return client.sendMessage(chatId, String(body));
+  let lastErr;
+  for (const chatId of candidates) {
+    try {
+      return await client.sendMessage(chatId, String(body));
+    } catch (err) {
+      lastErr = err;
+      console.warn(
+        `[notify] whatsapp send ${chatId} failed:`,
+        err && err.message ? err.message : err
+      );
+    }
+  }
+  throw lastErr || new Error('whatsapp send failed');
 }
 
 // ---------------------------------------------------------------------------
