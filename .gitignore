@@ -49,10 +49,6 @@ docs/INVESTOR-MAP.md
 docs/*investor*
 docs/*INVESTOR*
 docs/ENGINEER-ONBOARDING.md
-# Active threat model for money-path code that is not built or hardened yet.
-# Unlike ARCHITECTURE/OPERATIONS, which describe shipped behaviour, this names
-# which protections are load-bearing and which barely bite. Readable locally by
-# anything working in the tree; not for the public repo until it ships and holds.
 docs/username-send-phase1.md
 # Local screen captures and demo edit intermediates
 *.mp4

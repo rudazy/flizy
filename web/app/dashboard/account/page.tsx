@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AppTopBar } from '../../../components/AppTopBar';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
+import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { shortAddr } from '../../../lib/dashboardTypes';
 
 export default function AccountPage() {
@@ -154,6 +155,9 @@ export default function AccountPage() {
           </div>
         ) : null}
       </section>
+
+      {/* Platform identities (GitHub today, Discord and X later) */}
+      <LinkedAccounts />
 
       {/* Trusted */}
       <section className="card p-4">

@@ -10,6 +10,11 @@
  *   platform  to_channel + to_external_id (the immutable id, never the handle)
  */
 
+// One copy of the sanitizer for the whole web app, mirroring lib/sanitize.js.
+// It used to be inlined here, which is how it drifted from the bot in the first
+// place.
+import { displaySafeLabel as displaySafe } from './sanitize.ts';
+
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
   telegram: 'Telegram',
@@ -21,24 +26,6 @@ const CHANNEL_LABELS: Record<string, string> = {
 export function channelLabel(channel: string | null | undefined): string {
   if (!channel) return '';
   return CHANNEL_LABELS[channel] || String(channel);
-}
-
-// Same range as CONTROL_CHARS in lib/sanitize.js. A newline inside a handle
-// would otherwise let someone forge an extra line on a page that renders it.
-// eslint-disable-next-line no-control-regex
-const CONTROL_CHARS = /[\x00-\x1f\x7f-\x9f]/g;
-
-/**
- * Flatten attacker-controlled text before it reaches a page.
- * Matches displaySafeLabel in lib/sanitize.js.
- */
-function displaySafe(raw: unknown, maxLength = 40): string {
-  const flat = String(raw ?? '')
-    .replace(CONTROL_CHARS, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!flat) return '';
-  return flat.length > maxLength ? `${flat.slice(0, maxLength - 1)}...` : flat;
 }
 
 type ClaimRow = {

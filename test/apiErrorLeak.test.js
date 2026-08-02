@@ -175,6 +175,15 @@ describe('no route sends a raw error message', () => {
       const rel = path.relative(API_DIR, file).replace(/\\/g, '/');
       // A route with no catch block has nothing to leak (withdraw is a stub)
       if (!/catch\s*\(/.test(source)) continue;
+      // A route that never builds a JSON body has nothing to leak either. The
+      // OAuth callback is the case: a human is sitting in a browser, so every
+      // exit is a redirect to a fixed URL carrying a fixed status word, and the
+      // real error only ever reaches the server log.
+      //
+      // Deliberately keyed on the absence of NextResponse.json rather than on a
+      // filename allowlist. The moment such a route starts returning a body it
+      // is caught again, which is the property that matters.
+      if (!/NextResponse\.json\s*\(/.test(source)) continue;
       if (!/apiErrorBody/.test(source)) missing.push(rel);
     }
     assert.deepEqual(missing, []);

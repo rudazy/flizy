@@ -75,6 +75,19 @@ export async function getAccountIdFromCookie(): Promise<string | null> {
 }
 
 /**
+ * A stable per-session key: sha256 of the session token, the same value stored
+ * in web_sessions.token_hash. Never the raw token.
+ *
+ * Used to bind an OAuth state value to one session and to key the callback rate
+ * limiter. Safe to store and compare; useless to replay, because the cookie
+ * still has to carry the token this hashes from.
+ */
+export function getSessionKey(): string | null {
+  const token = cookies().get(COOKIE)?.value;
+  return token ? hashToken(token) : null;
+}
+
+/**
  * End the current session (server row and cookie).
  */
 export async function clearAccountCookie(): Promise<void> {
