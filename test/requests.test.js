@@ -1,7 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { formatRequestsMenu, formatRequestPaidNotice } = require('../lib/paymentRequests');
-const { formatClaimClaimedNotice } = require('../lib/claims');
+const { formatClaimClaimedNotice, claimViaLine } = require('../lib/claims');
 
 describe('formatRequestsMenu', () => {
   it('incoming empty', () => {
@@ -39,16 +39,37 @@ describe('formatRequestPaidNotice', () => {
 });
 
 describe('formatClaimClaimedNotice', () => {
-  it('tells the sender who claimed', () => {
+  it('pairs claimer with the original GitHub path so the sender is not confused', () => {
     const t = formatClaimClaimedNotice({
-      amountEth: '0.001',
-      byLabel: '+2349068893161',
-      forLabel: '@rudazy (GitHub)',
+      amountEth: '0.0005',
+      byLabel: '@youser',
+      viaLine: 'GitHub @rudazy',
       explorerUrl: 'https://explorer.test/tx/0xdef',
     });
     assert.match(t, /Claim delivered/i);
-    assert.match(t, /0\.001 ETH was claimed by \+2349068893161/);
-    assert.match(t, /@rudazy \(GitHub\)/);
+    assert.match(t, /0\.0005 ETH claimed by @youser/);
+    assert.match(t, /You sent this to GitHub @rudazy/);
     assert.match(t, /explorer\.test/);
+  });
+});
+
+describe('claimViaLine', () => {
+  it('names a GitHub hold as GitHub @handle', () => {
+    const line = claimViaLine({
+      to_channel: 'github',
+      to_external_id: '583231',
+      to_display_handle: 'rudazy',
+      to_wa_hint: null,
+    });
+    assert.equal(line, 'GitHub @rudazy');
+  });
+
+  it('names a phone hold as phone +digits', () => {
+    const line = claimViaLine({
+      to_wa_hint: '2348012345678',
+      to_channel: null,
+      to_external_id: null,
+    });
+    assert.equal(line, 'phone +2348012345678');
   });
 });
