@@ -1,6 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { formatRequestsMenu, formatRequestPaidNotice } = require('../lib/paymentRequests');
+const { formatClaimClaimedNotice } = require('../lib/claims');
 
 describe('formatRequestsMenu', () => {
   it('incoming empty', () => {
@@ -34,5 +35,20 @@ describe('formatRequestPaidNotice', () => {
   it('still works without explorer or label', () => {
     const t = formatRequestPaidNotice({ amountEth: '0.01' });
     assert.match(t, /0\.01 ETH from someone/);
+  });
+});
+
+describe('formatClaimClaimedNotice', () => {
+  it('tells the sender who claimed', () => {
+    const t = formatClaimClaimedNotice({
+      amountEth: '0.001',
+      byLabel: '+2349068893161',
+      forLabel: '@rudazy (GitHub)',
+      explorerUrl: 'https://explorer.test/tx/0xdef',
+    });
+    assert.match(t, /Claim delivered/i);
+    assert.match(t, /0\.001 ETH was claimed by \+2349068893161/);
+    assert.match(t, /@rudazy \(GitHub\)/);
+    assert.match(t, /explorer\.test/);
   });
 });
