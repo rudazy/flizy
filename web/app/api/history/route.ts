@@ -2,8 +2,18 @@ import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 import { apiErrorBody } from '../../../lib/apiError';
+// Shared with chat history — platform claims must show GitHub pay / Phone / X pay
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const {
+  formatClaimHistoryLabel,
+  claimHistoryCounterparty,
+} = require('../../../../lib/claimHistoryLabel');
 
 const ROUTE = 'GET /api/history';
+
+/** Claim columns needed for rail labels (phone vs GitHub vs X). */
+const CLAIM_SELECT =
+  'id, from_account_id, to_account_id, to_wa_hint, to_channel, to_external_id, to_display_handle, amount_eth, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at';
 
 export type ActivityItem = {
   id: string;
@@ -71,7 +81,6 @@ function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityI
   const status = String(row.status || 'pending');
   const amount = row.amount_eth as string | number;
   const isSender = row.from_account_id === accountId;
-  const hint = row.to_wa_hint ? `+${row.to_wa_hint}` : null;
   let type: ActivityItem['type'] = 'claim';
   let direction: 'in' | 'out' = 'out';
   let label = '';
@@ -80,28 +89,34 @@ function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityI
   if (isSender) {
     direction = 'out';
     if (status === 'cancelled') {
-      label = `Claim cancelled · refund ${amount} ETH`;
+      label = formatClaimHistoryLabel(row, { role: 'sender', status: 'cancelled' });
       txHash = row.refund_tx_hash ? String(row.refund_tx_hash) : null;
       type = 'receive';
       direction = 'in';
     } else if (status === 'claimed') {
-      label = `Claim paid to ${hint || 'recipient'} · ${amount} ETH`;
-      txHash = row.claim_tx_hash ? String(row.claim_tx_hash) : row.hold_tx_hash ? String(row.hold_tx_hash) : null;
+      label = formatClaimHistoryLabel(row, { role: 'sender', status: 'claimed' });
+      // Prefer payout hash so "View tx" is the claim receive leg, not only the hold
+      txHash = row.claim_tx_hash
+        ? String(row.claim_tx_hash)
+        : row.hold_tx_hash
+          ? String(row.hold_tx_hash)
+          : null;
       type = 'claim';
     } else {
-      label = `Claim held for ${hint || 'recipient'} · ${amount} ETH`;
+      label = formatClaimHistoryLabel(row, { role: 'sender', status });
       txHash = row.hold_tx_hash ? String(row.hold_tx_hash) : null;
       type = 'claim';
     }
   } else {
-    // Recipient view
+    // Recipient view — claimed payout must show with claim_tx_hash
     direction = 'in';
     type = status === 'claimed' ? 'receive' : 'claim';
-    label =
-      status === 'claimed'
-        ? `Received claim · ${amount} ETH`
-        : `Incoming claim · ${amount} ETH (${status})`;
-    txHash = row.claim_tx_hash ? String(row.claim_tx_hash) : null;
+    label = formatClaimHistoryLabel(row, { role: 'receiver', status });
+    txHash = row.claim_tx_hash
+      ? String(row.claim_tx_hash)
+      : status !== 'claimed' && row.hold_tx_hash
+        ? String(row.hold_tx_hash)
+        : null;
   }
 
   return {
@@ -110,7 +125,7 @@ function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityI
     direction,
     amount,
     asset: 'ETH',
-    counterparty: hint,
+    counterparty: claimHistoryCounterparty(row),
     status,
     txHash,
     createdAt: String(row.claimed_at || row.created_at),
@@ -193,18 +208,16 @@ export async function GET() {
 
     const { data: claimsOut } = await supabase
       .from('claims')
-      .select(
-        'id, from_account_id, to_account_id, to_wa_hint, amount_eth, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at'
-      )
+      .select(CLAIM_SELECT)
       .eq('from_account_id', accountId)
       .order('created_at', { ascending: false })
       .limit(30);
 
+    // Claimed rows (to_account_id set on payout). Also pending platform claims
+    // for this account are not listed here until claimed — matching is chat-side.
     const { data: claimsIn } = await supabase
       .from('claims')
-      .select(
-        'id, from_account_id, to_account_id, to_wa_hint, amount_eth, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at'
-      )
+      .select(CLAIM_SELECT)
       .eq('to_account_id', accountId)
       .order('created_at', { ascending: false })
       .limit(30);
