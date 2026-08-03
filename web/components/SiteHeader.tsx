@@ -15,7 +15,7 @@ export function SiteHeader() {
             Guide
           </Link>
           <Link href="/docs" className="nav-link hidden sm:inline-flex">
-            Security
+            Docs
           </Link>
           <Link href="/dashboard" className="nav-link">
             App

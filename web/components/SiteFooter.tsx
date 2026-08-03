@@ -31,7 +31,7 @@ export function SiteFooter() {
             Faucet
           </a>
           <Link href="/docs" className="text-muted no-underline hover:text-lime">
-            Security
+            Docs
           </Link>
           <a
             href="https://x.com/Flizyapp"
