@@ -15,12 +15,14 @@ import {
   useSlide,
 } from '../../components/AppSection';
 import { useDashboard } from '../../components/DashboardProvider';
+import { useLocale } from '../../components/LocaleProvider';
 import { shortAddr } from '../../lib/dashboardTypes';
 
 const SLIDES = ['overview', 'claims', 'go', 'recent'] as const;
 
 export default function DashboardHomePage() {
   const search = useSearchParams();
+  const { t } = useLocale();
   const welcome = search.get('welcome') === '1';
   const {
     data,
@@ -111,14 +113,22 @@ export default function DashboardHomePage() {
   }
 
   const nav = [
-    { id: 'overview', label: 'Overview', badge: openSetup.length ? String(openSetup.length) : undefined },
+    {
+      id: 'overview',
+      label: t('home.overview'),
+      badge: openSetup.length ? String(openSetup.length) : undefined,
+    },
     {
       id: 'claims',
-      label: 'Claims',
+      label: t('home.claims'),
       badge: pendingClaims.length ? String(pendingClaims.length) : undefined,
     },
-    { id: 'go', label: 'Go' },
-    { id: 'recent', label: 'Recent', badge: recent.length ? String(recent.length) : undefined },
+    { id: 'go', label: t('home.go') },
+    {
+      id: 'recent',
+      label: t('home.recent'),
+      badge: recent.length ? String(recent.length) : undefined,
+    },
   ];
 
   return (

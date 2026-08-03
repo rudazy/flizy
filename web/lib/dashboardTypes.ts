@@ -16,6 +16,10 @@ export type DashboardData = {
     display_name?: string | null;
     /** Flizy @username without leading @, or null */
     username?: string | null;
+    can_change_username?: boolean;
+    username_next_change_at?: string | null;
+    /** UI language en | ko | zh */
+    locale?: string | null;
     agent_wallet_address?: string | null;
     balance_eth?: number | string;
     has_pin: boolean;

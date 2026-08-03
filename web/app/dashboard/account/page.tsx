@@ -11,11 +11,14 @@ import {
 } from '../../../components/AppSection';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
+import { LanguageSelect, useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { shortAddr } from '../../../lib/dashboardTypes';
+import type { LocaleCode } from '../../../lib/locale';
 
 const SLIDES = [
   'profile',
+  'language',
   'chat',
   'platforms',
   'trusted',
@@ -28,6 +31,7 @@ type SlideId = (typeof SLIDES)[number];
 
 export default function AccountPage() {
   const search = useSearchParams();
+  const { t, locale } = useLocale();
   const {
     data,
     busy,
@@ -40,7 +44,9 @@ export default function AccountPage() {
     setUnlockPin,
     setDailyLimit,
     setUsername,
+    setAccountLocale,
   } = useDashboard();
+  const [localeDraft, setLocaleDraft] = useState<LocaleCode>(locale);
 
   const [addr, setAddr] = useState('');
   const [label, setLabel] = useState('');
@@ -70,12 +76,29 @@ export default function AccountPage() {
     }
   }, [data?.account?.username]);
 
+  useEffect(() => {
+    if (data?.account?.locale) {
+      setLocaleDraft(data.account.locale as LocaleCode);
+    } else {
+      setLocaleDraft(locale);
+    }
+  }, [data?.account?.locale, locale]);
+
   // OAuth error/status lands with ?github= — always show Platforms slide.
   useEffect(() => {
     if (search.get('github')) setSlide('platforms');
   }, [search, setSlide]);
 
   if (!data) return null;
+
+  const canChangeUsername = data.account.can_change_username !== false;
+  const nextChange = data.account.username_next_change_at
+    ? new Date(data.account.username_next_change_at).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : null;
 
   async function onSignOut() {
     setBusy('logout');
@@ -155,9 +178,10 @@ export default function AccountPage() {
   const nav = [
     {
       id: 'profile',
-      label: 'Profile',
+      label: t('account.profile'),
       badge: data.account.username ? `@${data.account.username}` : undefined,
     },
+    { id: 'language', label: t('account.language') },
     { id: 'chat', label: 'Chat', badge: data.link ? undefined : '!' },
     { id: 'platforms', label: 'Platforms' },
     { id: 'trusted', label: 'Trusted', badge: String(data.trusted.length) },
@@ -176,8 +200,8 @@ export default function AccountPage() {
       {/* One slide at a time — chips switch the panel, they do not scroll the page */}
       {slide === 'profile' ? (
         <AppSection
-          title="Profile"
-          helper="Email, display name, and Flizy @username (recognition only — not a payment route)."
+          title={t('account.profile')}
+          helper={t('account.profileHelper')}
           badge={data.account.username ? `@${data.account.username}` : 'Username?'}
           badgeTone={data.account.username ? 'lime' : 'gold'}
         >
@@ -190,33 +214,71 @@ export default function AccountPage() {
           <form onSubmit={onUsername} className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
             <div>
               <label className="label" htmlFor="flizy-username">
-                Username
+                {t('account.username')}
               </label>
               <input
                 id="flizy-username"
                 className="input"
-                placeholder="letters, numbers, underscore"
+                placeholder="letters and numbers only"
                 value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value.replace(/\s/g, ''))}
+                onChange={(e) => setUsernameInput(e.target.value.replace(/[^a-zA-Z0-9@]/g, ''))}
                 autoComplete="username"
                 autoCapitalize="none"
                 spellCheck={false}
-                maxLength={25}
+                maxLength={24}
                 required
+                disabled={!canChangeUsername}
               />
-              <p className="mt-1.5 text-xs text-muted">
-                3–24 chars, start with a letter. Used in “claimed by @you” — never to route money.
-              </p>
+              <p className="mt-1.5 text-xs text-muted">{t('account.usernameHint')}</p>
+              {!canChangeUsername && nextChange ? (
+                <p className="mt-1.5 text-xs text-gold">
+                  {t('account.usernameCooldown', { date: nextChange })}
+                </p>
+              ) : null}
             </div>
             <div className="flex items-end">
               <button
                 type="submit"
                 className="btn btn-primary w-full py-3 font-semibold sm:w-auto sm:px-6"
-                disabled={busy === 'username'}
+                disabled={busy === 'username' || !canChangeUsername}
               >
-                {busy === 'username' ? 'Saving…' : data.account.username ? 'Update' : 'Save'}
+                {busy === 'username'
+                  ? t('account.usernameSaving')
+                  : data.account.username
+                    ? t('account.usernameUpdate')
+                    : t('account.usernameSave')}
               </button>
             </div>
+          </form>
+        </AppSection>
+      ) : null}
+
+      {slide === 'language' ? (
+        <AppSection title={t('account.language')} helper={t('account.languageHelper')}>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              await setAccountLocale(localeDraft);
+            }}
+            className="grid gap-3"
+          >
+            <div>
+              <label className="label" htmlFor="account-locale">
+                {t('account.language')}
+              </label>
+              <LanguageSelect
+                id="account-locale"
+                value={localeDraft}
+                onChange={setLocaleDraft}
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary w-full py-3 font-semibold"
+              disabled={busy === 'locale'}
+            >
+              {busy === 'locale' ? t('account.languageSaving') : t('account.languageSave')}
+            </button>
           </form>
         </AppSection>
       ) : null}

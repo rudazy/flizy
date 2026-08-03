@@ -11,12 +11,17 @@
  * the response shape it had before, minus the id.
  */
 
+import { usernameChangeWindow } from './username.ts';
+import { normalizeLocale, type LocaleCode } from './locale.ts';
+
 export type AccountRow = {
   id?: string;
   email?: string | null;
   display_name?: string | null;
   /** Flizy @username (recognition only; not a payment key) */
   username?: string | null;
+  username_changed_at?: string | null;
+  locale?: string | null;
   agent_wallet_address?: string | null;
   balance_eth?: number | string | null;
   unlock_pin_hash?: string | null;
@@ -29,6 +34,12 @@ export type PublicAccount = {
   display_name?: string | null;
   /** Canonical lowercase username without @, or null */
   username?: string | null;
+  /** false while inside the 30-day rename window */
+  can_change_username?: boolean;
+  /** ISO time when rename is allowed again; null if now */
+  username_next_change_at?: string | null;
+  /** UI language: en | ko | zh */
+  locale?: LocaleCode;
   agent_wallet_address?: string | null;
   balance_eth?: number | string;
   has_pin?: boolean;
@@ -47,6 +58,14 @@ export function toPublicAccount(row: AccountRow | null | undefined): PublicAccou
   if ('username' in row) {
     const u = row.username == null ? null : String(row.username).trim().toLowerCase();
     out.username = u || null;
+  }
+  if ('username' in row || 'username_changed_at' in row) {
+    const win = usernameChangeWindow(row.username, row.username_changed_at ?? null);
+    out.can_change_username = win.canChangeUsername;
+    out.username_next_change_at = win.usernameNextChangeAt;
+  }
+  if ('locale' in row) {
+    out.locale = normalizeLocale(row.locale);
   }
   if ('agent_wallet_address' in row) out.agent_wallet_address = row.agent_wallet_address ?? null;
   if ('balance_eth' in row) out.balance_eth = row.balance_eth ?? 0;

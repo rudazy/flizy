@@ -1,7 +1,7 @@
 /**
  * Set or change the Flizy-native @username for the signed-in account.
  *
- * Optional at signup; editable here with uniqueness enforced by DB index.
+ * Required at signup. Change at most once every 30 days.
  * Not a payment routing key — platform ids and phones still are.
  */
 
@@ -9,10 +9,16 @@ import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
 import { toPublicAccount } from '../../../../lib/publicAccount';
-import { validateUsername } from '../../../../lib/username';
+import {
+  assertUsernameChangeAllowed,
+  validateUsername,
+} from '../../../../lib/username';
 import { apiErrorBody } from '../../../../lib/apiError';
 
 const ROUTE = 'POST /api/account/username';
+
+const ACCOUNT_SELECT =
+  'email, display_name, username, username_changed_at, locale, agent_wallet_address, balance_eth, unlock_pin_hash, daily_send_limit_eth';
 
 export async function POST(req: Request) {
   try {
@@ -29,10 +35,9 @@ export async function POST(req: Request) {
 
     const supabase = getSupabase();
 
-    // Same account already holds this name: idempotent success.
     const { data: current } = await supabase
       .from('accounts')
-      .select('id, email, display_name, username, agent_wallet_address, balance_eth, unlock_pin_hash, daily_send_limit_eth')
+      .select(`id, ${ACCOUNT_SELECT}`)
       .eq('id', accountId)
       .maybeSingle();
 
@@ -40,20 +45,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    const existing = current.username
-      ? String(current.username).trim().toLowerCase()
-      : '';
-    if (existing === check.username) {
+    const gate = assertUsernameChangeAllowed({
+      currentUsername: current.username,
+      usernameChangedAt: current.username_changed_at,
+      nextUsername: check.username,
+    });
+    if (!gate.ok) {
+      return NextResponse.json(
+        { error: gate.error, username_next_change_at: gate.nextChangeAt },
+        { status: 429 }
+      );
+    }
+    if (gate.isNoop) {
       return NextResponse.json({ account: toPublicAccount(current) });
     }
 
+    const nowIso = new Date().toISOString();
     const { data: updated, error } = await supabase
       .from('accounts')
-      .update({ username: check.username })
+      .update({ username: check.username, username_changed_at: nowIso })
       .eq('id', accountId)
-      .select(
-        'email, display_name, username, agent_wallet_address, balance_eth, unlock_pin_hash, daily_send_limit_eth'
-      )
+      .select(ACCOUNT_SELECT)
       .single();
 
     if (error) {

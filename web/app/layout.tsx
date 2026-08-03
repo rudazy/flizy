@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { AppChrome } from '../components/AppChrome';
+import { LocaleProvider } from '../components/LocaleProvider';
 import './globals.css';
 
 function siteOrigin() {
@@ -96,7 +97,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="page-shell font-mono antialiased">
-        <AppChrome>{children}</AppChrome>
+        <LocaleProvider>
+          <AppChrome>{children}</AppChrome>
+        </LocaleProvider>
       </body>
     </html>
   );

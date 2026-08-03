@@ -4,10 +4,14 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PasswordField } from '../../components/PasswordField';
+import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { validatePassword } from '../../lib/passwordPolicy';
+import { validateUsername } from '../../lib/username';
+import type { LocaleCode } from '../../lib/locale';
 
 export default function SignupPage() {
   const router = useRouter();
+  const { t, locale, setLocale } = useLocale();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -16,14 +20,18 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Live mismatch hint once the user has started the second field
   const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
-    // Check here as well as on the server so the user is told before a round trip
+    const userCheck = validateUsername(username);
+    if (!userCheck.ok) {
+      setError(userCheck.error);
+      return;
+    }
+
     const policy = validatePassword(password);
     if (!policy.ok) {
       setError(policy.error);
@@ -43,7 +51,8 @@ export default function SignupPage() {
           email,
           password,
           displayName,
-          username: username.trim() || undefined,
+          username: userCheck.username,
+          locale,
         }),
       });
       const data = await res.json();
@@ -59,65 +68,70 @@ export default function SignupPage() {
   return (
     <div className="fade-up mx-auto grid max-w-5xl gap-10 lg:grid-cols-2 lg:items-start">
       <div>
-        <p className="text-xs uppercase tracking-[0.18em] text-gold">Get started</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-gold">{t('auth.signup.kicker')}</p>
         <h1 className="mt-3 font-sans text-3xl tracking-wide text-paper md:text-4xl">
-          Create your Flizy account
+          {t('auth.signup.title')}
         </h1>
-        <p className="mt-4 text-sm leading-relaxed text-muted">
-          After signup the dashboard gives you a button that opens the Flizy bot on WhatsApp or
-          Telegram with your link code already filled in. You never need the bot number saved in
-          contacts.
-        </p>
+        <p className="mt-4 text-sm leading-relaxed text-muted">{t('auth.signup.blurb')}</p>
         <ol className="mt-8 space-y-3 text-sm text-muted">
           <li className="flex gap-3">
-            <span className="text-lime">1</span> Account, optional @username, agent wallet
+            <span className="text-lime">1</span> {t('auth.signup.step1')}
           </li>
           <li className="flex gap-3">
-            <span className="text-lime">2</span> Set unlock PIN (required for lock/unlock)
+            <span className="text-lime">2</span> {t('auth.signup.step2')}
           </li>
           <li className="flex gap-3">
-            <span className="text-lime">3</span> Link chat + platforms (e.g. GitHub), claim holds
+            <span className="text-lime">3</span> {t('auth.signup.step3')}
           </li>
         </ol>
       </div>
 
       <form onSubmit={onSubmit} className="card space-y-5 p-6 md:p-8">
         <div>
+          <label className="label" htmlFor="locale">
+            {t('auth.signup.language')}
+          </label>
+          <LanguageSelect
+            id="locale"
+            value={locale}
+            onChange={(code: LocaleCode) => setLocale(code)}
+          />
+        </div>
+        <div>
           <label className="label" htmlFor="name">
-            Display name (optional)
+            {t('auth.signup.displayName')}
           </label>
           <input
             id="name"
             className="input"
-            placeholder="How we greet you"
+            placeholder={t('auth.signup.displayNamePh')}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             autoComplete="nickname"
           />
+          <p className="mt-1.5 text-xs text-muted">{t('auth.signup.displayNameHint')}</p>
         </div>
         <div>
           <label className="label" htmlFor="username">
-            Username (optional)
+            {t('auth.signup.username')}
           </label>
           <input
             id="username"
             className="input"
-            placeholder="@you — unique on Flizy"
+            placeholder={t('auth.signup.usernamePh')}
             value={username}
-            onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
+            onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9@]/g, ''))}
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
-            maxLength={25}
+            maxLength={24}
+            required
           />
-          <p className="mt-1.5 text-xs text-muted">
-            Shown when you claim money (e.g. claimed by @you). Not used to route payments. You can
-            set this later on Account.
-          </p>
+          <p className="mt-1.5 text-xs text-muted">{t('auth.signup.usernameHint')}</p>
         </div>
         <div>
           <label className="label" htmlFor="email">
-            Email
+            {t('auth.signup.email')}
           </label>
           <input
             id="email"
@@ -132,7 +146,7 @@ export default function SignupPage() {
         </div>
         <PasswordField
           id="password"
-          label="Password"
+          label={t('auth.signup.password')}
           value={password}
           onChange={setPassword}
           required
@@ -143,7 +157,7 @@ export default function SignupPage() {
         />
         <PasswordField
           id="confirm-password"
-          label="Retype password"
+          label={t('auth.signup.confirm')}
           value={confirmPassword}
           onChange={setConfirmPassword}
           required
@@ -155,12 +169,12 @@ export default function SignupPage() {
         />
         {error ? <div className="alert alert-error">{error}</div> : null}
         <button className="btn btn-primary w-full" type="submit" disabled={loading || mismatch}>
-          {loading ? 'Creating account...' : 'Create account'}
+          {loading ? t('auth.signup.submitting') : t('auth.signup.submit')}
         </button>
         <p className="text-center text-sm text-muted">
-          Already have an account?{' '}
+          {t('auth.signup.hasAccount')}{' '}
           <Link href="/login" className="text-lime no-underline hover:text-gold">
-            Log in
+            {t('auth.signup.login')}
           </Link>
         </p>
       </form>

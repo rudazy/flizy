@@ -6,6 +6,7 @@ import { validatePassword } from '../../../../lib/passwordPolicy';
 import { deriveAgentAddress } from '../../../../lib/agentWallet';
 import { toPublicAccount } from '../../../../lib/publicAccount';
 import { validateUsername } from '../../../../lib/username';
+import { normalizeLocale } from '../../../../lib/locale';
 import { apiErrorBody } from '../../../../lib/apiError';
 
 const ROUTE = 'POST /api/auth/signup';
@@ -18,17 +19,14 @@ export async function POST(req: Request) {
       .toLowerCase();
     const password = String(body.password || '');
     const displayName = String(body.displayName || '').trim() || null;
+    const locale = normalizeLocale(body.locale);
 
-    // Optional at signup; can be set later on Account.
-    let username: string | null = null;
-    const rawUsername = body.username;
-    if (rawUsername != null && String(rawUsername).trim() !== '') {
-      const check = validateUsername(rawUsername);
-      if (!check.ok) {
-        return NextResponse.json({ error: check.error }, { status: 400 });
-      }
-      username = check.username;
+    // Required: Flizy @username is the recognition handle after onboarding.
+    const check = validateUsername(body.username);
+    if (!check.ok) {
+      return NextResponse.json({ error: check.error }, { status: 400 });
     }
+    const username = check.username;
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
@@ -40,6 +38,7 @@ export async function POST(req: Request) {
 
     const supabase = getSupabase();
     const password_hash = hashPassword(password);
+    const nowIso = new Date().toISOString();
     const { data, error } = await supabase
       .from('accounts')
       .insert({
@@ -47,32 +46,31 @@ export async function POST(req: Request) {
         password_hash,
         display_name: displayName,
         username,
+        username_changed_at: nowIso,
+        locale,
         agent_wallet_address: null,
       })
-      .select('id, email, display_name, username, agent_wallet_address')
+      .select('id, email, display_name, username, username_changed_at, locale, agent_wallet_address')
       .single();
 
     if (error) {
-      // Reading the constraint is ours to do; the client gets the sentence we
-      // wrote for it, not the constraint name.
       if (String(error.message).includes('duplicate') || error.code === '23505') {
         const msg = String(error.message || '').toLowerCase();
-        if (msg.includes('username') || (username && msg.includes('accounts_username'))) {
+        if (msg.includes('username') || msg.includes('accounts_username')) {
           return NextResponse.json({ error: 'That username is taken.' }, { status: 409 });
         }
         return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
       }
-      // No email in the log line: an identifier that is also PII is not worth it
-      // when the error itself already says which constraint or column failed.
       return NextResponse.json(apiErrorBody(ROUTE, error), { status: 500 });
     }
 
-    // Same derivation as bot lib/agentWallet.js, via the shared web module
     const { data: withWallet, error: wErr } = await supabase
       .from('accounts')
       .update({ agent_wallet_address: deriveAgentAddress(data.id) })
       .eq('id', data.id)
-      .select('email, display_name, username, agent_wallet_address, balance_eth')
+      .select(
+        'email, display_name, username, username_changed_at, locale, agent_wallet_address, balance_eth'
+      )
       .single();
     if (wErr) {
       return NextResponse.json(apiErrorBody(ROUTE, wErr, { accountId: data.id }), { status: 500 });

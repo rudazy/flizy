@@ -2,36 +2,48 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useLocale } from './LocaleProvider';
+import type { MessageKey } from '../lib/i18n/messages';
 
-const LEFT_TABS = [
+const LEFT_TABS: Array<{
+  href: string;
+  labelKey: MessageKey;
+  match: (p: string) => boolean;
+  icon: (p: { active: boolean }) => JSX.Element;
+}> = [
   {
     href: '/dashboard',
-    label: 'Home',
+    labelKey: 'nav.home',
     match: (p: string) => p === '/dashboard',
     icon: HomeIcon,
   },
   {
     href: '/dashboard/wallet',
-    label: 'Wallet',
+    labelKey: 'nav.wallet',
     match: (p: string) => p.startsWith('/dashboard/wallet'),
     icon: WalletIcon,
   },
-] as const;
+];
 
-const RIGHT_TABS = [
+const RIGHT_TABS: Array<{
+  href: string;
+  labelKey: MessageKey;
+  match: (p: string) => boolean;
+  icon: (p: { active: boolean }) => JSX.Element;
+}> = [
   {
     href: '/dashboard/history',
-    label: 'History',
+    labelKey: 'nav.history',
     match: (p: string) => p.startsWith('/dashboard/history'),
     icon: HistoryIcon,
   },
   {
     href: '/dashboard/account',
-    label: 'Account',
+    labelKey: 'nav.account',
     match: (p: string) => p.startsWith('/dashboard/account'),
     icon: AccountIcon,
   },
-] as const;
+];
 
 function CompactTab({
   href,
@@ -60,7 +72,9 @@ function CompactTab({
 
 function SwapPill({ compact }: { compact?: boolean }) {
   const pathname = usePathname() || '';
+  const { t } = useLocale();
   const active = pathname.startsWith('/dashboard/swap');
+  const label = t('nav.swap');
 
   if (!compact) {
     return (
@@ -71,7 +85,7 @@ function SwapPill({ compact }: { compact?: boolean }) {
         }`}
         aria-current={active ? 'page' : undefined}
       >
-        Swap
+        {label}
       </Link>
     );
   }
@@ -81,7 +95,7 @@ function SwapPill({ compact }: { compact?: boolean }) {
       href="/dashboard/swap"
       className="relative -mt-4 flex min-w-[72px] flex-col items-center justify-end no-underline"
       aria-current={active ? 'page' : undefined}
-      aria-label="Swap"
+      aria-label={label}
     >
       <span
         className={`flex h-14 w-14 items-center justify-center rounded-full border-2 shadow-glow transition-transform duration-150 active:scale-95 ${
@@ -95,7 +109,7 @@ function SwapPill({ compact }: { compact?: boolean }) {
           active ? 'text-lime' : 'text-muted'
         }`}
       >
-        Swap
+        {label}
       </span>
     </Link>
   );
@@ -104,6 +118,7 @@ function SwapPill({ compact }: { compact?: boolean }) {
 /** Desktop horizontal tabs. */
 export function AppDesktopTabs() {
   const pathname = usePathname() || '';
+  const { t } = useLocale();
   return (
     <nav className="flex flex-wrap items-center gap-1 border-b border-border pb-3" aria-label="App sections">
       {[...LEFT_TABS, ...RIGHT_TABS].map((tab) => {
@@ -117,7 +132,7 @@ export function AppDesktopTabs() {
             }`}
             aria-current={active ? 'page' : undefined}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </Link>
         );
       })}
@@ -129,6 +144,7 @@ export function AppDesktopTabs() {
 /** Mobile fixed bottom bar: Home | Wallet | large Swap | History | Account */
 export function AppBottomNav() {
   const pathname = usePathname() || '';
+  const { t } = useLocale();
   return (
     <nav
       className="app-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-border bg-ink/95 backdrop-blur-md md:hidden"
@@ -139,7 +155,7 @@ export function AppBottomNav() {
           <CompactTab
             key={tab.href}
             href={tab.href}
-            label={tab.label}
+            label={t(tab.labelKey)}
             active={tab.match(pathname)}
             Icon={tab.icon}
           />
@@ -149,7 +165,7 @@ export function AppBottomNav() {
           <CompactTab
             key={tab.href}
             href={tab.href}
-            label={tab.label}
+            label={t(tab.labelKey)}
             active={tab.match(pathname)}
             Icon={tab.icon}
           />

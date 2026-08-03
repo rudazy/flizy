@@ -15,6 +15,8 @@ import type {
   HoldingsData,
   TransferRow,
 } from '../lib/dashboardTypes';
+import { useLocale } from './LocaleProvider';
+import { normalizeLocale, type LocaleCode } from '../lib/locale';
 
 type DashboardContextValue = {
   data: DashboardData | null;
@@ -39,6 +41,7 @@ type DashboardContextValue = {
   setUnlockPin: (pin: string, password: string) => Promise<boolean>;
   setDailyLimit: (limit: number | null, password: string) => Promise<boolean>;
   setUsername: (username: string) => Promise<boolean>;
+  setAccountLocale: (locale: LocaleCode) => Promise<boolean>;
   explorerBase: string;
 };
 
@@ -51,6 +54,7 @@ export function useDashboard() {
 }
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
+  const { setLocale } = useLocale();
   const [data, setData] = useState<DashboardData | null>(null);
   const [history, setHistory] = useState<TransferRow[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
@@ -76,8 +80,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
     setError('');
     setData(json);
+    if (json?.account?.locale) {
+      setLocale(normalizeLocale(json.account.locale));
+    }
     return true;
-  }, []);
+  }, [setLocale]);
 
   const load = useCallback(async () => {
     setError('');
@@ -295,6 +302,32 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [loadAccount]
   );
 
+  const setAccountLocale = useCallback(
+    async (locale: LocaleCode) => {
+      setBusy('locale');
+      setMsg('');
+      try {
+        const res = await fetch('/api/account/locale', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ locale }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed');
+        setLocale(normalizeLocale(json.account?.locale || locale));
+        setMsg('Language saved.');
+        await loadAccount();
+        return true;
+      } catch (err) {
+        setMsg(err instanceof Error ? err.message : 'Failed');
+        return false;
+      } finally {
+        setBusy('');
+      }
+    },
+    [loadAccount, setLocale]
+  );
+
   const explorerBase =
     holdings?.holdings?.chain?.explorerBaseUrl || 'https://sepolia-explorer.giwa.io';
 
@@ -318,6 +351,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setUnlockPin,
       setDailyLimit,
       setUsername,
+      setAccountLocale,
       explorerBase,
     }),
     [
@@ -337,6 +371,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setUnlockPin,
       setDailyLimit,
       setUsername,
+      setAccountLocale,
       explorerBase,
     ]
   );

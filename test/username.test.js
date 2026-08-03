@@ -1,5 +1,5 @@
 /**
- * Flizy @username rules + web/bot parity.
+ * Flizy @username rules + web/bot parity + 30-day change window.
  * Run: node --test test/username.test.js
  */
 
@@ -22,9 +22,19 @@ describe('validateUsername', () => {
   });
 
   it('strips @ and lowercases', () => {
-    const r = bot.validateUsername('@RudaZy_1');
+    const r = bot.validateUsername('@RudaZy1');
     assert.equal(r.ok, true);
-    assert.equal(r.username, 'rudazy_1');
+    assert.equal(r.username, 'rudazy1');
+  });
+
+  it('rejects underscore', () => {
+    const r = bot.validateUsername('ruda_zy');
+    assert.equal(r.ok, false);
+  });
+
+  it('rejects Hangul (use display_name instead)', () => {
+    const r = bot.validateUsername('민수');
+    assert.equal(r.ok, false);
   });
 
   it('rejects too short', () => {
@@ -54,6 +64,54 @@ describe('validateUsername', () => {
   });
 });
 
+describe('assertUsernameChangeAllowed', () => {
+  const now = new Date('2026-08-03T12:00:00.000Z');
+
+  it('allows first set', () => {
+    const r = bot.assertUsernameChangeAllowed({
+      currentUsername: null,
+      usernameChangedAt: null,
+      nextUsername: 'alice',
+      now,
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.isNoop, false);
+  });
+
+  it('allows noop same name', () => {
+    const r = bot.assertUsernameChangeAllowed({
+      currentUsername: 'alice',
+      usernameChangedAt: '2026-08-01T00:00:00.000Z',
+      nextUsername: 'alice',
+      now,
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.isNoop, true);
+  });
+
+  it('blocks change inside 30 days', () => {
+    const r = bot.assertUsernameChangeAllowed({
+      currentUsername: 'alice',
+      usernameChangedAt: '2026-07-20T00:00:00.000Z',
+      nextUsername: 'bob',
+      now,
+    });
+    assert.equal(r.ok, false);
+    assert.ok(r.nextChangeAt);
+  });
+
+  it('allows change after 30 days', () => {
+    const r = bot.assertUsernameChangeAllowed({
+      currentUsername: 'alice',
+      usernameChangedAt: '2026-06-01T00:00:00.000Z',
+      nextUsername: 'bob',
+      now,
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.isNoop, false);
+  });
+});
+
 describe('formatUsernameLabel', () => {
   it('returns @label when set', () => {
     assert.equal(bot.formatUsernameLabel('alice'), '@alice');
@@ -66,7 +124,7 @@ describe('formatUsernameLabel', () => {
 });
 
 describe('web username mirrors bot', () => {
-  const samples = ['alice', '@Bob_1', 'ab', '1x', 'admin', 'flizy', ''];
+  const samples = ['alice', '@Bob1', 'ab', '1x', 'admin', 'flizy', '', 'a_b', '민수'];
 
   for (const s of samples) {
     it(`agrees on validateUsername(${JSON.stringify(s)})`, () => {
@@ -81,5 +139,13 @@ describe('web username mirrors bot', () => {
   it('agrees on formatUsernameLabel', () => {
     assert.equal(web.formatUsernameLabel('carol'), bot.formatUsernameLabel('carol'));
     assert.equal(web.formatUsernameLabel(null), bot.formatUsernameLabel(null));
+  });
+
+  it('agrees on cooldown window', () => {
+    const now = new Date('2026-08-03T12:00:00.000Z');
+    const b = bot.usernameChangeWindow('alice', '2026-07-20T00:00:00.000Z', now);
+    const w = web.usernameChangeWindow('alice', '2026-07-20T00:00:00.000Z', now);
+    assert.equal(w.canChangeUsername, b.canChangeUsername);
+    assert.equal(w.usernameNextChangeAt, b.usernameNextChangeAt);
   });
 });
