@@ -128,19 +128,12 @@ export function LinkedAccounts() {
 
   const github = (identities || []).find((i) => i.channel === 'github') || null;
 
+  // Content-only (parent Account subsection supplies the card chrome)
   return (
-    <section className="card p-4">
-      <div>
-        <p className="font-sans text-sm tracking-wide text-paper">Connected accounts</p>
-        <p className="mt-1 text-xs text-muted">
-          Link a platform account so people can send to you by your username. Flizy stores the
-          platform&apos;s permanent user id, never the handle, so a rename cannot redirect your money.
-        </p>
-      </div>
-
+    <div>
       {notice ? (
         <p
-          className={`mt-3 rounded-md border px-3 py-2 font-mono text-[11px] ${
+          className={`mb-3 rounded-md border px-3 py-2 font-mono text-[11px] ${
             notice.tone === 'ok'
               ? 'border-lime/40 bg-lime/10 text-lime'
               : 'border-gold/40 bg-gold/10 text-gold'
@@ -150,68 +143,66 @@ export function LinkedAccounts() {
         </p>
       ) : null}
 
-      <div className="mt-4">
-        {identities === null ? (
-          <p className="font-mono text-xs text-muted">Loading...</p>
-        ) : github ? (
-          <div className="rounded-md border border-border bg-ink/40 px-3 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-sans text-sm text-paper">
-                    {CHANNEL_LABELS.github}
-                  </span>
-                  <VerifiedMark />
-                </div>
-                <p className="mt-0.5 truncate font-mono text-xs text-lime">
-                  {github.handle ? `@${github.handle}` : 'linked'}
-                </p>
+      {identities === null ? (
+        <p className="font-mono text-xs text-muted">Loading...</p>
+      ) : github ? (
+        <div className="rounded-md border border-border bg-ink/40 px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-sans text-sm text-paper">{CHANNEL_LABELS.github}</span>
+                <VerifiedMark />
               </div>
-              <button
-                type="button"
-                className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
-                disabled={busy}
-                onClick={() => onUnlink('github')}
-              >
-                {busy ? 'Working...' : 'Unlink'}
-              </button>
+              <p className="mt-0.5 truncate font-mono text-xs text-lime">
+                {github.handle ? `@${github.handle}` : 'linked'}
+              </p>
             </div>
-
-            {unlinking === 'github' ? (
-              <div className="mt-3 space-y-2">
-                <p className="font-mono text-[11px] text-muted">
-                  Unlinking frees this GitHub to be linked elsewhere, and stops sends addressed to it
-                  reaching this account.
-                </p>
-                <input
-                  type="password"
-                  className="input w-full"
-                  placeholder="Account password"
-                  value={password}
-                  autoComplete="current-password"
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-            ) : null}
+            <button
+              type="button"
+              className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
+              disabled={busy}
+              onClick={() => onUnlink('github')}
+            >
+              {busy ? 'Working...' : 'Unlink'}
+            </button>
           </div>
-        ) : (
-          <div className="rounded-md border border-border bg-ink/40 px-3 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="font-sans text-sm text-paper">{CHANNEL_LABELS.github}</p>
-                <p className="mt-0.5 font-mono text-xs text-muted">Not linked</p>
-              </div>
-              <a href="/api/auth/github/start" className="btn btn-primary shrink-0 px-3 py-1.5 text-xs no-underline">
-                Link GitHub
-              </a>
+
+          {unlinking === 'github' ? (
+            <div className="mt-3 space-y-2">
+              <p className="font-mono text-[11px] text-muted">
+                Unlinking frees this GitHub for another account and stops claims to it here.
+              </p>
+              <input
+                type="password"
+                className="input w-full"
+                placeholder="Account password"
+                value={password}
+                autoComplete="current-password"
+                onChange={(e) => setPassword(e.target.value)}
+              />
             </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="rounded-md border border-border bg-ink/40 px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-sans text-sm text-paper">{CHANNEL_LABELS.github}</p>
+              <p className="mt-0.5 font-mono text-xs text-muted">Not linked</p>
+            </div>
+            <a
+              href="/api/auth/github/start"
+              className="btn btn-primary shrink-0 px-3 py-1.5 text-xs no-underline"
+            >
+              Link GitHub
+            </a>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <p className="mt-3 font-mono text-[11px] text-muted">
-        Discord and X come later. One account per platform.
+      <p className="mt-3 font-mono text-[10px] text-muted">
+        Discord and X: same list when they ship. One identity per platform.
       </p>
-    </section>
+    </div>
   );
 }

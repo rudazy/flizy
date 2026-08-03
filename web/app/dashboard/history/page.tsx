@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { AppTopBar } from '../../../components/AppTopBar';
+import { AppPage, AppSection } from '../../../components/AppSection';
 import { useDashboard } from '../../../components/DashboardProvider';
 import type { ActivityItem } from '../../../lib/dashboardTypes';
 import { shortAddr } from '../../../lib/dashboardTypes';
@@ -94,7 +95,7 @@ export default function HistoryPage() {
         }));
 
   return (
-    <div className="space-y-4">
+    <AppPage>
       <AppTopBar
         title="History"
         actionLabel={refreshing ? '...' : 'Refresh'}
@@ -102,38 +103,29 @@ export default function HistoryPage() {
         actionBusy={refreshing}
       />
 
-      <div className="flex items-baseline justify-between gap-2 px-0.5">
-        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-          Activity
-        </p>
-        <p className="font-mono text-[11px] text-muted">
-          {rows.length === 0 ? 'Empty' : `${rows.length} of last 30`}
-        </p>
-      </div>
-
-      {rows.length === 0 ? (
-        <section className="card p-5">
-          <p className="font-sans text-sm tracking-wide text-paper">No activity yet</p>
-          <p className="mt-2 text-xs leading-relaxed text-muted">
-            Sends, claims, and swaps land here after confirm on WhatsApp, Telegram or Swap.
-          </p>
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            <Link href="/dashboard/swap" className="btn btn-primary flex-1 text-sm no-underline">
-              Open Swap
-            </Link>
-            <Link href="/dashboard/wallet" className="btn btn-ghost flex-1 text-sm no-underline">
-              Wallet
-            </Link>
-          </div>
-          <p className="mt-3 font-mono text-[11px] text-muted">
-            In chat: <span className="text-paper">flizy history</span> or <span className="text-paper">/history</span>
-          </p>
-        </section>
-      ) : (
-        <section className="card overflow-hidden">
-          <ul className="divide-y divide-border">
+      <AppSection
+        title="Activity"
+        helper="Sends, claims, swaps, requests. One row shape for everything."
+        badge={rows.length === 0 ? 'Empty' : `${rows.length}`}
+      >
+        {rows.length === 0 ? (
+          <>
+            <p className="text-xs leading-relaxed text-muted">
+              Nothing yet. After chat or Swap, moves land here.
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Link href="/dashboard/swap" className="btn btn-primary flex-1 text-sm no-underline">
+                Open Swap
+              </Link>
+              <Link href="/dashboard/wallet" className="btn btn-ghost flex-1 text-sm no-underline">
+                Wallet
+              </Link>
+            </div>
+          </>
+        ) : (
+          <ul className="-mx-4 -mb-4 divide-y divide-border sm:-mx-5 sm:-mb-5">
             {rows.map((row) => (
-              <li key={row.id} className="px-3.5 py-3 sm:px-4">
+              <li key={row.id} className="px-4 py-3 sm:px-5">
                 <div className="flex items-start gap-3">
                   <span
                     className={`mt-0.5 inline-flex shrink-0 rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${typeClass(row.type)}`}
@@ -174,12 +166,8 @@ export default function HistoryPage() {
               </li>
             ))}
           </ul>
-        </section>
-      )}
-
-      <p className="px-0.5 text-center font-mono text-[10px] text-muted">
-        Sends · claims · swaps · last 30
-      </p>
-    </div>
+        )}
+      </AppSection>
+    </AppPage>
   );
 }
