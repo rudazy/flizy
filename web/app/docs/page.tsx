@@ -32,6 +32,16 @@ const CMD_GROUPS: Array<{
         meaning: 'Hold for that GitHub account until they claim',
       },
       {
+        wa: 'flizy send 0.01 to 123… on discord',
+        tg: '/send 0.01 to 123… on discord',
+        meaning: 'Hold for Discord (user id, or handle if already on Flizy)',
+      },
+      {
+        wa: 'flizy send 0.01 to @user on x',
+        tg: '/send 0.01 to @user on x',
+        meaning: 'Hold for that X account until they claim',
+      },
+      {
         wa: 'flizy send 10 FLZ to john',
         tg: '/send 10 FLZ to john',
         meaning: 'Send FLZ to a trusted name (when you hold FLZ)',

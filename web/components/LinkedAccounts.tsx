@@ -1,15 +1,8 @@
 'use client';
 
 /**
- * Platform identities on the Account tab.
- *
- * Unlinked shows one button. Linked shows the platform, the handle and a
- * verified mark, plus the way back out. The handle is rendered as returned by
- * the server, which already put it through displaySafeLabel, and it is never
- * treated as an identifier: the numeric id it routes on is not sent here at all.
- *
- * Unlink asks for the password because it changes where future payments can go,
- * and because it is the only way to move an identity to another account.
+ * Platform identities on the Account tab: GitHub, Discord, X.
+ * Bind via OAuth; unlink behind password. Numeric ids never leave the server.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -20,29 +13,56 @@ type Identity = {
   linked_at: string | null;
 };
 
-const CHANNEL_LABELS: Record<string, string> = {
-  github: 'GitHub',
-};
+const PLATFORMS: Array<{
+  channel: 'github' | 'discord' | 'x';
+  label: string;
+  startHref: string;
+  queryKey: string;
+}> = [
+  { channel: 'github', label: 'GitHub', startHref: '/api/auth/github/start', queryKey: 'github' },
+  {
+    channel: 'discord',
+    label: 'Discord',
+    startHref: '/api/auth/discord/start',
+    queryKey: 'discord',
+  },
+  { channel: 'x', label: 'X', startHref: '/api/auth/x/start', queryKey: 'x' },
+];
 
-/** Status codes the OAuth callback redirects back with. */
-const CALLBACK_MESSAGES: Record<string, { text: string; tone: 'ok' | 'warn' }> = {
-  linked: { text: 'GitHub linked.', tone: 'ok' },
-  cancelled: { text: 'GitHub linking was cancelled.', tone: 'warn' },
-  identity_taken: {
-    text: 'That GitHub is already linked to another Flizy account. Unlink it there first.',
-    tone: 'warn',
-  },
-  already_linked: {
-    text: 'This account already has a different GitHub linked. Unlink it first.',
-    tone: 'warn',
-  },
-  state_invalid: { text: 'That link request expired or did not match. Try again.', tone: 'warn' },
-  exchange_failed: { text: 'GitHub did not complete the sign in. Try again.', tone: 'warn' },
-  rate_limited: { text: 'Too many attempts. Wait a little and try again.', tone: 'warn' },
-  login_required: { text: 'Log in and try again.', tone: 'warn' },
-  unavailable: { text: 'GitHub linking is not available right now.', tone: 'warn' },
-  error: { text: 'Something went wrong. Try again.', tone: 'warn' },
-};
+function callbackMessage(
+  platform: string,
+  status: string
+): { text: string; tone: 'ok' | 'warn' } {
+  const name = platform === 'x' ? 'X' : platform === 'discord' ? 'Discord' : 'GitHub';
+  const map: Record<string, { text: string; tone: 'ok' | 'warn' }> = {
+    linked: { text: `${name} linked.`, tone: 'ok' },
+    cancelled: { text: `${name} linking was cancelled.`, tone: 'warn' },
+    identity_taken: {
+      text: `That ${name} is already linked to another Flizy account. Unlink it there first.`,
+      tone: 'warn',
+    },
+    already_linked: {
+      text: `This account already has a different ${name} linked. Unlink it first.`,
+      tone: 'warn',
+    },
+    state_invalid: {
+      text: 'That link request expired or did not match. Try again.',
+      tone: 'warn',
+    },
+    exchange_failed: {
+      text: `${name} did not complete the sign in. Try again.`,
+      tone: 'warn',
+    },
+    rate_limited: { text: 'Too many attempts. Wait a little and try again.', tone: 'warn' },
+    login_required: { text: 'Log in and try again.', tone: 'warn' },
+    unavailable: {
+      text: `${name} linking is not available right now (app credentials missing).`,
+      tone: 'warn',
+    },
+    error: { text: 'Something went wrong. Try again.', tone: 'warn' },
+  };
+  return map[status] || map.error;
+}
 
 function VerifiedMark() {
   return (
@@ -86,17 +106,21 @@ export function LinkedAccounts() {
     void load();
   }, [load]);
 
-  // Read the callback result from the URL, then strip it so a refresh does not
-  // show a stale outcome. Deliberately not useSearchParams, which would pull
-  // this subtree into a Suspense boundary for no gain.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const status = params.get('github');
-    if (!status) return;
-    setNotice(CALLBACK_MESSAGES[status] || CALLBACK_MESSAGES.error);
-    params.delete('github');
-    const rest = params.toString();
-    window.history.replaceState({}, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
+    for (const p of PLATFORMS) {
+      const status = params.get(p.queryKey);
+      if (!status) continue;
+      setNotice(callbackMessage(p.channel, status));
+      params.delete(p.queryKey);
+      const rest = params.toString();
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${rest ? `?${rest}` : ''}`
+      );
+      break;
+    }
   }, []);
 
   async function onUnlink(channel: string) {
@@ -126,14 +150,11 @@ export function LinkedAccounts() {
     }
   }
 
-  const github = (identities || []).find((i) => i.channel === 'github') || null;
-
-  // Content-only (parent Account subsection supplies the card chrome)
   return (
-    <div>
+    <div className="space-y-3">
       {notice ? (
         <p
-          className={`mb-3 rounded-md border px-3 py-2 font-mono text-[11px] ${
+          className={`rounded-md border px-3 py-2 font-mono text-[11px] ${
             notice.tone === 'ok'
               ? 'border-lime/40 bg-lime/10 text-lime'
               : 'border-gold/40 bg-gold/10 text-gold'
@@ -145,63 +166,70 @@ export function LinkedAccounts() {
 
       {identities === null ? (
         <p className="font-mono text-xs text-muted">Loading...</p>
-      ) : github ? (
-        <div className="rounded-md border border-border bg-ink/40 px-3 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-sans text-sm text-paper">{CHANNEL_LABELS.github}</span>
-                <VerifiedMark />
-              </div>
-              <p className="mt-0.5 truncate font-mono text-xs text-lime">
-                {github.handle ? `@${github.handle}` : 'linked'}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
-              disabled={busy}
-              onClick={() => onUnlink('github')}
-            >
-              {busy ? 'Working...' : 'Unlink'}
-            </button>
-          </div>
-
-          {unlinking === 'github' ? (
-            <div className="mt-3 space-y-2">
-              <p className="font-mono text-[11px] text-muted">
-                Unlinking frees this GitHub for another account and stops claims to it here.
-              </p>
-              <input
-                type="password"
-                className="input w-full"
-                placeholder="Account password"
-                value={password}
-                autoComplete="current-password"
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          ) : null}
-        </div>
       ) : (
-        <div className="rounded-md border border-border bg-ink/40 px-3 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="font-sans text-sm text-paper">{CHANNEL_LABELS.github}</p>
-              <p className="mt-0.5 font-mono text-xs text-muted">Not linked</p>
-            </div>
-            <a
-              href="/api/auth/github/start"
-              className="btn btn-primary shrink-0 px-3 py-1.5 text-xs no-underline"
+        PLATFORMS.map((p) => {
+          const row = identities.find((i) => i.channel === p.channel) || null;
+          return (
+            <div
+              key={p.channel}
+              className="rounded-md border border-border bg-ink/40 px-3 py-3"
             >
-              Link GitHub
-            </a>
-          </div>
-        </div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-sans text-sm text-paper">{p.label}</span>
+                    {row ? <VerifiedMark /> : null}
+                  </div>
+                  <p
+                    className={`mt-0.5 truncate font-mono text-xs ${
+                      row ? 'text-lime' : 'text-muted'
+                    }`}
+                  >
+                    {row ? (row.handle ? `@${row.handle}` : 'linked') : 'Not linked'}
+                  </p>
+                </div>
+                {row ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
+                    disabled={busy}
+                    onClick={() => onUnlink(p.channel)}
+                  >
+                    {busy ? 'Working...' : 'Unlink'}
+                  </button>
+                ) : (
+                  <a
+                    href={p.startHref}
+                    className="btn btn-primary shrink-0 px-3 py-1.5 text-xs no-underline"
+                  >
+                    Link {p.label}
+                  </a>
+                )}
+              </div>
+
+              {unlinking === p.channel ? (
+                <div className="mt-3 space-y-2">
+                  <p className="font-mono text-[11px] text-muted">
+                    Unlinking frees this {p.label} for another account and stops claims to it
+                    here.
+                  </p>
+                  <input
+                    type="password"
+                    className="input w-full"
+                    placeholder="Account password"
+                    value={password}
+                    autoComplete="current-password"
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              ) : null}
+            </div>
+          );
+        })
       )}
 
-      <p className="mt-3 font-mono text-[10px] text-muted">
-        Discord and X: same list when they ship. One identity per platform.
+      <p className="font-mono text-[10px] text-muted">
+        One identity per platform. Money routes on the platform id, not the handle.
       </p>
     </div>
   );

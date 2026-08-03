@@ -24,7 +24,7 @@ const ROUTE_GET = 'GET /api/identity';
 const ROUTE_DELETE = 'DELETE /api/identity';
 
 /** Channels the Account tab can show and unlink. */
-const SUPPORTED = ['github'] as const;
+const SUPPORTED = ['github', 'discord', 'x'] as const;
 
 export async function GET() {
   try {
