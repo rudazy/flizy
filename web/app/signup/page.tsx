@@ -3,15 +3,22 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { PasswordField } from '../../components/PasswordField';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { validatePassword } from '../../lib/passwordPolicy';
 import { validateUsername } from '../../lib/username';
 import type { LocaleCode } from '../../lib/locale';
 
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/dashboard?welcome=1';
+  return raw;
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const { t, locale, setLocale } = useLocale();
+  const [next, setNext] = useState('/dashboard?welcome=1');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -19,6 +26,10 @@ export default function SignupPage() {
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setNext(safeNext(new URLSearchParams(window.location.search).get('next')));
+  }, []);
 
   const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
@@ -57,7 +68,7 @@ export default function SignupPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Signup failed');
-      router.push('/dashboard?welcome=1');
+      router.push(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
@@ -173,7 +184,14 @@ export default function SignupPage() {
         </button>
         <p className="text-center text-sm text-muted">
           {t('auth.signup.hasAccount')}{' '}
-          <Link href="/login" className="text-lime no-underline hover:text-gold">
+          <Link
+            href={
+              next.startsWith('/claim/')
+                ? `/login?next=${encodeURIComponent(next)}`
+                : '/login'
+            }
+            className="text-lime no-underline hover:text-gold"
+          >
             {t('auth.signup.login')}
           </Link>
         </p>

@@ -1,18 +1,28 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import type { LocaleCode } from '../../lib/locale';
 
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/dashboard';
+  return raw;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { t, locale, setLocale } = useLocale();
+  const [next, setNext] = useState('/dashboard');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setNext(safeNext(new URLSearchParams(window.location.search).get('next')));
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,7 +36,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
-      router.push('/dashboard');
+      router.push(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -85,7 +95,10 @@ export default function LoginPage() {
         </button>
         <p className="text-center text-sm text-muted">
           {t('auth.login.newHere')}{' '}
-          <Link href="/signup" className="text-lime no-underline hover:text-gold">
+          <Link
+            href={next !== '/dashboard' ? `/signup?next=${encodeURIComponent(next)}` : '/signup'}
+            className="text-lime no-underline hover:text-gold"
+          >
             {t('auth.login.create')}
           </Link>
         </p>

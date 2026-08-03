@@ -39,6 +39,8 @@ export default function DashboardHomePage() {
   const [pin2, setPin2] = useState('');
   const [pinPassword, setPinPassword] = useState('');
   const [githubLinkedNotice, setGithubLinkedNotice] = useState(false);
+  const [claimBusyId, setClaimBusyId] = useState('');
+  const [claimMsg, setClaimMsg] = useState('');
 
   const pendingClaims = data?.pendingClaims || [];
   const needsPin = data ? !data.account.has_pin : false;
@@ -109,6 +111,30 @@ export default function DashboardHomePage() {
       setPin('');
       setPin2('');
       setPinPassword('');
+    }
+  }
+
+  async function onClaimOne(claimId: string) {
+    setClaimBusyId(claimId);
+    setClaimMsg('');
+    try {
+      const res = await fetch('/api/claim/payout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setClaimMsg(json.error || 'Could not claim.');
+        return;
+      }
+      setClaimMsg('Claim received. Funds are in your wallet.');
+      await refreshAll();
+      setSlide('claims');
+    } catch {
+      setClaimMsg('Could not claim. Try again.');
+    } finally {
+      setClaimBusyId('');
     }
   }
 
@@ -285,10 +311,19 @@ export default function DashboardHomePage() {
       {slide === 'claims' ? (
         <AppSection
           title="Pending claims"
-          helper="Money held for you. Claim in WhatsApp or Telegram with flizy claim (web payout later)."
+          helper="Money held for you. Claim here once the matching phone or platform is linked — or use flizy claim in chat."
           badge={pendingClaims.length ? String(pendingClaims.length) : '0'}
           badgeTone={pendingClaims.length ? 'gold' : 'default'}
         >
+          {claimMsg ? (
+            <div
+              className={`mb-3 alert text-sm ${
+                claimMsg.includes('received') ? 'alert-ok' : 'alert-error'
+              }`}
+            >
+              {claimMsg}
+            </div>
+          ) : null}
           {pendingClaims.length === 0 ? (
             <p className="text-xs text-muted">
               No pending claims. After someone sends to your GitHub or phone, holds show here once
@@ -300,28 +335,36 @@ export default function DashboardHomePage() {
                 {pendingClaims.map((c) => (
                   <li
                     key={c.id}
-                    className="flex items-start justify-between gap-2 py-2.5 first:pt-0 last:pb-0"
+                    className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
                       <p className="truncate font-sans text-sm text-paper">
                         {c.counterparty || c.label}
                       </p>
                       <p className="mt-0.5 font-mono text-[10px] uppercase text-muted">
-                        held · claim in chat
+                        held · claim here or in chat
+                      </p>
+                      <p className="mt-1 font-sans text-sm text-lime">
+                        +
+                        {Number(c.amountEth).toLocaleString(undefined, {
+                          maximumFractionDigits: 6,
+                        })}{' '}
+                        ETH
                       </p>
                     </div>
-                    <p className="shrink-0 font-sans text-sm text-lime">
-                      +
-                      {Number(c.amountEth).toLocaleString(undefined, {
-                        maximumFractionDigits: 6,
-                      })}{' '}
-                      ETH
-                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-primary shrink-0 py-2.5 text-sm font-semibold sm:min-w-[7rem]"
+                      disabled={Boolean(claimBusyId)}
+                      onClick={() => void onClaimOne(c.id)}
+                    >
+                      {claimBusyId === c.id ? 'Claiming…' : 'Claim'}
+                    </button>
                   </li>
                 ))}
               </ul>
               <p className="mt-3 text-xs text-muted">
-                Open the bot, unlock if needed, then send{' '}
+                Chat works too: unlock if needed, then{' '}
                 <span className="font-mono text-paper">flizy claim</span>.
               </p>
             </>
