@@ -223,8 +223,20 @@ describe('the recipient is notified the moment the claim is held', () => {
     const body = delivered.whatsapp[0].body;
     assert.match(body, /Pending claim/i);
     assert.match(body, /0\.1 ETH/);
-    assert.match(body, new RegExp(`\\+${SENDER_WA}`), 'should say who it is from');
+    // Prefer Flizy @username, then display name, then phone — never raw email.
+    // Seeded sender has display_name "Sender" and no username.
+    assert.match(body, /From:\s+Sender/, 'should name the sender (display name)');
     assert.match(body, /flizy claim/i, 'should say how to receive it');
+  });
+
+  it('prefers Flizy @username over display name in From', async () => {
+    seed({ recipientOnFlizy: true });
+    const acc = fake.db.tables.accounts.find((a) => a.id === 'acc-sender');
+    acc.username = 'alice';
+    await sendAndConfirm(RECIPIENT_PHONE, '0.05');
+    const body = delivered.whatsapp[0].body;
+    assert.match(body, /From:\s+@alice/, 'username wins over display name');
+    assert.doesNotMatch(body, /From:\s+Sender/);
   });
 
   it('works when the recipient is only on Telegram', async () => {

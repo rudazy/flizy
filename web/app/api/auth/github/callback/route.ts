@@ -31,9 +31,16 @@ import { getSupabase } from '../../../../../lib/supabase';
 
 const ROUTE = 'GET /api/auth/github/callback';
 
-function accountUrl(status: string): string {
+/**
+ * Success lands on Home so pending claims after bind are visible immediately.
+ * Failures go to Account (platforms section) where the user started Link GitHub.
+ */
+function postOAuthUrl(status: string): string {
   const base = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || '').replace(/\/$/, '');
-  return `${base}/dashboard?tab=account&github=${encodeURIComponent(status)}`;
+  if (status === 'linked') {
+    return `${base}/dashboard?github=linked`;
+  }
+  return `${base}/dashboard/account?github=${encodeURIComponent(status)}`;
 }
 
 export async function GET(req: Request) {
@@ -48,7 +55,7 @@ export async function GET(req: Request) {
     if (sessionKey) {
       const limit = await callbackLimitState(sessionKey);
       if (limit.locked) {
-        return NextResponse.redirect(accountUrl('rate_limited'));
+        return NextResponse.redirect(postOAuthUrl('rate_limited'));
       }
     }
 
@@ -56,13 +63,13 @@ export async function GET(req: Request) {
       // A misconfiguration, not a user error. Which variable is missing stays
       // in the server log.
       logApiError(ROUTE, new Error('GitHub OAuth env is incomplete'));
-      return NextResponse.redirect(accountUrl('unavailable'));
+      return NextResponse.redirect(postOAuthUrl('unavailable'));
     }
 
     // 2. Who is asking.
     const accountId = await getAccountIdFromCookie();
     if (!accountId || !sessionKey) {
-      return NextResponse.redirect(accountUrl('login_required'));
+      return NextResponse.redirect(postOAuthUrl('login_required'));
     }
 
     const url = new URL(req.url);
@@ -72,7 +79,7 @@ export async function GET(req: Request) {
     // The user pressed cancel on GitHub's consent screen. Not a failure worth
     // counting against them.
     if (url.searchParams.get('error')) {
-      return NextResponse.redirect(accountUrl('cancelled'));
+      return NextResponse.redirect(postOAuthUrl('cancelled'));
     }
 
     // 3. Did we start this, from this session, recently.
@@ -80,19 +87,19 @@ export async function GET(req: Request) {
     if (!stateCheck.ok) {
       console.warn(`[oauth] state rejected: ${stateCheck.reason}`);
       await recordCallbackFailure(sessionKey);
-      return NextResponse.redirect(accountUrl('state_invalid'));
+      return NextResponse.redirect(postOAuthUrl('state_invalid'));
     }
 
     if (!code) {
       await recordCallbackFailure(sessionKey);
-      return NextResponse.redirect(accountUrl('state_invalid'));
+      return NextResponse.redirect(postOAuthUrl('state_invalid'));
     }
 
     // 4. GitHub proves the identity. The token is used once and discarded.
     const identity = await exchangeCodeForIdentity(code);
     if (!identity) {
       await recordCallbackFailure(sessionKey);
-      return NextResponse.redirect(accountUrl('exchange_failed'));
+      return NextResponse.redirect(postOAuthUrl('exchange_failed'));
     }
 
     // 5. Bind. Policy is reject: an identity already on another account is not
@@ -109,22 +116,22 @@ export async function GET(req: Request) {
       });
     } catch (err) {
       if (err instanceof BindError) {
-        if (err.code === 'IDENTITY_TAKEN') return NextResponse.redirect(accountUrl('identity_taken'));
+        if (err.code === 'IDENTITY_TAKEN') return NextResponse.redirect(postOAuthUrl('identity_taken'));
         if (err.code === 'ALREADY_LINKED_DIFFERENT') {
-          return NextResponse.redirect(accountUrl('already_linked'));
+          return NextResponse.redirect(postOAuthUrl('already_linked'));
         }
-        if (err.code === 'LOCKED') return NextResponse.redirect(accountUrl('rate_limited'));
+        if (err.code === 'LOCKED') return NextResponse.redirect(postOAuthUrl('rate_limited'));
       }
       throw err;
     }
 
     await clearCallbackFailures(sessionKey);
-    return NextResponse.redirect(accountUrl('linked'));
+    return NextResponse.redirect(postOAuthUrl('linked'));
   } catch (err) {
     // Routes the failure through the same helper every other route uses, which
     // redacts secret-shaped substrings before they reach the log and rethrows
     // Next's dynamic-usage signal rather than swallowing it as a fake 500.
     logApiError(ROUTE, err);
-    return NextResponse.redirect(accountUrl('error'));
+    return NextResponse.redirect(postOAuthUrl('error'));
   }
 }

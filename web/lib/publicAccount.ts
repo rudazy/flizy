@@ -15,6 +15,8 @@ export type AccountRow = {
   id?: string;
   email?: string | null;
   display_name?: string | null;
+  /** Flizy @username (recognition only; not a payment key) */
+  username?: string | null;
   agent_wallet_address?: string | null;
   balance_eth?: number | string | null;
   unlock_pin_hash?: string | null;
@@ -25,6 +27,8 @@ export type AccountRow = {
 export type PublicAccount = {
   email?: string | null;
   display_name?: string | null;
+  /** Canonical lowercase username without @, or null */
+  username?: string | null;
   agent_wallet_address?: string | null;
   balance_eth?: number | string;
   has_pin?: boolean;
@@ -40,6 +44,10 @@ export function toPublicAccount(row: AccountRow | null | undefined): PublicAccou
 
   if ('email' in row) out.email = row.email ?? null;
   if ('display_name' in row) out.display_name = row.display_name ?? null;
+  if ('username' in row) {
+    const u = row.username == null ? null : String(row.username).trim().toLowerCase();
+    out.username = u || null;
+  }
   if ('agent_wallet_address' in row) out.agent_wallet_address = row.agent_wallet_address ?? null;
   if ('balance_eth' in row) out.balance_eth = row.balance_eth ?? 0;
   // Presence of a PIN is safe to expose; the hash never is.

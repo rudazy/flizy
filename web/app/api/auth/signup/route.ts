@@ -5,6 +5,7 @@ import { createSession } from '../../../../lib/cookies';
 import { validatePassword } from '../../../../lib/passwordPolicy';
 import { deriveAgentAddress } from '../../../../lib/agentWallet';
 import { toPublicAccount } from '../../../../lib/publicAccount';
+import { validateUsername } from '../../../../lib/username';
 import { apiErrorBody } from '../../../../lib/apiError';
 
 const ROUTE = 'POST /api/auth/signup';
@@ -17,6 +18,17 @@ export async function POST(req: Request) {
       .toLowerCase();
     const password = String(body.password || '');
     const displayName = String(body.displayName || '').trim() || null;
+
+    // Optional at signup; can be set later on Account.
+    let username: string | null = null;
+    const rawUsername = body.username;
+    if (rawUsername != null && String(rawUsername).trim() !== '') {
+      const check = validateUsername(rawUsername);
+      if (!check.ok) {
+        return NextResponse.json({ error: check.error }, { status: 400 });
+      }
+      username = check.username;
+    }
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
@@ -34,15 +46,20 @@ export async function POST(req: Request) {
         email,
         password_hash,
         display_name: displayName,
+        username,
         agent_wallet_address: null,
       })
-      .select('id, email, display_name, agent_wallet_address')
+      .select('id, email, display_name, username, agent_wallet_address')
       .single();
 
     if (error) {
       // Reading the constraint is ours to do; the client gets the sentence we
       // wrote for it, not the constraint name.
       if (String(error.message).includes('duplicate') || error.code === '23505') {
+        const msg = String(error.message || '').toLowerCase();
+        if (msg.includes('username') || (username && msg.includes('accounts_username'))) {
+          return NextResponse.json({ error: 'That username is taken.' }, { status: 409 });
+        }
         return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
       }
       // No email in the log line: an identifier that is also PII is not worth it
@@ -55,7 +72,7 @@ export async function POST(req: Request) {
       .from('accounts')
       .update({ agent_wallet_address: deriveAgentAddress(data.id) })
       .eq('id', data.id)
-      .select('email, display_name, agent_wallet_address, balance_eth')
+      .select('email, display_name, username, agent_wallet_address, balance_eth')
       .single();
     if (wErr) {
       return NextResponse.json(apiErrorBody(ROUTE, wErr, { accountId: data.id }), { status: 500 });

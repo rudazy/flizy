@@ -1,9 +1,21 @@
+export type PendingClaimItem = {
+  id: string;
+  amountEth: string;
+  status: string;
+  label: string;
+  counterparty: string | null;
+  createdAt: string | null;
+  claimToken: string | null;
+};
+
 export type DashboardData = {
   account: {
     // No id. The account id is agent wallet key material and never leaves the
     // server. See web/lib/publicAccount.ts.
     email?: string | null;
     display_name?: string | null;
+    /** Flizy @username without leading @, or null */
+    username?: string | null;
     agent_wallet_address?: string | null;
     balance_eth?: number | string;
     has_pin: boolean;
@@ -18,6 +30,8 @@ export type DashboardData = {
     telegramDeepLink?: string | null;
     expiresAt: string;
   } | null;
+  /** Claims this account can receive after proving phone / platform identity */
+  pendingClaims?: PendingClaimItem[];
 };
 
 /** Legacy transfer row shape */

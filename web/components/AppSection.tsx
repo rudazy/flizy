@@ -1,44 +1,126 @@
 /**
  * Structure-only layout primitives (LAYOUT.md).
- * Colors and chrome stay existing Flizy tokens — these only fix placement.
+ * Colors stay Flizy tokens. Sections on multi-mode screens are SLIDES:
+ * chip selects one panel; only that panel’s content is shown — no scroll-to-anchor.
  */
+
+'use client';
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { useCallback, useMemo } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 /** Page column rhythm */
 export function AppPage({ children }: { children: ReactNode }) {
   return <div className="space-y-4 pb-2">{children}</div>;
 }
 
-/** Horizontal jump chips for long settings pages — skip scroll hunting */
+export type SlideNavItem = { id: string; label: string; badge?: string };
+
+/**
+ * Secondary mode chips: switch which slide is on screen.
+ * Not hash links — do not jump down a long page.
+ */
+export function AppSlideNav({
+  items,
+  activeId,
+  onSelect,
+}: {
+  items: SlideNavItem[];
+  activeId: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <nav
+      className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      aria-label="Sections"
+      role="tablist"
+    >
+      {items.map((item) => {
+        const active = item.id === activeId;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onSelect(item.id)}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-sans text-[11px] tracking-wide transition-colors ${
+              active
+                ? 'border-lime/40 bg-lime/10 text-lime'
+                : 'border-border bg-surface text-muted hover:border-[#3a322a] hover:text-paper'
+            }`}
+          >
+            {item.label}
+            {item.badge ? (
+              <span
+                className={`font-mono text-[10px] ${active ? 'text-lime' : 'text-muted'}`}
+              >
+                {item.badge}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
+ * URL-synced slide state: ?s=slideId.
+ * Deep links open the right panel without stacking everything below.
+ */
+export function useSlide(
+  validIds: readonly string[],
+  defaultId: string
+): [string, (id: string) => void] {
+  const search = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname() || '';
+
+  const activeId = useMemo(() => {
+    const raw = search.get('s') || '';
+    if (validIds.includes(raw)) return raw;
+    return defaultId;
+  }, [search, validIds, defaultId]);
+
+  const setSlide = useCallback(
+    (id: string) => {
+      if (!validIds.includes(id)) return;
+      const params = new URLSearchParams(search.toString());
+      if (id === defaultId) {
+        params.delete('s');
+      } else {
+        params.set('s', id);
+      }
+      const q = params.toString();
+      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+    },
+    [validIds, defaultId, search, router, pathname]
+  );
+
+  return [activeId, setSlide];
+}
+
+/** @deprecated Use AppSlideNav — hash jump chips were the wrong model */
 export function AppSectionNav({
   items,
 }: {
   items: Array<{ id: string; label: string; badge?: string }>;
 }) {
   return (
-    <nav
-      className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      aria-label="On this page"
-    >
-      {items.map((item) => (
-        <a
-          key={item.id}
-          href={`#${item.id}`}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-sans text-[11px] tracking-wide text-muted no-underline transition-colors hover:border-[#3a322a] hover:text-paper"
-        >
-          {item.label}
-          {item.badge ? (
-            <span className="font-mono text-[10px] text-lime">{item.badge}</span>
-          ) : null}
-        </a>
-      ))}
-    </nav>
+    <AppSlideNav
+      items={items}
+      activeId={items[0]?.id || ''}
+      onSelect={() => {
+        /* no-op shell if something still imports this; pages should use AppSlideNav */
+      }}
+    />
   );
 }
 
-/** Subsection card: title · helper · badge · body */
+/** Subsection card: title · helper · badge · body (one slide’s content) */
 export function AppSection({
   id,
   title,
@@ -60,10 +142,7 @@ export function AppSection({
     badgeTone === 'gold' ? 'badge badge-gold' : badgeTone === 'lime' ? 'badge badge-lime' : 'badge';
 
   return (
-    <section
-      id={id}
-      className={`card scroll-mt-24 p-4 sm:p-5 ${className}`.trim()}
-    >
+    <section id={id} className={`card p-4 sm:p-5 ${className}`.trim()} role="tabpanel">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-sans text-sm tracking-wide text-paper">{title}</p>
@@ -79,11 +158,7 @@ export function AppSection({
 }
 
 /** Compact status strip (Home top) */
-export function AppStatusStrip({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function AppStatusStrip({ children }: { children: ReactNode }) {
   return (
     <section className="card grid grid-cols-2 gap-0 overflow-hidden sm:grid-cols-4">
       {children}
@@ -123,7 +198,7 @@ export function AppStatusCell({
   );
 }
 
-/** Quick action grid */
+/** Quick action grid — each item should open a real destination or slide (?s=) */
 export function AppQuickActions({
   items,
 }: {

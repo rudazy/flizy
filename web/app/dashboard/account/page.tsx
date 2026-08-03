@@ -1,15 +1,33 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AccordionSection } from '../../../components/Accordion';
+import { useSearchParams } from 'next/navigation';
 import { AppTopBar } from '../../../components/AppTopBar';
-import { AppPage, AppSection, AppSectionNav } from '../../../components/AppSection';
+import {
+  AppPage,
+  AppSection,
+  AppSlideNav,
+  useSlide,
+} from '../../../components/AppSection';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { shortAddr } from '../../../lib/dashboardTypes';
 
+const SLIDES = [
+  'profile',
+  'chat',
+  'platforms',
+  'trusted',
+  'pin',
+  'limits',
+  'security',
+] as const;
+
+type SlideId = (typeof SLIDES)[number];
+
 export default function AccountPage() {
+  const search = useSearchParams();
   const {
     data,
     busy,
@@ -21,6 +39,7 @@ export default function AccountPage() {
     removeTrusted,
     setUnlockPin,
     setDailyLimit,
+    setUsername,
   } = useDashboard();
 
   const [addr, setAddr] = useState('');
@@ -32,41 +51,31 @@ export default function AccountPage() {
   const [pinPassword, setPinPassword] = useState('');
   const [dailyLimit, setDailyLimitInput] = useState('');
   const [limitPassword, setLimitPassword] = useState('');
-  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [usernameInput, setUsernameInput] = useState('');
 
-  const defaults = useMemo((): Record<string, boolean> => {
-    if (!data) {
-      return {
-        chat: true,
-        platforms: true,
-        trusted: false,
-        pin: false,
-        limits: false,
-        security: false,
-      };
-    }
-    return {
-      chat: true,
-      platforms: true,
-      trusted: data.trusted.length === 0,
-      pin: !data.account.has_pin,
-      limits: false,
-      security: false,
-    };
-  }, [data]);
+  // Smart default slide when no ?s= — open the first thing that still needs work.
+  const defaultSlide = useMemo((): SlideId => {
+    if (!data) return 'profile';
+    if (!data.account.has_pin) return 'pin';
+    if (!data.link) return 'chat';
+    if (search.get('github')) return 'platforms';
+    return 'profile';
+  }, [data, search]);
+
+  const [slide, setSlide] = useSlide(SLIDES, defaultSlide);
 
   useEffect(() => {
-    setOpen((prev) => {
-      if (Object.keys(prev).length) return prev;
-      return defaults;
-    });
-  }, [defaults]);
+    if (data?.account?.username) {
+      setUsernameInput(data.account.username);
+    }
+  }, [data?.account?.username]);
+
+  // OAuth error/status lands with ?github= — always show Platforms slide.
+  useEffect(() => {
+    if (search.get('github')) setSlide('platforms');
+  }, [search, setSlide]);
 
   if (!data) return null;
-
-  function toggle(id: string) {
-    setOpen((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
 
   async function onSignOut() {
     setBusy('logout');
@@ -133,12 +142,22 @@ export default function AccountPage() {
     if (ok) setLimitPassword('');
   }
 
+  async function onUsername(e: React.FormEvent) {
+    e.preventDefault();
+    await setUsername(usernameInput);
+  }
+
   const currentLimit =
     data.account.daily_send_limit_eth == null || data.account.daily_send_limit_eth === ''
       ? 'App default'
       : `${data.account.daily_send_limit_eth} ETH / UTC day`;
 
   const nav = [
+    {
+      id: 'profile',
+      label: 'Profile',
+      badge: data.account.username ? `@${data.account.username}` : undefined,
+    },
     { id: 'chat', label: 'Chat', badge: data.link ? undefined : '!' },
     { id: 'platforms', label: 'Platforms' },
     { id: 'trusted', label: 'Trusted', badge: String(data.trusted.length) },
@@ -152,37 +171,66 @@ export default function AccountPage() {
       <AppTopBar title="Account" />
       {msg ? <div className="alert alert-ok text-sm">{msg}</div> : null}
 
-      {/* Jump chips — find a block without scrolling the whole page */}
-      <AppSectionNav items={nav} />
+      <AppSlideNav items={nav} activeId={slide} onSelect={setSlide} />
 
-      <AppSection
-        title="Profile"
-        helper="Signed-in account. Username (when shipped) will live here too."
-      >
-        <p className="text-sm text-paper">{data.account.email}</p>
-        {data.account.display_name ? (
-          <p className="mt-1 text-xs text-muted">{data.account.display_name}</p>
-        ) : (
-          <p className="mt-1 text-xs text-muted">No display name yet</p>
-        )}
-      </AppSection>
-
-      {/* Chat apps */}
-      <div id="chat" className="scroll-mt-24">
-        <AccordionSection
-          id="chat"
-          title="Chat apps"
-          badge={data.link ? 'Ready' : 'Needed'}
-          open={Boolean(open.chat)}
-          onToggle={toggle}
+      {/* One slide at a time — chips switch the panel, they do not scroll the page */}
+      {slide === 'profile' ? (
+        <AppSection
+          title="Profile"
+          helper="Email, display name, and Flizy @username (recognition only — not a payment route)."
+          badge={data.account.username ? `@${data.account.username}` : 'Username?'}
+          badgeTone={data.account.username ? 'lime' : 'gold'}
         >
-          <p className="text-xs leading-relaxed text-muted">
-            Generate a one-time code, then open WhatsApp or Telegram. Both can link to this
-            account. A code works once — generate again for the second app.
-          </p>
+          <p className="text-sm text-paper">{data.account.email}</p>
+          {data.account.display_name ? (
+            <p className="mt-1 text-xs text-muted">{data.account.display_name}</p>
+          ) : (
+            <p className="mt-1 text-xs text-muted">No display name yet</p>
+          )}
+          <form onSubmit={onUsername} className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <div>
+              <label className="label" htmlFor="flizy-username">
+                Username
+              </label>
+              <input
+                id="flizy-username"
+                className="input"
+                placeholder="letters, numbers, underscore"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value.replace(/\s/g, ''))}
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={25}
+                required
+              />
+              <p className="mt-1.5 text-xs text-muted">
+                3–24 chars, start with a letter. Used in “claimed by @you” — never to route money.
+              </p>
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                className="btn btn-primary w-full py-3 font-semibold sm:w-auto sm:px-6"
+                disabled={busy === 'username'}
+              >
+                {busy === 'username' ? 'Saving…' : data.account.username ? 'Update' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </AppSection>
+      ) : null}
+
+      {slide === 'chat' ? (
+        <AppSection
+          title="Chat apps"
+          helper="Generate a one-time code, then open WhatsApp or Telegram. A code works once."
+          badge={data.link ? 'Ready' : 'Needed'}
+          badgeTone={data.link ? 'lime' : 'gold'}
+        >
           <button
             type="button"
-            className="btn btn-primary mt-4 w-full py-3.5 text-base font-semibold"
+            className="btn btn-primary w-full py-3.5 text-base font-semibold"
             onClick={() => generateLink()}
             disabled={busy === 'link'}
           >
@@ -216,37 +264,26 @@ export default function AccountPage() {
               <CopyButton value={`flizy link ${data.link.code}`} label="Copy message" />
             </div>
           ) : null}
-        </AccordionSection>
-      </div>
+        </AppSection>
+      ) : null}
 
-      {/* Platforms — slot for GitHub now, Discord/X later */}
-      <div id="platforms" className="scroll-mt-24">
-        <AccordionSection
-          id="platforms"
+      {slide === 'platforms' ? (
+        <AppSection
           title="Platforms"
+          helper="Link GitHub so people can send claims to @you on github. Discord and X use the same place when they ship."
           badge="GitHub"
-          open={Boolean(open.platforms)}
-          onToggle={toggle}
         >
-          <p className="mb-4 text-xs leading-relaxed text-muted">
-            Link GitHub so people can send claims to @you on github. Discord and X use the same
-            place when they ship.
-          </p>
           <LinkedAccounts />
-        </AccordionSection>
-      </div>
+        </AppSection>
+      ) : null}
 
-      {/* Trusted */}
-      <div id="trusted" className="scroll-mt-24">
-        <AccordionSection
-          id="trusted"
+      {slide === 'trusted' ? (
+        <AppSection
           title="Trusted wallets"
+          helper="Only these names can receive chat sends."
           badge={`${data.trusted.length}`}
-          open={Boolean(open.trusted)}
-          onToggle={toggle}
         >
-          <p className="text-xs text-muted">Only these names can receive chat sends.</p>
-          <form onSubmit={onAddTrusted} className="mt-4 grid gap-3">
+          <form onSubmit={onAddTrusted} className="grid gap-3">
             <div>
               <label className="label">Name</label>
               <input
@@ -329,23 +366,17 @@ export default function AccountPage() {
               </div>
             ) : null}
           </div>
-        </AccordionSection>
-      </div>
+        </AppSection>
+      ) : null}
 
-      {/* PIN */}
-      <div id="pin" className="scroll-mt-24">
-        <AccordionSection
-          id="pin"
+      {slide === 'pin' ? (
+        <AppSection
           title="Unlock PIN"
+          helper="For flizy lock / unlock in chat. Password also works."
           badge={data.account.has_pin ? 'Set' : 'Required'}
-          open={Boolean(open.pin)}
-          onToggle={toggle}
+          badgeTone={data.account.has_pin ? 'lime' : 'gold'}
         >
-          <p className="text-xs text-muted">
-            For <span className="text-paper">flizy lock</span> /{' '}
-            <span className="text-paper">unlock</span>. Password also works.
-          </p>
-          <form onSubmit={onPin} className="mt-4 grid gap-3">
+          <form onSubmit={onPin} className="grid gap-3">
             <div>
               <label className="label">New PIN</label>
               <input
@@ -377,20 +408,16 @@ export default function AccountPage() {
               {busy === 'pin' ? 'Saving...' : data.account.has_pin ? 'Update PIN' : 'Save PIN'}
             </button>
           </form>
-        </AccordionSection>
-      </div>
+        </AppSection>
+      ) : null}
 
-      {/* Limits */}
-      <div id="limits" className="scroll-mt-24">
-        <AccordionSection
-          id="limits"
+      {slide === 'limits' ? (
+        <AppSection
           title="Daily send limit"
+          helper={`Current: ${currentLimit}`}
           badge="Policy"
-          open={Boolean(open.limits)}
-          onToggle={toggle}
         >
-          <p className="text-xs text-muted">Current: {currentLimit}</p>
-          <form onSubmit={onDailyLimit} className="mt-4 grid gap-3">
+          <form onSubmit={onDailyLimit} className="grid gap-3">
             <div>
               <label className="label">Limit (ETH / day)</label>
               <input
@@ -416,22 +443,18 @@ export default function AccountPage() {
               {busy === 'limit' ? 'Saving...' : 'Save daily limit'}
             </button>
           </form>
-        </AccordionSection>
-      </div>
+        </AppSection>
+      ) : null}
 
-      {/* Security */}
-      <div id="security" className="scroll-mt-24">
-        <AccordionSection
-          id="security"
+      {slide === 'security' ? (
+        <AppSection
           title="Security"
-          open={Boolean(open.security)}
-          onToggle={toggle}
+          helper="Password is required to change trusted wallets and limits."
         >
           <p className="text-xs leading-relaxed text-muted">
-            Signed in as <span className="text-paper">{data.account.email}</span>. Password is
-            required to change trusted wallets and limits.
+            Signed in as <span className="text-paper">{data.account.email}</span>.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <a href="/docs" className="btn btn-ghost text-sm no-underline">
               Security docs
             </a>
@@ -444,8 +467,8 @@ export default function AccountPage() {
               {busy === 'logout' ? 'Signing out…' : 'Sign out'}
             </button>
           </div>
-        </AccordionSection>
-      </div>
+        </AppSection>
+      ) : null}
     </AppPage>
   );
 }

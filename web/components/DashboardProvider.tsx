@@ -38,6 +38,7 @@ type DashboardContextValue = {
   removeTrusted: (address: string, password: string) => Promise<boolean>;
   setUnlockPin: (pin: string, password: string) => Promise<boolean>;
   setDailyLimit: (limit: number | null, password: string) => Promise<boolean>;
+  setUsername: (username: string) => Promise<boolean>;
   explorerBase: string;
 };
 
@@ -268,6 +269,32 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [load]
   );
 
+  const setUsername = useCallback(
+    async (username: string) => {
+      setBusy('username');
+      setMsg('');
+      try {
+        const res = await fetch('/api/account/username', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed');
+        const u = json.account?.username ? `@${json.account.username}` : 'Username';
+        setMsg(`${u} saved. Claimed-by notifications will use this label.`);
+        await loadAccount();
+        return true;
+      } catch (err) {
+        setMsg(err instanceof Error ? err.message : 'Failed');
+        return false;
+      } finally {
+        setBusy('');
+      }
+    },
+    [loadAccount]
+  );
+
   const explorerBase =
     holdings?.holdings?.chain?.explorerBaseUrl || 'https://sepolia-explorer.giwa.io';
 
@@ -290,6 +317,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       removeTrusted,
       setUnlockPin,
       setDailyLimit,
+      setUsername,
       explorerBase,
     }),
     [
@@ -308,6 +336,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       removeTrusted,
       setUnlockPin,
       setDailyLimit,
+      setUsername,
       explorerBase,
     ]
   );

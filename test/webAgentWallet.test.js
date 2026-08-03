@@ -105,6 +105,16 @@ describe('account id never leaves the server', () => {
     assert.equal(out.daily_send_limit_eth, null);
   });
 
+  it('includes username when selected and never the account id', () => {
+    const out = webPublicAccount.toPublicAccount({
+      id: 'acct-secret-id',
+      username: 'RudaZy',
+      email: 'user@example.com',
+    });
+    assert.equal(out.username, 'rudazy');
+    assert.equal('id' in out, false);
+  });
+
   it('emits only the keys the caller selected', () => {
     const out = webPublicAccount.toPublicAccount({ email: 'a@b.c', display_name: 'A' });
     assert.deepEqual(Object.keys(out).sort(), ['display_name', 'email']);

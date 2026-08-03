@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -38,7 +39,12 @@ export default function SignupPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, displayName }),
+        body: JSON.stringify({
+          email,
+          password,
+          displayName,
+          username: username.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Signup failed');
@@ -64,14 +70,13 @@ export default function SignupPage() {
         </p>
         <ol className="mt-8 space-y-3 text-sm text-muted">
           <li className="flex gap-3">
-            <span className="text-lime">1</span> Account + agent wallet
+            <span className="text-lime">1</span> Account, optional @username, agent wallet
           </li>
           <li className="flex gap-3">
             <span className="text-lime">2</span> Set unlock PIN (required for lock/unlock)
           </li>
           <li className="flex gap-3">
-            <span className="text-lime">3</span> Open the bot on WhatsApp or Telegram with your link
-            code, then send
+            <span className="text-lime">3</span> Link chat + platforms (e.g. GitHub), claim holds
           </li>
         </ol>
       </div>
@@ -89,6 +94,26 @@ export default function SignupPage() {
             onChange={(e) => setDisplayName(e.target.value)}
             autoComplete="nickname"
           />
+        </div>
+        <div>
+          <label className="label" htmlFor="username">
+            Username (optional)
+          </label>
+          <input
+            id="username"
+            className="input"
+            placeholder="@you — unique on Flizy"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={25}
+          />
+          <p className="mt-1.5 text-xs text-muted">
+            Shown when you claim money (e.g. claimed by @you). Not used to route payments. You can
+            set this later on Account.
+          </p>
         </div>
         <div>
           <label className="label" htmlFor="email">

@@ -4,12 +4,13 @@ import { listTrusted } from '../../../lib/trusted';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { deriveAgentAddress, deriveLegacyAddressV1 } from '../../../lib/agentWallet';
 import { toPublicAccount } from '../../../lib/publicAccount';
+import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
 import { apiErrorBody } from '../../../lib/apiError';
 
 const ROUTE = 'GET /api/dashboard';
 
 const ACCOUNT_COLS =
-  'id, email, display_name, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth';
+  'id, email, display_name, username, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth';
 
 export async function GET() {
   try {
@@ -85,10 +86,19 @@ export async function GET() {
       };
     }
 
+    let pendingClaims: Awaited<ReturnType<typeof listPendingClaimSummaries>> = [];
+    try {
+      pendingClaims = await listPendingClaimSummaries(accountId);
+    } catch (err) {
+      // Dashboard still loads if claims query fails; surface nothing rather than 500.
+      console.warn('[dashboard] pendingClaims:', err instanceof Error ? err.message : err);
+    }
+
     return NextResponse.json({
       account: toPublicAccount(account),
       trusted,
       link,
+      pendingClaims,
     });
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
