@@ -34,7 +34,8 @@ const CMD_GROUPS: Array<{
       {
         wa: 'flizy send 0.01 to 123… on discord',
         tg: '/send 0.01 to 123… on discord',
-        meaning: 'Hold for Discord (user id, or handle if already on Flizy)',
+        meaning:
+          'Hold for Discord. Prefer user id (Settings → Advanced → Developer Mode → right-click → Copy User ID). Handles work only after they link Discord on Flizy — Discord has no public name lookup.',
       },
       {
         wa: 'flizy send 0.01 to @user on x',
