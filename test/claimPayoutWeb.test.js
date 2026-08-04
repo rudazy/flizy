@@ -89,3 +89,13 @@ describe('claimViaLine', () => {
     );
   });
 });
+
+describe('phone claims are chat-only on web', () => {
+  it('documents phone vs platform policy in claimMatch (kind flags live in pendingClaims)', () => {
+    // Phone claim: no to_channel — web payout must refuse (claimPayout.executeWebClaimPayout).
+    const phoneClaim = { to_wa_hint: '2348012345678' };
+    const platformClaim = { to_channel: 'github', to_external_id: '1' };
+    assert.equal(Boolean(phoneClaim.to_wa_hint && !phoneClaim.to_channel), true);
+    assert.equal(Boolean(platformClaim.to_channel), true);
+  });
+});

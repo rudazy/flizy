@@ -186,6 +186,18 @@ export async function executeWebClaimPayout(p: {
     return { ok: false, error: `Claim is already ${claim.status}.`, status: 409 };
   }
 
+  // Phone claims: ownership is proven only in WhatsApp/Telegram (contact share /
+  // channel metadata). Web may show the hold, but payout stays chat-only.
+  const isPhoneClaim = !claim.to_channel && Boolean(claim.to_wa_hint);
+  if (isPhoneClaim) {
+    return {
+      ok: false,
+      error:
+        'Phone claims can only be received in WhatsApp or Telegram after that number is proven on that chat. Open the bot and send: flizy claim',
+      status: 403,
+    };
+  }
+
   const keys = await claimKeysForAccount(accountId);
   if (!claimMatchesAccountKeys(claim as ClaimRow, keys)) {
     return { ok: false, error: matchErrorForClaim(claim as ClaimRow, keys), status: 403 };

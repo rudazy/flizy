@@ -444,15 +444,16 @@ async function rejectAlreadyLinked(supabase: AnyClient, ctx: Ctx) {
   );
 }
 
+/**
+ * Remove an identity (platform or chat: whatsapp / telegram / github / …).
+ * Site callers re-check password; chat can unlink the current channel only.
+ */
 export async function unlinkChannelIdentity(
   supabase: AnyClient,
   p: { accountId: string; channel: string }
 ) {
   const ch = assertChannel(p?.channel, 'unlinkChannelIdentity');
   if (!p?.accountId) throw new BindError('INVALID', 'unlinkChannelIdentity: missing accountId');
-  if (!isPlatformChannel(ch)) {
-    throw new BindError('INVALID', 'Only platform identities can be unlinked here.');
-  }
 
   const { data: rows, error } = await supabase
     .from(IDENTITY_TABLE)

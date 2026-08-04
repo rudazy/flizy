@@ -18,6 +18,10 @@ export type PendingClaimSummary = {
   createdAt: string | null;
   /** Present so the user can open /claim/[token] if they have it; never a secret */
   claimToken: string | null;
+  /** phone = claim in WA/TG only; platform = can claim on site too */
+  kind: 'phone' | 'platform';
+  /** false for phone holds — web may display but not pay out */
+  canClaimOnWeb: boolean;
 };
 
 /**
@@ -96,6 +100,7 @@ export async function listPendingClaimSummaries(
   });
 
   return rows.map((c) => {
+    const isPlatform = Boolean(c.to_channel);
     const label =
       publicRecipientLabel({
         to_wa_hint: c.to_wa_hint as string | null,
@@ -103,10 +108,11 @@ export async function listPendingClaimSummaries(
         to_external_id: c.to_external_id as string | null,
         to_display_handle: c.to_display_handle as string | null,
       }) || 'Pending claim';
+    // Phone: show full digits to the matched account owner (they already prove it in chat).
     const peer = c.to_display_handle
       ? `@${String(c.to_display_handle).replace(/^@+/, '')}`
       : c.to_wa_hint
-        ? `+${String(c.to_wa_hint)}`
+        ? `+${String(c.to_wa_hint).replace(/\D/g, '')}`
         : null;
     const rail =
       c.to_channel === 'github'
@@ -126,6 +132,8 @@ export async function listPendingClaimSummaries(
       counterparty: peer ? `${rail} ${peer}` : rail,
       createdAt: c.created_at ? String(c.created_at) : null,
       claimToken: c.claim_token ? String(c.claim_token) : null,
+      kind: isPlatform ? ('platform' as const) : ('phone' as const),
+      canClaimOnWeb: isPlatform,
     };
   });
 }

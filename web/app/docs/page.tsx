@@ -92,6 +92,11 @@ const CMD_GROUPS: Array<{
         tg: '/link CODE',
         meaning: 'Connect this chat to your site account (code from dashboard)',
       },
+      {
+        wa: 'flizy unlink',
+        tg: '/unlink',
+        meaning: 'Disconnect this chat from Flizy (phone claims stop matching here)',
+      },
       { wa: 'flizy me', tg: '/me', meaning: 'Your linked account summary' },
       { wa: 'flizy balance', tg: '/balance', meaning: 'What you have' },
       { wa: 'flizy history', tg: '/history', meaning: 'Recent activity' },

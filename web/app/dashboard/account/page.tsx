@@ -58,6 +58,11 @@ export default function AccountPage() {
   const [dailyLimit, setDailyLimitInput] = useState('');
   const [limitPassword, setLimitPassword] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
+  const [chatLinks, setChatLinks] = useState<
+    Array<{ channel: string; phone: string | null; has_phone: boolean }>
+  >([]);
+  const [unlinkChat, setUnlinkChat] = useState<string | null>(null);
+  const [unlinkChatPassword, setUnlinkChatPassword] = useState('');
 
   // Smart default slide when no ?s= — open the first thing that still needs work.
   const defaultSlide = useMemo((): SlideId => {
@@ -75,6 +80,28 @@ export default function AccountPage() {
       setUsernameInput(data.account.username);
     }
   }, [data?.account?.username]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/identity', { cache: 'no-store' });
+        if (!res.ok) return;
+        const body = await res.json();
+        const rows = Array.isArray(body.identities) ? body.identities : [];
+        if (!cancelled) {
+          setChatLinks(
+            rows.filter((r: { channel: string }) => r.channel === 'whatsapp' || r.channel === 'telegram')
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data, msg]);
 
   useEffect(() => {
     if (data?.account?.locale) {
@@ -168,6 +195,38 @@ export default function AccountPage() {
   async function onUsername(e: React.FormEvent) {
     e.preventDefault();
     await setUsername(usernameInput);
+  }
+
+  async function onUnlinkChat(channel: string) {
+    if (!unlinkChatPassword) {
+      setUnlinkChat(channel);
+      setMsg('Enter your password below, then click Unlink again.');
+      return;
+    }
+    setBusy('unlink-chat');
+    setMsg('');
+    try {
+      const res = await fetch('/api/identity', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel, password: unlinkChatPassword }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(json.error || 'Could not unlink.');
+        return;
+      }
+      setUnlinkChatPassword('');
+      setUnlinkChat(null);
+      setMsg(
+        `${channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'} unlinked. Phone claims no longer match via that chat until you link again.`
+      );
+      setChatLinks((prev) => prev.filter((r) => r.channel !== channel));
+    } catch {
+      setMsg('Could not unlink. Try again.');
+    } finally {
+      setBusy('');
+    }
   }
 
   const currentLimit =
@@ -286,10 +345,63 @@ export default function AccountPage() {
       {slide === 'chat' ? (
         <AppSection
           title="Chat apps"
-          helper="Generate a one-time code, then open WhatsApp or Telegram. A code works once."
-          badge={data.link ? 'Ready' : 'Needed'}
-          badgeTone={data.link ? 'lime' : 'gold'}
+          helper="Link WhatsApp or Telegram with a one-time code. Unlink anytime (password). Phone claims only pay out in the chat where the number is proven."
+          badge={chatLinks.length ? String(chatLinks.length) : data.link ? 'Ready' : 'Needed'}
+          badgeTone={chatLinks.length || data.link ? 'lime' : 'gold'}
         >
+          {chatLinks.length > 0 ? (
+            <div className="mb-4 space-y-2">
+              <p className="label">Linked</p>
+              {chatLinks.map((row) => (
+                <div
+                  key={row.channel}
+                  className="rounded-md border border-border bg-ink/40 px-3 py-3"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-sans text-sm text-paper">
+                        {row.channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}
+                      </p>
+                      <p className="mt-0.5 font-mono text-xs text-lime">
+                        {row.phone || (row.has_phone ? 'Phone on file' : 'Linked (no phone yet)')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
+                      disabled={busy === 'unlink-chat'}
+                      onClick={() => void onUnlinkChat(row.channel)}
+                    >
+                      Unlink
+                    </button>
+                  </div>
+                  {unlinkChat === row.channel ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs text-muted">
+                        Removes this chat and its phone proof from Flizy. Pending phone claims need
+                        that number proven again in chat to claim.
+                      </p>
+                      <input
+                        type="password"
+                        className="input w-full"
+                        placeholder="Account password"
+                        value={unlinkChatPassword}
+                        autoComplete="current-password"
+                        onChange={(e) => setUnlinkChatPassword(e.target.value)}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+              <p className="text-xs text-muted">
+                In chat you can also send{' '}
+                <span className="font-mono text-paper">flizy unlink</span> to disconnect that app.
+              </p>
+            </div>
+          ) : (
+            <p className="mb-4 text-xs text-muted">No chat app linked yet.</p>
+          )}
+
           <button
             type="button"
             className="btn btn-primary w-full py-3.5 text-base font-semibold"

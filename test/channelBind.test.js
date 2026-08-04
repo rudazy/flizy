@@ -464,11 +464,21 @@ describe('unlink', () => {
     assert.deepEqual(eventTypes(), [IDENTITY_EVENT.LINKED, IDENTITY_EVENT.UNLINKED]);
   });
 
-  it('refuses to unlink a chat channel, which carries the claim phone key', async () => {
-    await assert.rejects(
-      () => unlinkChannelIdentity(fake.client, { accountId: ACC_A, channel: 'whatsapp' }),
-      (err) => err instanceof BindError && err.code === 'INVALID'
-    );
+  it('allows unlinking a chat channel (drops phone proof for that app)', async () => {
+    await bindChannelIdentity(fake.client, {
+      accountId: ACC_A,
+      channel: 'whatsapp',
+      externalId: '15551234567',
+      extraColumns: { phone_e164: '15551234567' },
+      rebindPolicy: REBIND_POLICY.REJECT,
+    });
+    const res = await unlinkChannelIdentity(fake.client, {
+      accountId: ACC_A,
+      channel: 'whatsapp',
+    });
+    assert.equal(res.removed, 1);
+    assert.equal(identities().length, 0);
+    assert.ok(eventTypes().includes(IDENTITY_EVENT.UNLINKED));
   });
 
   it('lets the identity be bound elsewhere afterwards', async () => {

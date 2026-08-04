@@ -10,6 +10,7 @@ type ClaimView = {
   error?: string;
   recipient?: string;
   recipient_kind?: string;
+  can_claim_on_web?: boolean;
   to_wa_hint?: string;
 };
 
@@ -72,13 +73,15 @@ export default function ClaimPage() {
 
   const pending = data && !data.error && data.status === 'pending';
   const claimed = data?.status === 'claimed';
+  const isPhone = data?.recipient_kind === 'phone';
+  const canWeb = Boolean(data?.can_claim_on_web);
 
   return (
     <div className="mx-auto max-w-md space-y-6">
       <h1 className="font-sans text-3xl tracking-wide text-paper">Claim funds</h1>
       <p className="text-sm text-muted">
-        Money held for a phone or platform identity. You receive it after proving that identity on
-        Flizy — then claim here or in chat.
+        Money held for a phone or platform. Phone holds are claimed in WhatsApp or Telegram after
+        that number is proven on that chat. Platform holds can be claimed here after you link.
       </p>
 
       {!data ? <p className="text-muted">Loading…</p> : null}
@@ -96,23 +99,66 @@ export default function ClaimPage() {
           {data.recipient ? (
             <p className="text-muted">
               Held for: <span className="text-paper">{data.recipient}</span>
+              {isPhone ? (
+                <span className="mt-1 block text-xs">
+                  (Phone — claim only in WhatsApp or Telegram)
+                </span>
+              ) : null}
             </p>
           ) : null}
 
           {msg ? (
-            <div className={`alert text-sm ${claimed || msg.includes('received') ? 'alert-ok' : 'alert-error'}`}>
+            <div
+              className={`alert text-sm ${
+                claimed || msg.includes('received') ? 'alert-ok' : 'alert-error'
+              }`}
+            >
               {msg}
             </div>
           ) : null}
 
-          {pending ? (
+          {pending && isPhone ? (
             <>
               <ol className="list-decimal space-y-2 pl-4 text-muted">
                 <li>Create or log in to your Flizy account</li>
+                <li>Link WhatsApp or Telegram from the dashboard (with this number proven)</li>
                 <li>
-                  Prove the identity this claim is for (link chat with phone, or link GitHub on
-                  Account → Platforms)
+                  In that chat send <span className="font-mono text-paper">flizy claim</span>
                 </li>
+              </ol>
+              <div className="flex flex-col gap-2">
+                {!loggedIn ? (
+                  <>
+                    <Link
+                      href={`/signup?next=${encodeURIComponent(`/claim/${token}`)}`}
+                      className="btn btn-primary no-underline"
+                    >
+                      Create account
+                    </Link>
+                    <Link
+                      href={`/login?next=${encodeURIComponent(`/claim/${token}`)}`}
+                      className="btn btn-ghost no-underline"
+                    >
+                      Log in
+                    </Link>
+                  </>
+                ) : (
+                  <Link href="/dashboard/account?s=chat" className="btn btn-primary no-underline">
+                    Open chat link options
+                  </Link>
+                )}
+              </div>
+              <p className="text-xs text-muted">
+                Web payout is off for phone holds on purpose — the number is proven only in chat.
+              </p>
+            </>
+          ) : null}
+
+          {pending && canWeb ? (
+            <>
+              <ol className="list-decimal space-y-2 pl-4 text-muted">
+                <li>Create or log in to your Flizy account</li>
+                <li>Link the matching platform (Account → Platforms)</li>
                 <li>Claim below — or in chat: flizy claim</li>
               </ol>
 
@@ -141,12 +187,6 @@ export default function ClaimPage() {
                   </Link>
                 </div>
               )}
-
-              <p className="text-xs text-muted">
-                Prefer chat? After linking, send{' '}
-                <span className="font-mono text-paper">flizy claim</span> (or{' '}
-                <span className="font-mono text-paper">/claim</span> on Telegram).
-              </p>
             </>
           ) : null}
 

@@ -311,7 +311,7 @@ export default function DashboardHomePage() {
       {slide === 'claims' ? (
         <AppSection
           title="Pending claims"
-          helper="Money held for you. Claim here once the matching phone or platform is linked — or use flizy claim in chat."
+          helper="Phone holds: claim in WhatsApp/Telegram only. Platform holds: claim here or in chat."
           badge={pendingClaims.length ? String(pendingClaims.length) : '0'}
           badgeTone={pendingClaims.length ? 'gold' : 'default'}
         >
@@ -326,46 +326,57 @@ export default function DashboardHomePage() {
           ) : null}
           {pendingClaims.length === 0 ? (
             <p className="text-xs text-muted">
-              No pending claims. After someone sends to your GitHub or phone, holds show here once
-              you have linked that identity.
+              No pending claims. After someone sends to your GitHub, phone, or other platform, holds
+              show here once you have linked that identity.
             </p>
           ) : (
             <>
               <ul className="divide-y divide-border">
-                {pendingClaims.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-sans text-sm text-paper">
-                        {c.counterparty || c.label}
-                      </p>
-                      <p className="mt-0.5 font-mono text-[10px] uppercase text-muted">
-                        held · claim here or in chat
-                      </p>
-                      <p className="mt-1 font-sans text-sm text-lime">
-                        +
-                        {Number(c.amountEth).toLocaleString(undefined, {
-                          maximumFractionDigits: 6,
-                        })}{' '}
-                        ETH
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-primary shrink-0 py-2.5 text-sm font-semibold sm:min-w-[7rem]"
-                      disabled={Boolean(claimBusyId)}
-                      onClick={() => void onClaimOne(c.id)}
+                {pendingClaims.map((c) => {
+                  const phoneOnly = c.kind === 'phone' || c.canClaimOnWeb === false;
+                  return (
+                    <li
+                      key={c.id}
+                      className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      {claimBusyId === c.id ? 'Claiming…' : 'Claim'}
-                    </button>
-                  </li>
-                ))}
+                      <div className="min-w-0">
+                        <p className="truncate font-sans text-sm text-paper">
+                          {c.counterparty || c.label}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[10px] uppercase text-muted">
+                          {phoneOnly
+                            ? 'phone · claim in WhatsApp or Telegram'
+                            : 'platform · claim here or in chat'}
+                        </p>
+                        <p className="mt-1 font-sans text-sm text-lime">
+                          +
+                          {Number(c.amountEth).toLocaleString(undefined, {
+                            maximumFractionDigits: 6,
+                          })}{' '}
+                          ETH
+                        </p>
+                      </div>
+                      {phoneOnly ? (
+                        <p className="shrink-0 text-xs text-muted sm:max-w-[9rem] sm:text-right">
+                          Open bot →{' '}
+                          <span className="font-mono text-paper">flizy claim</span>
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-primary shrink-0 py-2.5 text-sm font-semibold sm:min-w-[7rem]"
+                          disabled={Boolean(claimBusyId)}
+                          onClick={() => void onClaimOne(c.id)}
+                        >
+                          {claimBusyId === c.id ? 'Claiming…' : 'Claim'}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
               <p className="mt-3 text-xs text-muted">
-                Chat works too: unlock if needed, then{' '}
-                <span className="font-mono text-paper">flizy claim</span>.
+                Phone money only moves after the number is proven in that chat app.
               </p>
             </>
           )}

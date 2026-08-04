@@ -201,8 +201,19 @@ describe('the bind mirror does not drift', () => {
     assert.equal(out.results[2].outcome, 'LINKED', 'the identity is free after unlink');
   });
 
-  it('agrees on refusing to unlink a chat channel', async () => {
-    await assertNoDrift('unlink chat refused', [{ unlink: { accountId: ACC_A, channel: 'whatsapp' } }]);
+  it('agrees on unlinking a chat channel', async () => {
+    const out = await assertNoDrift('unlink chat', [
+      {
+        accountId: ACC_A,
+        channel: 'whatsapp',
+        externalId: '15551234567',
+        extraColumns: { phone_e164: '15551234567' },
+        rebindPolicy: REJECT,
+      },
+      { unlink: { accountId: ACC_A, channel: 'whatsapp' } },
+    ]);
+    assert.equal(out.results[1].ok, true);
+    assert.equal(out.results[1].outcome, 'UNLINKED:1');
   });
 
   it('agrees on refusing an unknown channel', async () => {
