@@ -332,7 +332,7 @@ export default function AccountPage() {
       {slide === 'platforms' ? (
         <AppSection
           title="Platforms"
-          helper="Link GitHub so people can send claims to @you on github. Discord and X use the same place when they ship."
+          helper="Link GitHub, Discord, or X so people can send claims to you on that platform."
           badge="GitHub"
         >
           <LinkedAccounts />

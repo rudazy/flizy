@@ -3,7 +3,8 @@ import { getAccountIdFromCookie, getSessionKey } from '../../../../../lib/cookie
 import { createOAuthState, oauthStateConfigured } from '../../../../../lib/oauthState';
 import { apiErrorBody } from '../../../../../lib/apiError';
 import {
-  createPkceAndStore,
+  attachPkceCookie,
+  mintPkce,
   xAuthorizeUrl,
   xOAuthConfigured,
 } from '../../../../../lib/xOAuth';
@@ -24,8 +25,12 @@ export async function GET() {
     }
 
     const state = createOAuthState(sessionKey);
-    const pkce = createPkceAndStore();
-    return NextResponse.redirect(xAuthorizeUrl(state, pkce.challenge));
+    const { verifier, challenge } = mintPkce();
+    // Cookie must ride on this redirect response (cookies().set alone is flaky
+    // with NextResponse.redirect on some Vercel paths).
+    const res = NextResponse.redirect(xAuthorizeUrl(state, challenge));
+    attachPkceCookie(res, verifier);
+    return res;
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
