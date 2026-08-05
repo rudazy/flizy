@@ -33,6 +33,7 @@ type ClaimRow = {
   to_channel?: string | null;
   to_external_id?: string | null;
   to_display_handle?: string | null;
+  to_email?: string | null;
 };
 
 /**
@@ -41,7 +42,7 @@ type ClaimRow = {
  * Phones stay masked to the last 4, as they always have. A platform handle is a
  * public identifier the sender typed on purpose, and the recipient needs it to
  * recognize the claim as theirs, so it is shown. The numeric platform id is
- * never shown: nothing on a public page needs it.
+ * never shown: nothing on a public page needs it. Emails are partially masked.
  */
 export function publicRecipientLabel(claim: ClaimRow | null): string | undefined {
   if (!claim) return undefined;
@@ -51,6 +52,14 @@ export function publicRecipientLabel(claim: ClaimRow | null): string | undefined
     return claim.to_display_handle
       ? `@${displaySafe(claim.to_display_handle)} (${where})`
       : `a ${where} user`;
+  }
+
+  if (claim.to_email) {
+    const e = String(claim.to_email).trim().toLowerCase();
+    if (!e.includes('@')) return 'an email';
+    const [local, domain] = e.split('@');
+    const head = local.slice(0, 1) || '?';
+    return `${head}…@${domain}`;
   }
 
   const digits = String(claim.to_wa_hint || '').replace(/\D/g, '');

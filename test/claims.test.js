@@ -74,4 +74,34 @@ describe('claim plan preview', () => {
     assert.match(preview, /cancel claims/i);
     assert.match(preview, /2348012345678/);
   });
+
+  it('telegram platform hold warns about handle typos and id binding', () => {
+    const { platformRecipient } = require('../lib/claimRecipient');
+    const intent = createSendIntent({
+      actor: {
+        accountId: 'a1',
+        waSenderId: '2348000000000',
+        isAdmin: false,
+        sessionUnlocked: true,
+        hasPin: false,
+      },
+      amountEth: '0.01',
+      toLabel: '@alice_crypto (Telegram)',
+    });
+    const recipient = platformRecipient('telegram', '111222333', 'alice_crypto');
+    const plan = buildClaimPlan({
+      intent,
+      policy: { decision: 'ALLOW_WITH_CONFIRM' },
+      chain: { chainId: 91342, chainName: 'GIWA Sepolia', nativeSymbol: 'ETH' },
+      fromAddress: '0x3333333333333333333333333333333333333333',
+      recipient,
+      fromBalanceEth: '1',
+    });
+    const preview = formatClaimPlanPreview(plan);
+    assert.match(preview, /@alice_crypto \(Telegram\)/);
+    assert.match(preview, /lookalike|handle carefully/i);
+    assert.match(preview, /account id/i);
+    assert.match(preview, /Telegram/);
+    assert.match(preview, /cancel claims/i);
+  });
 });

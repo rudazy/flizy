@@ -2,12 +2,13 @@
  * Pending claims visible to a logged-in Flizy account (web).
  *
  * Mirrors listPendingClaimsForAccount in lib/pendingClaims.js: load this
- * account's channel_identities + phones, then match pending claim rows.
- * Money still moves only via chat claim (or later web claim-and-payout).
+ * account's channel_identities + phones + claimable emails, then match pending
+ * claim rows.
  */
 
 import { getSupabase } from './supabase';
 import { publicRecipientLabel } from './claimRecipient.ts';
+import { parseEmail } from './email.ts';
 
 export type PendingClaimSummary = {
   id: string;
@@ -18,8 +19,8 @@ export type PendingClaimSummary = {
   createdAt: string | null;
   /** Present so the user can open /claim/[token] if they have it; never a secret */
   claimToken: string | null;
-  /** phone = claim in WA/TG only; platform = can claim on site too */
-  kind: 'phone' | 'platform';
+  /** phone = claim in WA/TG only; platform|email = can claim on site too */
+  kind: 'phone' | 'platform' | 'email';
   /** false for phone holds — web may display but not pay out */
   canClaimOnWeb: boolean;
 };
@@ -39,12 +40,12 @@ export async function listPendingClaimSummaries(
     .eq('account_id', accountId);
 
   if (idErr) throw new Error(idErr.message);
-  if (!identities?.length) return [];
 
   const phones = new Set<string>();
   const platformIds: Array<{ channel: string; externalId: string }> = [];
+  const emails = new Set<string>();
 
-  for (const row of identities) {
+  for (const row of identities || []) {
     const phone = row.phone_e164 ? String(row.phone_e164).replace(/\D/g, '') : '';
     if (phone) phones.add(phone);
     if (row.channel && row.external_id) {
@@ -55,7 +56,26 @@ export async function listPendingClaimSummaries(
     }
   }
 
-  if (!phones.size && !platformIds.length) return [];
+  const { data: acc, error: aErr } = await supabase
+    .from('accounts')
+    .select('email')
+    .eq('id', accountId)
+    .maybeSingle();
+  if (aErr) throw new Error(aErr.message);
+  const primary = parseEmail(acc?.email);
+  if (primary) emails.add(primary);
+
+  const { data: extra } = await supabase
+    .from('account_emails')
+    .select('email')
+    .eq('account_id', accountId)
+    .not('verified_at', 'is', null);
+  for (const row of extra || []) {
+    const e = parseEmail(row.email);
+    if (e) emails.add(e);
+  }
+
+  if (!phones.size && !platformIds.length && !emails.size) return [];
 
   const found = new Map<string, Record<string, unknown>>();
 
@@ -63,7 +83,7 @@ export async function listPendingClaimSummaries(
     supabase
       .from('claims')
       .select(
-        'id, amount_eth, status, created_at, claim_token, to_wa_hint, to_channel, to_external_id, to_display_handle'
+        'id, amount_eth, status, created_at, claim_token, to_wa_hint, to_channel, to_external_id, to_display_handle, to_email'
       )
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
@@ -93,6 +113,21 @@ export async function listPendingClaimSummaries(
     }
   }
 
+  if (emails.size) {
+    const list = [...emails];
+    let q = base();
+    q = list.length === 1 ? q.eq('to_email', list[0]) : q.in('to_email', list);
+    const { data, error } = await q;
+    if (error) {
+      // Column missing until migration — skip email holds quietly.
+      if (!String(error.message || '').includes('to_email')) throw new Error(error.message);
+    } else {
+      for (const row of data || []) {
+        found.set(String(row.id), row as Record<string, unknown>);
+      }
+    }
+  }
+
   const rows = [...found.values()].sort((a, b) => {
     const ta = new Date(String(a.created_at || 0)).getTime();
     const tb = new Date(String(b.created_at || 0)).getTime();
@@ -101,19 +136,22 @@ export async function listPendingClaimSummaries(
 
   return rows.map((c) => {
     const isPlatform = Boolean(c.to_channel);
+    const isEmail = Boolean(c.to_email) && !isPlatform;
     const label =
       publicRecipientLabel({
         to_wa_hint: c.to_wa_hint as string | null,
         to_channel: c.to_channel as string | null,
         to_external_id: c.to_external_id as string | null,
         to_display_handle: c.to_display_handle as string | null,
+        to_email: c.to_email as string | null,
       }) || 'Pending claim';
-    // Phone: show full digits to the matched account owner (they already prove it in chat).
     const peer = c.to_display_handle
       ? `@${String(c.to_display_handle).replace(/^@+/, '')}`
-      : c.to_wa_hint
-        ? `+${String(c.to_wa_hint).replace(/\D/g, '')}`
-        : null;
+      : c.to_email
+        ? String(c.to_email)
+        : c.to_wa_hint
+          ? `+${String(c.to_wa_hint).replace(/\D/g, '')}`
+          : null;
     const rail =
       c.to_channel === 'github'
         ? 'GitHub pay'
@@ -121,9 +159,13 @@ export async function listPendingClaimSummaries(
           ? 'X pay'
           : c.to_channel === 'discord'
             ? 'Discord pay'
-            : c.to_wa_hint
-              ? 'Phone pay'
-              : 'Claim';
+            : c.to_channel === 'telegram'
+              ? 'Telegram pay'
+              : c.to_email
+                ? 'Email pay'
+                : c.to_wa_hint
+                  ? 'Phone pay'
+                  : 'Claim';
     return {
       id: String(c.id),
       amountEth: String(c.amount_eth ?? ''),
@@ -132,8 +174,9 @@ export async function listPendingClaimSummaries(
       counterparty: peer ? `${rail} ${peer}` : rail,
       createdAt: c.created_at ? String(c.created_at) : null,
       claimToken: c.claim_token ? String(c.claim_token) : null,
-      kind: isPlatform ? ('platform' as const) : ('phone' as const),
-      canClaimOnWeb: isPlatform,
+      kind: isPlatform ? ('platform' as const) : isEmail ? ('email' as const) : ('phone' as const),
+      // Email and platform claims can pay out on the site; phone remains chat-only.
+      canClaimOnWeb: isPlatform || isEmail,
     };
   });
 }

@@ -63,6 +63,13 @@ export default function AccountPage() {
   >([]);
   const [unlinkChat, setUnlinkChat] = useState<string | null>(null);
   const [unlinkChatPassword, setUnlinkChatPassword] = useState('');
+  const [emailList, setEmailList] = useState<{
+    primary: string | null;
+    additional: Array<{ id: string; email: string; verified: boolean }>;
+    claimable: string[];
+  } | null>(null);
+  const [extraEmail, setExtraEmail] = useState('');
+  const [extraEmailPassword, setExtraEmailPassword] = useState('');
 
   // Smart default slide when no ?s= — open the first thing that still needs work.
   const defaultSlide = useMemo((): SlideId => {
@@ -80,6 +87,35 @@ export default function AccountPage() {
       setUsernameInput(data.account.username);
     }
   }, [data?.account?.username]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/account/emails', { cache: 'no-store' });
+        if (!res.ok) return;
+        const body = await res.json();
+        if (!cancelled) {
+          setEmailList({
+            primary: body.primary || data?.account?.email || null,
+            additional: Array.isArray(body.additional) ? body.additional : [],
+            claimable: Array.isArray(body.claimable) ? body.claimable : [],
+          });
+        }
+      } catch {
+        if (!cancelled && data?.account?.email) {
+          setEmailList({
+            primary: data.account.email,
+            additional: [],
+            claimable: [data.account.email],
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.account?.email]);
 
   useEffect(() => {
     let cancelled = false;
@@ -265,11 +301,149 @@ export default function AccountPage() {
           badgeTone={data.account.username ? 'lime' : 'gold'}
         >
           <p className="text-sm text-paper">{data.account.email}</p>
+          <p className="mt-1 text-xs text-muted">
+            Registration email — can receive email claims (sign up / log in proves ownership).
+          </p>
           {data.account.display_name ? (
             <p className="mt-1 text-xs text-muted">{data.account.display_name}</p>
           ) : (
             <p className="mt-1 text-xs text-muted">No display name yet</p>
           )}
+
+          <div className="mt-4 border-t border-line pt-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Emails for claims</p>
+            <ul className="mt-2 space-y-1.5 text-sm">
+              <li className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-paper">{emailList?.primary || data.account.email}</span>
+                <span className="rounded border border-line px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-lime">
+                  Registration · claimable
+                </span>
+              </li>
+              {(emailList?.additional || []).map((row) => (
+                <li key={row.id} className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-paper">{row.email}</span>
+                  <span
+                    className={`rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
+                      row.verified
+                        ? 'border-line text-lime'
+                        : 'border-line text-gold'
+                    }`}
+                  >
+                    {row.verified ? 'Verified · claimable' : 'Unverified · not claimable yet'}
+                  </span>
+                  <button
+                    type="button"
+                    className="text-xs text-muted underline hover:text-paper"
+                    disabled={busy === `email-rm-${row.id}`}
+                    onClick={async () => {
+                      setBusy(`email-rm-${row.id}`);
+                      setMsg(null);
+                      try {
+                        const res = await fetch('/api/account/emails', {
+                          method: 'DELETE',
+                          headers: { 'content-type': 'application/json' },
+                          body: JSON.stringify({ id: row.id }),
+                        });
+                        const body = await res.json().catch(() => ({}));
+                        if (!res.ok) throw new Error(body.error || 'Could not remove email');
+                        setEmailList({
+                          primary: body.primary || emailList?.primary || null,
+                          additional: body.additional || [],
+                          claimable: body.claimable || [],
+                        });
+                        setMsg('Email removed.');
+                      } catch (err) {
+                        setMsg(err instanceof Error ? err.message : 'Could not remove email');
+                      } finally {
+                        setBusy('');
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <form
+              className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setBusy('email-add');
+                setMsg(null);
+                try {
+                  const res = await fetch('/api/account/emails', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                      email: extraEmail,
+                      password: extraEmailPassword,
+                    }),
+                  });
+                  const body = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(body.error || 'Could not add email');
+                  setEmailList({
+                    primary: body.primary || emailList?.primary || null,
+                    additional: body.additional || [],
+                    claimable: body.claimable || [],
+                  });
+                  setExtraEmail('');
+                  setExtraEmailPassword('');
+                  setMsg(
+                    body.note ||
+                      'Email added. It must be verified before it can receive claims. Registration email already can.'
+                  );
+                } catch (err) {
+                  setMsg(err instanceof Error ? err.message : 'Could not add email');
+                } finally {
+                  setBusy('');
+                }
+              }}
+            >
+              <div>
+                <label className="label" htmlFor="extra-email">
+                  Add email
+                </label>
+                <input
+                  id="extra-email"
+                  className="input"
+                  type="email"
+                  placeholder="other@email.com"
+                  value={extraEmail}
+                  onChange={(e) => setExtraEmail(e.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="extra-email-password">
+                  Password
+                </label>
+                <input
+                  id="extra-email-password"
+                  className="input"
+                  type="password"
+                  value={extraEmailPassword}
+                  onChange={(e) => setExtraEmailPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full py-3 font-semibold sm:w-auto sm:px-6"
+                  disabled={busy === 'email-add'}
+                >
+                  {busy === 'email-add' ? 'Adding…' : 'Add'}
+                </button>
+              </div>
+            </form>
+            <p className="mt-2 text-xs text-muted">
+              Additional emails need verification before claims match them. Registration email is
+              always claimable.
+            </p>
+          </div>
+
           <form onSubmit={onUsername} className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
             <div>
               <label className="label" htmlFor="flizy-username">

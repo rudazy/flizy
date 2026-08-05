@@ -5,17 +5,20 @@
 
 import { channelLabel } from './claimRecipient.ts';
 import { displaySafeLabel } from './sanitize.ts';
+import { normalizeEmail, isValidEmail, maskEmail } from './email.ts';
 
 export type ClaimMatchRow = {
   to_wa_hint?: string | null;
   to_channel?: string | null;
   to_external_id?: string | null;
   to_display_handle?: string | null;
+  to_email?: string | null;
 };
 
 export type ClaimAccountKeys = {
   phones: string[];
   identities: Array<{ channel: string; externalId: string }>;
+  emails: string[];
 };
 
 export function normalizePhoneDigits(raw: unknown): string {
@@ -35,6 +38,11 @@ export function claimMatchesAccountKeys(
     const id = String(claim.to_external_id).trim();
     return keys.identities.some((i) => i.channel === ch && i.externalId === id);
   }
+  if (claim.to_email) {
+    const email = normalizeEmail(claim.to_email);
+    if (!email || !isValidEmail(email)) return false;
+    return (keys.emails || []).includes(email);
+  }
   const phone = normalizePhoneDigits(claim.to_wa_hint);
   if (!phone) return false;
   return keys.phones.includes(phone);
@@ -48,10 +56,16 @@ export function matchErrorForClaim(claim: ClaimMatchRow, keys: ClaimAccountKeys)
       ? `This claim is for a different ${where} account.`
       : `This claim is held for a ${where} account. Link ${where} on Account → Platforms first.`;
   }
+  if (claim.to_email) {
+    if ((keys.emails || []).length) {
+      return 'This claim is for a different email than the ones on your account.';
+    }
+    return 'This claim is held for an email. Log in with that registration email, or add and verify it on Account.';
+  }
   if (keys.phones.length) {
     return 'This claim is for a different phone number than the ones on your account.';
   }
-  return 'Link WhatsApp or Telegram with a verified phone (or the right platform) before claiming.';
+  return 'Link WhatsApp or Telegram with a verified phone (or the right platform/email) before claiming.';
 }
 
 export function claimViaLine(claim: ClaimMatchRow): string | null {
@@ -61,6 +75,9 @@ export function claimViaLine(claim: ClaimMatchRow): string | null {
       return `${where} @${displaySafeLabel(claim.to_display_handle)}`;
     }
     return `${where} user`;
+  }
+  if (claim.to_email) {
+    return `email ${maskEmail(claim.to_email)}`;
   }
   const phone = normalizePhoneDigits(claim.to_wa_hint);
   return phone ? `phone +${phone}` : 'phone';
@@ -78,6 +95,6 @@ export function formatClaimClaimedNotice(p: {
   const lines = ['Claim delivered on Flizy.', `${amount} ETH claimed by ${by}.`];
   if (via) lines.push(`You sent this to ${via}.`);
   lines.push('', 'Funds left escrow for their agent wallet.');
-  if (p.explorerUrl) lines.push('', String(p.explorerUrl));
+  if (p.explorerUrl) lines.push(String(p.explorerUrl));
   return lines.join('\n');
 }

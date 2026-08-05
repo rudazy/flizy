@@ -25,6 +25,7 @@ import {
   normalizePhoneDigits,
   type ClaimMatchRow,
 } from './claimMatch.ts';
+import { parseEmail } from './email.ts';
 
 export type ClaimRow = ClaimMatchRow & {
   id: string;
@@ -80,6 +81,7 @@ function gasBufferWei(): bigint {
 export async function claimKeysForAccount(accountId: string): Promise<{
   phones: string[];
   identities: Array<{ channel: string; externalId: string }>;
+  emails: string[];
 }> {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -90,6 +92,7 @@ export async function claimKeysForAccount(accountId: string): Promise<{
 
   const phones: string[] = [];
   const identities: Array<{ channel: string; externalId: string }> = [];
+  const emails: string[] = [];
 
   for (const row of data || []) {
     const phone = normalizePhoneDigits(row.phone_e164);
@@ -104,7 +107,34 @@ export async function claimKeysForAccount(accountId: string): Promise<{
       }
     }
   }
-  return { phones, identities };
+
+  const { data: acc, error: aErr } = await supabase
+    .from('accounts')
+    .select('email')
+    .eq('id', accountId)
+    .maybeSingle();
+  if (aErr) throw new Error(aErr.message);
+  const primary = parseEmail(acc?.email);
+  if (primary) emails.push(primary);
+
+  const { data: extra, error: eErr } = await supabase
+    .from('account_emails')
+    .select('email')
+    .eq('account_id', accountId)
+    .not('verified_at', 'is', null);
+  if (eErr) {
+    // Migration not applied yet: primary still works.
+    if (!String(eErr.message || '').includes('account_emails') && eErr.code !== '42P01') {
+      throw new Error(eErr.message);
+    }
+  } else {
+    for (const row of extra || []) {
+      const e = parseEmail(row.email);
+      if (e && !emails.includes(e)) emails.push(e);
+    }
+  }
+
+  return { phones, identities, emails };
 }
 
 async function claimerLabel(accountId: string): Promise<string> {

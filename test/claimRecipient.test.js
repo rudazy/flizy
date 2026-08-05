@@ -127,6 +127,38 @@ describe('claimMatchesRecipient', () => {
     assert.equal(claimMatchesRecipient(githubClaim, keys), true);
   });
 
+  it('pays a telegram claim only after that telegram user id is linked', () => {
+    const tgClaim = {
+      to_wa_hint: null,
+      to_channel: 'telegram',
+      to_external_id: '9988776655',
+      to_display_handle: 'alice_crypto',
+    };
+    assert.equal(
+      claimMatchesRecipient(
+        tgClaim,
+        recipientKeys({ identities: [{ channel: 'telegram', external_id: '9988776655' }] })
+      ),
+      true
+    );
+    // Same handle is irrelevant — id must match (username reassignment).
+    assert.equal(
+      claimMatchesRecipient(
+        tgClaim,
+        recipientKeys({ identities: [{ channel: 'telegram', external_id: '1111111111' }] })
+      ),
+      false
+    );
+    // Unlinked (or only other platforms): no payout.
+    assert.equal(
+      claimMatchesRecipient(
+        tgClaim,
+        recipientKeys({ identities: [{ channel: 'github', external_id: GH_ID }] })
+      ),
+      false
+    );
+  });
+
   it('refuses the same id on a different channel', () => {
     // The collision this whole design exists to prevent. Platform ids are
     // numeric everywhere, so the same digits are a real person on each one.

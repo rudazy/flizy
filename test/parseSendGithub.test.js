@@ -34,6 +34,33 @@ describe('parseSendCommand platforms', () => {
     assert.equal(tw.platform, 'x');
   });
 
+  it('parses on telegram and on tg', () => {
+    const a = parseSendCommand('send 0.001 to @alice_crypto on telegram');
+    assert.equal(a.platform, 'telegram');
+    assert.equal(a.toRaw, 'alice_crypto');
+    assert.equal(a.isPhone, false);
+
+    const b = parseSendCommand('send 0.01 eth to alice_crypto on tg');
+    assert.equal(b.platform, 'telegram');
+    assert.equal(b.toRaw, 'alice_crypto');
+
+    const c = parseSendCommand('send 0.001 to telegram:alice_crypto');
+    assert.equal(c.platform, 'telegram');
+    assert.equal(c.toRaw, 'alice_crypto');
+
+    const d = parseSendCommand('send 0.001 to tg:123456789');
+    assert.equal(d.platform, 'telegram');
+    assert.equal(d.toRaw, '123456789');
+  });
+
+  it('parses asset form on telegram', () => {
+    const a = parseSendCommand('send 10 FLZ to @alice_crypto on telegram');
+    assert.equal(a.platform, 'telegram');
+    assert.equal(a.asset, 'FLZ');
+    // Token claims to unlinked platforms are rejected later; parse still accepts.
+    assert.equal(a.toRaw, 'alice_crypto');
+  });
+
   it('allows login without @', () => {
     const a = parseSendCommand('send 0.001 to rudazy on github');
     assert.equal(a.platform, 'github');
@@ -125,6 +152,9 @@ describe('platform claim receipt copy', () => {
     if (ch === 'x') {
       return 'They receive after they link X on Flizy (Account → Platforms → Link X), then flizy claim or claim on the site.';
     }
+    if (ch === 'telegram') {
+      return 'They receive after they open the Flizy Telegram bot, link with a site code (link CODE), then flizy claim or claim on the site. After that, this Telegram account stays tied to their Flizy account until they unlink.';
+    }
     return 'They receive after they link that platform on Flizy (Account → Platforms), then flizy claim or claim on the site.';
   }
 
@@ -136,5 +166,13 @@ describe('platform claim receipt copy', () => {
 
   it('names GitHub for github holds', () => {
     assert.match(howTo('github'), /Link GitHub/);
+  });
+
+  it('names Telegram bot link and id binding for telegram holds', () => {
+    const t = howTo('telegram');
+    assert.match(t, /Telegram bot/i);
+    assert.match(t, /link CODE/i);
+    assert.match(t, /until they unlink/i);
+    assert.doesNotMatch(t, /Platforms → Link/);
   });
 });
