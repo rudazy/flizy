@@ -78,6 +78,19 @@ describe('parseSendCommand platforms', () => {
     assert.equal(parseSendCommand('send 0.01 to x:elonmusk').platform, 'x');
   });
 
+  it('accepts short aliases gh, dc, tg (full names still work)', () => {
+    assert.equal(parseSendCommand('send 0.001 to ludarep on tg').platform, 'telegram');
+    assert.equal(parseSendCommand('send 0.001 to rudazy on gh').platform, 'github');
+    assert.equal(parseSendCommand('send 0.001 to 123456789012345678 on dc').platform, 'discord');
+    assert.equal(parseSendCommand('send 0.001 to gh:octocat').platform, 'github');
+    assert.equal(parseSendCommand('send 0.001 to dc:99').platform, 'discord');
+    assert.equal(parseSendCommand('send 0.001 to tg:alice_crypto').platform, 'telegram');
+    // Full forms unchanged
+    assert.equal(parseSendCommand('send 0.001 to rudazy on github').platform, 'github');
+    assert.equal(parseSendCommand('send 0.001 to 99 on discord').platform, 'discord');
+    assert.equal(parseSendCommand('send 0.001 to alice on telegram').platform, 'telegram');
+  });
+
   it('parses asset form on github', () => {
     const a = parseSendCommand('send 10 FLZ to @octocat on github');
     assert.equal(a.platform, 'github');
