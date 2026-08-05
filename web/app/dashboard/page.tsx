@@ -311,7 +311,7 @@ export default function DashboardHomePage() {
       {slide === 'claims' ? (
         <AppSection
           title="Pending claims"
-          helper="Phone holds: claim in WhatsApp/Telegram only. Platform holds: claim here or in chat."
+          helper="Phone holds: claim in WhatsApp/Telegram only. Email and platform holds: claim here or in chat."
           badge={pendingClaims.length ? String(pendingClaims.length) : '0'}
           badgeTone={pendingClaims.length ? 'gold' : 'default'}
         >
@@ -326,14 +326,21 @@ export default function DashboardHomePage() {
           ) : null}
           {pendingClaims.length === 0 ? (
             <p className="text-xs text-muted">
-              No pending claims. After someone sends to your GitHub, phone, or other platform, holds
-              show here once you have linked that identity.
+              No pending claims for you. Holds show here when someone sends to your registration
+              email, a verified secondary email, GitHub/Discord/X/Telegram once linked, or a phone
+              proven on chat.
             </p>
           ) : (
             <>
               <ul className="divide-y divide-border">
                 {pendingClaims.map((c) => {
                   const phoneOnly = c.kind === 'phone' || c.canClaimOnWeb === false;
+                  const kindLine =
+                    c.kind === 'email'
+                      ? 'email · claim here or in chat'
+                      : phoneOnly
+                        ? 'phone · claim in WhatsApp or Telegram'
+                        : 'platform · claim here or in chat';
                   return (
                     <li
                       key={c.id}
@@ -344,9 +351,7 @@ export default function DashboardHomePage() {
                           {c.counterparty || c.label}
                         </p>
                         <p className="mt-0.5 font-mono text-[10px] uppercase text-muted">
-                          {phoneOnly
-                            ? 'phone · claim in WhatsApp or Telegram'
-                            : 'platform · claim here or in chat'}
+                          {kindLine}
                         </p>
                         <p className="mt-1 font-sans text-sm text-lime">
                           +

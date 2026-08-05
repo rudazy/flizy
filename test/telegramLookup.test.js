@@ -85,22 +85,28 @@ describe('resolveTelegramUser', () => {
   });
 
   it('throws TELEGRAM_LOOKUP_UNAVAILABLE without token when not found in DB path', async () => {
-    const prev = process.env.TELEGRAM_BOT_TOKEN;
-    delete process.env.TELEGRAM_BOT_TOKEN;
-    try {
-      await assert.rejects(
-        () =>
-          resolveTelegramUser('nobody_handle_xyz', {
-            skipDb: true,
-          }),
-        (err) => {
-          assert.equal(err.code, 'TELEGRAM_LOOKUP_UNAVAILABLE');
-          return true;
-        }
-      );
-    } finally {
-      if (prev !== undefined) process.env.TELEGRAM_BOT_TOKEN = prev;
-    }
+    await assert.rejects(
+      () => resolveTelegramUser('nobody_handle_xyz', { skipDb: true, token: '' }),
+      (err) => {
+        assert.equal(err.code, 'TELEGRAM_LOOKUP_UNAVAILABLE');
+        return true;
+      }
+    );
+  });
+
+  it('prefers linked-handle path before getChat', async () => {
+    let getChatCalled = false;
+    // Inject getChat that would succeed if called — should not run when DB returns first.
+    // skipDb forces API path in this unit test for getChat alone.
+    const p = await resolveTelegramUser('alice_crypto', {
+      skipDb: true,
+      getChat: async () => {
+        getChatCalled = true;
+        return { id: 42, username: 'alice_crypto', type: 'private' };
+      },
+    });
+    assert.equal(getChatCalled, true);
+    assert.equal(p.id, '42');
   });
 });
 
@@ -111,8 +117,10 @@ describe('copy', () => {
     assert.match(t, /telegram:@/);
   });
 
-  it('not-found warns about typos', () => {
+  it('not-found explains private users and user id path', () => {
     const t = telegramNotFoundMessage();
-    assert.match(t, /spelling|typos/i);
+    assert.match(t, /does not let bots look up private users/i);
+    assert.match(t, /numeric Telegram user id/i);
+    assert.match(t, /opened the bot once/i);
   });
 });

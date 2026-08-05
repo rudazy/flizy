@@ -214,7 +214,9 @@ describe('recipientKeys', () => {
         { channel: 'github', external_id: GH_ID },
       ],
     });
-    assert.deepEqual(keys.identities, [{ channel: 'github', externalId: GH_ID }]);
+    assert.deepEqual(keys.identities, [
+      { channel: 'github', externalId: GH_ID, displayHandle: null },
+    ]);
   });
 
   it('drops blank ids and implausible phones', () => {

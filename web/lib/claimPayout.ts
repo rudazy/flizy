@@ -86,12 +86,13 @@ export async function claimKeysForAccount(accountId: string): Promise<{
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('channel_identities')
-    .select('channel, external_id, phone_e164')
+    .select('channel, external_id, phone_e164, display_handle')
     .eq('account_id', accountId);
   if (error) throw new Error(error.message);
 
   const phones: string[] = [];
-  const identities: Array<{ channel: string; externalId: string }> = [];
+  const identities: Array<{ channel: string; externalId: string; displayHandle?: string | null }> =
+    [];
   const emails: string[] = [];
 
   for (const row of data || []) {
@@ -102,8 +103,18 @@ export async function claimKeysForAccount(accountId: string): Promise<{
     if (row.channel && row.external_id) {
       const ch = String(row.channel);
       const id = String(row.external_id).trim();
+      const displayHandle = row.display_handle
+        ? String(row.display_handle).replace(/^@+/, '')
+        : null;
       if (id && !identities.some((i) => i.channel === ch && i.externalId === id)) {
-        identities.push({ channel: ch, externalId: id });
+        identities.push({ channel: ch, externalId: id, displayHandle });
+      }
+      // Synthetic key for pending-by-@username Telegram claims
+      if (ch === 'telegram' && displayHandle) {
+        const pendingId = `tguser:${displayHandle.toLowerCase()}`;
+        if (!identities.some((i) => i.channel === ch && i.externalId === pendingId)) {
+          identities.push({ channel: ch, externalId: pendingId, displayHandle });
+        }
       }
     }
   }

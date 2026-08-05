@@ -53,6 +53,16 @@ export async function listPendingClaimSummaries(
         channel: String(row.channel),
         externalId: String(row.external_id),
       });
+      // Pending Telegram holds use tguser:@handle until they join
+      if (row.channel === 'telegram' && row.display_handle) {
+        const h = String(row.display_handle).replace(/^@+/, '').toLowerCase();
+        if (h) {
+          platformIds.push({
+            channel: 'telegram',
+            externalId: `tguser:${h}`,
+          });
+        }
+      }
     }
   }
 

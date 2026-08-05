@@ -92,6 +92,59 @@ describe('parseSendCommand email', () => {
   });
 });
 
+describe('telegram pending-by-username claim', () => {
+  const {
+    telegramPendingUsernameRecipient,
+    claimMatchesRecipient,
+    recipientKeys,
+    isTelegramPendingUsernameId,
+  } = require('../lib/claimRecipient');
+
+  it('builds tguser: external id from handle', () => {
+    const r = telegramPendingUsernameRecipient('Ludareq');
+    assert.equal(r.channel, 'telegram');
+    assert.equal(r.externalId, 'tguser:ludareq');
+    assert.equal(r.displayHandle, 'Ludareq');
+    assert.equal(isTelegramPendingUsernameId(r.externalId), true);
+  });
+
+  it('matches when linked telegram has that display_handle', () => {
+    const row = {
+      to_channel: 'telegram',
+      to_external_id: 'tguser:ludareq',
+      to_display_handle: 'Ludareq',
+    };
+    const keys = recipientKeys({
+      identities: [
+        {
+          channel: 'telegram',
+          external_id: '999888777',
+          display_handle: 'ludareq',
+        },
+      ],
+    });
+    assert.equal(claimMatchesRecipient(row, keys), true);
+  });
+
+  it('does not match a different handle', () => {
+    const row = {
+      to_channel: 'telegram',
+      to_external_id: 'tguser:ludareq',
+      to_display_handle: 'Ludareq',
+    };
+    const keys = recipientKeys({
+      identities: [
+        {
+          channel: 'telegram',
+          external_id: '999888777',
+          display_handle: 'ludarep',
+        },
+      ],
+    });
+    assert.equal(claimMatchesRecipient(row, keys), false);
+  });
+});
+
 describe('email claim plan preview', () => {
   it('warns about typos and signup', () => {
     const intent = createSendIntent({

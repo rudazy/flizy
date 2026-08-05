@@ -17,9 +17,11 @@ export type ClaimMatchRow = {
 
 export type ClaimAccountKeys = {
   phones: string[];
-  identities: Array<{ channel: string; externalId: string }>;
+  identities: Array<{ channel: string; externalId: string; displayHandle?: string | null }>;
   emails: string[];
 };
+
+const TG_PENDING_PREFIX = 'tguser:';
 
 export function normalizePhoneDigits(raw: unknown): string {
   return String(raw || '').replace(/\D/g, '');
@@ -29,6 +31,16 @@ export function isPlausiblePhoneDigits(digits: string): boolean {
   return digits.length >= 10 && digits.length <= 15;
 }
 
+function isTelegramPendingUsernameId(externalId: string): boolean {
+  return String(externalId || '').toLowerCase().startsWith(TG_PENDING_PREFIX);
+}
+
+function telegramPendingUsernameFromId(externalId: string): string {
+  const s = String(externalId || '');
+  if (!isTelegramPendingUsernameId(s)) return '';
+  return s.slice(TG_PENDING_PREFIX.length).trim().toLowerCase().replace(/^@+/, '');
+}
+
 export function claimMatchesAccountKeys(
   claim: ClaimMatchRow,
   keys: ClaimAccountKeys
@@ -36,7 +48,23 @@ export function claimMatchesAccountKeys(
   if (claim.to_channel && claim.to_external_id) {
     const ch = String(claim.to_channel);
     const id = String(claim.to_external_id).trim();
-    return keys.identities.some((i) => i.channel === ch && i.externalId === id);
+    if (keys.identities.some((i) => i.channel === ch && i.externalId === id)) {
+      return true;
+    }
+    // Pending-by-@username Telegram holds
+    if (ch === 'telegram' && isTelegramPendingUsernameId(id)) {
+      const want = telegramPendingUsernameFromId(id);
+      if (!want) return false;
+      return keys.identities.some((i) => {
+        if (i.channel !== 'telegram') return false;
+        const h = String(i.displayHandle || '')
+          .trim()
+          .replace(/^@+/, '')
+          .toLowerCase();
+        return h === want;
+      });
+    }
+    return false;
   }
   if (claim.to_email) {
     const email = normalizeEmail(claim.to_email);
@@ -52,6 +80,11 @@ export function matchErrorForClaim(claim: ClaimMatchRow, keys: ClaimAccountKeys)
   if (claim.to_channel) {
     const where = channelLabel(claim.to_channel) || claim.to_channel;
     const hasChannel = keys.identities.some((i) => i.channel === claim.to_channel);
+    if (claim.to_channel === 'telegram' && isTelegramPendingUsernameId(String(claim.to_external_id))) {
+      return hasChannel
+        ? 'This claim is for a different Telegram @username. Link the account that owns that handle.'
+        : 'This claim is held for a Telegram @username. Open the Flizy Telegram bot, link with a site code, then claim.';
+    }
     return hasChannel
       ? `This claim is for a different ${where} account.`
       : `This claim is held for a ${where} account. Link ${where} on Account → Platforms first.`;
