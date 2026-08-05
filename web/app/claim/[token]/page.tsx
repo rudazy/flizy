@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { track } from '../../../lib/analytics';
 
 type ClaimView = {
   amount_eth?: string;
@@ -62,6 +63,7 @@ export default function ClaimPage() {
         setMsg(json.error || 'Could not claim.');
         return;
       }
+      track('claim_completed');
       setMsg('Claim received. Funds are in your Flizy wallet.');
       await load();
     } catch {

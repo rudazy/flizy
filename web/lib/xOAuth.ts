@@ -16,7 +16,12 @@ import { cookies } from 'next/headers';
 const AUTHORIZE_URL = 'https://twitter.com/i/oauth2/authorize';
 /** Both hostnames are documented; twitter.com is widely used for token. */
 const TOKEN_URL = 'https://api.twitter.com/2/oauth2/token';
-const USER_URL = 'https://api.twitter.com/2/users/me';
+const USER_URLS = [
+  'https://api.twitter.com/2/users/me?user.fields=username,name',
+  'https://api.x.com/2/users/me?user.fields=username,name',
+  'https://api.twitter.com/2/users/me',
+  'https://api.x.com/2/users/me',
+];
 /**
  * tweet.read is required by X for user-context identity in practice, even when
  * we only read the profile. offline.access is optional; kept for longer sessions
@@ -99,6 +104,19 @@ export type XIdentity = {
   login: string;
 };
 
+/** Structured failure so the callback can show a useful status (not only exchange_failed). */
+export type XExchangeResult =
+  | { ok: true; identity: XIdentity }
+  | {
+      ok: false;
+      /** Mapped into ?x=… query for the Account UI */
+      reason:
+        | 'exchange_failed'
+        | 'project_required'
+        | 'unauthorized'
+        | 'rate_limited';
+    };
+
 async function postToken(body: URLSearchParams, useBasic: boolean): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/x-www-form-urlencoded',
@@ -120,7 +138,7 @@ async function postToken(body: URLSearchParams, useBasic: boolean): Promise<Resp
 export async function exchangeCodeForIdentity(
   code: string,
   codeVerifier: string
-): Promise<XIdentity | null> {
+): Promise<XExchangeResult> {
   try {
     // Confidential client (Web App): Basic auth, no client_id in body.
     const confidentialBody = new URLSearchParams({
@@ -151,7 +169,7 @@ export async function exchangeCodeForIdentity(
 
     if (!tokenRes.ok) {
       console.error(`[oauth:x] token exchange failed HTTP ${tokenRes.status}: ${tokenText.slice(0, 300)}`);
-      return null;
+      return { ok: false, reason: 'exchange_failed' };
     }
 
     let tokenBody: {
@@ -164,14 +182,14 @@ export async function exchangeCodeForIdentity(
       tokenBody = JSON.parse(tokenText);
     } catch {
       console.error('[oauth:x] token response was not JSON');
-      return null;
+      return { ok: false, reason: 'exchange_failed' };
     }
 
     if (!tokenBody?.access_token) {
       console.error(
         `[oauth:x] no access_token: ${tokenBody?.error || 'unknown'} ${tokenBody?.error_description || ''}`
       );
-      return null;
+      return { ok: false, reason: 'exchange_failed' };
     }
 
     let accessToken = tokenBody.access_token;
@@ -182,8 +200,12 @@ export async function exchangeCodeForIdentity(
         const refreshBody = new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token: tokenBody.refresh_token,
+          client_id: clientId(),
         });
-        const refreshRes = await postToken(refreshBody, true);
+        let refreshRes = await postToken(refreshBody, true);
+        if (!refreshRes.ok) {
+          refreshRes = await postToken(refreshBody, false);
+        }
         if (refreshRes.ok) {
           const refreshed = (await refreshRes.json()) as { access_token?: string };
           if (refreshed.access_token) accessToken = refreshed.access_token;
@@ -193,32 +215,54 @@ export async function exchangeCodeForIdentity(
       }
     }
 
-    const userRes = await fetch(`${USER_URL}?user.fields=username,name`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'User-Agent': 'Flizy-App',
-      },
-      cache: 'no-store',
-    });
-
-    if (!userRes.ok) {
-      const errBody = await userRes.text().catch(() => '');
-      console.error(`[oauth:x] user read HTTP ${userRes.status}: ${errBody.slice(0, 200)}`);
-      return null;
+    let lastStatus = 0;
+    let lastBody = '';
+    for (const userUrl of USER_URLS) {
+      const userRes = await fetch(userUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'User-Agent': 'Flizy-App',
+        },
+        cache: 'no-store',
+      });
+      lastStatus = userRes.status;
+      if (!userRes.ok) {
+        lastBody = await userRes.text().catch(() => '');
+        console.error(`[oauth:x] user read HTTP ${userRes.status} ${userUrl}: ${lastBody.slice(0, 200)}`);
+        continue;
+      }
+      const payload = (await userRes.json()) as {
+        data?: { id?: string; username?: string; name?: string };
+      };
+      const id = payload?.data?.id != null ? String(payload.data.id) : '';
+      if (!/^\d+$/.test(id)) {
+        console.error('[oauth:x] missing numeric id in /2/users/me');
+        return { ok: false, reason: 'exchange_failed' };
+      }
+      const login = String(payload.data?.username || payload.data?.name || '').trim() || id;
+      return { ok: true, identity: { externalId: id, login } };
     }
 
-    const payload = (await userRes.json()) as {
-      data?: { id?: string; username?: string; name?: string };
-    };
-    const id = payload?.data?.id != null ? String(payload.data.id) : '';
-    if (!/^\d+$/.test(id)) {
-      console.error('[oauth:x] missing numeric id in /2/users/me');
-      return null;
+    console.error(`[oauth:x] all user reads failed last=${lastStatus}: ${lastBody.slice(0, 300)}`);
+    // X Free / unenrolled apps often 403 with this "Project" wording even when the
+    // app is already under a project in the portal.
+    if (
+      lastStatus === 403 &&
+      /attached to a Project|developer App that is attached|not permitted|client-not-enrolled/i.test(
+        lastBody
+      )
+    ) {
+      return { ok: false, reason: 'project_required' };
     }
-    const login = String(payload.data?.username || payload.data?.name || '').trim() || id;
-    return { externalId: id, login };
+    if (lastStatus === 401 || lastStatus === 403) {
+      return { ok: false, reason: 'unauthorized' };
+    }
+    if (lastStatus === 429) {
+      return { ok: false, reason: 'rate_limited' };
+    }
+    return { ok: false, reason: 'exchange_failed' };
   } catch (err) {
     console.error(`[oauth:x] exchange threw: ${(err as Error).message}`);
-    return null;
+    return { ok: false, reason: 'exchange_failed' };
   }
 }

@@ -7,16 +7,15 @@ import {
   faqJsonLd,
 } from '../../components/StructuredData';
 import { FLIZY_FAQ } from '../../lib/flizyFaq';
+import { pageMetadata } from '../../lib/seo';
 import { siteOrigin } from '../../lib/siteOrigin';
 
-export const metadata: Metadata = {
-  title: 'How it works',
+export const metadata: Metadata = pageMetadata({
+  title: 'How Flizy works — send crypto on WhatsApp & Telegram',
   description:
     'Set up Flizy once on the web, then send crypto from WhatsApp or Telegram to people you trust. Account, funding, link code, and everyday chat sends.',
-  alternates: {
-    canonical: '/how-it-works',
-  },
-};
+  path: '/how-it-works',
+});
 
 export default function HowItWorksPage() {
   const origin = siteOrigin();

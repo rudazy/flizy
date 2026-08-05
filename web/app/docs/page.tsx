@@ -1,16 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { StructuredData, breadcrumbJsonLd } from '../../components/StructuredData';
+import { pageMetadata } from '../../lib/seo';
 import { siteOrigin } from '../../lib/siteOrigin';
 
-export const metadata: Metadata = {
-  title: 'Commands & security',
+export const metadata: Metadata = pageMetadata({
+  title: 'WhatsApp & Telegram crypto commands | Flizy',
   description:
     'Full Flizy WhatsApp and Telegram command list. Why sends only go to people you already trust, and how unlock PIN and chat unlink work.',
-  alternates: {
-    canonical: '/docs',
-  },
-};
+  path: '/docs',
+});
 
 const CMD_GROUPS: Array<{
   title: string;

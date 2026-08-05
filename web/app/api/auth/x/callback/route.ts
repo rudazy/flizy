@@ -67,11 +67,12 @@ export async function GET(req: Request) {
       return NextResponse.redirect(postOAuthUrl('state_invalid'));
     }
 
-    const identity = await exchangeCodeForIdentity(code, codeVerifier);
-    if (!identity) {
+    const exchanged = await exchangeCodeForIdentity(code, codeVerifier);
+    if (!exchanged.ok) {
       await recordCallbackFailure(sessionKey);
-      return NextResponse.redirect(postOAuthUrl('exchange_failed'));
+      return NextResponse.redirect(postOAuthUrl(exchanged.reason));
     }
+    const identity = exchanged.identity;
 
     try {
       await bindChannelIdentity(getSupabase(), {

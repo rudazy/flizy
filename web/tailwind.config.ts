@@ -22,8 +22,16 @@ const config: Config = {
         copper: '#a86b3c',
       },
       fontFamily: {
-        sans: ['Geist', 'Segoe UI', 'system-ui', 'sans-serif'],
-        mono: ['Geist Mono', 'ui-monospace', 'Cascadia Code', 'Consolas', 'monospace'],
+        // Variables come from the `geist` package, applied on <html> in app/layout.tsx.
+        // Self-hosted woff2 — no external font request, so the CSP stays font-src 'self'.
+        sans: ['var(--font-geist-sans)', 'Segoe UI', 'system-ui', 'sans-serif'],
+        mono: [
+          'var(--font-geist-mono)',
+          'ui-monospace',
+          'Cascadia Code',
+          'Consolas',
+          'monospace',
+        ],
       },
       boxShadow: {
         glow: '0 0 0 1px rgba(224, 184, 74, 0.12), 0 18px 50px rgba(0, 0, 0, 0.45)',

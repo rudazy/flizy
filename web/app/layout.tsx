@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from 'next';
+import { GeistMono } from 'geist/font/mono';
+import { GeistSans } from 'geist/font/sans';
 import { Analytics } from '../components/Analytics';
 import { AppChrome } from '../components/AppChrome';
 import { JsonLd } from '../components/JsonLd';
 import { LocaleProvider } from '../components/LocaleProvider';
+import { OG_IMAGE } from '../lib/seo';
 import './globals.css';
 
 function siteOrigin() {
@@ -42,7 +45,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Flizy' }],
   alternates: {
-    canonical: origin,
+    canonical: './',
   },
   manifest: '/manifest.webmanifest',
   appleWebApp: {
@@ -60,14 +63,7 @@ export const metadata: Metadata = {
     siteName: 'Flizy',
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: [
-      {
-        url: '/og.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Flizy — send crypto from WhatsApp and Telegram, only to people you trust',
-      },
-    ],
+    images: [OG_IMAGE],
   },
   twitter: {
     card: 'summary_large_image',
@@ -75,7 +71,7 @@ export const metadata: Metadata = {
     creator: '@Flizyapp',
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: ['/og.jpg'],
+    images: [OG_IMAGE.url],
   },
   icons: {
     icon: [
@@ -102,7 +98,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="page-shell font-mono antialiased">
         <JsonLd />
         <Analytics />

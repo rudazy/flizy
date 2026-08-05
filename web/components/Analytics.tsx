@@ -9,6 +9,17 @@ import Script from 'next/script';
 const GA_ID = (process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || '').trim();
 const CLARITY_ID = (process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || '').trim();
 
+/**
+ * Preview deploys inherit Production env vars on Vercel, so without this guard
+ * every preview build would report into the live GA4 property and Clarity
+ * project. Vercel injects NEXT_PUBLIC_VERCEL_ENV automatically.
+ */
+function isMeasurableEnv(): boolean {
+  if (process.env.NODE_ENV !== 'production') return false;
+  const vercelEnv = process.env.NEXT_PUBLIC_VERCEL_ENV;
+  return vercelEnv !== 'preview' && vercelEnv !== 'development';
+}
+
 function looksLikeGaId(id: string): boolean {
   return /^G-[A-Z0-9]+$/i.test(id);
 }
@@ -19,6 +30,8 @@ function looksLikeClarityId(id: string): boolean {
 }
 
 export function Analytics() {
+  if (!isMeasurableEnv()) return null;
+
   const ga = looksLikeGaId(GA_ID) ? GA_ID : '';
   const clarity = looksLikeClarityId(CLARITY_ID) ? CLARITY_ID : '';
 

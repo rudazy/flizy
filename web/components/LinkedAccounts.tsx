@@ -53,6 +53,15 @@ function callbackMessage(
       text: `${name} did not complete the sign in. Try again.`,
       tone: 'warn',
     },
+    project_required: {
+      text:
+        'X blocked profile read (API access). Your app settings look fine — Free tier often cannot call /2/users/me. On developer.x.com open the Project → Products / Access and enable a paid tier (e.g. Basic), wait a few minutes, then Link X again.',
+      tone: 'warn',
+    },
+    unauthorized: {
+      text: 'X rejected the app credentials or scopes. Check Client ID/Secret and App permissions, then try again.',
+      tone: 'warn',
+    },
     rate_limited: { text: 'Too many attempts. Wait a little and try again.', tone: 'warn' },
     login_required: { text: 'Log in and try again.', tone: 'warn' },
     unavailable: {

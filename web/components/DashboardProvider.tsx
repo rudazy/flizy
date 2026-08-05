@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { track } from '../lib/analytics';
 import type {
   ActivityItem,
   DashboardData,
@@ -156,6 +157,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       // sending that prefilled message spent it, and the Telegram button beside
       // it was then pointing at a dead code. Let the user pick.
       setMsg('Link code ready. It works once, on whichever chat app you open first.');
+      track('link_code_generated');
       await loadAccount();
       return json as { code?: string; waDeepLink?: string; expiresAt?: string };
     } catch (e) {
@@ -183,6 +185,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
         setMsg(`Saved trusted wallet "${input.label.trim() || input.address}".`);
+        track('trusted_address_added');
         await load();
         return true;
       } catch (err) {
