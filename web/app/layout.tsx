@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
+import { Analytics } from '../components/Analytics';
 import { AppChrome } from '../components/AppChrome';
+import { JsonLd } from '../components/JsonLd';
 import { LocaleProvider } from '../components/LocaleProvider';
 import './globals.css';
 
@@ -14,27 +16,34 @@ function siteOrigin() {
 
 const origin = siteOrigin();
 
+const SITE_TITLE = 'Flizy — Send crypto from WhatsApp & Telegram';
+const SITE_DESCRIPTION =
+  'Chat wallet for WhatsApp and Telegram. One account, both chats. Send only to people you already trust. Manage addresses and unlock PIN on the site. GIWA-first EVM.';
+
 export const metadata: Metadata = {
   metadataBase: new URL(origin),
   title: {
-    default: 'Flizy | Chat wallet for WhatsApp and Telegram, trusted sends',
+    default: SITE_TITLE,
     template: '%s | Flizy',
   },
-  description:
-    'Send crypto from WhatsApp or Telegram to people you already trust. One account, both chats. Manage trusted addresses and unlock PIN on the site. GIWA-first EVM.',
+  description: SITE_DESCRIPTION,
   applicationName: 'Flizy',
   keywords: [
     'Flizy',
-    'WhatsApp',
-    'Telegram',
-    'crypto',
-    'wallet',
-    'GIWA',
+    'WhatsApp wallet',
+    'Telegram wallet',
+    'crypto chat wallet',
     'trusted addresses',
-    'EVM',
+    'send crypto WhatsApp',
+    'send crypto Telegram',
+    'GIWA',
+    'EVM wallet',
     'PWA',
   ],
   authors: [{ name: 'Flizy' }],
+  alternates: {
+    canonical: origin,
+  },
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
@@ -49,15 +58,14 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: origin,
     siteName: 'Flizy',
-    title: 'Flizy | Send crypto from your chat app. Not to strangers.',
-    description:
-      'Chat-native wallet for WhatsApp and Telegram. Trusted destinations on the site. Unlock with a PIN. Built for GIWA and EVM.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     images: [
       {
         url: '/og.jpg',
         width: 1200,
         height: 630,
-        alt: 'Flizy: Send crypto from WhatsApp or Telegram',
+        alt: 'Flizy — send crypto from WhatsApp and Telegram, only to people you trust',
       },
     ],
   },
@@ -65,9 +73,8 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     site: '@Flizyapp',
     creator: '@Flizyapp',
-    title: 'Flizy | Chat wallet for WhatsApp and Telegram, trusted sends',
-    description:
-      'Send crypto from WhatsApp or Telegram, only to addresses you already trust.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     images: ['/og.jpg'],
   },
   icons: {
@@ -97,6 +104,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="page-shell font-mono antialiased">
+        <JsonLd />
+        <Analytics />
         <LocaleProvider>
           <AppChrome>{children}</AppChrome>
         </LocaleProvider>

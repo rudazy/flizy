@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { StructuredData, breadcrumbJsonLd } from '../../components/StructuredData';
+import { siteOrigin } from '../../lib/siteOrigin';
 
 export const metadata: Metadata = {
-  title: 'Docs — Security & commands',
+  title: 'Commands & security',
   description:
-    'Why Flizy only sends to trusted people, and the full chat command list for WhatsApp and Telegram.',
+    'Full Flizy WhatsApp and Telegram command list. Why sends only go to people you already trust, and how unlock PIN and chat unlink work.',
+  alternates: {
+    canonical: '/docs',
+  },
 };
 
 const CMD_GROUPS: Array<{
@@ -131,8 +136,31 @@ const CMD_GROUPS: Array<{
 ];
 
 export default function DocsPage() {
+  const origin = siteOrigin();
+
   return (
     <article className="fade-up mx-auto max-w-3xl space-y-12">
+      <StructuredData
+        data={breadcrumbJsonLd(origin, [
+          { name: 'Home', path: '/' },
+          { name: 'Docs', path: '/docs' },
+        ])}
+      />
+
+      <nav className="text-xs text-muted" aria-label="Breadcrumb">
+        <ol className="flex flex-wrap items-center gap-1.5">
+          <li>
+            <Link href="/" className="text-muted no-underline hover:text-lime">
+              Home
+            </Link>
+          </li>
+          <li aria-hidden className="text-border">
+            /
+          </li>
+          <li className="text-paper">Docs</li>
+        </ol>
+      </nav>
+
       <div>
         <p className="text-xs uppercase tracking-[0.18em] text-gold">Docs</p>
         <h1 className="mt-3 font-sans text-3xl tracking-wide text-paper md:text-4xl">
