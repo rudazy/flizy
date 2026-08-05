@@ -337,7 +337,7 @@ export default function AccountPage() {
                     disabled={busy === `email-rm-${row.id}`}
                     onClick={async () => {
                       setBusy(`email-rm-${row.id}`);
-                      setMsg(null);
+                      setMsg('');
                       try {
                         const res = await fetch('/api/account/emails', {
                           method: 'DELETE',
@@ -369,7 +369,7 @@ export default function AccountPage() {
               onSubmit={async (e) => {
                 e.preventDefault();
                 setBusy('email-add');
-                setMsg(null);
+                setMsg('');
                 try {
                   const res = await fetch('/api/account/emails', {
                     method: 'POST',

@@ -6,7 +6,7 @@ export type PendingClaimItem = {
   counterparty: string | null;
   createdAt: string | null;
   claimToken: string | null;
-  kind?: 'phone' | 'platform';
+  kind?: 'phone' | 'platform' | 'email';
   canClaimOnWeb?: boolean;
 };
 
