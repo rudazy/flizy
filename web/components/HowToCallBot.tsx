@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { GIWA_BRIDGE_URL, GIWA_FAUCET_URL } from '../lib/botPublic';
+import { GIWA_FAUCET_URL } from '../lib/botPublic';
 
 const COUNTRY_CODES = [
   { code: '+44', label: 'United Kingdom' },
@@ -160,51 +160,39 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
       <div className="border-t border-border pt-6">
         <p className="text-xs uppercase tracking-[0.18em] text-gold">Get test ETH</p>
         <h3 className="mt-2 font-sans text-base tracking-wide text-paper sm:text-lg">
-          Fund your agent wallet
+          Fund your Flizy wallet
         </h3>
         <p className="mt-2 text-sm text-muted">
-          Copy your agent address from the dashboard. Sends leave from that wallet.
+          Open the official GIWA faucet, paste your Flizy wallet address from the dashboard (Wallet
+          tab), and request test ETH. No bridge. No MetaMask required for the faucet.
         </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <a
-            href={GIWA_FAUCET_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="flex flex-col rounded border border-border bg-ink/60 p-4 no-underline transition-colors hover:border-[rgba(224,184,74,0.35)]"
-          >
-            <span className="font-sans text-sm text-lime">Google Web3 faucet</span>
-            <span className="mt-2 text-xs leading-relaxed text-muted">
-              Free test ETH for development networks.
-            </span>
-          </a>
-          <a
-            href={GIWA_BRIDGE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="flex flex-col rounded border border-border bg-ink/60 p-4 no-underline transition-colors hover:border-[rgba(224,184,74,0.35)]"
-          >
-            <span className="font-sans text-sm text-lime">GIWA bridge</span>
-            <span className="mt-2 text-xs leading-relaxed text-muted">
-              Bridge test assets onto GIWA Sepolia.
-            </span>
-          </a>
-        </div>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <ol className="mt-4 space-y-2 text-xs leading-relaxed text-muted sm:text-sm">
+          <li>
+            <span className="text-paper">1.</span> Copy your Flizy wallet address from Wallet → Fund
+          </li>
+          <li>
+            <span className="text-paper">2.</span> Open{' '}
+            <a
+              href={GIWA_FAUCET_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="text-lime no-underline hover:text-gold"
+            >
+              faucet.giwa.io
+            </a>
+          </li>
+          <li>
+            <span className="text-paper">3.</span> Paste that address and request funds
+          </li>
+        </ol>
+        <div className="mt-4">
           <a
             href={GIWA_FAUCET_URL}
             className="btn btn-primary w-full justify-center sm:w-auto"
             target="_blank"
             rel="noreferrer"
           >
-            Open faucet
-          </a>
-          <a
-            href={GIWA_BRIDGE_URL}
-            className="btn btn-ghost w-full justify-center sm:w-auto"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open bridge
+            Open GIWA faucet
           </a>
         </div>
       </div>

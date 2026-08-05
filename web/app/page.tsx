@@ -91,7 +91,7 @@ export default function HomePage() {
             },
             {
               t: 'Your wallet sends',
-              d: 'From address is your agent wallet. Fund it from MetaMask or Rabby after faucet + GIWA bridge.',
+              d: 'Sends leave from your Flizy wallet. Fund it via the official GIWA faucet (paste your Flizy address).',
             },
           ].map((item) => (
             <div key={item.t} className="card card-hover p-5">
@@ -106,38 +106,32 @@ export default function HomePage() {
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-gold">Testnet</p>
           <h2 className="mt-2 font-sans text-2xl tracking-wide text-paper">
-            How to fund (MetaMask / Rabby)
+            How to fund (GIWA faucet)
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-            Faucets and bridges need a regular wallet. Your Flizy agent address is a smart wallet —
-            it cannot claim Google faucet ETH or operate the GIWA bridge. Use MetaMask or Rabby,
-            then send GIWA Sepolia ETH to your agent address from the app Wallet tab.
+            Use the official GIWA faucet. Copy your Flizy wallet address from the dashboard (Wallet
+            → Fund), open faucet.giwa.io, paste that address, and request test ETH. No bridge step.
           </p>
         </div>
-        <ol className="grid gap-3 sm:grid-cols-2">
+        <ol className="grid gap-3 sm:grid-cols-3">
           {[
             {
               n: '01',
-              t: 'MetaMask or Rabby',
-              d: 'Connect a normal browser wallet. Not your Flizy agent address.',
+              t: 'Copy Flizy address',
+              d: 'Sign up, open Wallet → Fund, copy your Flizy wallet address.',
+              href: '/signup',
             },
             {
               n: '02',
-              t: 'Google faucet',
-              d: 'Claim Sepolia test ETH into that wallet.',
-              href: 'https://cloud.google.com/application/web3/faucet',
+              t: 'Open GIWA faucet',
+              d: 'Visit the official faucet for GIWA testnet.',
+              href: 'https://faucet.giwa.io',
             },
             {
               n: '03',
-              t: 'GIWA bridge',
-              d: 'Bridge Sepolia ETH onto GIWA Sepolia with the same wallet.',
-              href: 'https://bridge-giwa.vercel.app/',
-            },
-            {
-              n: '04',
-              t: 'Send to Flizy',
-              d: 'Transfer GIWA ETH to your agent wallet address after you sign up.',
-              href: '/signup',
+              t: 'Paste and request',
+              d: 'Paste your Flizy wallet address and claim test ETH into it.',
+              href: 'https://faucet.giwa.io',
             },
           ].map((s) => (
             <li key={s.n} className="rounded-md border border-border bg-ink/40 p-4">

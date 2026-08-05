@@ -113,11 +113,11 @@ export default function WalletPage() {
       {slide === 'fund' ? (
         <AppSection
           title="Fund"
-          helper="Faucet and bridge need MetaMask/Rabby. Then send GIWA ETH to your agent address."
+          helper="Copy your Flizy wallet address, open the official GIWA faucet, paste it, and request test ETH."
         >
           {data.account.agent_wallet_address ? (
             <div className="mb-5">
-              <p className="label">Send to this address</p>
+              <p className="label">Your Flizy wallet (paste this on the faucet)</p>
               <p className="mono-box mt-1 break-all text-sm">{data.account.agent_wallet_address}</p>
               <div className="mt-2">
                 <CopyButton value={data.account.agent_wallet_address} label="Copy address" />
@@ -128,27 +128,22 @@ export default function WalletPage() {
             {[
               {
                 n: '1',
-                t: 'Open MetaMask or Rabby',
-                d: 'Use a regular browser wallet on Ethereum Sepolia.',
+                t: 'Copy your Flizy wallet address',
+                d: 'Use the address above — that is the wallet chat sends leave from.',
               },
               {
                 n: '2',
-                t: 'Claim Sepolia ETH',
-                d: 'Do not paste your Flizy agent address into the faucet.',
-                href: 'https://cloud.google.com/application/web3/faucet',
-                linkLabel: 'Google faucet',
+                t: 'Open the official GIWA faucet',
+                d: 'Go to faucet.giwa.io (official GIWA testnet faucet).',
+                href: 'https://faucet.giwa.io',
+                linkLabel: 'Open faucet.giwa.io',
               },
               {
                 n: '3',
-                t: 'Bridge to GIWA Sepolia',
-                d: 'Same wallet through the GIWA bridge.',
-                href: 'https://bridge-giwa.vercel.app/',
-                linkLabel: 'GIWA bridge',
-              },
-              {
-                n: '4',
-                t: 'Send to agent wallet',
-                d: 'Transfer GIWA ETH to the address above.',
+                t: 'Paste and request funds',
+                d: 'Paste your Flizy wallet address on the faucet and claim test ETH. No bridge step.',
+                href: 'https://faucet.giwa.io',
+                linkLabel: 'Request on faucet',
               },
             ].map((step) => (
               <li

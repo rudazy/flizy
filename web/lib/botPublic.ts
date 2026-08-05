@@ -26,5 +26,5 @@ export function botWaMeUrl(text?: string): string {
   return `https://wa.me/${d}?text=${encodeURIComponent(text)}`;
 }
 
-export const GIWA_FAUCET_URL = 'https://cloud.google.com/application/web3/faucet';
-export const GIWA_BRIDGE_URL = 'https://bridge-giwa.vercel.app/';
+/** Official GIWA testnet faucet. Paste your Flizy agent wallet address there. */
+export const GIWA_FAUCET_URL = 'https://faucet.giwa.io';

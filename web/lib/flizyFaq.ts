@@ -35,6 +35,11 @@ export const FLIZY_FAQ: Array<{ question: string; answer: string }> = [
       'Flizy is GIWA-first on EVM. The site and bots use the configured default chain (see the dashboard for the live network and deposit address).',
   },
   {
+    question: 'How do I get test ETH for Flizy?',
+    answer:
+      'Copy your Flizy wallet address from the dashboard (Wallet → Fund), open the official GIWA faucet at https://faucet.giwa.io, paste that address, and request funds. No bridge or separate MetaMask step is required for the faucet.',
+  },
+  {
     question: 'Is Flizy free to start?',
     answer:
       'Creating an account is free. You need gas and balance on the supported chain to send. Trading FLZ on the built-in DEX may include protocol fees shown in the quote before you confirm.',

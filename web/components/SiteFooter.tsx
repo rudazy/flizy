@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { GIWA_FAUCET_URL } from '../lib/botPublic';
 
 export function SiteFooter() {
   return (
@@ -15,20 +16,12 @@ export function SiteFooter() {
             Guide
           </Link>
           <a
-            href="https://bridge-giwa.vercel.app/"
+            href={GIWA_FAUCET_URL}
             className="text-muted no-underline hover:text-lime"
             target="_blank"
             rel="noreferrer"
           >
-            Bridge
-          </a>
-          <a
-            href="https://cloud.google.com/application/web3/faucet"
-            className="text-muted no-underline hover:text-lime"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Faucet
+            GIWA faucet
           </a>
           <Link href="/docs" className="text-muted no-underline hover:text-lime">
             Docs

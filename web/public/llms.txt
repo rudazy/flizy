@@ -16,8 +16,10 @@ testnet with source-verified contracts.
 - https://flizy.app/signup : Create account
 - https://flizy.app/login : Sign in
 - https://flizy.app/dashboard : Wallet, PIN, trusted people, link code for WhatsApp or Telegram
+- https://flizy.app/dashboard/wallet : Flizy wallet address and fund steps
 - https://flizy.app/dashboard/swap : Swap FLZ and ETH, add or remove liquidity
 - https://flizy.app/claim/:token : Claim funds reserved for a phone number
+- https://faucet.giwa.io : Official GIWA testnet faucet — paste Flizy wallet address to receive test ETH
 - https://x.com/Flizyapp : Official X account
 
 ## Channels
