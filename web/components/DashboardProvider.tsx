@@ -71,26 +71,34 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
    * a chat app while this tab sits open, and re-reading balances and on-chain
    * holdings every time the tab regains focus would be wasteful.
    */
-  const loadAccount = useCallback(async () => {
+  const loadAccount = useCallback(async (): Promise<DashboardData | null> => {
     const res = await fetch('/api/dashboard');
     const json = await res.json();
     if (!res.ok) {
       setError(json.error || 'Not logged in');
       setData(null);
-      return false;
+      return null;
     }
     setError('');
     setData(json);
     if (json?.account?.locale) {
       setLocale(normalizeLocale(json.account.locale));
     }
-    return true;
+    return json as DashboardData;
   }, [setLocale]);
 
   const load = useCallback(async () => {
     setError('');
-    const ok = await loadAccount();
-    if (!ok) return;
+    const accountPayload = await loadAccount();
+    if (!accountPayload) return;
+
+    // No history/holdings until email is verified (user is on the gate only).
+    if (!accountPayload.account?.email_verified) {
+      setHistory([]);
+      setActivity([]);
+      setHoldings(null);
+      return;
+    }
 
     const [histRes, holdRes] = await Promise.all([
       fetch('/api/history'),

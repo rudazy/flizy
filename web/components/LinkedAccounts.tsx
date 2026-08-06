@@ -201,10 +201,19 @@ export function LinkedAccounts() {
                   <button
                     type="button"
                     className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
-                    disabled={busy}
+                    disabled={busy || p.channel === 'x'}
                     onClick={() => onUnlink(p.channel)}
                   >
                     {busy ? 'Working...' : 'Unlink'}
+                  </button>
+                ) : p.channel === 'x' ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary shrink-0 px-3 py-1.5 text-xs opacity-50"
+                    disabled
+                    title="X linking is temporarily unavailable"
+                  >
+                    Link X
                   </button>
                 ) : (
                   <a
@@ -215,6 +224,13 @@ export function LinkedAccounts() {
                   </a>
                 )}
               </div>
+
+              {p.channel === 'x' && !row ? (
+                <p className="mt-2 font-mono text-[10px] text-muted">
+                  X linking is temporarily disabled. You can still see it here; GitHub and Discord
+                  work.
+                </p>
+              ) : null}
 
               {unlinking === p.channel ? (
                 <div className="mt-3 space-y-2">

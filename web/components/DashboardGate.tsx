@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { useDashboard } from './DashboardProvider';
 import { AppBottomNav } from './AppBottomNav';
 import { PwaRegister } from './PwaRegister';
+import { EmailVerifyGate } from './EmailVerifyGate';
 
 export function DashboardGate({ children }: { children: ReactNode }) {
   const { data, error, msg } = useDashboard();
@@ -34,6 +35,21 @@ export function DashboardGate({ children }: { children: ReactNode }) {
     );
   }
 
+  // Hard gate: no nav, no features until registration email is verified.
+  if (!data.account.email_verified) {
+    return (
+      <div className="app-shell fade-up pb-8">
+        {msg ? (
+          <div className="alert alert-ok mb-4 text-sm" role="status">
+            {msg}
+          </div>
+        ) : null}
+        <EmailVerifyGate />
+        <PwaRegister />
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell fade-up pb-24 md:pb-8">
       {msg ? (
@@ -41,7 +57,6 @@ export function DashboardGate({ children }: { children: ReactNode }) {
           {msg}
         </div>
       ) : null}
-      {/* Desktop section tabs (top). Mobile bar is position:fixed inside the component. */}
       <AppBottomNav />
       {children}
       <PwaRegister />
