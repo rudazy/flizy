@@ -49,8 +49,12 @@ export async function POST(req: Request) {
         username_changed_at: nowIso,
         locale,
         agent_wallet_address: null,
+        // Must prove inbox control before email claims unlock.
+        email_verified_at: null,
       })
-      .select('id, email, display_name, username, username_changed_at, locale, agent_wallet_address')
+      .select(
+        'id, email, email_verified_at, display_name, username, username_changed_at, locale, agent_wallet_address'
+      )
       .single();
 
     if (error) {
@@ -69,7 +73,7 @@ export async function POST(req: Request) {
       .update({ agent_wallet_address: deriveAgentAddress(data.id) })
       .eq('id', data.id)
       .select(
-        'email, display_name, username, username_changed_at, locale, agent_wallet_address, balance_eth'
+        'email, email_verified_at, display_name, username, username_changed_at, locale, agent_wallet_address, balance_eth'
       )
       .single();
     if (wErr) {
@@ -77,7 +81,29 @@ export async function POST(req: Request) {
     }
 
     await createSession(data.id);
-    return NextResponse.json({ account: toPublicAccount(withWallet) });
+
+    // Best-effort: send verification code so they can unlock email claims.
+    let emailCodeSent = false;
+    let emailCodeError: string | null = null;
+    try {
+      const { issueEmailVerificationCode } = await import('../../../../lib/emailVerify');
+      const issued = await issueEmailVerificationCode({
+        accountId: data.id,
+        email,
+        purpose: 'primary',
+      });
+      if (issued.ok) emailCodeSent = true;
+      else emailCodeError = issued.error;
+    } catch {
+      emailCodeError = 'Could not send verification email.';
+    }
+
+    return NextResponse.json({
+      account: toPublicAccount(withWallet),
+      needsEmailVerification: true,
+      emailCodeSent,
+      emailCodeError,
+    });
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }

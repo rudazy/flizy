@@ -17,6 +17,7 @@ import { normalizeLocale, type LocaleCode } from './locale.ts';
 export type AccountRow = {
   id?: string;
   email?: string | null;
+  email_verified_at?: string | null;
   display_name?: string | null;
   /** Flizy @username (recognition only; not a payment key) */
   username?: string | null;
@@ -31,6 +32,8 @@ export type AccountRow = {
 
 export type PublicAccount = {
   email?: string | null;
+  /** True when registration email was proven with a one-time code */
+  email_verified?: boolean;
   display_name?: string | null;
   /** Canonical lowercase username without @, or null */
   username?: string | null;
@@ -54,6 +57,9 @@ export function toPublicAccount(row: AccountRow | null | undefined): PublicAccou
   if (!row) return out;
 
   if ('email' in row) out.email = row.email ?? null;
+  if ('email' in row || 'email_verified_at' in row) {
+    out.email_verified = Boolean(row.email_verified_at);
+  }
   if ('display_name' in row) out.display_name = row.display_name ?? null;
   if ('username' in row) {
     const u = row.username == null ? null : String(row.username).trim().toLowerCase();

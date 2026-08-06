@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('accounts')
-      .select('id, email, password_hash, display_name')
+      .select('id, email, email_verified_at, password_hash, display_name')
       .eq('email', email)
       .maybeSingle();
 
@@ -35,7 +35,11 @@ export async function POST(req: Request) {
 
     await createSession(data.id);
     return NextResponse.json({
-      account: toPublicAccount({ email: data.email, display_name: data.display_name }),
+      account: toPublicAccount({
+        email: data.email,
+        email_verified_at: data.email_verified_at,
+        display_name: data.display_name,
+      }),
     });
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });

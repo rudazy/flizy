@@ -68,12 +68,12 @@ export async function listPendingClaimSummaries(
 
   const { data: acc, error: aErr } = await supabase
     .from('accounts')
-    .select('email')
+    .select('email, email_verified_at')
     .eq('id', accountId)
     .maybeSingle();
   if (aErr) throw new Error(aErr.message);
   const primary = parseEmail(acc?.email);
-  if (primary) emails.add(primary);
+  if (primary && acc?.email_verified_at) emails.add(primary);
 
   const { data: extra } = await supabase
     .from('account_emails')

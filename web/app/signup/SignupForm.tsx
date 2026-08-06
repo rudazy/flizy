@@ -70,7 +70,12 @@ export function SignupForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Signup failed');
       track('signup_completed', { locale });
-      router.push(next);
+      // Email claims require inbox proof — land on Account → Profile to enter code.
+      const verifyNext =
+        data.needsEmailVerification !== false
+          ? '/dashboard/account?s=profile&verify=email'
+          : next;
+      router.push(verifyNext);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {

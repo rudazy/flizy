@@ -1,8 +1,8 @@
 /**
  * List / add / remove secondary emails for the signed-in account.
  *
- * Registration email (accounts.email) is always claimable and is not managed here.
- * Secondary emails are claimable only after verified_at is set (magic-link later).
+ * Registration email is claimable only when accounts.email_verified_at is set.
+ * Secondary emails are claimable only after verified_at (via email code).
  */
 
 import { NextResponse } from 'next/server';
@@ -10,6 +10,7 @@ import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
 import { parseEmail, isValidEmail, normalizeEmail } from '../../../../lib/email';
 import { verifyPassword } from '../../../../lib/cryptoPin';
+import { issueEmailVerificationCode } from '../../../../lib/emailVerify';
 import { apiErrorBody } from '../../../../lib/apiError';
 
 const ROUTE = '/api/account/emails';
@@ -18,11 +19,12 @@ async function listEmails(accountId: string) {
   const supabase = getSupabase();
   const { data: acc, error: aErr } = await supabase
     .from('accounts')
-    .select('email')
+    .select('email, email_verified_at')
     .eq('id', accountId)
     .maybeSingle();
   if (aErr) throw new Error(aErr.message);
   const primary = parseEmail(acc?.email);
+  const primaryVerified = Boolean(acc?.email_verified_at);
 
   const { data: rows, error: eErr } = await supabase
     .from('account_emails')
@@ -34,6 +36,7 @@ async function listEmails(accountId: string) {
     if (String(eErr.message || '').includes('account_emails') || eErr.code === '42P01') {
       return {
         primary,
+        primaryVerified,
         additional: [] as Array<{
           id: string;
           email: string;
@@ -41,7 +44,7 @@ async function listEmails(accountId: string) {
           verifiedAt: string | null;
           createdAt: string | null;
         }>,
-        claimable: primary ? [primary] : [],
+        claimable: primary && primaryVerified ? [primary] : [],
       };
     }
     throw new Error(eErr.message);
@@ -55,12 +58,13 @@ async function listEmails(accountId: string) {
     createdAt: r.created_at ? String(r.created_at) : null,
   }));
 
-  const claimable = [...(primary ? [primary] : [])];
+  const claimable: string[] = [];
+  if (primary && primaryVerified) claimable.push(primary);
   for (const row of additional) {
     if (row.verified && !claimable.includes(row.email)) claimable.push(row.email);
   }
 
-  return { primary, additional, claimable };
+  return { primary, primaryVerified, additional, claimable };
 }
 
 export async function GET() {
@@ -146,6 +150,13 @@ export async function POST(req: Request) {
       return NextResponse.json(apiErrorBody(`POST ${ROUTE}`, error), { status: 500 });
     }
 
+    // Send verification code so only the inbox owner can make it claimable.
+    const issued = await issueEmailVerificationCode({
+      accountId,
+      email,
+      purpose: 'secondary',
+    });
+
     const list = await listEmails(accountId);
     return NextResponse.json({
       email: {
@@ -156,7 +167,12 @@ export async function POST(req: Request) {
         createdAt: data.created_at,
       },
       ...list,
-      note: 'Additional emails must be verified before they can receive claims. Registration email already can.',
+      codeSent: issued.ok,
+      codeError: issued.ok ? null : issued.error,
+      note: issued.ok
+        ? 'We sent a 6-digit code to that address. Enter it to make this email claimable.'
+        : 'Email added but we could not send a code yet. Use Resend code below when mail is configured.',
+      ...(issued.ok && 'devCode' in issued && issued.devCode ? { devCode: issued.devCode } : {}),
     });
   } catch (err) {
     return NextResponse.json(apiErrorBody(`POST ${ROUTE}`, err), { status: 500 });

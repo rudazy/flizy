@@ -15,6 +15,7 @@ export type DashboardData = {
     // No id. The account id is agent wallet key material and never leaves the
     // server. See web/lib/publicAccount.ts.
     email?: string | null;
+    email_verified?: boolean;
     display_name?: string | null;
     /** Flizy @username without leading @, or null */
     username?: string | null;

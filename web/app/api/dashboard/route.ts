@@ -10,7 +10,7 @@ import { apiErrorBody } from '../../../lib/apiError';
 const ROUTE = 'GET /api/dashboard';
 
 const ACCOUNT_COLS =
-  'id, email, display_name, username, username_changed_at, locale, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth';
+  'id, email, email_verified_at, display_name, username, username_changed_at, locale, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth';
 
 export async function GET() {
   try {

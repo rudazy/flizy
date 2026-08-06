@@ -121,12 +121,13 @@ export async function claimKeysForAccount(accountId: string): Promise<{
 
   const { data: acc, error: aErr } = await supabase
     .from('accounts')
-    .select('email')
+    .select('email, email_verified_at')
     .eq('id', accountId)
     .maybeSingle();
   if (aErr) throw new Error(aErr.message);
   const primary = parseEmail(acc?.email);
-  if (primary) emails.push(primary);
+  // Unverified registration email must not unlock email claims.
+  if (primary && acc?.email_verified_at) emails.push(primary);
 
   const { data: extra, error: eErr } = await supabase
     .from('account_emails')
