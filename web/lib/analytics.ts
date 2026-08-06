@@ -1,5 +1,5 @@
 /**
- * Funnel events for GA4 + Clarity.
+ * Funnel events for GA4 + Clarity + Umami.
  *
  * Two rules, both non-negotiable:
  *  1. Never pass PII. No email, wallet address, phone number, username, claim
@@ -25,6 +25,9 @@ type EventParams = Record<string, string | number | boolean>;
 type TagWindow = Window & {
   gtag?: (command: 'event', name: string, params?: EventParams) => void;
   clarity?: (command: 'event', name: string) => void;
+  umami?: {
+    track: (event: string, data?: EventParams) => void;
+  };
 };
 
 export function track(event: FlizyEvent, params?: EventParams): void {
@@ -35,6 +38,12 @@ export function track(event: FlizyEvent, params?: EventParams): void {
     w.gtag?.('event', event, params);
     // Clarity tags the session so recordings can be filtered by what happened.
     w.clarity?.('event', event);
+    // Umami: pageviews are automatic; funnel events are explicit.
+    if (params && Object.keys(params).length) {
+      w.umami?.track(event, params);
+    } else {
+      w.umami?.track(event);
+    }
   } catch {
     // Swallow deliberately: a blocked or half-loaded tag must not surface to the user.
   }

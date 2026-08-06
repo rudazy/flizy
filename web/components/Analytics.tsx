@@ -1,13 +1,18 @@
 import Script from 'next/script';
 
 /**
- * Optional GA4 + Microsoft Clarity.
+ * Optional GA4 + Microsoft Clarity + Umami Cloud.
  * Only load when public env ids are set (production Vercel).
  * Never load without an id — keeps local/dev clean.
+ * Preview deploys must not pollute production properties.
  */
 
 const GA_ID = (process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || '').trim();
 const CLARITY_ID = (process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || '').trim();
+const UMAMI_ID = (process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID || '').trim();
+const UMAMI_SRC = (
+  process.env.NEXT_PUBLIC_UMAMI_SCRIPT_URL || 'https://cloud.umami.is/script.js'
+).trim();
 
 /**
  * Preview deploys inherit Production env vars on Vercel, so without this guard
@@ -29,13 +34,19 @@ function looksLikeClarityId(id: string): boolean {
   return /^[a-z0-9]{8,20}$/i.test(id);
 }
 
+function looksLikeUmamiId(id: string): boolean {
+  // UUID website id from Umami Cloud
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 export function Analytics() {
   if (!isMeasurableEnv()) return null;
 
   const ga = looksLikeGaId(GA_ID) ? GA_ID : '';
   const clarity = looksLikeClarityId(CLARITY_ID) ? CLARITY_ID : '';
+  const umami = looksLikeUmamiId(UMAMI_ID) ? UMAMI_ID : '';
 
-  if (!ga && !clarity) return null;
+  if (!ga && !clarity && !umami) return null;
 
   return (
     <>
@@ -66,6 +77,15 @@ gtag('config', '${ga}', { anonymize_ip: true });
 })(window, document, "clarity", "script", "${clarity}");
 `}
         </Script>
+      ) : null}
+
+      {umami ? (
+        <Script
+          src={UMAMI_SRC}
+          data-website-id={umami}
+          strategy="afterInteractive"
+          defer
+        />
       ) : null}
     </>
   );
