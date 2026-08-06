@@ -6,6 +6,12 @@ import { useDashboard } from './DashboardProvider';
 import { AppBottomNav } from './AppBottomNav';
 import { PwaRegister } from './PwaRegister';
 import { EmailVerifyGate } from './EmailVerifyGate';
+import { ProfileCompleteGate } from './ProfileCompleteGate';
+
+function hasUsername(data: { account?: { username?: string | null } }): boolean {
+  const u = String(data.account?.username || '').trim();
+  return u.length > 0;
+}
 
 export function DashboardGate({ children }: { children: ReactNode }) {
   const { data, error, msg } = useDashboard();
@@ -35,7 +41,7 @@ export function DashboardGate({ children }: { children: ReactNode }) {
     );
   }
 
-  // Hard gate: no nav, no features until registration email is verified.
+  // Stage 2: verify email before any features.
   if (!data.account.email_verified) {
     return (
       <div className="app-shell fade-up pb-8">
@@ -45,6 +51,21 @@ export function DashboardGate({ children }: { children: ReactNode }) {
           </div>
         ) : null}
         <EmailVerifyGate />
+        <PwaRegister />
+      </div>
+    );
+  }
+
+  // Stage 3: username (+ optional display name) after email is verified.
+  if (!hasUsername(data)) {
+    return (
+      <div className="app-shell fade-up pb-8">
+        {msg ? (
+          <div className="alert alert-ok mb-4 text-sm" role="status">
+            {msg}
+          </div>
+        ) : null}
+        <ProfileCompleteGate />
         <PwaRegister />
       </div>
     );

@@ -5,12 +5,15 @@ import { createSession } from '../../../../lib/cookies';
 import { validatePassword } from '../../../../lib/passwordPolicy';
 import { deriveAgentAddress } from '../../../../lib/agentWallet';
 import { toPublicAccount } from '../../../../lib/publicAccount';
-import { validateUsername } from '../../../../lib/username';
 import { normalizeLocale } from '../../../../lib/locale';
 import { apiErrorBody } from '../../../../lib/apiError';
 
 const ROUTE = 'POST /api/auth/signup';
 
+/**
+ * Stage 1 of onboarding: email + password only.
+ * Stage 2 (verify email) and stage 3 (username + display name) run on /dashboard.
+ */
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -18,15 +21,7 @@ export async function POST(req: Request) {
       .trim()
       .toLowerCase();
     const password = String(body.password || '');
-    const displayName = String(body.displayName || '').trim() || null;
     const locale = normalizeLocale(body.locale);
-
-    // Required: Flizy @username is the recognition handle after onboarding.
-    const check = validateUsername(body.username);
-    if (!check.ok) {
-      return NextResponse.json({ error: check.error }, { status: 400 });
-    }
-    const username = check.username;
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
@@ -38,18 +33,16 @@ export async function POST(req: Request) {
 
     const supabase = getSupabase();
     const password_hash = hashPassword(password);
-    const nowIso = new Date().toISOString();
     const { data, error } = await supabase
       .from('accounts')
       .insert({
         email,
         password_hash,
-        display_name: displayName,
-        username,
-        username_changed_at: nowIso,
+        display_name: null,
+        username: null,
+        username_changed_at: null,
         locale,
         agent_wallet_address: null,
-        // Must prove inbox control before email claims unlock.
         email_verified_at: null,
       })
       .select(
@@ -59,10 +52,6 @@ export async function POST(req: Request) {
 
     if (error) {
       if (String(error.message).includes('duplicate') || error.code === '23505') {
-        const msg = String(error.message || '').toLowerCase();
-        if (msg.includes('username') || msg.includes('accounts_username')) {
-          return NextResponse.json({ error: 'That username is taken.' }, { status: 409 });
-        }
         return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
       }
       return NextResponse.json(apiErrorBody(ROUTE, error), { status: 500 });
@@ -82,7 +71,6 @@ export async function POST(req: Request) {
 
     await createSession(data.id);
 
-    // Best-effort: send verification code so they can unlock email claims.
     let emailCodeSent = false;
     let emailCodeError: string | null = null;
     try {
@@ -101,6 +89,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       account: toPublicAccount(withWallet),
       needsEmailVerification: true,
+      needsProfile: true,
       emailCodeSent,
       emailCodeError,
     });

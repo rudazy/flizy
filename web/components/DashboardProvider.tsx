@@ -92,8 +92,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const accountPayload = await loadAccount();
     if (!accountPayload) return;
 
-    // No history/holdings until email is verified (user is on the gate only).
-    if (!accountPayload.account?.email_verified) {
+    // No history/holdings until onboarding gates are clear.
+    const hasUser = Boolean(String(accountPayload.account?.username || '').trim());
+    if (!accountPayload.account?.email_verified || !hasUser) {
       setHistory([]);
       setActivity([]);
       setHoldings(null);

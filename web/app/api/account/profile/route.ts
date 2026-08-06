@@ -1,8 +1,6 @@
 /**
- * Set or change the Flizy-native @username for the signed-in account.
- *
- * Required at signup. Change at most once every 30 days.
- * Not a payment routing key — platform ids and phones still are.
+ * Complete onboarding profile: required @username + optional display name.
+ * Used after email verification, before dashboard features unlock.
  */
 
 import { NextResponse } from 'next/server';
@@ -15,7 +13,7 @@ import {
 } from '../../../../lib/username';
 import { apiErrorBody } from '../../../../lib/apiError';
 
-const ROUTE = 'POST /api/account/username';
+const ROUTE = 'POST /api/account/profile';
 
 const ACCOUNT_SELECT =
   'email, email_verified_at, display_name, username, username_changed_at, locale, agent_wallet_address, balance_eth, unlock_pin_hash, daily_send_limit_eth';
@@ -33,8 +31,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: check.error }, { status: 400 });
     }
 
-    const supabase = getSupabase();
+    const displayNameRaw = String(body.displayName ?? body.display_name ?? '').trim();
+    const display_name = displayNameRaw ? displayNameRaw.slice(0, 64) : null;
 
+    const supabase = getSupabase();
     const { data: current } = await supabase
       .from('accounts')
       .select(`id, ${ACCOUNT_SELECT}`)
@@ -43,6 +43,13 @@ export async function POST(req: Request) {
 
     if (!current) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    }
+
+    if (!current.email_verified_at) {
+      return NextResponse.json(
+        { error: 'Verify your email before setting a username.' },
+        { status: 403 }
+      );
     }
 
     const gate = assertUsernameChangeAllowed({
@@ -56,14 +63,19 @@ export async function POST(req: Request) {
         { status: 429 }
       );
     }
-    if (gate.isNoop) {
-      return NextResponse.json({ account: toPublicAccount(current) });
-    }
 
     const nowIso = new Date().toISOString();
+    const patch: Record<string, string | null> = {
+      display_name,
+    };
+    if (!gate.isNoop) {
+      patch.username = check.username;
+      patch.username_changed_at = nowIso;
+    }
+
     const { data: updated, error } = await supabase
       .from('accounts')
-      .update({ username: check.username, username_changed_at: nowIso })
+      .update(patch)
       .eq('id', accountId)
       .select(ACCOUNT_SELECT)
       .single();

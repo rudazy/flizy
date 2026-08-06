@@ -8,7 +8,6 @@ import { PasswordField } from '../../components/PasswordField';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { track } from '../../lib/analytics';
 import { validatePassword } from '../../lib/passwordPolicy';
-import { validateUsername } from '../../lib/username';
 import type { LocaleCode } from '../../lib/locale';
 
 function safeNext(raw: string | null): string {
@@ -16,6 +15,10 @@ function safeNext(raw: string | null): string {
   return raw;
 }
 
+/**
+ * Stage 1 only: email + password.
+ * Stage 2 (verify email) and stage 3 (username) run on /dashboard gates.
+ */
 export function SignupForm() {
   const router = useRouter();
   const { t, locale, setLocale } = useLocale();
@@ -23,8 +26,6 @@ export function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -37,12 +38,6 @@ export function SignupForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-
-    const userCheck = validateUsername(username);
-    if (!userCheck.ok) {
-      setError(userCheck.error);
-      return;
-    }
 
     const policy = validatePassword(password);
     if (!policy.ok) {
@@ -62,15 +57,13 @@ export function SignupForm() {
         body: JSON.stringify({
           email,
           password,
-          displayName,
-          username: userCheck.username,
           locale,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Signup failed');
       track('signup_completed', { locale });
-      // Mandatory email verify gate lives on /dashboard before any features.
+      // Always land on dashboard: email gate then profile gate.
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
@@ -89,13 +82,13 @@ export function SignupForm() {
         <p className="mt-4 text-sm leading-relaxed text-muted">{t('auth.signup.blurb')}</p>
         <ol className="mt-8 space-y-3 text-sm text-muted">
           <li className="flex gap-3">
-            <span className="text-lime">1</span> {t('auth.signup.step1')}
+            <span className="text-lime">1</span> Create with email and password
           </li>
           <li className="flex gap-3">
-            <span className="text-lime">2</span> {t('auth.signup.step2')}
+            <span className="text-lime">2</span> Verify your email with a 6-digit code
           </li>
           <li className="flex gap-3">
-            <span className="text-lime">3</span> {t('auth.signup.step3')}
+            <span className="text-lime">3</span> Choose your @username and optional display name
           </li>
         </ol>
       </div>
@@ -110,38 +103,6 @@ export function SignupForm() {
             value={locale}
             onChange={(code: LocaleCode) => setLocale(code)}
           />
-        </div>
-        <div>
-          <label className="label" htmlFor="name">
-            {t('auth.signup.displayName')}
-          </label>
-          <input
-            id="name"
-            className="input"
-            placeholder={t('auth.signup.displayNamePh')}
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            autoComplete="nickname"
-          />
-          <p className="mt-1.5 text-xs text-muted">{t('auth.signup.displayNameHint')}</p>
-        </div>
-        <div>
-          <label className="label" htmlFor="username">
-            {t('auth.signup.username')}
-          </label>
-          <input
-            id="username"
-            className="input"
-            placeholder={t('auth.signup.usernamePh')}
-            value={username}
-            onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9@]/g, ''))}
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            maxLength={24}
-            required
-          />
-          <p className="mt-1.5 text-xs text-muted">{t('auth.signup.usernameHint')}</p>
         </div>
         <div>
           <label className="label" htmlFor="email">
@@ -167,7 +128,7 @@ export function SignupForm() {
           minLength={8}
           placeholder="e.g. MyPass1!"
           autoComplete="new-password"
-          hint="No email code is sent. Use a strong password: at least 8 characters, with a letter, a number, and a special character (!@#$%…)."
+          hint="At least 8 characters, with a letter, a number, and a special character (!@#$%…)."
         />
         <PasswordField
           id="confirm-password"
@@ -183,8 +144,11 @@ export function SignupForm() {
         />
         {error ? <div className="alert alert-error">{error}</div> : null}
         <button className="btn btn-primary w-full" type="submit" disabled={loading || mismatch}>
-          {loading ? t('auth.signup.submitting') : t('auth.signup.submit')}
+          {loading ? t('auth.signup.submitting') : 'Continue'}
         </button>
+        <p className="text-center text-xs text-muted">
+          Next: we email a code, then you pick your @username.
+        </p>
         <p className="text-center text-sm text-muted">
           {t('auth.signup.hasAccount')}{' '}
           <Link
