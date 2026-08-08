@@ -238,10 +238,24 @@ export default function AccountPage() {
     await setUsername(usernameInput);
   }
 
+  /** Open the password prompt for a chat row, or close it if already open. */
+  function toggleUnlinkChat(channel: string) {
+    if (unlinkChat === channel) {
+      setUnlinkChat(null);
+      setUnlinkChatPassword('');
+      setMsg('');
+      return;
+    }
+    // Clear on every open so a password typed for WhatsApp cannot carry over
+    // and authorise unlinking Telegram in one click.
+    setUnlinkChat(channel);
+    setUnlinkChatPassword('');
+    setMsg('');
+  }
+
   async function onUnlinkChat(channel: string) {
     if (!unlinkChatPassword) {
-      setUnlinkChat(channel);
-      setMsg('Enter your password below, then click Unlink again.');
+      setMsg('Enter your account password to confirm.');
       return;
     }
     setBusy('unlink-chat');
@@ -693,13 +707,22 @@ export default function AccountPage() {
                       type="button"
                       className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
                       disabled={busy === 'unlink-chat'}
-                      onClick={() => void onUnlinkChat(row.channel)}
+                      onClick={() => toggleUnlinkChat(row.channel)}
                     >
-                      Unlink
+                      {unlinkChat === row.channel ? 'Cancel' : 'Unlink'}
                     </button>
                   </div>
                   {unlinkChat === row.channel ? (
-                    <div className="mt-3 space-y-2">
+                    // A form, not a bare input: without one there is no submit
+                    // control and Enter does nothing, so the prompt asks for a
+                    // password and then gives no way to send it.
+                    <form
+                      className="mt-3 space-y-2"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void onUnlinkChat(row.channel);
+                      }}
+                    >
                       <p className="text-xs text-muted">
                         Removes this chat and its phone proof from Flizy. Pending phone claims need
                         that number proven again in chat to claim.
@@ -710,9 +733,29 @@ export default function AccountPage() {
                         placeholder="Account password"
                         value={unlinkChatPassword}
                         autoComplete="current-password"
+                        autoFocus
                         onChange={(e) => setUnlinkChatPassword(e.target.value)}
                       />
-                    </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          className="btn btn-primary px-3 py-1.5 text-xs"
+                          disabled={busy === 'unlink-chat' || !unlinkChatPassword}
+                        >
+                          {busy === 'unlink-chat'
+                            ? 'Unlinking...'
+                            : `Confirm unlink ${row.channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}`}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost px-3 py-1.5 text-xs"
+                          disabled={busy === 'unlink-chat'}
+                          onClick={() => toggleUnlinkChat(row.channel)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
                   ) : null}
                 </div>
               ))}

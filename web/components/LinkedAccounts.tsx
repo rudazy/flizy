@@ -132,10 +132,24 @@ export function LinkedAccounts() {
     }
   }, []);
 
-  async function onUnlink(channel: string) {
+  /** Open the password prompt for a row, or close it if it is already open. */
+  function toggleUnlink(channel: string) {
+    if (unlinking === channel) {
+      setUnlinking(null);
+      setPassword('');
+      setNotice(null);
+      return;
+    }
+    // Clear on every open: a password typed for one platform must never carry
+    // over and authorise a different one.
+    setUnlinking(channel);
+    setPassword('');
+    setNotice(null);
+  }
+
+  async function confirmUnlink(channel: string) {
     if (!password) {
-      setUnlinking(channel);
-      setNotice({ text: 'Enter your password below, then click Unlink again.', tone: 'warn' });
+      setNotice({ text: 'Enter your account password to confirm.', tone: 'warn' });
       return;
     }
     setBusy(true);
@@ -154,6 +168,8 @@ export function LinkedAccounts() {
       setUnlinking(null);
       setNotice({ text: 'Unlinked.', tone: 'ok' });
       await load();
+    } catch {
+      setNotice({ text: 'Could not unlink. Try again.', tone: 'warn' });
     } finally {
       setBusy(false);
     }
@@ -198,13 +214,16 @@ export function LinkedAccounts() {
                   </p>
                 </div>
                 {row ? (
+                  // X stays gated on purpose. Linking X is paused, so unlinking it
+                  // would be a one-way door: the row would be gone with no way to
+                  // put it back. Do not lift this until X linking works again.
                   <button
                     type="button"
                     className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
                     disabled={busy || p.channel === 'x'}
-                    onClick={() => onUnlink(p.channel)}
+                    onClick={() => toggleUnlink(p.channel)}
                   >
-                    {busy ? 'Working...' : 'Unlink'}
+                    {unlinking === p.channel ? 'Cancel' : 'Unlink'}
                   </button>
                 ) : p.channel === 'x' ? (
                   <button
@@ -225,15 +244,25 @@ export function LinkedAccounts() {
                 )}
               </div>
 
-              {p.channel === 'x' && !row ? (
+              {p.channel === 'x' ? (
                 <p className="mt-2 font-mono text-[10px] text-muted">
-                  X linking is temporarily disabled. You can still see it here; GitHub and Discord
-                  work.
+                  {row
+                    ? 'X linking is temporarily disabled, so unlinking is held too - you could not link it back yet. It stays connected until X is available again.'
+                    : 'X linking is temporarily disabled. You can still see it here; GitHub and Discord work.'}
                 </p>
               ) : null}
 
               {unlinking === p.channel ? (
-                <div className="mt-3 space-y-2">
+                // A form, not a bare input: without one there is no submit control
+                // and Enter does nothing, so the prompt asks for a password and
+                // then gives no way to send it.
+                <form
+                  className="mt-3 space-y-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void confirmUnlink(p.channel);
+                  }}
+                >
                   <p className="font-mono text-[11px] text-muted">
                     Unlinking frees this {p.label} for another account and stops claims to it
                     here.
@@ -244,9 +273,27 @@ export function LinkedAccounts() {
                     placeholder="Account password"
                     value={password}
                     autoComplete="current-password"
+                    autoFocus
                     onChange={(e) => setPassword(e.target.value)}
                   />
-                </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      className="btn btn-primary px-3 py-1.5 text-xs"
+                      disabled={busy || !password}
+                    >
+                      {busy ? 'Unlinking...' : `Confirm unlink ${p.label}`}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost px-3 py-1.5 text-xs"
+                      disabled={busy}
+                      onClick={() => toggleUnlink(p.channel)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               ) : null}
             </div>
           );
