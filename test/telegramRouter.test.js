@@ -131,6 +131,7 @@ describe('every advertised Telegram command works as a bare slash command', () =
     buy: '0.01 FLZ',
     sell: '10 FLZ',
     swap: '0.01 ETH for FLZ',
+    trade: '100 FLZ',
     price: 'FLZ',
   };
 

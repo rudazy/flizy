@@ -18,12 +18,19 @@ const CMD_GROUPS: Array<{
 }> = [
   {
     title: 'Pay someone',
-    blurb: 'Nothing leaves until you confirm. Trusted names are managed on the site only.',
+    blurb:
+      'Nothing leaves until you confirm. Trusted names are managed on the site only. ' +
+      'send, pay, transfer and give all mean the same thing, and the name can come first.',
     rows: [
       {
         wa: 'flizy send 0.01 to john',
         tg: '/send 0.01 to john',
         meaning: 'Pay a trusted name you saved on the site',
+      },
+      {
+        wa: 'flizy pay john 0.01',
+        tg: '/pay john 0.01',
+        meaning: 'Same thing — name first also works, with send, pay, transfer or give',
       },
       {
         wa: 'flizy send 0.01 to 2348012345678',
@@ -74,7 +81,11 @@ const CMD_GROUPS: Array<{
         tg: '/request 0.01 from 234…',
         meaning: 'Ask someone for money',
       },
-      { wa: 'flizy pay', tg: '/pay', meaning: 'Pay a request addressed to you' },
+      {
+        wa: 'flizy pay',
+        tg: '/pay',
+        meaning: 'Pay a request addressed to you. On its own, pay always means this — with an amount it is a send',
+      },
       {
         wa: 'flizy requests',
         tg: '/requests',
@@ -122,14 +133,20 @@ const CMD_GROUPS: Array<{
     title: 'Optional — trade FLZ',
     blurb: 'Power tools. Fees appear in the plan before you confirm. Liquidity is site-only.',
     rows: [
-      { wa: 'flizy buy 0.01 FLZ', tg: '/buy 0.01 FLZ', meaning: 'Spend ETH for FLZ' },
+      { wa: 'flizy buy 100 FLZ', tg: '/buy 100 FLZ', meaning: 'Buy about 100 FLZ — the amount is the token you receive' },
+      {
+        wa: 'flizy buy 0.01 ETH of FLZ',
+        tg: '/buy 0.01 ETH of FLZ',
+        meaning: 'Spend exactly 0.01 ETH on FLZ',
+      },
       { wa: 'flizy sell 10 FLZ', tg: '/sell 10 FLZ', meaning: 'Sell FLZ for ETH' },
       {
         wa: 'flizy swap 0.01 ETH for FLZ',
         tg: '/swap 0.01 ETH for FLZ',
         meaning: 'Same idea, explicit pair',
       },
-      { wa: 'flizy price FLZ', tg: '/price FLZ', meaning: 'Current FLZ price' },
+      { wa: 'flizy trade 100 FLZ', tg: '/trade 100 FLZ', meaning: 'Asks whether you mean buy or sell' },
+      { wa: 'flizy price FLZ', tg: '/price FLZ', meaning: 'Current FLZ price — "flizy FLZ price" works too' },
     ],
   },
 ];

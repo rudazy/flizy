@@ -57,6 +57,10 @@ docs/ROADMAP.md
 docs/DECISIONS.md
 docs/FUTURE-SYSTEMS.md
 docs/README.md
+# Staged build plans (private). Glob covers future stages, not just this one.
+docs/STAGE-2-PLAN.md
+docs/STAGE-*-PLAN.md
+docs/STAGE-*-PLAN-*.md
 docs/demo-scripts/
 docs/demo-scripts/**
 # Local screen captures and demo edit intermediates

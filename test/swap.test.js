@@ -10,6 +10,8 @@ const { buildSwapPlan, formatSwapPlanPreview } = require('../lib/engine/plan');
 const {
   computeFee,
   amountOutMin,
+  amountInForExactOut,
+  grossUpForFee,
   isAllowedSwapRouter,
   getRouterAllowlist,
   getDexConfig,
@@ -106,6 +108,68 @@ describe('evaluateSwapPolicy', () => {
   });
 });
 
+describe('amountInForExactOut', () => {
+  // A 10 WETH / 1000 FLZ pool. Buying 100 FLZ moves the price, so the answer is
+  // above the 1.0 WETH a naive spot-price calculation would give.
+  const RESERVE_IN = 10n * 10n ** 18n; // WETH
+  const RESERVE_OUT = 1000n * 10n ** 18n; // FLZ
+
+  /** Forward V2 quote, so the inverse can be checked against it. */
+  function amountOutFor(amountIn, reserveIn, reserveOut) {
+    const inWithFee = amountIn * 997n;
+    return (inWithFee * reserveOut) / (reserveIn * 1000n + inWithFee);
+  }
+
+  it('solves for an input that actually clears the desired output', () => {
+    const want = 100n * 10n ** 18n;
+    const needed = amountInForExactOut(want, RESERVE_IN, RESERVE_OUT);
+    assert.ok(amountOutFor(needed, RESERVE_IN, RESERVE_OUT) >= want);
+  });
+
+  it('never undershoots by a wei — one less input misses the target', () => {
+    const want = 100n * 10n ** 18n;
+    const needed = amountInForExactOut(want, RESERVE_IN, RESERVE_OUT);
+    assert.ok(amountOutFor(needed - 1n, RESERVE_IN, RESERVE_OUT) < want);
+  });
+
+  it('prices in slippage: buying more costs disproportionately more', () => {
+    const one = amountInForExactOut(10n * 10n ** 18n, RESERVE_IN, RESERVE_OUT);
+    const ten = amountInForExactOut(100n * 10n ** 18n, RESERVE_IN, RESERVE_OUT);
+    assert.ok(ten > one * 10n);
+  });
+
+  it('refuses to quote more than the pool holds', () => {
+    assert.throws(() => amountInForExactOut(RESERVE_OUT, RESERVE_IN, RESERVE_OUT), /does not hold/i);
+    assert.throws(
+      () => amountInForExactOut(RESERVE_OUT + 1n, RESERVE_IN, RESERVE_OUT),
+      /does not hold/i
+    );
+  });
+
+  it('refuses zero and an empty pool', () => {
+    assert.throws(() => amountInForExactOut(0n, RESERVE_IN, RESERVE_OUT), /greater than zero/i);
+    assert.throws(() => amountInForExactOut(1n, 0n, RESERVE_OUT), /empty pool/i);
+  });
+});
+
+describe('grossUpForFee', () => {
+  it('is the inverse of computeFee — enough survives the fee', () => {
+    for (const bps of [0, 30, 100]) {
+      const need = 1_114_454_474_534_715_257n;
+      const gross = grossUpForFee(need, bps);
+      assert.ok(computeFee(gross, bps).amountAfterFee >= need, `bps ${bps}`);
+    }
+  });
+
+  it('is a no-op when there is no fee', () => {
+    assert.equal(grossUpForFee(1000n, 0), 1000n);
+  });
+
+  it('rejects a fee that would consume the whole input', () => {
+    assert.throws(() => grossUpForFee(1000n, 10000), /misconfigured/i);
+  });
+});
+
 describe('swap plan fee disclosure', () => {
   it('preview includes fee line', () => {
     const intent = createSwapIntent({
@@ -138,6 +202,43 @@ describe('swap plan fee disclosure', () => {
     assert.match(preview, /Fee:/i);
     assert.match(preview, /0\.30%/);
     assert.match(preview, /Slippage/i);
+  });
+
+  it('names the side the user pinned on an exact-out buy', () => {
+    // "buy 100 FLZ" and "buy 100 ETH of FLZ" must never read alike here: one
+    // spends whatever it takes, the other spends exactly 100 ETH.
+    const base = {
+      intent: createSwapIntent({
+        actor: { accountId: 'a', waSenderId: 'w' },
+        amountIn: '0.052',
+        routerAddress: getDexConfig().feeRouter,
+      }),
+      policy: { decision: 'ALLOW_WITH_CONFIRM', checks: {} },
+      chain: { chainId: 91342, chainName: 'GIWA Sepolia', nativeSymbol: 'ETH' },
+      fromAddress: '0x3333333333333333333333333333333333333333',
+      amountInDisplay: '0.052',
+      amountOutDisplay: '100.4',
+      feeDisplay: '0.00015',
+      feePctDisplay: '0.30%',
+      slippagePctDisplay: '1.00%',
+      tokenInLabel: 'ETH',
+      tokenOutLabel: 'FLZ',
+      routerAddress: getDexConfig().feeRouter,
+      amountInWei: '52000000000000000',
+      amountOutMinWei: '99000000000000000000',
+      inIsNative: true,
+      outIsNative: false,
+      tokenIn: null,
+      tokenOut: getDexConfig().flz,
+    };
+
+    const exactOut = formatSwapPlanPreview(buildSwapPlan({ ...base, targetOutDisplay: '100' }));
+    assert.match(exactOut, /You asked for:\s*100 FLZ/);
+    assert.match(exactOut, /You pay:\s*0\.052 ETH/);
+
+    // Plain exact-in swaps keep the preview they always had.
+    const exactIn = formatSwapPlanPreview(buildSwapPlan(base));
+    assert.doesNotMatch(exactIn, /You asked for/);
   });
 });
 
