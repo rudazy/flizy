@@ -5,9 +5,11 @@ import { apiErrorBody } from '../../../../lib/apiError';
 
 const ROUTE = 'GET /api/claim/[token]';
 
-export async function GET(_req: Request, ctx: { params: { token: string } }) {
+// params is a promise since Next 15.
+export async function GET(_req: Request, ctx: { params: Promise<{ token: string }> }) {
   try {
-    const claim = await getClaimByToken(ctx.params.token);
+    const { token } = await ctx.params;
+    const claim = await getClaimByToken(token);
     if (!claim) return NextResponse.json({ error: 'Claim not found' }, { status: 404 });
     const isPlatform = Boolean(claim.to_channel);
     return NextResponse.json({

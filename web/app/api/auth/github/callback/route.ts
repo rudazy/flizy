@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     // Inside the try on purpose: reading cookies is what makes this route
     // dynamic, and Next signals that by throwing. Outside, that throw would
     // escape unhandled instead of reaching the rethrow in logApiError.
-    const sessionKey = getSessionKey();
+    const sessionKey = await getSessionKey();
 
     // 1. Refuse early if this session has been failing repeatedly. Before the
     //    session lookup, the state check and any call out to GitHub.

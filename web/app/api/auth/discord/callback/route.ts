@@ -23,7 +23,7 @@ function postOAuthUrl(status: string): string {
 
 export async function GET(req: Request) {
   try {
-    const sessionKey = getSessionKey();
+    const sessionKey = await getSessionKey();
 
     if (sessionKey) {
       const limit = await callbackLimitState(sessionKey);

@@ -41,7 +41,7 @@ export async function createSession(accountId: string): Promise<void> {
   });
   if (error) throw new Error(`Could not start session: ${error.message}`);
 
-  const jar = cookies();
+  const jar = await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
     // Off in local dev, where Next serves plain http and a secure cookie would
@@ -59,7 +59,8 @@ export async function createSession(accountId: string): Promise<void> {
  * Absolute expiry is enforced server side; the cookie maxAge is only a hint.
  */
 export async function getAccountIdFromCookie(): Promise<string | null> {
-  const token = cookies().get(COOKIE)?.value;
+  const jar = await cookies();
+  const token = jar.get(COOKIE)?.value;
   if (!token) return null;
 
   const supabase = getSupabase();
@@ -81,9 +82,12 @@ export async function getAccountIdFromCookie(): Promise<string | null> {
  * Used to bind an OAuth state value to one session and to key the callback rate
  * limiter. Safe to store and compare; useless to replay, because the cookie
  * still has to carry the token this hashes from.
+ *
+ * Async since Next 15: cookies() returns a promise. Every caller awaits it.
  */
-export function getSessionKey(): string | null {
-  const token = cookies().get(COOKIE)?.value;
+export async function getSessionKey(): Promise<string | null> {
+  const jar = await cookies();
+  const token = jar.get(COOKIE)?.value;
   return token ? hashToken(token) : null;
 }
 
@@ -91,7 +95,7 @@ export function getSessionKey(): string | null {
  * End the current session (server row and cookie).
  */
 export async function clearAccountCookie(): Promise<void> {
-  const jar = cookies();
+  const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
 
   if (token) {

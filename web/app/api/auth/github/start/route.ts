@@ -17,7 +17,7 @@ const ROUTE = 'GET /api/auth/github/start';
 export async function GET() {
   try {
     const accountId = await getAccountIdFromCookie();
-    const sessionKey = getSessionKey();
+    const sessionKey = await getSessionKey();
     if (!accountId || !sessionKey) {
       return NextResponse.json({ error: 'Log in first' }, { status: 401 });
     }
