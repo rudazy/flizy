@@ -15,9 +15,9 @@ const ROUTE = 'GET /api/auth/discord/callback';
 
 function postOAuthUrl(status: string): string {
   const base = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || '').replace(/\/$/, '');
-  if (status === 'linked') {
-    return `${base}/dashboard?discord=linked`;
-  }
+  // Success lands on Account too, not the dashboard home. It used to go to
+  // /dashboard, which reads no status param, so a successful link showed no
+  // confirmation and dropped the user off the page they started from.
   return `${base}/dashboard/account?s=platforms&discord=${encodeURIComponent(status)}`;
 }
 
