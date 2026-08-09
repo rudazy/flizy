@@ -37,10 +37,12 @@ const ROUTE = 'GET /api/auth/github/callback';
  */
 function postOAuthUrl(status: string): string {
   const base = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || '').replace(/\/$/, '');
-  if (status === 'linked') {
-    return `${base}/dashboard?github=linked`;
-  }
-  return `${base}/dashboard/account?github=${encodeURIComponent(status)}`;
+  // Success lands on Account too, not the dashboard home. It used to go to
+  // /dashboard, which reads no status param, so a successful link showed no
+  // confirmation and dropped the user off the page they started from.
+  // s=platforms matches discord and x, so all three select the slide the same
+  // way instead of leaning on a github-only effect in the Account page.
+  return `${base}/dashboard/account?s=platforms&github=${encodeURIComponent(status)}`;
 }
 
 export async function GET(req: Request) {
