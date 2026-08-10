@@ -10,6 +10,15 @@ web/.env*.local
 **/.env
 **/.env.local
 **/.env.*.local
+# Dev/staging env files. The patterns above only cover names ending in .local,
+# so .env.dev would otherwise be committable. Templates (.env.dev.example) are
+# excluded from the ignore so the key list stays in the repo without values.
+.env.dev
+.env.dev.*
+!.env.dev.example
+**/.env.dev
+**/.env.dev.*
+!**/.env.dev.example
 *.pem
 *.key
 id_rsa
@@ -41,6 +50,9 @@ supabase/.branches/
 tasks/
 tasks/**
 **/todo.md
+# Standing agent rules. Local-only: read from the folder, never pushed to any
+# remote, so it stays out of both the private and the public repo.
+CLAUDE.md
 
 # Private / non-public materials (never ship to the public repo)
 .video-analysis/

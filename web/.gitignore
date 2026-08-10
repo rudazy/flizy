@@ -1,6 +1,10 @@
 .env
 .env.local
 .env*.local
+# .env*.local does not cover .env.dev
+.env.dev
+.env.dev.*
+!.env.dev.example
 node_modules
 .next
 *.tsbuildinfo
