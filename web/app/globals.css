@@ -12,6 +12,22 @@
   --accent: #e0b84a;
   --accent-deep: #c4893f;
   --accent-ink: #1a140c;
+
+  /*
+   * Mobile tab bar geometry. Single source of truth: the nav row, the content
+   * clearance under it and the panel floor all derive from these, so they
+   * cannot drift apart the way three separate hardcoded numbers did.
+   *
+   * --app-nav-row is declared, not measured. The nav row is pinned to it, so
+   * the token is true by construction rather than by estimate.
+   */
+  --app-nav-row: 4rem;
+  /* The Swap pill uses -mt-4 to ride above the bar and overflows it by that much. */
+  --app-nav-overhang: 1rem;
+  /* Home indicator / gesture bar. Declared once, consumed everywhere. */
+  --app-nav-h: calc(var(--app-nav-row) + env(safe-area-inset-bottom, 0px));
+  /* Nav + pill overhang + deliberate breathing room under the last item. */
+  --app-nav-clearance: calc(var(--app-nav-h) + var(--app-nav-overhang) + 0.75rem);
 }
 
 html {
@@ -227,9 +243,48 @@ textarea {
   }
 }
 
+/*
+ * Dashboard shell. Owns the viewport height on mobile so slide panels fill the
+ * space actually left over, instead of each panel guessing at a
+ * "100dvh minus everything above me" constant it cannot know.
+ *
+ * Height ownership stops at md: the bottom nav is hidden there and the page
+ * reverts to normal document flow.
+ */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 767.98px) {
+  .app-shell {
+    /* dvh, not vh: mobile browser chrome collapsing must not leave a gap or
+       clip the nav. */
+    min-height: 100dvh;
+  }
+}
+
+/* Shell variant that sits above the bottom nav. The onboarding gates render no
+   nav, so they take .app-shell alone and none of this clearance. */
+.app-shell-tabbed {
+  padding-bottom: var(--app-nav-clearance);
+}
+
+@media (min-width: 768px) {
+  .app-shell-tabbed {
+    padding-bottom: 2rem;
+  }
+}
+
 .app-bottom-nav {
-  /* iOS home indicator + Android gesture bar */
+  /* iOS home indicator + Android gesture bar. Declared here and ONLY here --
+     the nav markup must not repeat it, or the inset lands twice. */
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Pins the nav row to the token above. */
+.app-bottom-nav-row {
+  min-height: var(--app-nav-row);
 }
 
 /* Mobile tap targets */

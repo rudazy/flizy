@@ -11,9 +11,15 @@ import Link from 'next/link';
 import { useCallback, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
-/** Page column rhythm */
+/**
+ * Page column rhythm, and the link in the height chain.
+ *
+ * Fills the shell (.app-shell owns 100dvh on mobile) so slide panels below can
+ * grow into the leftover space. Bottom spacing belongs to .app-shell-tabbed,
+ * which derives it from the nav token -- not to this component.
+ */
 export function AppPage({ children }: { children: ReactNode }) {
-  return <div className="space-y-4 pb-2">{children}</div>;
+  return <div className="flex flex-1 flex-col space-y-4">{children}</div>;
 }
 
 export type SlideNavItem = { id: string; label: string; badge?: string };
@@ -123,11 +129,16 @@ export function AppSectionNav({
 /**
  * Subsection card: title · helper · badge · body (one slide's content).
  *
- * Height owner for every dashboard slide panel (Home / Wallet / Account /
- * History). Min-height is viewport-relative so short tabs keep a stable floor
- * above the fixed bottom nav; content stays top-anchored and leftover space
- * sits below the body inside the card. Tall slides grow past the floor.
- * No filler content is injected.
+ * Slide panel for Home / Wallet / Account / History.
+ *
+ * Does NOT own its own height. It grows into whatever the shell has left, so a
+ * short tab has no dead void below it regardless of what sits above the panel
+ * -- Home's status strip, chips, alert banners or nothing at all. Content stays
+ * top-anchored and the leftover sits below the body, inside the card. Tall
+ * slides simply grow past. No filler content is injected.
+ *
+ * Growth is mobile-only. From md up the bottom nav is hidden and a plain
+ * min-height reads better than cards stretched down a tall desktop viewport.
  */
 export function AppSection({
   id,
@@ -155,9 +166,10 @@ export function AppSection({
       role="tabpanel"
       className={[
         'card flex flex-col p-4 sm:p-5',
-        // Mobile primary: leave room for top bar + chips + bottom nav (~13.5rem).
-        // Soft floor on md+ where bottom nav is hidden.
-        'min-h-[calc(100dvh-13.5rem)] md:min-h-[16rem]',
+        // grow, not a min-height: absorb the shell's leftover space rather than
+        // guess at it. basis stays auto, so a panel is never squashed below its
+        // content and sibling panels on one slide share the surplus evenly.
+        'grow md:grow-0 md:min-h-[16rem]',
         className,
       ]
         .filter(Boolean)

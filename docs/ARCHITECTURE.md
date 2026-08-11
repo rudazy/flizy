@@ -315,6 +315,16 @@ Representative surfaces:
 
 Errors: prefer `web/lib/apiError.ts` patterns — no secret leakage, fail closed.
 
+### Dashboard shell layout
+
+The authenticated surface (Home / Wallet / Swap / History / Account) shares one
+shell that owns the viewport height and pins the bottom nav. Its structural
+contract — and the rules that silently break it, chiefly **no transform,
+filter or backdrop-filter on any ancestor of the fixed nav** — is in
+[app-shell-layout.md](app-shell-layout.md). Read it before changing
+`DashboardGate`, `AppSection`, `AppChrome` or `AppBottomNav`, or before adding
+a page-level animation.
+
 ---
 
 ## Future authenticated Engine API

@@ -150,7 +150,11 @@ export function AppBottomNav() {
       className="app-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-border bg-ink/95 backdrop-blur-md md:hidden"
       aria-label="App"
     >
-      <div className="mx-auto flex max-w-lg items-end justify-between px-1 pb-[env(safe-area-inset-bottom)] pt-1">
+      {/*
+        Row height comes from --app-nav-row so the clearance token stays true.
+        The safe-area inset lives on .app-bottom-nav only -- do not add it here.
+      */}
+      <div className="app-bottom-nav-row mx-auto flex max-w-lg items-end justify-between px-1">
         {LEFT_TABS.map((tab) => (
           <CompactTab
             key={tab.href}

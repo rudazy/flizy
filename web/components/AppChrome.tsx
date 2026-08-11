@@ -11,9 +11,12 @@ export function AppChrome({ children }: { children: ReactNode }) {
   const isApp = pathname.startsWith('/dashboard');
 
   if (isApp) {
-    // App routes: own top bar + bottom nav; no marketing chrome
+    // App routes: own top bar + bottom nav; no marketing chrome.
+    // Vertical padding starts at md, matching where .app-shell stops owning
+    // 100dvh -- at sm it would add height the shell has not accounted for and
+    // push the page into a short scroll.
     return (
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-0 sm:max-w-[1200px] sm:px-6 sm:py-8">
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-0 sm:max-w-[1200px] sm:px-6 md:py-8">
         {children}
       </main>
     );

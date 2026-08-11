@@ -72,14 +72,26 @@ export function DashboardGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="app-shell fade-up pb-24 md:pb-8">
-      {msg ? (
-        <div className="alert alert-ok mb-4 text-sm" role="status">
-          {msg}
-        </div>
-      ) : null}
+    <div className="app-shell app-shell-tabbed">
+      {/*
+        fade-up must stay OFF the shell. It animates transform, and with
+        fill-mode both the final translateY(0) sticks around -- a transformed
+        ancestor becomes the containing block for position:fixed descendants,
+        which silently demotes the bottom nav to absolute against this element
+        and lets it scroll away. Keep the entrance animation scoped to the
+        content, never to an ancestor of the nav.
+      */}
+      <div className="fade-up flex flex-1 flex-col">
+        {msg ? (
+          <div className="alert alert-ok mb-4 text-sm" role="status">
+            {msg}
+          </div>
+        ) : null}
+        {children}
+      </div>
+      {/* After the content: the nav is fixed, so DOM order is free to follow
+          reading order for screen readers and sequential focus. */}
       <AppBottomNav />
-      {children}
       <PwaRegister />
     </div>
   );
