@@ -120,7 +120,15 @@ export function AppSectionNav({
   );
 }
 
-/** Subsection card: title · helper · badge · body (one slide’s content) */
+/**
+ * Subsection card: title · helper · badge · body (one slide's content).
+ *
+ * Height owner for every dashboard slide panel (Home / Wallet / Account /
+ * History). Min-height is viewport-relative so short tabs keep a stable floor
+ * above the fixed bottom nav; content stays top-anchored and leftover space
+ * sits below the body inside the card. Tall slides grow past the floor.
+ * No filler content is injected.
+ */
 export function AppSection({
   id,
   title,
@@ -142,8 +150,20 @@ export function AppSection({
     badgeTone === 'gold' ? 'badge badge-gold' : badgeTone === 'lime' ? 'badge badge-lime' : 'badge';
 
   return (
-    <section id={id} className={`card p-4 sm:p-5 ${className}`.trim()} role="tabpanel">
-      <div className="flex items-start justify-between gap-2">
+    <section
+      id={id}
+      role="tabpanel"
+      className={[
+        'card flex flex-col p-4 sm:p-5',
+        // Mobile primary: leave room for top bar + chips + bottom nav (~13.5rem).
+        // Soft floor on md+ where bottom nav is hidden.
+        'min-h-[calc(100dvh-13.5rem)] md:min-h-[16rem]',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <div className="flex shrink-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-sans text-sm tracking-wide text-paper">{title}</p>
           {helper ? (
@@ -152,7 +172,7 @@ export function AppSection({
         </div>
         {badge ? <span className={`${badgeClass} shrink-0`}>{badge}</span> : null}
       </div>
-      <div className="mt-4">{children}</div>
+      <div className="mt-4 min-h-0 flex-1">{children}</div>
     </section>
   );
 }
