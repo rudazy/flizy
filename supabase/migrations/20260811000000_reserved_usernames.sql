@@ -63,9 +63,16 @@ comment on function public.username_reserved_key(text) is
 -- 3. Trigger: refuse insert/update of a reserved username on accounts
 -- ---------------------------------------------------------------------------
 
+-- security definer on purpose. reserved_usernames has RLS on and no policies, so
+-- a caller subject to RLS (anon / authenticated) reads zero rows and the exists()
+-- check below would pass every reserved name — blocking only the service_role /
+-- postgres callers that bypass RLS, which is backwards. Running as owner makes the
+-- lookup see the seeds for every caller. search_path pinned as definer funcs require.
 create or replace function public.accounts_enforce_username_not_reserved()
 returns trigger
 language plpgsql
+security definer
+set search_path = public, pg_temp
 as $$
 declare
   key text;
@@ -187,6 +194,15 @@ begin
       and not tgisinternal
   ) then
     raise exception 'accounts_username_not_reserved trigger was not created';
+  end if;
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'accounts_enforce_username_not_reserved'
+      and p.prosecdef
+  ) then
+    raise exception 'accounts_enforce_username_not_reserved is not security definer';
   end if;
 end
 $$;

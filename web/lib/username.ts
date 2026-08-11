@@ -68,20 +68,27 @@ export function isReservedAgainst(
   return new Set(reservedKeys).has(key);
 }
 
+/** Shape of the one row this lookup reads. */
+type ReservedRow = { normalized_name?: string | null };
+
+/** Shape of the maybeSingle() envelope, re-asserted below. */
+type ReservedLookup = {
+  data: ReservedRow | null;
+  error: { message?: string } | null;
+};
+
+/**
+ * Minimal client shape. `from` returns unknown on purpose.
+ *
+ * Spelling out the full select/eq/maybeSingle chain here forces tsc to check
+ * SupabaseClient against it structurally, and supabase-js parses the select
+ * string at the type level (GetResult<...>), so that check recurses until the
+ * compiler bails with "Type instantiation is excessively deep and possibly
+ * infinite" at the CALL SITE. That is a build failure, not a runtime bug.
+ * Returning unknown makes the check trivial; the chain is typed below instead.
+ */
 type SupabaseLike = {
-  from: (table: string) => {
-    select: (cols: string) => {
-      eq: (
-        col: string,
-        val: string
-      ) => {
-        maybeSingle: () => Promise<{
-          data: { normalized_name?: string } | null;
-          error: { message?: string } | null;
-        }>;
-      };
-    };
-  };
+  from: (table: string) => unknown;
 };
 
 /** Query reserved_usernames. Throws on DB error (fail closed at the route). */
@@ -91,8 +98,14 @@ export async function isUsernameReserved(
 ): Promise<boolean> {
   const key = reservedKey(raw);
   if (!key) return false;
-  const { data, error } = await supabase
-    .from('reserved_usernames')
+  const query = supabase.from('reserved_usernames') as {
+    select: (cols: string) => {
+      eq: (col: string, val: string) => {
+        maybeSingle: () => Promise<ReservedLookup>;
+      };
+    };
+  };
+  const { data, error } = await query
     .select('normalized_name')
     .eq('normalized_name', key)
     .maybeSingle();
