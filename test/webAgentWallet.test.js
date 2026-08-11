@@ -117,7 +117,9 @@ describe('account id never leaves the server', () => {
 
   it('emits only the keys the caller selected', () => {
     const out = webPublicAccount.toPublicAccount({ email: 'a@b.c', display_name: 'A' });
-    assert.deepEqual(Object.keys(out).sort(), ['display_name', 'email']);
+    // email also implies email_verified (boolean derived from email_verified_at).
+    assert.deepEqual(Object.keys(out).sort(), ['display_name', 'email', 'email_verified']);
+    assert.equal(out.email_verified, false);
   });
 
   it('reports has_pin false when no PIN is set', () => {

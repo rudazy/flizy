@@ -2,7 +2,8 @@
  * Flizy-native @username (web mirror of lib/username.js).
  *
  * ASCII a-z / 0-9 only. No underscore. Not Hangul/Han (use display_name).
- * Change at most once every 30 days. Keep in sync with bot; tests cover drift.
+ * Change at most once every 30 days. Reserved names live in the DB, matched
+ * on reservedKey. Keep in sync with bot; tests cover drift.
  */
 
 import { displaySafeLabel } from './sanitize.ts';
@@ -10,24 +11,8 @@ import { displaySafeLabel } from './sanitize.ts';
 /** 30 days in ms */
 export const USERNAME_CHANGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 
-const RESERVED = new Set([
-  'admin',
-  'administrator',
-  'flizy',
-  'support',
-  'help',
-  'api',
-  'root',
-  'system',
-  'null',
-  'undefined',
-  'me',
-  'you',
-  'claim',
-  'send',
-  'pay',
-  'official',
-]);
+/** Client-facing copy for reserved and taken (identical on purpose). */
+export const USERNAME_UNAVAILABLE = 'That username is unavailable.';
 
 export function normalizeUsername(raw: unknown): string {
   return String(raw || '')
@@ -36,10 +21,23 @@ export function normalizeUsername(raw: unknown): string {
     .toLowerCase();
 }
 
+/**
+ * Key used for reserved-name lookup and storage.
+ * Seeds store reservedKey(name); lookup always uses the same function.
+ * support / supportt both become suport after collapse of repeated chars.
+ */
+export function reservedKey(raw: unknown): string {
+  let u = normalizeUsername(raw);
+  u = u.replace(/[^a-z0-9]/g, '');
+  u = u.replace(/(.)\1+/g, '$1');
+  return u;
+}
+
 export type UsernameValidation =
   | { ok: true; username: string }
   | { ok: false; error: string };
 
+/** Format-only. Reserved check is separate (DB or injected set). */
 export function validateUsername(raw: unknown): UsernameValidation {
   const u = normalizeUsername(raw);
   if (!u) {
@@ -57,10 +55,52 @@ export function validateUsername(raw: unknown): UsernameValidation {
       error: 'Username must start with a letter and use only letters and numbers (a-z, 0-9).',
     };
   }
-  if (RESERVED.has(u)) {
-    return { ok: false, error: 'That username is reserved.' };
-  }
   return { ok: true, username: u };
+}
+
+export function isReservedAgainst(
+  raw: unknown,
+  reservedKeys: Set<string> | Iterable<string>
+): boolean {
+  const key = reservedKey(raw);
+  if (!key) return false;
+  if (reservedKeys instanceof Set) return reservedKeys.has(key);
+  return new Set(reservedKeys).has(key);
+}
+
+type SupabaseLike = {
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (
+        col: string,
+        val: string
+      ) => {
+        maybeSingle: () => Promise<{
+          data: { normalized_name?: string } | null;
+          error: { message?: string } | null;
+        }>;
+      };
+    };
+  };
+};
+
+/** Query reserved_usernames. Throws on DB error (fail closed at the route). */
+export async function isUsernameReserved(
+  supabase: SupabaseLike,
+  raw: unknown
+): Promise<boolean> {
+  const key = reservedKey(raw);
+  if (!key) return false;
+  const { data, error } = await supabase
+    .from('reserved_usernames')
+    .select('normalized_name')
+    .eq('normalized_name', key)
+    .maybeSingle();
+  if (error) {
+    const err = new Error(`reserved_usernames lookup failed: ${error.message || error}`);
+    throw err;
+  }
+  return Boolean(data && data.normalized_name);
 }
 
 export function formatUsernameLabel(username: unknown): string | null {
@@ -138,5 +178,3 @@ export function usernameChangeWindow(
     usernameNextChangeAt: new Date(nextMs).toISOString(),
   };
 }
-
-export { RESERVED };

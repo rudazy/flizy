@@ -150,22 +150,56 @@ describe('no route sends a raw error message', () => {
   });
 
   it('has no route returning err.message or error.message to the client', () => {
-    // The two shapes this batch removed. Inspecting a message server-side is
-    // fine; putting it in a response body is what this forbids.
+    // Putting a raw Error.message in a response body is what this forbids.
+    // Inspecting a message server-side (console.*) is fine.
+    //
+    // Deliberate product-copy returns are allowlisted below by file + line
+    // match. Do not reshape code to dodge the scanner; add an entry here only
+    // after confirming the text is author-written (BindError, ClientError),
+    // never Supabase / ethers / fetch.
+    const DELIBERATE_CLIENT_MESSAGES = [
+      {
+        file: 'identity/route.ts',
+        // BindError: messages set in web/lib/channelBind.ts, not DB errors.
+        lineMustMatch: /error:\s*err\.message/,
+        reason: 'BindError product copy (IDENTITY_TAKEN, LOCKED, ...)',
+      },
+    ];
+
     const offenders = [];
     for (const file of routeFiles()) {
       const source = fs.readFileSync(file, 'utf8');
       const rel = path.relative(API_DIR, file).replace(/\\/g, '/');
-      for (const [i, line] of source.split('\n').entries()) {
-        if (/error:\s*(err|error|wErr|swapErr)\w*\.message/.test(line)) {
-          offenders.push(`${rel}:${i + 1} ${line.trim()}`);
-        }
-        if (/err\s+instanceof\s+Error\s*\?\s*err\.message/.test(line)) {
-          offenders.push(`${rel}:${i + 1} ${line.trim()}`);
-        }
+      const lines = source.split('\n');
+      for (const [i, line] of lines.entries()) {
+        const trimmed = line.trim();
+        // Comments and server logs are not client responses.
+        if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+        if (/console\.(log|warn|error|info|debug)\s*\(/.test(line)) continue;
+
+        const hitsBody =
+          /error:\s*(err|error|wErr|swapErr)\w*\.message/.test(line) ||
+          /err\s+instanceof\s+Error\s*\?\s*err\.message/.test(line);
+        if (!hitsBody) continue;
+
+        const allowed = DELIBERATE_CLIENT_MESSAGES.some(
+          (a) => a.file === rel && a.lineMustMatch.test(line)
+        );
+        if (allowed) continue;
+
+        offenders.push(`${rel}:${i + 1} ${trimmed}`);
       }
     }
     assert.deepEqual(offenders, []);
+  });
+
+  it('documents why identity may return BindError.message', () => {
+    // Guard against silent removal of the allowlist: the route must still
+    // handle BindError as deliberate product copy, not as a generic Error.
+    const source = fs.readFileSync(path.join(API_DIR, 'identity', 'route.ts'), 'utf8');
+    assert.match(source, /instanceof BindError/);
+    assert.match(source, /error:\s*err\.message/);
+    assert.match(source, /BindError product copy|author-written product copy/i);
   });
 
   it('routes that can fail go through the shared helper', () => {

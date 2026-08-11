@@ -50,6 +50,7 @@ const EXPECTED_TABLES = [
   'notifications',
   'oauth_callback_attempts',
   'payment_requests',
+  'reserved_usernames',
   'sessions',
   'transfers',
   'trusted_addresses',
@@ -62,15 +63,18 @@ const EXPECTED_TABLES = [
 const EXPECTED_VIEWS = ['channel_identity_phone_conflicts', 'whatsapp_identities'];
 
 const EXPECTED_FUNCTIONS = [
+  'accounts_enforce_username_not_reserved',
   'channel_identities_enforce_one_phone',
   'credit_user_balance',
   'debit_user_balance',
   'identity_events_append_only',
   'set_updated_at',
+  'username_reserved_key',
 ];
 
 const EXPECTED_TRIGGERS = [
   'accounts_set_updated_at',
+  'accounts_username_not_reserved',
   'channel_identities_one_phone',
   'contacts_set_updated_at',
   'identity_events_no_update',

@@ -91,7 +91,8 @@ export async function GET() {
       pendingClaims = await listPendingClaimSummaries(accountId);
     } catch (err) {
       // Dashboard still loads if claims query fails; surface nothing rather than 500.
-      console.warn('[dashboard] pendingClaims:', err instanceof Error ? err.message : err);
+      // Log the error object, not err.message in a ternary (static leak guard).
+      console.warn('[dashboard] pendingClaims failed', err);
     }
 
     return NextResponse.json({

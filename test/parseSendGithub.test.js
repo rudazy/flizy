@@ -5,6 +5,17 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+
+// router -> runtime requireEnv at load. Seed test stubs before any require.
+process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase.co';
+process.env.SUPABASE_KEY = process.env.SUPABASE_KEY || 'test-service-role-key';
+process.env.GIWA_RPC = process.env.GIWA_RPC || 'https://sepolia.example';
+process.env.PRIVATE_KEY =
+  process.env.PRIVATE_KEY ||
+  '0x1111111111111111111111111111111111111111111111111111111111111111';
+process.env.WALLET_DERIVATION_SECRET =
+  process.env.WALLET_DERIVATION_SECRET || 'test-derivation-secret-32chars!!';
+
 const { parseSendCommand } = require('../lib/router');
 
 describe('parseSendCommand platforms', () => {

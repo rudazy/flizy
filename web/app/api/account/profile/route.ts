@@ -9,6 +9,8 @@ import { getSupabase } from '../../../../lib/supabase';
 import { toPublicAccount } from '../../../../lib/publicAccount';
 import {
   assertUsernameChangeAllowed,
+  isUsernameReserved,
+  USERNAME_UNAVAILABLE,
   validateUsername,
 } from '../../../../lib/username';
 import { apiErrorBody } from '../../../../lib/apiError';
@@ -68,7 +70,11 @@ export async function POST(req: Request) {
     const patch: Record<string, string | null> = {
       display_name,
     };
+    // Holders of a name that later becomes reserved may keep it (noop).
     if (!gate.isNoop) {
+      if (await isUsernameReserved(supabase, check.username)) {
+        return NextResponse.json({ error: USERNAME_UNAVAILABLE }, { status: 409 });
+      }
       patch.username = check.username;
       patch.username_changed_at = nowIso;
     }
@@ -81,8 +87,15 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
-      if (error.code === '23505' || String(error.message).toLowerCase().includes('duplicate')) {
-        return NextResponse.json({ error: 'That username is taken.' }, { status: 409 });
+      const code = String(error.code || '');
+      const msg = String(error.message || '').toLowerCase();
+      if (
+        code === '23505' ||
+        code === 'FZ002' ||
+        msg.includes('duplicate') ||
+        msg.includes('username is reserved')
+      ) {
+        return NextResponse.json({ error: USERNAME_UNAVAILABLE }, { status: 409 });
       }
       return NextResponse.json(apiErrorBody(ROUTE, error), { status: 500 });
     }

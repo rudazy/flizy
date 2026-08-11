@@ -88,6 +88,9 @@ export async function DELETE(req: Request) {
     });
   } catch (err) {
     if (err instanceof BindError) {
+      // Deliberate: BindError messages are author-written product copy
+      // (IDENTITY_TAKEN, ALREADY_LINKED_DIFFERENT, LOCKED, ...), not Supabase
+      // or ethers text. Allowed explicitly in test/apiErrorLeak.test.js.
       return NextResponse.json({ error: err.message || 'Could not unlink' }, { status: 400 });
     }
     return NextResponse.json(apiErrorBody(ROUTE_DELETE, err), { status: 500 });
