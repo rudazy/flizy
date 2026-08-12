@@ -43,6 +43,9 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
+  // Required on Next 14 for instrumentation.ts. Runs the cold start schema
+  // check once per server instance, not per request.
+  experimental: { instrumentationHook: true },
   async headers() {
     return [
       {

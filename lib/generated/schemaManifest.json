@@ -1,0 +1,192 @@
+{
+  "_generated": "Derived from source by node scripts/generate-schema-manifest.js. Do not edit by hand.",
+  "surface": "bot",
+  "objects": [
+    {
+      "kind": "function",
+      "name": "accounts_enforce_username_not_reserved",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "executed by trigger accounts_username_not_reserved"
+    },
+    {
+      "kind": "function",
+      "name": "channel_identities_enforce_one_phone",
+      "providedBy": "20260725100000_channel_identities.sql",
+      "requiredBy": "executed by trigger channel_identities_one_phone"
+    },
+    {
+      "kind": "function",
+      "name": "credit_user_balance",
+      "providedBy": "20260729110000_atomic_balance_debit.sql",
+      "requiredBy": "lib/credit.js"
+    },
+    {
+      "kind": "function",
+      "name": "debit_user_balance",
+      "providedBy": "20260729110000_atomic_balance_debit.sql",
+      "requiredBy": "lib/credit.js"
+    },
+    {
+      "kind": "function",
+      "name": "identity_events_append_only",
+      "providedBy": "20260802160000_identity_events.sql",
+      "requiredBy": "executed by trigger identity_events_no_update"
+    },
+    {
+      "kind": "function",
+      "name": "schema_guard_objects",
+      "providedBy": "20260812000000_schema_guard.sql",
+      "requiredBy": "lib/schemaGuard.js"
+    },
+    {
+      "kind": "function",
+      "name": "set_updated_at",
+      "providedBy": "20260721000000_create_users.sql",
+      "requiredBy": "executed by trigger users_set_updated_at"
+    },
+    {
+      "kind": "function",
+      "name": "username_reserved_key",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "called by accounts_enforce_username_not_reserved"
+    },
+    {
+      "kind": "table",
+      "name": "account_emails",
+      "providedBy": "20260805120000_claim_email_recipient.sql",
+      "requiredBy": "lib/accountEmails.js"
+    },
+    {
+      "kind": "table",
+      "name": "accounts",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/engine/executeTransfer.js, lib/identity.js, lib/router.js, lib/session.js"
+    },
+    {
+      "kind": "table",
+      "name": "channel_identities",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "lib/channelBind.js, lib/discordLookup.js, lib/identity.js, lib/router.js, lib/telegramLookup.js"
+    },
+    {
+      "kind": "table",
+      "name": "claims",
+      "providedBy": "20260721120000_phase_full_features.sql",
+      "requiredBy": "lib/claims.js, lib/dailyLimits.js, lib/escrowWallet.js, lib/router.js"
+    },
+    {
+      "kind": "table",
+      "name": "contacts",
+      "providedBy": "20260721020000_user_contacts.sql",
+      "requiredBy": "lib/router.js"
+    },
+    {
+      "kind": "table",
+      "name": "identity_bind_attempts",
+      "providedBy": "20260802170000_identity_bind_attempts.sql",
+      "requiredBy": "lib/channelBind.js"
+    },
+    {
+      "kind": "table",
+      "name": "identity_events",
+      "providedBy": "20260802160000_identity_events.sql",
+      "requiredBy": "lib/channelBind.js"
+    },
+    {
+      "kind": "table",
+      "name": "link_code_attempts",
+      "providedBy": "20260730120000_link_code_attempts.sql",
+      "requiredBy": "lib/linkAttempts.js"
+    },
+    {
+      "kind": "table",
+      "name": "link_codes",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "lib/identity.js"
+    },
+    {
+      "kind": "table",
+      "name": "notifications",
+      "providedBy": "20260725110000_notifications_outbox.sql",
+      "requiredBy": "lib/notify.js"
+    },
+    {
+      "kind": "table",
+      "name": "payment_requests",
+      "providedBy": "20260722200000_requests_and_limits.sql",
+      "requiredBy": "lib/paymentRequests.js"
+    },
+    {
+      "kind": "table",
+      "name": "reserved_usernames",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "lib/username.js"
+    },
+    {
+      "kind": "table",
+      "name": "sessions",
+      "providedBy": "20260721120000_phase_full_features.sql",
+      "requiredBy": "lib/session.js"
+    },
+    {
+      "kind": "table",
+      "name": "transfers",
+      "providedBy": "20260721010000_multi_user_friendly.sql",
+      "requiredBy": "lib/dailyLimits.js, lib/router.js, lib/transferLog.js"
+    },
+    {
+      "kind": "table",
+      "name": "trusted_addresses",
+      "providedBy": "20260721120000_phase_full_features.sql",
+      "requiredBy": "lib/router.js, lib/trusted.js"
+    },
+    {
+      "kind": "table",
+      "name": "users",
+      "providedBy": "20260721000000_create_users.sql",
+      "requiredBy": "lib/engine/executeTransfer.js, lib/identity.js, lib/router.js"
+    },
+    {
+      "kind": "trigger",
+      "name": "accounts_set_updated_at",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "trigger on accounts"
+    },
+    {
+      "kind": "trigger",
+      "name": "accounts_username_not_reserved",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "trigger on accounts"
+    },
+    {
+      "kind": "trigger",
+      "name": "channel_identities_one_phone",
+      "providedBy": "20260725100000_channel_identities.sql",
+      "requiredBy": "trigger on channel_identities"
+    },
+    {
+      "kind": "trigger",
+      "name": "contacts_set_updated_at",
+      "providedBy": "20260721020000_user_contacts.sql",
+      "requiredBy": "trigger on contacts"
+    },
+    {
+      "kind": "trigger",
+      "name": "identity_events_no_update",
+      "providedBy": "20260802160000_identity_events.sql",
+      "requiredBy": "trigger on identity_events"
+    },
+    {
+      "kind": "trigger",
+      "name": "trusted_addresses_set_updated_at",
+      "providedBy": "20260721120000_phase_full_features.sql",
+      "requiredBy": "trigger on trusted_addresses"
+    },
+    {
+      "kind": "trigger",
+      "name": "users_set_updated_at",
+      "providedBy": "20260721000000_create_users.sql",
+      "requiredBy": "trigger on users"
+    }
+  ]
+}

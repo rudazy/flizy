@@ -20,6 +20,7 @@ const {
   escrowWallet,
   addressUrl,
   getOpsBalanceEth,
+  assertSchema,
 } = require('./lib/runtime');
 const { publicErrorMessage } = require('./lib/sanitize');
 const { CHANNELS } = require('./lib/identity');
@@ -483,7 +484,19 @@ client.on('message_create', (message) => {
   handleIncomingMessage(message);
 });
 
-client.initialize().catch((err) => {
-  console.error('Failed to start WhatsApp client:', err);
+async function main() {
+  // Schema before code. A migration that has not been applied stops the process
+  // here, rather than surfacing as "Something went wrong" to a user mid-flow.
+  await assertSchema();
+  await client.initialize();
+}
+
+main().catch((err) => {
+  if (err && err.schemaGuard) {
+    // Operator instruction, not a crash. A stack trace would bury it.
+    console.error(`\n${err.message}\n`);
+  } else {
+    console.error('Failed to start WhatsApp client:', err);
+  }
   process.exit(1);
 });

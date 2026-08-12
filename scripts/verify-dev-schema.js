@@ -22,6 +22,9 @@ const path = require('path');
 const dotenv = require('dotenv');
 const { Client } = require('pg');
 
+const { declaredObjects } = require('../lib/schemaRequirements');
+const { MIGRATIONS_DIR } = require('../lib/schemaSurfaces');
+
 const ROOT = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT, '.env.dev');
 const PLACEHOLDER = /^(your_|0xyour_|fresh_dev_only_|change-this)|^$/i;
@@ -29,134 +32,41 @@ const PLACEHOLDER = /^(your_|0xyour_|fresh_dev_only_|change-this)|^$/i;
 const dump = process.argv.includes('--dump');
 
 // ---------------------------------------------------------------------------
-// Expected end state after all 28 migrations.
+// Expected end state, derived from the migration files themselves.
 //
-// Derived from the migration files, including the renames: whatsapp_identities
-// is renamed to channel_identities by 20260725100000 and then re-created as a
-// backward-compatible view, so it must end up a VIEW and not a table.
+// This used to be six hand-typed arrays headed "after all 28 migrations". They
+// were correct when written and then drifted: EXPECTED_RLS_ON had already lost
+// reserved_usernames, which 20260811000000_reserved_usernames.sql enables. That
+// is the failure mode of a second source of truth, so there is no longer one.
+// Add a migration and these update themselves.
+//
+// The replay applies renames in order, so whatsapp_identities ends up a VIEW
+// and channel_identities a TABLE, and row level security follows the rename.
 // ---------------------------------------------------------------------------
 
-const EXPECTED_TABLES = [
-  'account_emails',
-  'accounts',
-  'channel_identities',
-  'claims',
-  'contacts',
-  'email_verifications',
-  'identity_bind_attempts',
-  'identity_events',
-  'link_code_attempts',
-  'link_codes',
-  'notifications',
-  'oauth_callback_attempts',
-  'payment_requests',
-  'reserved_usernames',
-  'sessions',
-  'transfers',
-  'trusted_addresses',
-  'users',
-  'web_sessions',
-];
+const declared = declaredObjects(MIGRATIONS_DIR);
+
+const EXPECTED_TABLES = declared.tables;
 
 // Both must be security_invoker so they cannot be used to read around the RLS
 // of the tables underneath them.
-const EXPECTED_VIEWS = ['channel_identity_phone_conflicts', 'whatsapp_identities'];
+const EXPECTED_VIEWS = declared.views;
 
-const EXPECTED_FUNCTIONS = [
-  'accounts_enforce_username_not_reserved',
-  'channel_identities_enforce_one_phone',
-  'credit_user_balance',
-  'debit_user_balance',
-  'identity_events_append_only',
-  'set_updated_at',
-  'username_reserved_key',
-];
+const EXPECTED_FUNCTIONS = declared.functions;
 
-const EXPECTED_TRIGGERS = [
-  'accounts_set_updated_at',
-  'accounts_username_not_reserved',
-  'channel_identities_one_phone',
-  'contacts_set_updated_at',
-  'identity_events_no_update',
-  'trusted_addresses_set_updated_at',
-  'users_set_updated_at',
-];
+const EXPECTED_TRIGGERS = declared.triggers;
 
-// Index names the migrations declare. whatsapp_identities_* survive the table
-// rename: renaming a table does not rename its indexes, and no migration drops
-// them.
-const EXPECTED_INDEXES = [
-  'account_emails_account_idx',
-  'account_emails_email_unique',
-  'accounts_agent_wallet_idx',
-  'accounts_email_unique',
-  'accounts_username_lower_uidx',
-  'channel_identities_account_idx',
-  'channel_identities_account_platform_idx',
-  'channel_identities_channel_external_idx',
-  'channel_identities_phone_idx',
-  'claims_from_account_status_idx',
-  'claims_from_wa_sender_idx',
-  'claims_status_idx',
-  'claims_to_email_status_idx',
-  'claims_to_platform_status_idx',
-  'claims_to_wa_hint_status_idx',
-  'contacts_owner_phone_idx',
-  'contacts_user_id_idx',
-  'email_verifications_account_idx',
-  'email_verifications_email_open_idx',
-  'identity_bind_attempts_locked_idx',
-  'identity_events_account_idx',
-  'identity_events_identity_idx',
-  'link_code_attempts_locked_idx',
-  'link_codes_account_idx',
-  'link_codes_expires_idx',
-  'notifications_account_idx',
-  'notifications_pending_idx',
-  'oauth_callback_attempts_locked_idx',
-  'payment_requests_from_wa_status_idx',
-  'payment_requests_requester_status_idx',
-  'payment_requests_status_idx',
-  'sessions_account_channel_external_idx',
-  'sessions_expires_idx',
-  'transfers_account_created_idx',
-  'transfers_phone_created_idx',
-  'transfers_tx_hash_idx',
-  'trusted_addresses_account_idx',
-  'users_account_id_idx',
-  'users_phone_idx',
-  'users_wallet_address_idx',
-  'web_sessions_account_idx',
-  'web_sessions_expires_idx',
-  'web_sessions_token_hash_idx',
-  'whatsapp_identities_account_idx',
-  'whatsapp_identities_phone_idx',
-];
+// Index names the migrations declare. Primary key and unique constraint
+// indexes are named by the constraint rather than declared, so they are
+// filtered out of the live side before the comparison instead.
+const EXPECTED_INDEXES = declared.indexes;
 
 // Tables the migrations explicitly enable RLS on.
-const EXPECTED_RLS_ON = [
-  'accounts',
-  'channel_identities',
-  'claims',
-  'contacts',
-  'identity_bind_attempts',
-  'identity_events',
-  'link_code_attempts',
-  'link_codes',
-  'notifications',
-  'oauth_callback_attempts',
-  'payment_requests',
-  'sessions',
-  'transfers',
-  'trusted_addresses',
-  'users',
-  'web_sessions',
-];
+const EXPECTED_RLS_ON = declared.rlsEnabled;
 
-// No migration enables RLS on these two. Recorded here so the verifier reports
-// a known, pre-existing gap rather than silently passing it, and so it does not
-// read as a dev-only mistake.
-const KNOWN_RLS_GAPS = ['account_emails', 'email_verifications'];
+// Tables no migration ever enables RLS on. Derived rather than listed, so a
+// newly unprotected table is reported as a note instead of passing silently.
+const KNOWN_RLS_GAPS = EXPECTED_TABLES.filter((t) => !EXPECTED_RLS_ON.includes(t));
 
 const problems = [];
 const notes = [];

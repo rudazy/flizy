@@ -1,0 +1,162 @@
+{
+  "_generated": "Derived from source by node scripts/generate-schema-manifest.js. Do not edit by hand.",
+  "surface": "web",
+  "objects": [
+    {
+      "kind": "function",
+      "name": "accounts_enforce_username_not_reserved",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "executed by trigger accounts_username_not_reserved"
+    },
+    {
+      "kind": "function",
+      "name": "channel_identities_enforce_one_phone",
+      "providedBy": "20260725100000_channel_identities.sql",
+      "requiredBy": "executed by trigger channel_identities_one_phone"
+    },
+    {
+      "kind": "function",
+      "name": "identity_events_append_only",
+      "providedBy": "20260802160000_identity_events.sql",
+      "requiredBy": "executed by trigger identity_events_no_update"
+    },
+    {
+      "kind": "function",
+      "name": "schema_guard_objects",
+      "providedBy": "20260812000000_schema_guard.sql",
+      "requiredBy": "web/lib/schemaGuard.mjs"
+    },
+    {
+      "kind": "function",
+      "name": "set_updated_at",
+      "providedBy": "20260721000000_create_users.sql",
+      "requiredBy": "executed by trigger accounts_set_updated_at"
+    },
+    {
+      "kind": "function",
+      "name": "username_reserved_key",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "called by accounts_enforce_username_not_reserved"
+    },
+    {
+      "kind": "table",
+      "name": "account_emails",
+      "providedBy": "20260805120000_claim_email_recipient.sql",
+      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/auth/email/send-code/route.ts, web/lib/claimPayout.ts, web/lib/emailVerify.ts, web/lib/pendingClaims.ts"
+    },
+    {
+      "kind": "table",
+      "name": "accounts",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/trusted/route.ts, web/lib/claimPayout.ts, web/lib/emailVerify.ts, web/lib/passwordGate.ts, web/lib/pendingClaims.ts"
+    },
+    {
+      "kind": "table",
+      "name": "channel_identities",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "web/app/api/history/route.ts, web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/pendingClaims.ts"
+    },
+    {
+      "kind": "table",
+      "name": "claims",
+      "providedBy": "20260721120000_phase_full_features.sql",
+      "requiredBy": "web/app/api/history/route.ts, web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts"
+    },
+    {
+      "kind": "table",
+      "name": "email_verifications",
+      "providedBy": "20260805200000_email_verification.sql",
+      "requiredBy": "web/lib/emailVerify.ts"
+    },
+    {
+      "kind": "table",
+      "name": "identity_bind_attempts",
+      "providedBy": "20260802170000_identity_bind_attempts.sql",
+      "requiredBy": "web/lib/channelBind.ts"
+    },
+    {
+      "kind": "table",
+      "name": "identity_events",
+      "providedBy": "20260802160000_identity_events.sql",
+      "requiredBy": "web/lib/channelBind.ts"
+    },
+    {
+      "kind": "table",
+      "name": "link_codes",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "web/app/api/dashboard/route.ts, web/lib/identity.ts"
+    },
+    {
+      "kind": "table",
+      "name": "notifications",
+      "providedBy": "20260725110000_notifications_outbox.sql",
+      "requiredBy": "web/lib/claimPayout.ts"
+    },
+    {
+      "kind": "table",
+      "name": "oauth_callback_attempts",
+      "providedBy": "20260802170000_identity_bind_attempts.sql",
+      "requiredBy": "web/lib/callbackLimiter.ts"
+    },
+    {
+      "kind": "table",
+      "name": "reserved_usernames",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "web/lib/username.ts"
+    },
+    {
+      "kind": "table",
+      "name": "sessions",
+      "providedBy": "20260721120000_phase_full_features.sql",
+      "requiredBy": "web/lib/passwordGate.ts"
+    },
+    {
+      "kind": "table",
+      "name": "transfers",
+      "providedBy": "20260721010000_multi_user_friendly.sql",
+      "requiredBy": "web/app/api/history/route.ts, web/app/api/swap/execute/route.ts"
+    },
+    {
+      "kind": "table",
+      "name": "trusted_addresses",
+      "providedBy": "20260721120000_phase_full_features.sql",
+      "requiredBy": "web/lib/trusted.ts"
+    },
+    {
+      "kind": "table",
+      "name": "web_sessions",
+      "providedBy": "20260727120000_web_sessions.sql",
+      "requiredBy": "web/lib/cookies.ts"
+    },
+    {
+      "kind": "trigger",
+      "name": "accounts_set_updated_at",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "trigger on accounts"
+    },
+    {
+      "kind": "trigger",
+      "name": "accounts_username_not_reserved",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "trigger on accounts"
+    },
+    {
+      "kind": "trigger",
+      "name": "channel_identities_one_phone",
+      "providedBy": "20260725100000_channel_identities.sql",
+      "requiredBy": "trigger on channel_identities"
+    },
+    {
+      "kind": "trigger",
+      "name": "identity_events_no_update",
+      "providedBy": "20260802160000_identity_events.sql",
+      "requiredBy": "trigger on identity_events"
+    },
+    {
+      "kind": "trigger",
+      "name": "trusted_addresses_set_updated_at",
+      "providedBy": "20260721120000_phase_full_features.sql",
+      "requiredBy": "trigger on trusted_addresses"
+    }
+  ]
+}
