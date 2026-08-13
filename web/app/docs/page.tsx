@@ -220,7 +220,34 @@ export default function DocsPage() {
         </div>
         <p className="text-sm leading-relaxed text-muted">
           One engine enforces the rules on every channel. We hide network plumbing (RPC, gas,
-          chain IDs) unless you dig into fund or power tools — money should feel like messaging.
+          chain IDs) unless you dig into fund or power tools. Money should feel like messaging.
+        </p>
+      </section>
+
+      <section id="invites" className="space-y-4">
+        <h2 className="font-sans text-xl tracking-wide text-paper">Invites</h2>
+        <p className="text-base leading-relaxed text-muted">
+          Every account with a username gets a personal invite link on Home. Copy it and share it.
+          The link is yours alone. It does not move money.
+        </p>
+        <p className="text-base leading-relaxed text-muted">
+          An invite counts once, when the person who used your link has done all of these:
+        </p>
+        <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
+          <li>Signed up through your invite link (or a claim you sent with invite attached)</li>
+          <li>Verified their email and set a Flizy username</li>
+          <li>Bound a verified phone on WhatsApp or Telegram</li>
+          <li>Completed a transfer (claiming a hold they received counts)</li>
+        </ul>
+        <p className="text-base leading-relaxed text-muted">
+          One phone can only produce one counted invite, even if they unlink and join again. A
+          count is a recorded number. It is not spendable yet.
+        </p>
+        <p className="text-base leading-relaxed text-muted">
+          Home has an optional <span className="text-paper">Attach to claims I send</span> checkbox.
+          Off by default. When on, new claims you send carry your invite. Opening that claim link
+          and creating an account attributes them to you. The money path is unchanged: they can
+          still claim without finishing an invite, and a claim still works if the box is off.
         </p>
       </section>
 

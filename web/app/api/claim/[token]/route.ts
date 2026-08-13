@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getClaimByToken } from '../../../../lib/claims';
 import { publicRecipientLabel } from '../../../../lib/claimRecipient';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { INVITE_SOURCE_CLAIM, isInviteCodeFormat, normalizeInviteCode } from '../../../../lib/invite.ts';
+import { attachInviteCookie } from '../../../../lib/inviteCookie.ts';
 
 const ROUTE = 'GET /api/claim/[token]';
 
@@ -10,7 +12,9 @@ export async function GET(_req: Request, ctx: { params: { token: string } }) {
     const claim = await getClaimByToken(ctx.params.token);
     if (!claim) return NextResponse.json({ error: 'Claim not found' }, { status: 404 });
     const isPlatform = Boolean(claim.to_channel);
-    return NextResponse.json({
+    const stored = normalizeInviteCode(claim.invite_code);
+    const carriesInvite = isInviteCodeFormat(stored);
+    const body = {
       amount_eth: claim.amount_eth,
       status: claim.status,
       chain_id: claim.chain_id,
@@ -25,7 +29,12 @@ export async function GET(_req: Request, ctx: { params: { token: string } }) {
       to_wa_hint: claim.to_wa_hint
         ? `...${String(claim.to_wa_hint).slice(-4)}`
         : undefined,
-    });
+      carries_invite: carriesInvite,
+    };
+    const res = NextResponse.json(body);
+    // Cookie is the attribution path. Trust only the snapshot on the hold, never ?i=.
+    if (carriesInvite) attachInviteCookie(res, stored, INVITE_SOURCE_CLAIM);
+    return res;
   } catch (err) {
     // This route is reachable without logging in, from a link that gets pasted
     // around, so it is the cheapest place to probe. The token is the credential

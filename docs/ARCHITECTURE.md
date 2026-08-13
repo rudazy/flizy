@@ -15,7 +15,7 @@ in the public tree.
                     +------------------------+
                     |   flizy.app            |
                     |  dashboard · swap UI   |
-                    |  liquidity add/remove  |
+                    |  invite · liquidity    |
                     +-----------+------------+
                                 |
                                 v
@@ -24,6 +24,7 @@ in the public tree.
                     | accounts · identities    |
                     | (channel, external id)   |
                     | trusted · claims · txs   |
+                    | invite codes · count     |
                     +-----------+--------------+
                                 ^
                                 |
@@ -95,14 +96,18 @@ enforced again by a database trigger.
 ```mermaid
 flowchart LR
   subgraph ACC["One Flizy account"]
-    A["accounts row<br/>agent wallet · trusted · limits · PIN"]
+    A["accounts row<br/>agent wallet · username · trusted · PIN"]
+    IC["invite_codes<br/>one stable slug"]
   end
 
   WA["channel_identities<br/>('whatsapp', LID)"] --> A
   TG["channel_identities<br/>('telegram', user id)"] --> A
   PH["phone_e164<br/>verified only"] -.->|claims and requests join here| A
+  IC --> A
 
   CL["Claim addressed to a phone"] --> PH
+  INV["/i/CODE or claim with invite attached"] --> AT["invite_attributions<br/>set once"]
+  AT --> CNT["try_count_invite<br/>phone permanence + first tx"]
 ```
 
 Two rules do the heavy lifting:
@@ -129,8 +134,14 @@ Two rules do the heavy lifting:
   additionally store `null` unless the value passes `isPlausiblePhone`.
 - Sessions are keyed `(account_id, channel, external_id)`. Locking one chat app leaves the
   other untouched.
-- Agent wallets are derived once per account from `flizy:agent:v1:{accountId}` and are never
-  rotated, so the site and every chat client always show the same address.
+- Agent wallets are derived once per account (v2: HMAC-SHA256 of the account id under
+  `WALLET_DERIVATION_SECRET`, then keccak256). They are never rotated, so the site and every
+  chat client always show the same address.
+- Invites: `invite_codes` is one unguessable slug per account. Attribution is set once on
+  signup from an httpOnly cookie (invite link or an opted-in claim). A count is written by
+  `try_count_invite` only after onboarding, a currently bound verified phone, and a
+  qualifying first tx. `invite_phone_claims` remembers that E.164 forever so unlink cannot
+  recycle a SIM for a second credit. FZ001 still only governs live binds.
 
 ---
 
@@ -146,8 +157,8 @@ sequenceDiagram
   participant R as Router + engine
   participant Chain as GIWA Sepolia
 
-  U->>Site: Signup · agent wallet derived
-  U->>Site: Add trusted name · generate link code
+  U->>Site: Signup · verify email · set username · agent wallet derived
+  U->>Site: Add trusted name · generate chat link code
   U->>Chat: flizy link CODE  /  /link CODE
   Chat->>R: Intent
   Note over R: Binds (channel, external id) to the account<br/>captures a verified phone for the claims join
@@ -185,6 +196,30 @@ sequenceDiagram
   Bot->>Esc: Payout to recipient agent wallet
   Bot-->>R: Receipt
   Note over S: cancel claims anytime while pending
+```
+
+If the sender has **Attach to claims I send** on, the hold snapshots their invite code.
+Opening `/claim/{token}` sets the same attribution cookie as `/i/{code}`. Money still
+settles claim-first; the invite is attribution only.
+
+### Invite count
+
+```mermaid
+sequenceDiagram
+  participant I as Inviter
+  participant Site as Site
+  participant F as Friend
+  participant DB as Invite tables
+  participant Chat as Chat
+
+  I->>Site: Copy /i/CODE or send a claim with attach on
+  F->>Site: Open link · signup cookie binds once
+  Site->>DB: invite_attributions source invite_link or claim_link
+  F->>Site: Verify email · set username
+  F->>Chat: Link WhatsApp or Telegram · prove phone
+  F->>Chat: Qualifying send or claim payout
+  Chat->>DB: try_count_invite
+  Note over DB: Burns current E.164 into invite_phone_claims<br/>unlink cannot undo that
 ```
 
 ### Swap

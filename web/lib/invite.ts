@@ -14,9 +14,21 @@ export const INVITE_CODE_FORMAT = /^[0-9a-hjkmnp-tv-z]{10}$/;
 export const INVITE_ISSUE_TRIES = 8;
 
 export const INVITE_COOKIE = 'flizy_invite';
+export const INVITE_COOKIE_SRC = 'flizy_invite_src';
 export const INVITE_COOKIE_MAX_AGE_SEC = 14 * 24 * 60 * 60;
 
 export const INVITE_SOURCE = 'invite_link';
+export const INVITE_SOURCE_CLAIM = 'claim_link';
+export const INVITE_SOURCES = Object.freeze({
+  INVITE_LINK: INVITE_SOURCE,
+  CLAIM_LINK: INVITE_SOURCE_CLAIM,
+});
+
+export function normalizeInviteSource(raw: unknown): string {
+  const s = String(raw || '').trim();
+  if (s === INVITE_SOURCE_CLAIM) return INVITE_SOURCE_CLAIM;
+  return INVITE_SOURCE;
+}
 
 export const INVITE_EVENT = Object.freeze({
   ATTRIBUTED: 'ATTRIBUTED',
@@ -194,12 +206,13 @@ export async function ensureInviteCode(
 
 export async function attributeSignup(
   supabase: InviteClient,
-  p: { inviteeAccountId: string; code: string | null }
+  p: { inviteeAccountId: string; code: string | null; source?: string | null }
 ): Promise<{ ok: boolean; reason?: string; attributed?: boolean }> {
   const slug = normalizeInviteCode(p.code);
   if (!p.inviteeAccountId || !isInviteCodeFormat(slug)) {
     return { ok: true, attributed: false, reason: 'no_code' };
   }
+  const via = normalizeInviteSource(p.source);
 
   const { data: existing, error: existErr } = await supabase
     .from('invite_attributions')
@@ -230,7 +243,7 @@ export async function attributeSignup(
     invitee_account_id: p.inviteeAccountId,
     inviter_account_id: owned.account_id,
     invite_code: owned.code,
-    source: INVITE_SOURCE,
+    source: via,
   });
   if (insErr) {
     if (isMissingRelation(insErr)) return { ok: true, attributed: false, reason: 'unavailable' };
@@ -499,19 +512,51 @@ export async function countedInvitesFor(supabase: InviteClient, inviterAccountId
   return (data || []).filter((row: { counted_at?: string | null }) => row.counted_at).length;
 }
 
+export async function inviteCodeIfAttachEnabled(
+  supabase: InviteClient,
+  accountId: string
+): Promise<string | null> {
+  if (!accountId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('attach_invite_on_claims')
+      .eq('id', accountId)
+      .maybeSingle();
+    if (error || !data || !data.attach_invite_on_claims) return null;
+    const issued = await ensureInviteCode(supabase, accountId);
+    return issued.ok ? issued.code : null;
+  } catch (err) {
+    console.warn('[invite] attach lookup:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 export async function getInviteSummary(
   supabase: InviteClient,
   accountId: string,
   siteUrl: string
-): Promise<{ code: string; url: string; counted: number } | null> {
+): Promise<{ code: string; url: string; counted: number; attachOnClaims: boolean } | null> {
   const issued = await ensureInviteCode(supabase, accountId);
   if (!issued.ok) return null;
   const counted = await countedInvitesFor(supabase, accountId);
   const base = String(siteUrl || '').replace(/\/$/, '');
+  let attachOnClaims = false;
+  try {
+    const { data } = await supabase
+      .from('accounts')
+      .select('attach_invite_on_claims')
+      .eq('id', accountId)
+      .maybeSingle();
+    attachOnClaims = Boolean(data && data.attach_invite_on_claims);
+  } catch {
+    attachOnClaims = false;
+  }
   return {
     code: issued.code,
     url: base ? `${base}/i/${issued.code}` : `/i/${issued.code}`,
     counted,
+    attachOnClaims,
   };
 }
 

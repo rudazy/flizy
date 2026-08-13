@@ -10,11 +10,12 @@ Flizy is a WhatsApp + web system for sending crypto only to trusted destinations
 
 - https://flizy.app/ : Product home
 - https://flizy.app/how-it-works : Full user guide and commands
-- https://flizy.app/docs : Why trusted addresses exist
-- https://flizy.app/signup : Create account (strong password; no email verification code)
+- https://flizy.app/docs : Trusted destinations, invite counting rules
+- https://flizy.app/signup : Create account (email + verification code + username)
 - https://flizy.app/login : Sign in
-- https://flizy.app/dashboard : Agent wallet, PIN, trusted people, WhatsApp link code
-- https://flizy.app/claim/:token : Claim funds waiting for non-users
+- https://flizy.app/dashboard : Agent wallet, invite link, PIN, trusted people, chat link code
+- https://flizy.app/i/:code : Personal invite. Attributes a new signup to the inviter
+- https://flizy.app/claim/:token : Claim funds waiting for a phone, email, or platform. May carry an invite
 - https://x.com/Flizyapp : Official X account
 
 ## Bot (WhatsApp)

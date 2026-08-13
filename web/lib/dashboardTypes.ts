@@ -40,7 +40,12 @@ export type DashboardData = {
   /** Claims this account can receive after proving phone / platform identity */
   pendingClaims?: PendingClaimItem[];
   /** Personal invite link. Present after username is set. Count is friends activated. */
-  invite?: { code: string; url: string; counted: number } | null;
+  invite?: {
+    code: string;
+    url: string;
+    counted: number;
+    attachOnClaims: boolean;
+  } | null;
 };
 
 /** Legacy transfer row shape */

@@ -9,7 +9,6 @@ import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
 import { parseEmail, isValidEmail, normalizeEmail } from '../../../../lib/email';
-import { verifyPassword } from '../../../../lib/cryptoPin';
 import { issueEmailVerificationCode } from '../../../../lib/emailVerify';
 import { apiErrorBody } from '../../../../lib/apiError';
 
@@ -89,27 +88,20 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const email = parseEmail(body.email);
-    const password = String(body.password || '');
 
     if (!email || !isValidEmail(email)) {
       return NextResponse.json({ error: 'Invalid email address.' }, { status: 400 });
-    }
-    if (!password) {
-      return NextResponse.json({ error: 'Password is required to add an email.' }, { status: 400 });
     }
 
     const supabase = getSupabase();
     const { data: acc, error: aErr } = await supabase
       .from('accounts')
-      .select('email, password_hash')
+      .select('email')
       .eq('id', accountId)
       .maybeSingle();
     if (aErr) throw new Error(aErr.message);
     if (!acc) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
-    }
-    if (!verifyPassword(password, acc.password_hash)) {
-      return NextResponse.json({ error: 'Incorrect password.' }, { status: 401 });
     }
     if (parseEmail(acc.email) === email) {
       return NextResponse.json(

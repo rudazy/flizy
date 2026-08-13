@@ -70,9 +70,10 @@ export default function AccountPage() {
     claimable: string[];
   } | null>(null);
   const [extraEmail, setExtraEmail] = useState('');
-  const [extraEmailPassword, setExtraEmailPassword] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
   const [verifyTarget, setVerifyTarget] = useState<'primary' | string>('primary');
+  const [addEmailOpen, setAddEmailOpen] = useState(false);
+  const [addEmailStep, setAddEmailStep] = useState<'email' | 'code'>('email');
 
   // Smart default slide when no ?s= — open the first thing that still needs work.
   const defaultSlide = useMemo((): SlideId => {
@@ -238,6 +239,46 @@ export default function AccountPage() {
     await setUsername(usernameInput);
   }
 
+  async function refreshEmails() {
+    const listRes = await fetch('/api/account/emails', { cache: 'no-store' });
+    const listBody = await listRes.json().catch(() => ({}));
+    if (!listRes.ok) return;
+    setEmailList({
+      primary: listBody.primary || emailList?.primary || null,
+      primaryVerified: Boolean(listBody.primaryVerified),
+      additional: listBody.additional || [],
+      claimable: listBody.claimable || [],
+    });
+  }
+
+  async function requestEmailCode(purpose: 'primary' | 'secondary', email?: string) {
+    const res = await fetch('/api/auth/email/send-code', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(
+        purpose === 'primary' ? { purpose: 'primary' } : { purpose: 'secondary', email }
+      ),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'Could not send code');
+    return body;
+  }
+
+  async function verifyEmailCode(purpose: 'primary' | 'secondary', email?: string) {
+    const res = await fetch('/api/auth/email/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        purpose,
+        code: verifyCode,
+        email: purpose === 'secondary' ? email : undefined,
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'Could not verify');
+    return body;
+  }
+
   /** Open the password prompt for a chat row, or close it if already open. */
   function toggleUnlinkChat(channel: string) {
     if (unlinkChat === channel) {
@@ -320,54 +361,29 @@ export default function AccountPage() {
           badgeTone={data.account.username ? 'lime' : 'gold'}
         >
           <p className="text-sm text-paper">{data.account.email}</p>
-          <p className="mt-1 text-xs text-muted">
-            Email claims only unlock after a one-time code proves you control the inbox. Anyone can
-            type an address when sending; only the verified owner can receive.
-          </p>
           {data.account.display_name ? (
             <p className="mt-1 text-xs text-muted">{data.account.display_name}</p>
-          ) : (
-            <p className="mt-1 text-xs text-muted">No display name yet</p>
-          )}
+          ) : null}
 
-          <div className="mt-4 border-t border-line pt-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">Emails for claims</p>
-            <ul className="mt-2 space-y-1.5 text-sm">
-              <li className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-paper">{emailList?.primary || data.account.email}</span>
-                <span
-                  className={`rounded border border-line px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
-                    emailList?.primaryVerified || data.account.email_verified
-                      ? 'text-lime'
-                      : 'text-gold'
-                  }`}
-                >
-                  {emailList?.primaryVerified || data.account.email_verified
-                    ? 'Registration · verified · claimable'
-                    : 'Registration · unverified · not claimable'}
+          <div className="mt-4 border-t border-line pt-4 space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Emails</p>
+            <ul className="space-y-2 text-sm">
+              <li className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-mono text-paper">
+                  {emailList?.primary || data.account.email}
                 </span>
                 {!(emailList?.primaryVerified || data.account.email_verified) ? (
                   <button
                     type="button"
-                    className="text-xs text-muted underline hover:text-paper"
+                    className="btn btn-ghost text-sm"
                     disabled={busy === 'email-send-primary'}
                     onClick={async () => {
                       setBusy('email-send-primary');
                       setMsg('');
                       setVerifyTarget('primary');
                       try {
-                        const res = await fetch('/api/auth/email/send-code', {
-                          method: 'POST',
-                          headers: { 'content-type': 'application/json' },
-                          body: JSON.stringify({ purpose: 'primary' }),
-                        });
-                        const body = await res.json().catch(() => ({}));
-                        if (!res.ok) throw new Error(body.error || 'Could not send code');
-                        setMsg(
-                          body.devCode
-                            ? `Code sent (dev): ${body.devCode}`
-                            : 'Code sent. Check your registration email inbox.'
-                        );
+                        await requestEmailCode('primary');
+                        setAddEmailOpen(false);
                       } catch (err) {
                         setMsg(err instanceof Error ? err.message : 'Could not send code');
                       } finally {
@@ -375,42 +391,59 @@ export default function AccountPage() {
                       }
                     }}
                   >
-                    Send code
+                    {busy === 'email-send-primary' ? 'Sending…' : 'Request code'}
                   </button>
                 ) : null}
               </li>
               {(emailList?.additional || []).map((row) => (
-                <li key={row.id} className="flex flex-wrap items-center gap-2">
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono text-paper">{row.email}</span>
-                  <span
-                    className={`rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
-                      row.verified ? 'border-line text-lime' : 'border-line text-gold'
-                    }`}
-                  >
-                    {row.verified ? 'Verified · claimable' : 'Unverified · not claimable'}
-                  </span>
-                  {!row.verified ? (
+                  {row.verified ? (
                     <button
                       type="button"
-                      className="text-xs text-muted underline hover:text-paper"
+                      className="btn btn-ghost text-sm"
+                      disabled={busy === `email-rm-${row.id}`}
+                      onClick={async () => {
+                        setBusy(`email-rm-${row.id}`);
+                        setMsg('');
+                        try {
+                          const res = await fetch('/api/account/emails', {
+                            method: 'DELETE',
+                            headers: { 'content-type': 'application/json' },
+                            body: JSON.stringify({ id: row.id }),
+                          });
+                          const body = await res.json().catch(() => ({}));
+                          if (!res.ok) throw new Error(body.error || 'Could not unlink email');
+                          setEmailList({
+                            primary: body.primary || emailList?.primary || null,
+                            primaryVerified: Boolean(body.primaryVerified),
+                            additional: body.additional || [],
+                            claimable: body.claimable || [],
+                          });
+                          setMsg('Email unlinked.');
+                        } catch (err) {
+                          setMsg(err instanceof Error ? err.message : 'Could not unlink email');
+                        } finally {
+                          setBusy('');
+                        }
+                      }}
+                    >
+                      Unlink
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-ghost text-sm"
                       disabled={busy === `email-send-${row.id}`}
                       onClick={async () => {
                         setBusy(`email-send-${row.id}`);
                         setMsg('');
                         setVerifyTarget(row.email);
+                        setAddEmailOpen(true);
+                        setAddEmailStep('code');
+                        setExtraEmail(row.email);
                         try {
-                          const res = await fetch('/api/auth/email/send-code', {
-                            method: 'POST',
-                            headers: { 'content-type': 'application/json' },
-                            body: JSON.stringify({ purpose: 'secondary', email: row.email }),
-                          });
-                          const body = await res.json().catch(() => ({}));
-                          if (!res.ok) throw new Error(body.error || 'Could not send code');
-                          setMsg(
-                            body.devCode
-                              ? `Code sent (dev): ${body.devCode}`
-                              : `Code sent to ${row.email}.`
-                          );
+                          await requestEmailCode('secondary', row.email);
                         } catch (err) {
                           setMsg(err instanceof Error ? err.message : 'Could not send code');
                         } finally {
@@ -418,193 +451,149 @@ export default function AccountPage() {
                         }
                       }}
                     >
-                      Send code
+                      Request code
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="text-xs text-muted underline hover:text-paper"
-                    disabled={busy === `email-rm-${row.id}`}
-                    onClick={async () => {
-                      setBusy(`email-rm-${row.id}`);
-                      setMsg('');
-                      try {
-                        const res = await fetch('/api/account/emails', {
-                          method: 'DELETE',
-                          headers: { 'content-type': 'application/json' },
-                          body: JSON.stringify({ id: row.id }),
-                        });
-                        const body = await res.json().catch(() => ({}));
-                        if (!res.ok) throw new Error(body.error || 'Could not remove email');
-                        setEmailList({
-                          primary: body.primary || emailList?.primary || null,
-                          primaryVerified: Boolean(body.primaryVerified),
-                          additional: body.additional || [],
-                          claimable: body.claimable || [],
-                        });
-                        setMsg('Email removed.');
-                      } catch (err) {
-                        setMsg(err instanceof Error ? err.message : 'Could not remove email');
-                      } finally {
-                        setBusy('');
-                      }
-                    }}
-                  >
-                    Remove
-                  </button>
+                  )}
                 </li>
               ))}
             </ul>
 
-            <form
-              className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto_auto]"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setBusy('email-verify');
-                setMsg('');
-                try {
-                  const purpose = verifyTarget === 'primary' ? 'primary' : 'secondary';
-                  const res = await fetch('/api/auth/email/verify', {
-                    method: 'POST',
-                    headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({
-                      purpose,
-                      code: verifyCode,
-                      email: purpose === 'secondary' ? verifyTarget : undefined,
-                    }),
-                  });
-                  const body = await res.json().catch(() => ({}));
-                  if (!res.ok) throw new Error(body.error || 'Could not verify');
-                  setVerifyCode('');
-                  const listRes = await fetch('/api/account/emails', { cache: 'no-store' });
-                  const listBody = await listRes.json().catch(() => ({}));
-                  if (listRes.ok) {
-                    setEmailList({
-                      primary: listBody.primary || emailList?.primary || null,
-                      primaryVerified: Boolean(listBody.primaryVerified),
-                      additional: listBody.additional || [],
-                      claimable: listBody.claimable || [],
-                    });
+            {verifyTarget === 'primary' &&
+            !(emailList?.primaryVerified || data.account.email_verified) ? (
+              <form
+                className="grid gap-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setBusy('email-verify');
+                  setMsg('');
+                  try {
+                    await verifyEmailCode('primary');
+                    setVerifyCode('');
+                    await refreshEmails();
+                    setMsg('Added successfully');
+                  } catch (err) {
+                    setMsg(err instanceof Error ? err.message : 'Could not verify');
+                  } finally {
+                    setBusy('');
                   }
-                  setMsg('Email verified. It can now receive claims.');
-                } catch (err) {
-                  setMsg(err instanceof Error ? err.message : 'Could not verify');
-                } finally {
-                  setBusy('');
-                }
-              }}
-            >
-              <div>
-                <label className="label" htmlFor="email-code">
-                  Verification code
-                </label>
+                }}
+              >
                 <input
-                  id="email-code"
                   className="input font-mono"
                   inputMode="numeric"
-                  pattern="[0-9]{6}"
                   maxLength={6}
-                  placeholder="6 digits"
+                  placeholder="6-digit code"
                   value={verifyCode}
                   onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   required
                 />
-              </div>
-              <div className="flex items-end text-xs text-muted">
-                {verifyTarget === 'primary' ? 'For registration email' : `For ${verifyTarget}`}
-              </div>
-              <div className="flex items-end">
                 <button
                   type="submit"
-                  className="btn btn-primary w-full py-3 font-semibold sm:w-auto sm:px-6"
+                  className="btn btn-primary w-full py-2 text-sm font-semibold"
                   disabled={busy === 'email-verify' || verifyCode.length !== 6}
                 >
                   {busy === 'email-verify' ? 'Checking…' : 'Verify'}
                 </button>
-              </div>
-            </form>
+              </form>
+            ) : null}
 
-            <form
-              className="mt-4 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setBusy('email-add');
-                setMsg('');
-                try {
-                  const res = await fetch('/api/account/emails', {
-                    method: 'POST',
-                    headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({
-                      email: extraEmail,
-                      password: extraEmailPassword,
-                    }),
-                  });
-                  const body = await res.json().catch(() => ({}));
-                  if (!res.ok) throw new Error(body.error || 'Could not add email');
-                  setEmailList({
-                    primary: body.primary || emailList?.primary || null,
-                    primaryVerified: Boolean(body.primaryVerified),
-                    additional: body.additional || [],
-                    claimable: body.claimable || [],
-                  });
-                  setVerifyTarget(String(extraEmail || '').trim().toLowerCase());
+            {!addEmailOpen ? (
+              <button
+                type="button"
+                className="btn btn-ghost w-full text-sm"
+                onClick={() => {
+                  setAddEmailOpen(true);
+                  setAddEmailStep('email');
                   setExtraEmail('');
-                  setExtraEmailPassword('');
-                  setMsg(
-                    body.devCode
-                      ? `Added. Dev code: ${body.devCode}`
-                      : body.note || 'Email added. Enter the code we sent to make it claimable.'
-                  );
-                } catch (err) {
-                  setMsg(err instanceof Error ? err.message : 'Could not add email');
-                } finally {
-                  setBusy('');
-                }
-              }}
-            >
-              <div>
-                <label className="label" htmlFor="extra-email">
-                  Add email
-                </label>
+                  setVerifyCode('');
+                  setMsg('');
+                }}
+              >
+                Add email
+              </button>
+            ) : addEmailStep === 'email' ? (
+              <form
+                className="grid gap-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setBusy('email-add');
+                  setMsg('');
+                  try {
+                    const res = await fetch('/api/account/emails', {
+                      method: 'POST',
+                      headers: { 'content-type': 'application/json' },
+                      body: JSON.stringify({ email: extraEmail }),
+                    });
+                    const body = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(body.error || 'Could not add email');
+                    await refreshEmails();
+                    setVerifyTarget(String(extraEmail || '').trim().toLowerCase());
+                    setAddEmailStep('code');
+                    setVerifyCode('');
+                  } catch (err) {
+                    setMsg(err instanceof Error ? err.message : 'Could not add email');
+                  } finally {
+                    setBusy('');
+                  }
+                }}
+              >
                 <input
-                  id="extra-email"
                   className="input"
                   type="email"
-                  placeholder="other@email.com"
+                  placeholder="email@example.com"
                   value={extraEmail}
                   onChange={(e) => setExtraEmail(e.target.value)}
                   autoComplete="email"
                   required
                 />
-              </div>
-              <div>
-                <label className="label" htmlFor="extra-email-password">
-                  Password
-                </label>
-                <input
-                  id="extra-email-password"
-                  className="input"
-                  type="password"
-                  value={extraEmailPassword}
-                  onChange={(e) => setExtraEmailPassword(e.target.value)}
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
-              <div className="flex items-end">
                 <button
                   type="submit"
-                  className="btn btn-primary w-full py-3 font-semibold sm:w-auto sm:px-6"
+                  className="btn btn-primary w-full py-2 text-sm font-semibold"
                   disabled={busy === 'email-add'}
                 >
-                  {busy === 'email-add' ? 'Adding…' : 'Add'}
+                  {busy === 'email-add' ? 'Sending…' : 'Request code'}
                 </button>
-              </div>
-            </form>
-            <p className="mt-2 text-xs text-muted">
-              Unverified addresses never match email claims. Set RESEND_API_KEY on Vercel to deliver
-              codes in production.
-            </p>
+              </form>
+            ) : (
+              <form
+                className="grid gap-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setBusy('email-verify');
+                  setMsg('');
+                  try {
+                    await verifyEmailCode('secondary', verifyTarget === 'primary' ? extraEmail : verifyTarget);
+                    setVerifyCode('');
+                    setAddEmailOpen(false);
+                    setAddEmailStep('email');
+                    setExtraEmail('');
+                    await refreshEmails();
+                    setMsg('Added successfully');
+                  } catch (err) {
+                    setMsg(err instanceof Error ? err.message : 'Could not verify');
+                  } finally {
+                    setBusy('');
+                  }
+                }}
+              >
+                <input
+                  className="input font-mono"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="6-digit code"
+                  value={verifyCode}
+                  onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  required
+                />
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full py-2 text-sm font-semibold"
+                  disabled={busy === 'email-verify' || verifyCode.length !== 6}
+                >
+                  {busy === 'email-verify' ? 'Checking…' : 'Verify'}
+                </button>
+              </form>
+            )}
           </div>
 
           <form onSubmit={onUsername} className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">

@@ -13,6 +13,7 @@ type ClaimView = {
   recipient_kind?: string;
   can_claim_on_web?: boolean;
   to_wa_hint?: string;
+  carries_invite?: boolean;
 };
 
 export default function ClaimPage() {
@@ -106,6 +107,14 @@ export default function ClaimPage() {
                   (Phone — claim only in WhatsApp or Telegram)
                 </span>
               ) : null}
+            </p>
+          ) : null}
+
+          {data.carries_invite && pending ? (
+            <p className="text-xs text-muted">
+              The sender invited you. Create an account from this page to be attributed. It
+              counts for them after you finish setup, bind a verified phone, and complete a
+              transfer (claiming this hold counts).
             </p>
           ) : null}
 

@@ -43,6 +43,7 @@ type DashboardContextValue = {
   setDailyLimit: (limit: number | null, password: string) => Promise<boolean>;
   setUsername: (username: string) => Promise<boolean>;
   setAccountLocale: (locale: LocaleCode) => Promise<boolean>;
+  setAttachInviteOnClaims: (enabled: boolean) => Promise<boolean>;
   explorerBase: string;
 };
 
@@ -340,6 +341,35 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [loadAccount, setLocale]
   );
 
+  const setAttachInviteOnClaims = useCallback(
+    async (enabled: boolean) => {
+      setBusy('invite-attach');
+      setMsg('');
+      try {
+        const res = await fetch('/api/account/invite-attach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed');
+        setMsg(
+          enabled
+            ? 'New claims you send will carry your invite.'
+            : 'New claims you send will not carry an invite.'
+        );
+        await loadAccount();
+        return true;
+      } catch (err) {
+        setMsg(err instanceof Error ? err.message : 'Failed');
+        return false;
+      } finally {
+        setBusy('');
+      }
+    },
+    [loadAccount]
+  );
+
   const explorerBase =
     holdings?.holdings?.chain?.explorerBaseUrl || 'https://sepolia-explorer.giwa.io';
 
@@ -364,6 +394,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setDailyLimit,
       setUsername,
       setAccountLocale,
+      setAttachInviteOnClaims,
       explorerBase,
     }),
     [
@@ -384,6 +415,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setDailyLimit,
       setUsername,
       setAccountLocale,
+      setAttachInviteOnClaims,
       explorerBase,
     ]
   );

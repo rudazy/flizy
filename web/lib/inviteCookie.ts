@@ -7,12 +7,15 @@ import type { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import {
   INVITE_COOKIE,
+  INVITE_COOKIE_SRC,
   INVITE_COOKIE_MAX_AGE_SEC,
+  INVITE_SOURCE,
   isInviteCodeFormat,
   normalizeInviteCode,
+  normalizeInviteSource,
 } from './invite.ts';
 
-export { INVITE_COOKIE, INVITE_COOKIE_MAX_AGE_SEC };
+export { INVITE_COOKIE, INVITE_COOKIE_SRC, INVITE_COOKIE_MAX_AGE_SEC };
 
 export function inviteCookieOptions(maxAge: number) {
   return {
@@ -24,10 +27,16 @@ export function inviteCookieOptions(maxAge: number) {
   };
 }
 
-export function attachInviteCookie(res: NextResponse, code: string): void {
+export function attachInviteCookie(
+  res: NextResponse,
+  code: string,
+  source?: string | null
+): void {
   const slug = normalizeInviteCode(code);
   if (!isInviteCodeFormat(slug)) return;
-  res.cookies.set(INVITE_COOKIE, slug, inviteCookieOptions(INVITE_COOKIE_MAX_AGE_SEC));
+  const opts = inviteCookieOptions(INVITE_COOKIE_MAX_AGE_SEC);
+  res.cookies.set(INVITE_COOKIE, slug, opts);
+  res.cookies.set(INVITE_COOKIE_SRC, normalizeInviteSource(source), opts);
 }
 
 export function readInviteCookie(): string | null {
@@ -36,6 +45,11 @@ export function readInviteCookie(): string | null {
   return isInviteCodeFormat(slug) ? slug : null;
 }
 
+export function readInviteSource(): string {
+  return normalizeInviteSource(cookies().get(INVITE_COOKIE_SRC)?.value || INVITE_SOURCE);
+}
+
 export function clearInviteCookieOn(res: NextResponse): void {
   res.cookies.set(INVITE_COOKIE, '', inviteCookieOptions(0));
+  res.cookies.set(INVITE_COOKIE_SRC, '', inviteCookieOptions(0));
 }

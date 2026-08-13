@@ -12,13 +12,14 @@ testnet with source-verified contracts.
 
 - https://flizy.app/ : Product home and four-step overview
 - https://flizy.app/how-it-works : Full user guide and commands for both chat apps
-- https://flizy.app/docs : Why trusted addresses exist (security)
-- https://flizy.app/signup : Create account
+- https://flizy.app/docs : Trusted destinations, invite counting rules
+- https://flizy.app/signup : Create account (email + verification code + username)
 - https://flizy.app/login : Sign in
-- https://flizy.app/dashboard : Wallet, PIN, trusted people, link code for WhatsApp or Telegram
+- https://flizy.app/dashboard : Wallet, personal invite link, PIN, trusted people, chat link code
 - https://flizy.app/dashboard/wallet : Flizy wallet address and fund steps
 - https://flizy.app/dashboard/swap : Swap FLZ and ETH, add or remove liquidity
-- https://flizy.app/claim/:token : Claim funds reserved for a phone number
+- https://flizy.app/i/:code : Personal invite. Attributes a new signup to the inviter
+- https://flizy.app/claim/:token : Claim funds reserved for a phone, email, or platform. May carry an invite
 - https://faucet.giwa.io : Official GIWA testnet faucet — paste Flizy wallet address to receive test ETH
 - https://x.com/Flizyapp : Official X account
 

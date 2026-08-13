@@ -34,6 +34,7 @@ export default function DashboardHomePage() {
     refreshing,
     refreshAll,
     setUnlockPin,
+    setAttachInviteOnClaims,
     setMsg,
   } = useDashboard();
   const [pin, setPin] = useState('');
@@ -213,20 +214,22 @@ export default function DashboardHomePage() {
       {slide === 'overview' ? (
         <>
           {data.invite ? (
-            <AppSection
-              title="Invite"
-              helper="A friend counts after they finish setup, bind a verified phone, and complete a transfer."
-              badge={String(data.invite.counted)}
-            >
+            <AppSection title="Invite">
               <p className="break-all font-mono text-sm text-paper">{data.invite.url}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
+              <div className="mt-3">
                 <CopyButton value={data.invite.url} label="Copy link" />
-                <span className="text-xs text-muted">
-                  {data.invite.counted === 1
-                    ? '1 friend activated'
-                    : `${data.invite.counted} friends activated`}
-                </span>
               </div>
+              <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-muted">
+                <input
+                  type="checkbox"
+                  checked={Boolean(data.invite.attachOnClaims)}
+                  disabled={busy === 'invite-attach'}
+                  onChange={(e) => {
+                    void setAttachInviteOnClaims(e.target.checked);
+                  }}
+                />
+                Attach to claims I send
+              </label>
             </AppSection>
           ) : null}
 

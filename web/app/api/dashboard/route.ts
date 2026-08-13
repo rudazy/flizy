@@ -96,7 +96,12 @@ export async function GET() {
       console.warn('[dashboard] pendingClaims failed', err);
     }
 
-    let invite: { code: string; url: string; counted: number } | null = null;
+    let invite: {
+      code: string;
+      url: string;
+      counted: number;
+      attachOnClaims: boolean;
+    } | null = null;
     if (account.username) {
       try {
         invite = await getInviteSummary(supabase, accountId, getSiteConfig().siteUrl);

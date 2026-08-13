@@ -66,7 +66,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/trusted/route.ts, web/lib/claimPayout.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/passwordGate.ts, web/lib/pendingClaims.ts"
+      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/trusted/route.ts, web/lib/claimPayout.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/passwordGate.ts, web/lib/pendingClaims.ts"
     },
     {
       "kind": "table",

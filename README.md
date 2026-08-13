@@ -66,20 +66,24 @@ third channel is an adapter, not a second product.
 
 ## How it works, for a user
 
-1. **Sign up on the site.** You get an account and an agent wallet address.
+1. **Sign up on the site.** Email, password, then a one-time code to prove the inbox. Set a
+   Flizy `@username`. You get an account, an agent wallet, and a personal invite link.
 2. **Approve who you can pay.** Add a name and an address under trusted destinations. This
    step needs your password, and it only happens on the site.
 3. **Link your chat app.** Generate a one-time code, open WhatsApp or Telegram from the
    dashboard, send the code. Only a logged-in account holder can produce a code, which is
-   what makes it proof of identity.
+   what makes it proof of identity. Telegram also asks you to share your number once.
 4. **Pay from chat.** `flizy send 0.01 to john`. Flizy replies with a plan showing amount,
    destination, network and fees. Nothing moves until you confirm.
 5. **Get a receipt** with an explorer link.
 
-You can also send to a **phone number**. The funds go into escrow and you can cancel any
-time until they are claimed. If that number is already on Flizy, the owner is notified in
-their chat app straight away and claims it there. If it is not, you share a claim link, and
-the money becomes theirs once they join and prove the number.
+You can also send to a **phone number, email, or platform handle** (GitHub, Discord, X,
+Telegram). Funds go into escrow and you can cancel any time until they are claimed. If that
+person is already on Flizy they are notified in chat. If not, you share a claim link.
+
+Home has an optional **Attach to claims I send** checkbox. Off by default. When on, new
+holds carry your invite so someone who joins from that claim can count as a referred
+friend. How a count is earned is on [the docs](https://flizy.app/docs#invites).
 
 Money never lands in someone's wallet unannounced, and a number that is not on Flizy is
 never messaged out of the blue.
@@ -154,13 +158,14 @@ flowchart TB
   subgraph clients["Clients"]
     WA["WhatsApp"]
     TG["Telegram"]
-    WEB["flizy.app<br/>dashboard · PIN · trusted list"]
+    WEB["flizy.app<br/>dashboard · PIN · trusted · invite"]
   end
 
   subgraph engine["Flizy engine"]
     R["Router<br/>intent from chat or web"]
     P["Policy<br/>approved destinations · limits · lock · PIN"]
     X["Execute<br/>plan · confirm · sign"]
+    INV["Invite gate<br/>link · phone permanence · first tx"]
   end
 
   CH["GIWA Sepolia<br/>agent wallet · receipt"]
@@ -168,10 +173,12 @@ flowchart TB
   WA --> R
   TG --> R
   WEB --> R
+  WEB --> INV
   R --> P
   P -->|allowed| X
   P -.->|denied with reason| clients
   X --> CH
+  X --> INV
   CH -->|explorer receipt| clients
 ```
 
@@ -192,25 +199,42 @@ flowchart LR
   G --> H["Receipt on explorer"]
 ```
 
-### Sending to a phone number
+### Sending to a phone, email, or platform
 
 ```mermaid
 flowchart LR
-  A["Chat: send 0.01 to a phone"] --> B["Funds held for claim"]
-  B --> C{"Number already<br/>on Flizy?"}
+  A["Chat: send 0.01 to a phone / email / @handle"] --> B["Funds held for claim"]
+  B --> C{"Already on Flizy?"}
   C -->|yes| D["Notify them in chat"]
   C -->|no| E["Share claim link<br/>flizy.app/claim/..."]
-  D --> F["They prove the number and claim"]
+  D --> F["They prove identity and claim"]
   E --> F
   F --> G["Funds released to their agent wallet"]
   B -.->|before claim| H["You cancel and recover"]
 ```
 
+### Invite a friend
+
+```mermaid
+flowchart LR
+  S["Home: copy flizy.app/i/CODE"] --> J["Friend signs up through the link"]
+  J --> O["Email verified + username set"]
+  O --> P["Verified phone on WhatsApp or Telegram"]
+  P --> T["First qualifying transfer or claim"]
+  T --> C["Invite counted once"]
+  S -.->|optional| K["Attach invite to claims I send"]
+  K --> E["Claim link carries the same invite"]
+  E --> J
+```
+
+A counted invite is a recorded number, not spendable credit. One verified phone can only
+produce one count, even after unlink. Detail: [docs#invites](https://flizy.app/docs#invites).
+
 ### Link once, use both chats
 
 ```mermaid
 flowchart LR
-  S["Sign up on flizy.app"] --> T["Add trusted destinations<br/>set unlock PIN"]
+  S["Sign up on flizy.app<br/>verify email · set @username"] --> T["Add trusted destinations<br/>set unlock PIN"]
   T --> L["Generate link code"]
   L --> WA["Open WhatsApp with code"]
   L --> TG["Open Telegram with code"]
@@ -234,8 +258,8 @@ Bare `confirm` and `cancel` work on both.
 | `link CODE` | Bind this chat to your account |
 | `me` · `balance` · `deposit` · `history` | Account and wallet |
 | `add wallet 0x…` | Start the approved-destination flow |
-| `send AMOUNT to name \| 0x… \| phone` | Transfer, or hold a claim for a phone number |
-| `claim` · `cancel claims` | Receive or cancel phone claims |
+| `send AMOUNT to name \| 0x… \| phone \| email \| @user on github` | Transfer, or hold a claim |
+| `claim` · `cancel claims` | Receive or cancel holds |
 | `request` · `pay` · `requests` | Payment requests |
 | `buy AMOUNT FLZ` · `sell AMOUNT FLZ` | Trade against the pool |
 | `swap AMOUNT ETH for FLZ` · `price FLZ` | Explicit swap and spot price |
@@ -250,9 +274,10 @@ Bare `confirm` and `cancel` work on both.
 | [flizy.app](https://flizy.app/) | Product home |
 | [/how-it-works](https://flizy.app/how-it-works) · [/docs](https://flizy.app/docs) | Guides and security |
 | [/signup](https://flizy.app/signup) · [/login](https://flizy.app/login) | Account |
-| [/dashboard](https://flizy.app/dashboard) | Wallet, history, approved destinations, PIN, link codes |
+| [/dashboard](https://flizy.app/dashboard) | Wallet, invite link, history, approved destinations, PIN, chat link codes |
 | [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap and liquidity |
-| `/claim/[token]` | Public claim status page |
+| `/i/[code]` | Personal invite. Sets attribution, then signup |
+| `/claim/[token]` | Public claim status. May carry an invite if the sender opted in |
 
 Swapping is available in chat and on the site. The protocol fee is **0.30%** by default with
 a hard maximum of 1%, on top of the standard pool fee, and it is shown in the plan before
@@ -264,7 +289,7 @@ you confirm. Details in [docs/swap-fees.md](docs/swap-fees.md).
 
 | Horizon | Focus |
 |---------|-------|
-| **Now** | GIWA Sepolia: chat payments, phone claims, payment requests, FLZ swap and liquidity, both chat apps live on one engine |
+| **Now** | GIWA Sepolia: chat payments, identity claims (phone, email, GitHub, Discord, X, Telegram), invites with a phone-permanence count, FLZ swap and liquidity, both chat apps on one engine |
 | **Next** | On-chain enforcement of approved destinations through session-key smart wallets, moving the guarantee out of the backend |
 | **Then** | More tokens through the pair registry, then more EVM chains through the chain registry. Same policy path, no new AMM |
 

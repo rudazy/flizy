@@ -14,6 +14,7 @@ const {
   INVITE_COOKIE,
   INVITE_COOKIE_MAX_AGE_SEC,
   INVITE_SOURCE,
+  INVITE_SOURCE_CLAIM,
   INVITE_EVENT,
   QUALIFYING_KINDS,
   generateInviteCode,
@@ -27,6 +28,7 @@ const {
   maybeMarkFirstTx,
   tryCountInviteLocal,
   countedInvitesFor,
+  inviteCodeIfAttachEnabled,
   collectCountablePhones,
 } = require('../lib/invite');
 
@@ -382,6 +384,45 @@ describe('counting gate', () => {
   });
 });
 
+describe('optional invite on claims', () => {
+  it('does not attach a code when the sender toggle is off', async () => {
+    const fake = seed();
+    fake.db.tables.accounts.find((a) => a.id === INVITER).attach_invite_on_claims = false;
+    assert.equal(await inviteCodeIfAttachEnabled(fake.client, INVITER), null);
+  });
+
+  it('attaches the sender code when the toggle is on', async () => {
+    const fake = seed();
+    fake.db.tables.accounts.find((a) => a.id === INVITER).attach_invite_on_claims = true;
+    const code = await inviteCodeIfAttachEnabled(fake.client, INVITER);
+    assert.ok(isInviteCodeFormat(code));
+    assert.equal(fake.db.tables.invite_codes[0].account_id, INVITER);
+  });
+
+  it('records claim_link as the attribution source', async () => {
+    const fake = seed();
+    const code = await issueFor(fake, INVITER);
+    const res = await attributeSignup(fake.client, {
+      inviteeAccountId: INVITEE,
+      code,
+      source: INVITE_SOURCE_CLAIM,
+    });
+    assert.equal(res.attributed, true);
+    assert.equal(fake.db.tables.invite_attributions[0].source, INVITE_SOURCE_CLAIM);
+  });
+
+  it('treats an unknown source as invite_link', async () => {
+    const fake = seed();
+    const code = await issueFor(fake, INVITER);
+    await attributeSignup(fake.client, {
+      inviteeAccountId: INVITEE,
+      code,
+      source: 'campaign',
+    });
+    assert.equal(fake.db.tables.invite_attributions[0].source, INVITE_SOURCE);
+  });
+});
+
 describe('cookie constants', () => {
   it('uses a 14 day httpOnly cookie named flizy_invite', () => {
     assert.equal(INVITE_COOKIE, 'flizy_invite');
@@ -401,6 +442,8 @@ describe('web mirror agrees on the predicates', () => {
     assert.equal(web.INVITE_COOKIE, INVITE_COOKIE);
     assert.equal(web.INVITE_COOKIE_MAX_AGE_SEC, INVITE_COOKIE_MAX_AGE_SEC);
     assert.equal(web.INVITE_SOURCE, INVITE_SOURCE);
+    assert.equal(web.INVITE_SOURCE_CLAIM, INVITE_SOURCE_CLAIM);
+    assert.equal(web.INVITE_COOKIE_SRC, 'flizy_invite_src');
     assert.deepEqual({ ...web.QUALIFYING_KINDS }, { ...QUALIFYING_KINDS });
   });
 
