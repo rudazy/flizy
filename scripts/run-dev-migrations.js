@@ -14,6 +14,15 @@
  * from it will not match DEV_SUPABASE_REF. One slip is not enough to reach a
  * production database; it takes two deliberate, agreeing edits.
  *
+ * The guard itself lives in scripts/devDbTarget.js so this file and
+ * verify-dev-schema.js cannot drift apart on what counts as dev.
+ *
+ * Connection route: direct to db.<ref>.supabase.co by default. Where that host
+ * resolves IPv6-only and times out, set SUPABASE_DB_POOLER_HOST in .env.dev to
+ * use the IPv4-reachable pooler instead. The dry run prints which route it will
+ * take. The pooler does not widen the guard: the tenant is pinned by the
+ * postgres.<ref> username, built from the ref that already passed the check.
+ *
  * Usage (Windows CMD):
  *   node scripts\run-dev-migrations.js --dry-run
  *   node scripts\run-dev-migrations.js --confirm
@@ -28,16 +37,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const dotenv = require('dotenv');
 const { Client } = require('pg');
+
+const { loadDevTarget, describeTarget } = require('./devDbTarget');
 
 const ROOT = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT, '.env.dev');
 const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
-
-// Values still carrying their template text. Treated as "not filled in" so the
-// script fails with a clear message instead of a confusing connection error.
-const PLACEHOLDER = /^(your_|0xyour_|fresh_dev_only_|change-this)|^$/i;
 
 const args = process.argv.slice(2);
 const hasFlag = (name) => args.includes(name);
@@ -49,64 +55,6 @@ const flagValue = (name) => {
 function fail(message) {
   console.error(`\nABORTED: ${message}\n`);
   process.exit(1);
-}
-
-// ---------------------------------------------------------------------------
-// Load and validate the dev target
-// ---------------------------------------------------------------------------
-
-function loadDevEnv() {
-  if (!fs.existsSync(ENV_FILE)) {
-    fail(
-      `.env.dev not found at ${ENV_FILE}\n` +
-        'Copy .env.dev.example to .env.dev and fill in the dev Supabase values.'
-    );
-  }
-
-  // Parsed, not injected into process.env, so nothing here can leak into other
-  // libraries that read process.env later in the same process.
-  const env = dotenv.parse(fs.readFileSync(ENV_FILE));
-
-  const url = (env.SUPABASE_URL || '').trim();
-  const declaredRef = (env.DEV_SUPABASE_REF || '').trim();
-  const password = env.SUPABASE_DB_PASSWORD || '';
-
-  if (PLACEHOLDER.test(declaredRef)) {
-    fail('DEV_SUPABASE_REF is empty or still a placeholder in .env.dev.');
-  }
-  if (PLACEHOLDER.test(url)) {
-    fail('SUPABASE_URL is empty or still a placeholder in .env.dev.');
-  }
-  if (PLACEHOLDER.test(password)) {
-    fail('SUPABASE_DB_PASSWORD is empty or still a placeholder in .env.dev.');
-  }
-
-  const match = url.match(/^https?:\/\/([a-z0-9]+)\.supabase\.co\/?$/i);
-  if (!match) {
-    fail(`SUPABASE_URL is not a Supabase project URL: ${url}`);
-  }
-  const derivedRef = match[1];
-
-  if (derivedRef !== declaredRef) {
-    fail(
-      'dev guard tripped: SUPABASE_URL and DEV_SUPABASE_REF disagree.\n' +
-        `  SUPABASE_URL points at project: ${derivedRef}\n` +
-        `  DEV_SUPABASE_REF declares:      ${declaredRef}\n` +
-        'Refusing to connect. If the URL is correct, this is the check telling\n' +
-        'you the project you are about to migrate is not the one you called dev.'
-    );
-  }
-
-  // Optional extra belt: explicit refs that must never be touched.
-  const blocked = (env.BLOCKED_SUPABASE_REFS || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (blocked.includes(derivedRef)) {
-    fail(`project ref ${derivedRef} is in BLOCKED_SUPABASE_REFS. Refusing.`);
-  }
-
-  return { ref: derivedRef, password };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,13 +98,15 @@ async function main() {
 
   // Resolve the target even on a dry run: a dry run that skips the guard would
   // report an order that a real run might not be allowed to apply.
-  const { ref, password } = loadDevEnv();
-  const host = `db.${ref}.supabase.co`;
+  let target;
+  try {
+    target = loadDevTarget(ENV_FILE);
+  } catch (err) {
+    fail(err.message);
+  }
 
   console.log('');
-  console.log('  target host : ' + host);
-  console.log('  project ref : ' + ref + '  (matches DEV_SUPABASE_REF)');
-  console.log('  database    : postgres');
+  describeTarget(target).forEach((line) => console.log(line));
   console.log('  migrations  : ' + files.length + ' file(s), in timestamp order');
   console.log('');
   files.forEach((f, i) => console.log(`    ${String(i + 1).padStart(2, ' ')}. ${f}`));
@@ -171,23 +121,35 @@ async function main() {
     fail('refusing to run without --confirm. Review the target above, then re-run with --confirm.');
   }
 
-  const client = new Client({
-    host,
-    port: 5432,
-    user: 'postgres',
-    password,
-    database: 'postgres',
-    ssl: { rejectUnauthorized: false },
-  });
+  const client = new Client(target.clientConfig);
 
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (err) {
+    const unreachable = ['ETIMEDOUT', 'ENETUNREACH', 'ENOTFOUND', 'EAI_AGAIN'];
+    if (err && unreachable.includes(err.code)) {
+      fail(
+        `cannot reach ${target.host}:${target.port} (${err.code}).\n` +
+          (target.mode === 'direct'
+            ? '  The direct host is not reachable from every network: it can resolve\n' +
+              '  IPv6-only, and on newer Supabase projects it may not exist at all.\n' +
+              '  Set SUPABASE_DB_POOLER_HOST in .env.dev to use the IPv4 pooler, e.g.\n' +
+              '    SUPABASE_DB_POOLER_HOST=aws-0-eu-west-1.pooler.supabase.com\n' +
+              '  then re-run. Nothing was applied.'
+            : '  Check the pooler hostname and region. Nothing was applied.')
+      );
+    }
+    fail(`could not connect to ${target.host}:${target.port}: ${err.message}`);
+  }
 
   // Confirm at the server, not just from the connection string, that this is
-  // the database we think it is.
+  // the database we think it is. inet_server_addr() is null through the pooler,
+  // which is expected rather than a problem, so it is reported as unavailable.
   const who = await client.query(
     'select current_database() as db, inet_server_addr()::text as addr'
   );
-  console.log(`Connected: database=${who.rows[0].db} server=${who.rows[0].addr}\n`);
+  const addr = who.rows[0].addr || 'n/a via pooler';
+  console.log(`Connected: database=${who.rows[0].db} server=${addr} route=${target.mode}\n`);
 
   const applied = [];
   for (const file of files) {
@@ -228,7 +190,7 @@ async function main() {
   }
 
   await client.end();
-  console.log(`\nAll ${applied.length} migration(s) applied cleanly to ${ref}.`);
+  console.log(`\nAll ${applied.length} migration(s) applied cleanly to ${target.ref}.`);
   console.log('Next: node scripts\\verify-dev-schema.js');
 }
 

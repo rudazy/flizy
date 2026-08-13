@@ -17,17 +17,17 @@
  * Exit code 0 = schema matches. 1 = gaps found (listed table by table).
  */
 
-const fs = require('fs');
 const path = require('path');
-const dotenv = require('dotenv');
 const { Client } = require('pg');
 
 const { declaredObjects } = require('../lib/schemaRequirements');
 const { MIGRATIONS_DIR } = require('../lib/schemaSurfaces');
+// Env parsing, the dev guard and the connection route all live here now, shared
+// with run-dev-migrations.js so the two cannot disagree about what is dev.
+const { loadDevTarget, describeTarget } = require('./devDbTarget');
 
 const ROOT = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT, '.env.dev');
-const PLACEHOLDER = /^(your_|0xyour_|fresh_dev_only_|change-this)|^$/i;
 
 const dump = process.argv.includes('--dump');
 
@@ -86,54 +86,38 @@ function diff(label, expected, actual) {
   return missing;
 }
 
-function loadDevEnv() {
-  if (!fs.existsSync(ENV_FILE)) {
-    console.error(`\nABORTED: .env.dev not found at ${ENV_FILE}\n`);
+async function main() {
+  // Same guard and same connection route as run-dev-migrations.js, including
+  // the optional SUPABASE_DB_POOLER_HOST path for IPv6-only networks.
+  let target;
+  try {
+    target = loadDevTarget(ENV_FILE);
+  } catch (err) {
+    console.error(`\nABORTED: ${err.message}\n`);
     process.exit(1);
   }
-  const env = dotenv.parse(fs.readFileSync(ENV_FILE));
-  const url = (env.SUPABASE_URL || '').trim();
-  const declaredRef = (env.DEV_SUPABASE_REF || '').trim();
-  const password = env.SUPABASE_DB_PASSWORD || '';
 
-  for (const [k, v] of [
-    ['DEV_SUPABASE_REF', declaredRef],
-    ['SUPABASE_URL', url],
-    ['SUPABASE_DB_PASSWORD', password],
-  ]) {
-    if (PLACEHOLDER.test(v)) {
-      console.error(`\nABORTED: ${k} is empty or still a placeholder in .env.dev\n`);
-      process.exit(1);
-    }
-  }
+  console.log('');
+  describeTarget(target).forEach((line) => console.log(line));
 
-  const m = url.match(/^https?:\/\/([a-z0-9]+)\.supabase\.co\/?$/i);
-  if (!m) {
-    console.error(`\nABORTED: SUPABASE_URL is not a Supabase project URL: ${url}\n`);
-    process.exit(1);
-  }
-  if (m[1] !== declaredRef) {
+  const client = new Client(target.clientConfig);
+  try {
+    await client.connect();
+  } catch (err) {
+    const unreachable = ['ETIMEDOUT', 'ENETUNREACH', 'ENOTFOUND', 'EAI_AGAIN'];
+    const hint =
+      unreachable.includes(err.code) && target.mode === 'direct'
+        ? '\n  The direct host is not reachable from every network, and on newer\n' +
+          '  Supabase projects it may not exist at all. Set SUPABASE_DB_POOLER_HOST\n' +
+          '  in .env.dev to use the IPv4 pooler.'
+        : '';
     console.error(
-      `\nABORTED: dev guard tripped. SUPABASE_URL points at ${m[1]}, ` +
-        `DEV_SUPABASE_REF declares ${declaredRef}.\n`
+      `\nABORTED: could not connect to ${target.host}:${target.port}: ${err.message}${hint}\n`
     );
     process.exit(1);
   }
-  return { ref: m[1], password };
-}
 
-async function main() {
-  const { ref, password } = loadDevEnv();
-  const client = new Client({
-    host: `db.${ref}.supabase.co`,
-    port: 5432,
-    user: 'postgres',
-    password,
-    database: 'postgres',
-    ssl: { rejectUnauthorized: false },
-  });
-  await client.connect();
-
+  const ref = target.ref;
   console.log(`\nVerifying schema on dev project ${ref}\n`);
   console.log('Object counts');
 
