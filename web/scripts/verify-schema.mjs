@@ -28,11 +28,13 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(HERE, '..');
 const MANIFEST = path.join(WEB_ROOT, 'lib', 'generated', 'schemaManifest.json');
 
-// Same order as web/lib/supabase.ts. On Vercel these are already in the
-// environment and every load is a no-op.
+// Same order and precedence as web/lib/supabase.ts, so the gate always checks
+// the database the application itself would talk to. See the comment there for
+// why override:true matters and why .env.local is loaded last. On Vercel all
+// three are no-ops and the platform supplies process.env.
 loadEnv({ path: path.join(WEB_ROOT, '..', '.env') });
-loadEnv({ path: path.join(WEB_ROOT, '.env.local') });
-loadEnv({ path: path.join(WEB_ROOT, '.env') });
+loadEnv({ path: path.join(WEB_ROOT, '.env'), override: true });
+loadEnv({ path: path.join(WEB_ROOT, '.env.local'), override: true });
 
 /**
  * Set a failing exit code and let node wind down on its own.
