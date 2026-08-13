@@ -317,6 +317,22 @@ export async function executeWebClaimPayout(p: {
       .single();
     if (uErr) throw new Error(uErr.message);
 
+    try {
+      const { maybeMarkFirstTx } = await import('./invite.ts');
+      await maybeMarkFirstTx(supabase, {
+        accountId,
+        kind: 'claim_payout',
+        amount: updated.amount_eth,
+        ok: true,
+        counterpartyAccountId: updated.from_account_id || null,
+      });
+    } catch (hookErr) {
+      console.warn(
+        '[invite] first tx hook:',
+        hookErr instanceof Error ? hookErr.message : hookErr
+      );
+    }
+
     const explorerUrl = `${chain.explorerBaseUrl}/tx/${tx.hash}`;
     const byLabel = await claimerLabel(accountId);
     const viaLine = claimViaLine(updated as ClaimRow);

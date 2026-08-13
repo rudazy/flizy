@@ -7,6 +7,8 @@ import { deriveAgentAddress } from '../../../../lib/agentWallet';
 import { toPublicAccount } from '../../../../lib/publicAccount';
 import { normalizeLocale } from '../../../../lib/locale';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { attributeSignup } from '../../../../lib/invite.ts';
+import { readInviteCookie } from '../../../../lib/inviteCookie.ts';
 
 const ROUTE = 'POST /api/auth/signup';
 
@@ -70,6 +72,14 @@ export async function POST(req: Request) {
     }
 
     await createSession(data.id);
+
+    try {
+      const inviteCode = readInviteCookie();
+      // Cookie is the only source. A body invite / inviterId is ignored.
+      await attributeSignup(supabase, { inviteeAccountId: data.id, code: inviteCode });
+    } catch (err) {
+      console.warn('[signup] attribution:', err instanceof Error ? err.message : err);
+    }
 
     let emailCodeSent = false;
     let emailCodeError: string | null = null;

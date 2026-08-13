@@ -17,6 +17,7 @@ import {
 import { useDashboard } from '../../components/DashboardProvider';
 import { useLocale } from '../../components/LocaleProvider';
 import { shortAddr } from '../../lib/dashboardTypes';
+import { CopyButton } from '../../components/CopyButton';
 
 const SLIDES = ['overview', 'claims', 'go', 'recent'] as const;
 
@@ -211,6 +212,24 @@ export default function DashboardHomePage() {
 
       {slide === 'overview' ? (
         <>
+          {data.invite ? (
+            <AppSection
+              title="Invite"
+              helper="A friend counts after they finish setup, bind a verified phone, and complete a transfer."
+              badge={String(data.invite.counted)}
+            >
+              <p className="break-all font-mono text-sm text-paper">{data.invite.url}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <CopyButton value={data.invite.url} label="Copy link" />
+                <span className="text-xs text-muted">
+                  {data.invite.counted === 1
+                    ? '1 friend activated'
+                    : `${data.invite.counted} friends activated`}
+                </span>
+              </div>
+            </AppSection>
+          ) : null}
+
           {needsPin ? (
             <AppSection
               title="Set unlock PIN"

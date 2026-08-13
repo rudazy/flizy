@@ -34,6 +34,18 @@
     },
     {
       "kind": "function",
+      "name": "invite_append_only",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "executed by trigger invite_phone_claims_no_update"
+    },
+    {
+      "kind": "function",
+      "name": "invite_attributions_set_once",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "executed by trigger invite_attributions_set_once"
+    },
+    {
+      "kind": "function",
       "name": "schema_guard_objects",
       "providedBy": "20260812000000_schema_guard.sql",
       "requiredBy": "lib/schemaGuard.js"
@@ -43,6 +55,12 @@
       "name": "set_updated_at",
       "providedBy": "20260721000000_create_users.sql",
       "requiredBy": "executed by trigger users_set_updated_at"
+    },
+    {
+      "kind": "function",
+      "name": "try_count_invite",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "lib/invite.js"
     },
     {
       "kind": "function",
@@ -60,13 +78,13 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/engine/executeTransfer.js, lib/identity.js, lib/router.js, lib/session.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/engine/executeTransfer.js, lib/identity.js, lib/invite.js, lib/router.js, lib/session.js"
     },
     {
       "kind": "table",
       "name": "channel_identities",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/channelBind.js, lib/discordLookup.js, lib/identity.js, lib/router.js, lib/telegramLookup.js"
+      "requiredBy": "lib/channelBind.js, lib/discordLookup.js, lib/identity.js, lib/invite.js, lib/router.js, lib/telegramLookup.js"
     },
     {
       "kind": "table",
@@ -91,6 +109,30 @@
       "name": "identity_events",
       "providedBy": "20260802160000_identity_events.sql",
       "requiredBy": "lib/channelBind.js"
+    },
+    {
+      "kind": "table",
+      "name": "invite_attributions",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "lib/invite.js"
+    },
+    {
+      "kind": "table",
+      "name": "invite_codes",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "lib/invite.js"
+    },
+    {
+      "kind": "table",
+      "name": "invite_events",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "lib/invite.js"
+    },
+    {
+      "kind": "table",
+      "name": "invite_phone_claims",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "lib/invite.js"
     },
     {
       "kind": "table",
@@ -175,6 +217,24 @@
       "name": "identity_events_no_update",
       "providedBy": "20260802160000_identity_events.sql",
       "requiredBy": "trigger on identity_events"
+    },
+    {
+      "kind": "trigger",
+      "name": "invite_attributions_set_once",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "trigger on invite_attributions"
+    },
+    {
+      "kind": "trigger",
+      "name": "invite_events_no_update",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "trigger on invite_events"
+    },
+    {
+      "kind": "trigger",
+      "name": "invite_phone_claims_no_update",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "trigger on invite_phone_claims"
     },
     {
       "kind": "trigger",

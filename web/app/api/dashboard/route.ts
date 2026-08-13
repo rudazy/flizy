@@ -6,6 +6,7 @@ import { deriveAgentAddress, deriveLegacyAddressV1 } from '../../../lib/agentWal
 import { toPublicAccount } from '../../../lib/publicAccount';
 import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
 import { apiErrorBody } from '../../../lib/apiError';
+import { getInviteSummary } from '../../../lib/invite.ts';
 
 const ROUTE = 'GET /api/dashboard';
 
@@ -95,11 +96,21 @@ export async function GET() {
       console.warn('[dashboard] pendingClaims failed', err);
     }
 
+    let invite: { code: string; url: string; counted: number } | null = null;
+    if (account.username) {
+      try {
+        invite = await getInviteSummary(supabase, accountId, getSiteConfig().siteUrl);
+      } catch (err) {
+        console.warn('[dashboard] invite summary', err);
+      }
+    }
+
     return NextResponse.json({
       account: toPublicAccount(account),
       trusted,
       link,
       pendingClaims,
+      invite,
     });
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });

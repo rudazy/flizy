@@ -270,6 +270,12 @@ export async function consumeEmailVerificationCode(p: {
     if (uErr) {
       return { ok: false, error: 'Could not mark email verified.', status: 500 };
     }
+    try {
+      const { maybeMarkOnboarded } = await import('./invite.ts');
+      await maybeMarkOnboarded(supabase, p.accountId);
+    } catch (err) {
+      console.warn('[emailVerify] invite onboard:', err instanceof Error ? err.message : err);
+    }
   } else {
     const { data: sec, error: sErr } = await supabase
       .from('account_emails')
