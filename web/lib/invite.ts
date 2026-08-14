@@ -5,13 +5,10 @@
  * is never uploaded. test/invite.test.js pins the shared predicates.
  */
 
-import { generateLinkCode } from './linkCode.ts';
-import { isUsernameReserved, reservedKey } from './username.ts';
+import { isUsernameReserved, reservedKey, normalizeUsername } from './username.ts';
 
-export const INVITE_CODE_LENGTH = 10;
-export const INVITE_CODE_ALPHABET = '0123456789abcdefghjkmnpqrstvwxyz';
-export const INVITE_CODE_FORMAT = /^[0-9a-hjkmnp-tv-z]{10}$/;
-export const INVITE_ISSUE_TRIES = 8;
+export const INVITE_CODE_FORMAT = /^[a-z][a-z0-9]{2,23}$/;
+export const INVITE_ISSUE_TRIES = 2;
 
 export const INVITE_COOKIE = 'flizy_invite';
 export const INVITE_COOKIE_SRC = 'flizy_invite_src';
@@ -63,14 +60,38 @@ function isMissingRelation(error: { code?: string; message?: string } | null | u
   );
 }
 
-export function generateInviteCode(): string {
-  return generateLinkCode().toLowerCase();
+export function normalizeInviteCode(raw: unknown): string {
+  return normalizeUsername(raw);
 }
 
-export function normalizeInviteCode(raw: unknown): string {
-  return String(raw || '')
-    .trim()
-    .toLowerCase();
+/** @name, /i/name, /claim/{token}/name, or ?i=name. Never an account id. */
+export function extractInviteCode(raw: unknown): string {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const fromInvite = s.match(/\/i\/([a-z][a-z0-9]{2,23})/i);
+  if (fromInvite) return normalizeInviteCode(fromInvite[1]);
+  const fromClaim = s.match(/\/claim\/[^/]+\/([a-z][a-z0-9]{2,23})(?:[/?#]|$)/i);
+  if (fromClaim) return normalizeInviteCode(fromClaim[1]);
+  const fromQuery = s.match(/[?&](?:i|invite)=([a-z][a-z0-9]{2,23})/i);
+  if (fromQuery) return normalizeInviteCode(fromQuery[1]);
+  return normalizeInviteCode(s);
+}
+
+/** Typed field wins when valid. Cookie is the fallback. */
+export function resolveSignupInvite(
+  typed: unknown,
+  cookie: unknown,
+  cookieSource?: unknown
+): { code: string | null; source: string } {
+  const fromField = extractInviteCode(typed);
+  if (isInviteCodeFormat(fromField)) {
+    return { code: fromField, source: INVITE_SOURCE };
+  }
+  const fromCookie = normalizeInviteCode(cookie);
+  if (isInviteCodeFormat(fromCookie)) {
+    return { code: fromCookie, source: normalizeInviteSource(cookieSource) };
+  }
+  return { code: null, source: INVITE_SOURCE };
 }
 
 export function isInviteCodeFormat(raw: unknown): boolean {
@@ -167,6 +188,18 @@ export async function ensureInviteCode(
 ): Promise<{ ok: true; code: string; created: boolean } | { ok: false; reason: string }> {
   if (!accountId) return { ok: false, reason: 'invalid' };
 
+  const { data: acc, error: accErr } = await supabase
+    .from('accounts')
+    .select('username')
+    .eq('id', accountId)
+    .maybeSingle();
+  if (accErr) {
+    if (isMissingRelation(accErr)) return { ok: false, reason: 'unavailable' };
+    throw new Error(`invite username read failed: ${accErr.message}`);
+  }
+  const code = normalizeInviteCode(acc?.username);
+  if (!isInviteCodeFormat(code)) return { ok: false, reason: 'no_username' };
+
   const { data: existing, error: readErr } = await supabase
     .from('invite_codes')
     .select('code')
@@ -176,32 +209,59 @@ export async function ensureInviteCode(
     if (isMissingRelation(readErr)) return { ok: false, reason: 'unavailable' };
     throw new Error(`invite code read failed: ${readErr.message}`);
   }
-  if (existing?.code) return { ok: true, code: existing.code, created: false };
+  if (existing?.code === code) return { ok: true, code, created: false };
 
-  for (let i = 0; i < INVITE_ISSUE_TRIES; i += 1) {
-    const code = generateInviteCode();
-    if (!isInviteCodeFormat(code)) continue;
-
-    let reserved = false;
-    try {
-      reserved = await isUsernameReserved(supabase, code);
-    } catch (err) {
-      const cause = err instanceof Error ? err : null;
-      if (!isMissingRelation(cause)) throw err;
+  if (existing) {
+    const { error: upErr } = await supabase
+      .from('invite_codes')
+      .update({ code })
+      .eq('account_id', accountId);
+    if (upErr) {
+      if (isMissingRelation(upErr)) return { ok: false, reason: 'unavailable' };
+      throw new Error(`invite code update failed: ${upErr.message}`);
     }
-    if (reserved) continue;
-
-    const { error: insErr } = await supabase.from('invite_codes').insert({
-      account_id: accountId,
-      code,
-    });
-    if (!insErr) return { ok: true, code, created: true };
-    if (isMissingRelation(insErr)) return { ok: false, reason: 'unavailable' };
-    if (String(insErr.code) === '23505') continue;
-    throw new Error(`invite code insert failed: ${insErr.message}`);
+    return { ok: true, code, created: false };
   }
 
-  return { ok: false, reason: 'exhausted' };
+  const { error: insErr } = await supabase.from('invite_codes').insert({
+    account_id: accountId,
+    code,
+  });
+  if (insErr) {
+    if (isMissingRelation(insErr)) return { ok: false, reason: 'unavailable' };
+    if (String(insErr.code) === '23505') return { ok: true, code, created: false };
+    throw new Error(`invite code insert failed: ${insErr.message}`);
+  }
+  return { ok: true, code, created: true };
+}
+
+export async function resolveInviterByRef(
+  supabase: InviteClient,
+  slug: unknown
+): Promise<{ account_id: string; code: string } | null> {
+  const ref = normalizeInviteCode(slug);
+  if (!isInviteCodeFormat(ref)) return null;
+
+  const { data: byCode, error: codeErr } = await supabase
+    .from('invite_codes')
+    .select('account_id, code')
+    .eq('code', ref)
+    .maybeSingle();
+  if (codeErr && !isMissingRelation(codeErr)) {
+    throw new Error(`invite ref lookup failed: ${codeErr.message}`);
+  }
+  if (byCode?.account_id) return byCode;
+
+  const { data: byName, error: nameErr } = await supabase
+    .from('accounts')
+    .select('id, username')
+    .eq('username', ref)
+    .maybeSingle();
+  if (nameErr && !isMissingRelation(nameErr)) {
+    throw new Error(`invite username lookup failed: ${nameErr.message}`);
+  }
+  if (byName?.id) return { account_id: byName.id, code: normalizeInviteCode(byName.username) };
+  return null;
 }
 
 export async function attributeSignup(
@@ -225,14 +285,14 @@ export async function attributeSignup(
   }
   if (existing) return { ok: true, attributed: false, reason: 'already' };
 
-  const { data: owned, error: codeErr } = await supabase
-    .from('invite_codes')
-    .select('account_id, code')
-    .eq('code', slug)
-    .maybeSingle();
-  if (codeErr) {
-    if (isMissingRelation(codeErr)) return { ok: true, attributed: false, reason: 'unavailable' };
-    throw new Error(`invite code lookup failed: ${codeErr.message}`);
+  let owned;
+  try {
+    owned = await resolveInviterByRef(supabase, slug);
+  } catch (err) {
+    if (isMissingRelation(err instanceof Error ? err : null)) {
+      return { ok: true, attributed: false, reason: 'unavailable' };
+    }
+    throw err;
   }
   if (!owned?.account_id) return { ok: true, attributed: false, reason: 'unknown_code' };
   if (owned.account_id === p.inviteeAccountId) {

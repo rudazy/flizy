@@ -16,6 +16,7 @@ import {
   validateUsername,
 } from '../../../../lib/username';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { ensureInviteCode } from '../../../../lib/invite.ts';
 
 const ROUTE = 'POST /api/account/username';
 
@@ -88,6 +89,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: USERNAME_UNAVAILABLE }, { status: 409 });
       }
       return NextResponse.json(apiErrorBody(ROUTE, error), { status: 500 });
+    }
+
+    try {
+      await ensureInviteCode(supabase, accountId);
+    } catch (err) {
+      console.warn('[username] invite ref:', err instanceof Error ? err.message : err);
     }
 
     return NextResponse.json({ account: toPublicAccount(updated) });

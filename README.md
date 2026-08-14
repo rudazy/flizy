@@ -217,7 +217,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  S["Home: copy flizy.app/i/CODE"] --> J["Friend signs up through the link"]
+  S["Home: copy flizy.app/i/username"] --> J["Friend signs up through the link"]
   J --> O["Email verified + username set"]
   O --> P["Verified phone on WhatsApp or Telegram"]
   P --> T["First qualifying transfer or claim"]
@@ -276,8 +276,8 @@ Bare `confirm` and `cancel` work on both.
 | [/signup](https://flizy.app/signup) · [/login](https://flizy.app/login) | Account |
 | [/dashboard](https://flizy.app/dashboard) | Wallet, invite link, history, approved destinations, PIN, chat link codes |
 | [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap and liquidity |
-| `/i/[code]` | Personal invite. Sets attribution, then signup |
-| `/claim/[token]` | Public claim status. May carry an invite if the sender opted in |
+| `/i/[username]` | Personal invite. Sets attribution, then signup |
+| `/claim/[token]/[username]` | Public claim. Trailing username is the invite when the sender opted in |
 
 Swapping is available in chat and on the site. The protocol fee is **0.30%** by default with
 a hard maximum of 1%, on top of the standard pool fee, and it is shown in the plan before

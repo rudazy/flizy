@@ -7,7 +7,7 @@ import { deriveAgentAddress } from '../../../../lib/agentWallet';
 import { toPublicAccount } from '../../../../lib/publicAccount';
 import { normalizeLocale } from '../../../../lib/locale';
 import { apiErrorBody } from '../../../../lib/apiError';
-import { attributeSignup } from '../../../../lib/invite.ts';
+import { attributeSignup, resolveSignupInvite } from '../../../../lib/invite.ts';
 import { readInviteCookie, readInviteSource } from '../../../../lib/inviteCookie.ts';
 
 const ROUTE = 'POST /api/auth/signup';
@@ -74,12 +74,13 @@ export async function POST(req: Request) {
     await createSession(data.id);
 
     try {
-      const inviteCode = readInviteCookie();
-      // Cookie is the only source. A body invite / inviterId is ignored.
+      const typed = body.inviteCode ?? body.invite ?? '';
+      const resolved = resolveSignupInvite(typed, readInviteCookie(), readInviteSource());
+      // Inviter id from the body is ignored. Only a public code is accepted.
       await attributeSignup(supabase, {
         inviteeAccountId: data.id,
-        code: inviteCode,
-        source: readInviteSource(),
+        code: resolved.code,
+        source: resolved.source,
       });
     } catch (err) {
       console.warn('[signup] attribution:', err instanceof Error ? err.message : err);

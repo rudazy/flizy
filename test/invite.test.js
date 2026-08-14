@@ -9,19 +9,17 @@ const assert = require('node:assert/strict');
 const { createFakeSupabase } = require('./helpers/fakeSupabase');
 
 const {
-  INVITE_CODE_LENGTH,
-  INVITE_CODE_ALPHABET,
   INVITE_COOKIE,
   INVITE_COOKIE_MAX_AGE_SEC,
   INVITE_SOURCE,
   INVITE_SOURCE_CLAIM,
   INVITE_EVENT,
   QUALIFYING_KINDS,
-  generateInviteCode,
   normalizeInviteCode,
+  extractInviteCode,
+  resolveSignupInvite,
   isInviteCodeFormat,
   isQualifyingFirstTx,
-  reservedKey,
   ensureInviteCode,
   attributeSignup,
   maybeMarkOnboarded,
@@ -74,26 +72,33 @@ async function issueFor(fake, accountId) {
   return issued.code;
 }
 
-describe('invite code shape', () => {
-  it('is 10 lowercase Crockford characters, 50 bits', () => {
-    assert.equal(INVITE_CODE_ALPHABET.length, 32);
-    assert.equal(INVITE_CODE_LENGTH, 10);
-    assert.equal(INVITE_CODE_LENGTH * Math.log2(INVITE_CODE_ALPHABET.length), 50);
-    for (let i = 0; i < 200; i += 1) {
-      const code = generateInviteCode();
-      assert.equal(code, code.toLowerCase());
-      assert.ok(isInviteCodeFormat(code), code);
-    }
+describe('invite refs are usernames', () => {
+  it('accepts a Flizy username and rejects a random slug', () => {
+    assert.equal(isInviteCodeFormat('ludarep'), true);
+    assert.equal(isInviteCodeFormat('alice'), true);
+    assert.equal(isInviteCodeFormat('2h2zmbbtbd'), false);
+    assert.equal(isInviteCodeFormat('ab'), false);
   });
 
-  it('normalizes incoming codes to lowercase', () => {
-    assert.equal(normalizeInviteCode('  ABCDEFGHJK '), 'abcdefghjk');
+  it('normalizes @ and case', () => {
+    assert.equal(normalizeInviteCode('  @Alice '), 'alice');
   });
 
-  it('does not treat a reserved-looking draw as issuable without a reroll path', async () => {
-    const fake = seed();
-    const code = await issueFor(fake, INVITER);
-    assert.notEqual(reservedKey(code), 'suport');
+  it('extracts a username from a slug, /i/ path, or claim path', () => {
+    assert.equal(extractInviteCode('ludarep'), 'ludarep');
+    assert.equal(extractInviteCode('@ludarep'), 'ludarep');
+    assert.equal(extractInviteCode('https://flizy.app/i/ludarep'), 'ludarep');
+    assert.equal(extractInviteCode('/i/ludarep'), 'ludarep');
+    assert.equal(extractInviteCode('https://flizy.app/claim/tok/ludarep'), 'ludarep');
+  });
+
+  it('lets a typed signup username beat the cookie', () => {
+    const typed = resolveSignupInvite('ludarep', 'alice', INVITE_SOURCE_CLAIM);
+    assert.deepEqual(typed, { code: 'ludarep', source: INVITE_SOURCE });
+    const cookie = resolveSignupInvite('', 'alice', INVITE_SOURCE_CLAIM);
+    assert.deepEqual(cookie, { code: 'alice', source: INVITE_SOURCE_CLAIM });
+    const empty = resolveSignupInvite('not-a-code', null);
+    assert.equal(empty.code, null);
   });
 });
 
@@ -436,14 +441,24 @@ describe('web mirror agrees on the predicates', () => {
     web = await import('../web/lib/invite.ts');
   });
 
-  it('shares code charset, cookie name and qualifying kinds', () => {
-    assert.equal(web.INVITE_CODE_ALPHABET, INVITE_CODE_ALPHABET);
-    assert.equal(web.INVITE_CODE_LENGTH, INVITE_CODE_LENGTH);
+  it('shares username refs, cookie name and qualifying kinds', () => {
     assert.equal(web.INVITE_COOKIE, INVITE_COOKIE);
     assert.equal(web.INVITE_COOKIE_MAX_AGE_SEC, INVITE_COOKIE_MAX_AGE_SEC);
     assert.equal(web.INVITE_SOURCE, INVITE_SOURCE);
     assert.equal(web.INVITE_SOURCE_CLAIM, INVITE_SOURCE_CLAIM);
     assert.equal(web.INVITE_COOKIE_SRC, 'flizy_invite_src');
+    assert.equal(
+      web.extractInviteCode('https://flizy.app/i/ludarep'),
+      extractInviteCode('https://flizy.app/i/ludarep')
+    );
+    assert.equal(
+      web.extractInviteCode('https://flizy.app/claim/tok/ludarep'),
+      extractInviteCode('https://flizy.app/claim/tok/ludarep')
+    );
+    assert.deepEqual(
+      web.resolveSignupInvite('ludarep', 'alice', INVITE_SOURCE_CLAIM),
+      resolveSignupInvite('ludarep', 'alice', INVITE_SOURCE_CLAIM)
+    );
     assert.deepEqual({ ...web.QUALIFYING_KINDS }, { ...QUALIFYING_KINDS });
   });
 

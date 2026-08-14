@@ -18,8 +18,8 @@ testnet with source-verified contracts.
 - https://flizy.app/dashboard : Wallet, personal invite link, PIN, trusted people, chat link code
 - https://flizy.app/dashboard/wallet : Flizy wallet address and fund steps
 - https://flizy.app/dashboard/swap : Swap FLZ and ETH, add or remove liquidity
-- https://flizy.app/i/:code : Personal invite. Attributes a new signup to the inviter
-- https://flizy.app/claim/:token : Claim funds reserved for a phone, email, or platform. May carry an invite
+- https://flizy.app/i/:username : Personal invite. Attributes a new signup to that @username
+- https://flizy.app/claim/:token/:username : Claim funds. Trailing username is the invite when attached
 - https://faucet.giwa.io : Official GIWA testnet faucet — paste Flizy wallet address to receive test ETH
 - https://x.com/Flizyapp : Official X account
 

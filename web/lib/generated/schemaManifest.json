@@ -108,7 +108,7 @@
       "kind": "table",
       "name": "invite_codes",
       "providedBy": "20260813000000_invite_attribution.sql",
-      "requiredBy": "web/app/i/[code]/route.ts, web/lib/invite.ts"
+      "requiredBy": "web/lib/invite.ts"
     },
     {
       "kind": "table",

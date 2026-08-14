@@ -227,8 +227,10 @@ export default function DocsPage() {
       <section id="invites" className="space-y-4">
         <h2 className="font-sans text-xl tracking-wide text-paper">Invites</h2>
         <p className="text-base leading-relaxed text-muted">
-          Every account with a username gets a personal invite link on Home. Copy it and share it.
-          The link is yours alone. It does not move money.
+          Every account with a username gets a personal invite link on Home:
+          <span className="text-paper"> flizy.app/i/yourname</span>. Copy it and share it.
+          The link is yours alone. It does not move money. Claims you send with invite
+          attached end the same way: <span className="text-paper">/claim/…/yourname</span>.
         </p>
         <p className="text-base leading-relaxed text-muted">
           An invite counts once, when the person who used your link has done all of these:

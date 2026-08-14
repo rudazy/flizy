@@ -26,11 +26,15 @@ export function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setNext(safeNext(new URLSearchParams(window.location.search).get('next')));
+    const q = new URLSearchParams(window.location.search);
+    setNext(safeNext(q.get('next')));
+    const fromQuery = q.get('invite') || q.get('i') || '';
+    if (fromQuery) setInviteCode(fromQuery);
   }, []);
 
   const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
@@ -58,6 +62,7 @@ export function SignupForm() {
           email,
           password,
           locale,
+          inviteCode,
         }),
       });
       const data = await res.json();
@@ -142,6 +147,24 @@ export function SignupForm() {
           problem={mismatch ? 'Passwords do not match yet.' : undefined}
           hint="Both entries must match exactly."
         />
+        <div>
+          <label className="label" htmlFor="invite-code">
+            Invite <span className="font-normal text-muted">(optional)</span>
+          </label>
+          <input
+            id="invite-code"
+            className="input font-mono"
+            type="text"
+            inputMode="text"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="@username"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
         {error ? <div className="alert alert-error">{error}</div> : null}
         <button className="btn btn-primary w-full" type="submit" disabled={loading || mismatch}>
           {loading ? t('auth.signup.submitting') : 'Continue'}

@@ -137,11 +137,12 @@ Two rules do the heavy lifting:
 - Agent wallets are derived once per account (v2: HMAC-SHA256 of the account id under
   `WALLET_DERIVATION_SECRET`, then keccak256). They are never rotated, so the site and every
   chat client always show the same address.
-- Invites: `invite_codes` is one unguessable slug per account. Attribution is set once on
-  signup from an httpOnly cookie (invite link or an opted-in claim). A count is written by
-  `try_count_invite` only after onboarding, a currently bound verified phone, and a
-  qualifying first tx. `invite_phone_claims` remembers that E.164 forever so unlink cannot
-  recycle a SIM for a second credit. FZ001 still only governs live binds.
+- Invites: the public ref is the Flizy `@username` (`/i/ludarep`, and
+  `/claim/{token}/ludarep` when attach is on). Attribution is set once on signup from
+  an httpOnly cookie or a typed username. A count is written by `try_count_invite` only
+  after onboarding, a currently bound verified phone, and a qualifying first tx.
+  `invite_phone_claims` remembers that E.164 forever so unlink cannot recycle a SIM for
+  a second credit. FZ001 still only governs live binds.
 
 ---
 
