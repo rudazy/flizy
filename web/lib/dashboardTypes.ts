@@ -47,6 +47,13 @@ export type DashboardData = {
     counted: number;
     attachOnClaims: boolean;
   } | null;
+  /** Short pay code + /pay/{code} URL. Present after username is set. */
+  pay?: {
+    code: string;
+    url: string;
+    username: string | null;
+    displayName?: string | null;
+  } | null;
 };
 
 /** Legacy transfer row shape */

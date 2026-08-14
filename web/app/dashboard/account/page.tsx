@@ -14,10 +14,12 @@ import { useDashboard } from '../../../components/DashboardProvider';
 import { LanguageSelect, useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { shortAddr } from '../../../lib/dashboardTypes';
+import { PayIdentity } from '../../../components/PayIdentity';
 import type { LocaleCode } from '../../../lib/locale';
 
 const SLIDES = [
   'profile',
+  'pay',
   'language',
   'chat',
   'platforms',
@@ -337,6 +339,7 @@ export default function AccountPage() {
       label: t('account.profile'),
       badge: data.account.username ? `@${data.account.username}` : undefined,
     },
+    { id: 'pay', label: 'Pay me', badge: data.pay?.username ? `@${data.pay.username}` : undefined },
     { id: 'language', label: t('account.language') },
     { id: 'chat', label: 'Chat', badge: data.link ? undefined : '!' },
     { id: 'platforms', label: 'Platforms' },
@@ -665,6 +668,25 @@ export default function AccountPage() {
               </div>
             ) : null}
           </div>
+        </AppSection>
+      ) : null}
+
+      {slide === 'pay' ? (
+        <AppSection
+          title="Pay me"
+          helper="Print the QR with your name under it. A scan or that @username opens Flizy pay."
+        >
+          {data.pay ? (
+            <PayIdentity
+              url={data.pay.url}
+              username={data.pay.username}
+              displayName={data.pay.displayName || data.account.display_name}
+            />
+          ) : (
+            <p className="text-sm text-muted">
+              Set a username on Profile first. Your pay code is issued then.
+            </p>
+          )}
         </AppSection>
       ) : null}
 

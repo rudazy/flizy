@@ -66,6 +66,12 @@ class Query {
     return this;
   }
 
+  ilike(col, value) {
+    const needle = String(value ?? '').toLowerCase();
+    this.filters.push((r) => String(r[col] ?? '').toLowerCase() === needle);
+    return this;
+  }
+
   /**
    * Range filters. Numbers compare numerically, everything else as strings,
    * which is the right answer for the ISO timestamps these are used on.

@@ -50,7 +50,8 @@ approved list, the same history. Link either one, or both, from the dashboard.
 
 | | WhatsApp | Telegram |
 | --- | --- | --- |
-| Send | `flizy send 0.01 to john` | `/send 0.01 to john` |
+| Send to a saved name | `flizy send 0.01 to john` | `/send 0.01 to john` |
+| Pay a Flizy account | `flizy pay 0.01 to @ludarep` | `/pay 0.01 to @ludarep` |
 | Confirm | reply `confirm` | tap Confirm, or type it |
 | Receive to your number | automatic once linked | share your number once with `/phone` |
 | Lock this device | `flizy lock` | `/lock` |
@@ -73,9 +74,15 @@ third channel is an adapter, not a second product.
 3. **Link your chat app.** Generate a one-time code, open WhatsApp or Telegram from the
    dashboard, send the code. Only a logged-in account holder can produce a code, which is
    what makes it proof of identity. Telegram also asks you to share your number once.
-4. **Pay from chat.** `flizy send 0.01 to john`. Flizy replies with a plan showing amount,
-   destination, network and fees. Nothing moves until you confirm.
+4. **Pay from chat.** `flizy send 0.01 to john` for a name you already saved, or
+   `flizy pay 0.01 to @ludarep` for a Flizy account. Flizy replies with a plan showing
+   amount, destination, network and fees. Nothing moves until you confirm.
 5. **Get a receipt** with an explorer link.
+
+Every account also has a **Pay me** card: a QR with your `@username` under it. A scan or
+that name opens [flizy.app/pay/username](https://flizy.app/pay/ludarep). The first time you
+pay someone, Flizy says so before you confirm. After the payment lands, it offers to save
+them so the next send is just their name.
 
 You can also send to a **phone number, email, or platform handle** (GitHub, Discord, X,
 Telegram). Funds go into escrow and you can cancel any time until they are claimed. If that
@@ -94,7 +101,8 @@ never messaged out of the blue.
 
 | Control | What it does |
 | --- | --- |
-| **Approved destinations** | Transfers reach addresses on your list only. The list is managed on the site behind your password, never from chat |
+| **Approved destinations** | Named address sends reach your trusted list only. The list is managed on the site behind your password, never from chat |
+| **Pay by identity** | A Flizy `@username`, pay code, or scanned QR can be paid with confirm. First payment is flagged. After success you can save them as a trusted contact |
 | **Plan then confirm** | Every money action shows a plan first. Amount, destination, network, fees. Nothing executes without an explicit confirm |
 | **Fees disclosed up front** | Swap plans show the protocol fee percentage, the fee amount and slippage before you confirm |
 | **Per-channel lock** | Lock a chat app instantly. Unlocking needs your PIN or account password, and wrong attempts start blocking unlock for longer and longer. Setting a new PIN on the site, behind your password, clears the block |
@@ -158,7 +166,7 @@ flowchart TB
   subgraph clients["Clients"]
     WA["WhatsApp"]
     TG["Telegram"]
-    WEB["flizy.app<br/>dashboard · PIN · trusted · invite"]
+    WEB["flizy.app<br/>dashboard · PIN · trusted · invite · pay QR"]
   end
 
   subgraph engine["Flizy engine"]
@@ -197,6 +205,19 @@ flowchart LR
   E --> F["You confirm"]
   F --> G["Signed and broadcast"]
   G --> H["Receipt on explorer"]
+```
+
+### Paying a Flizy account
+
+```mermaid
+flowchart LR
+  A["Chat: pay 0.01 to @name<br/>or scan their QR"] --> B["Resolve to their agent wallet"]
+  B --> C{"Paid them before?"}
+  C -->|no| D["First-payment warning"]
+  C -->|yes| E["Plan, then confirm"]
+  D --> E
+  E --> F["Receipt"]
+  F --> G["Save as trusted contact, or skip"]
 ```
 
 ### Sending to a phone, email, or platform

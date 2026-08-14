@@ -320,3 +320,17 @@ textarea {
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(224, 184, 74, 0.25), transparent);
 }
+
+@media print {
+  header,
+  nav,
+  footer,
+  .app-bottom-nav,
+  .alert {
+    display: none !important;
+  }
+
+  .pay-print {
+    color: #0a0a0a;
+  }
+}

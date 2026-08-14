@@ -163,6 +163,29 @@ describe('buildSendPlan + preview', () => {
     assert.match(preview, /Transfer plan/);
     assert.match(preview, /confirm/i);
     assert.match(preview, /john/i);
+    assert.equal(preview.includes('First payment'), false);
+  });
+
+  it('warns on a first payment to someone new', () => {
+    const intent = createSendIntent({
+      actor: baseActor(),
+      amountEth: '0.01',
+      toAddress: OTHER,
+      toLabel: '@merchant',
+    });
+    const plan = buildSendPlan({
+      intent,
+      policy: { decision: 'ALLOW_WITH_CONFIRM', checks: { trustedEnforced: false } },
+      chain: { chainId: 91342, chainName: 'GIWA Sepolia', nativeSymbol: 'ETH' },
+      fromAddress: '0x3333333333333333333333333333333333333333',
+      fromBalanceEth: '1.0',
+      firstPay: true,
+      offerSave: true,
+    });
+    const preview = formatPlanPreview(plan);
+    assert.match(preview, /First payment\. You have not paid this person before\./);
+    assert.equal(plan.input.firstPay, true);
+    assert.equal(plan.input.offerSave, true);
   });
 
   it('assertPlanFunded rejects low balance', () => {

@@ -7,6 +7,7 @@ import { toPublicAccount } from '../../../lib/publicAccount';
 import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
 import { apiErrorBody } from '../../../lib/apiError';
 import { getInviteSummary } from '../../../lib/invite.ts';
+import { getPaySummary } from '../../../lib/payCode.ts';
 
 const ROUTE = 'GET /api/dashboard';
 
@@ -111,12 +112,27 @@ export async function GET() {
       }
     }
 
+    let pay: {
+      code: string;
+      url: string;
+      username: string | null;
+      displayName: string | null;
+    } | null = null;
+    if (account.username) {
+      try {
+        pay = await getPaySummary(supabase, accountId, getSiteConfig().siteUrl);
+      } catch (err) {
+        console.warn('[dashboard] pay summary', err);
+      }
+    }
+
     return NextResponse.json({
       account: toPublicAccount(account),
       trusted,
       link,
       pendingClaims,
       invite,
+      pay,
     });
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });

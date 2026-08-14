@@ -17,6 +17,7 @@ import {
 } from '../../../../lib/username';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { ensureInviteCode } from '../../../../lib/invite.ts';
+import { ensurePayCode } from '../../../../lib/payCode.ts';
 
 const ROUTE = 'POST /api/account/username';
 
@@ -95,6 +96,11 @@ export async function POST(req: Request) {
       await ensureInviteCode(supabase, accountId);
     } catch (err) {
       console.warn('[username] invite ref:', err instanceof Error ? err.message : err);
+    }
+    try {
+      await ensurePayCode(supabase, accountId);
+    } catch (err) {
+      console.warn('[username] pay code:', err instanceof Error ? err.message : err);
     }
 
     return NextResponse.json({ account: toPublicAccount(updated) });

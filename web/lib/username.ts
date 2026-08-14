@@ -1,6 +1,7 @@
 /**
  * Flizy-native @username (web mirror of lib/username.js).
  *
+ * Recognition, invite, and public pay identity.
  * ASCII a-z / 0-9 only. No underscore. Not Hangul/Han (use display_name).
  * Change at most once every 30 days. Reserved names live in the DB, matched
  * on reservedKey. Keep in sync with bot; tests cover drift.

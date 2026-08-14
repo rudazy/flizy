@@ -78,7 +78,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/engine/executeTransfer.js, lib/identity.js, lib/invite.js, lib/router.js, lib/session.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/engine/executeTransfer.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/router.js, lib/session.js"
     },
     {
       "kind": "table",
@@ -151,6 +151,12 @@
       "name": "notifications",
       "providedBy": "20260725110000_notifications_outbox.sql",
       "requiredBy": "lib/notify.js"
+    },
+    {
+      "kind": "table",
+      "name": "pay_codes",
+      "providedBy": "20260816000000_pay_codes.sql",
+      "requiredBy": "lib/payCode.js"
     },
     {
       "kind": "table",

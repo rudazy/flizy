@@ -13,6 +13,7 @@ Flizy is a WhatsApp + web system for sending crypto only to trusted destinations
 - https://flizy.app/docs : Trusted destinations, invite counting rules
 - https://flizy.app/terms : Terms of service
 - https://flizy.app/privacy : Privacy policy, including TikTok user.info.basic
+- https://flizy.app/pay/:code : Pay a Flizy account by username or printed code. First payment is flagged; after success you can save them as a trusted contact.
 - https://flizy.app/signup : Create account (email + verification code + username)
 - https://flizy.app/login : Sign in
 - https://flizy.app/dashboard : Agent wallet, invite link, PIN, trusted people, chat link code

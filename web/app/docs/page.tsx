@@ -33,6 +33,21 @@ const CMD_GROUPS: Array<{
         meaning: 'Same thing — name first also works, with send, pay, transfer or give',
       },
       {
+        wa: 'flizy pay 0.01 to @ludarep',
+        tg: '/pay 0.01 to @ludarep',
+        meaning: 'Pay a Flizy account by @username (same as scanning their QR)',
+      },
+      {
+        wa: 'flizy pay 0.01 for coffee',
+        tg: '/pay 0.01 for coffee',
+        meaning: 'Then send their @username or the code under their QR, then confirm',
+      },
+      {
+        wa: 'save',
+        tg: 'save',
+        meaning: 'After a first Flizy pay succeeds, save that person as a trusted contact (or skip)',
+      },
+      {
         wa: 'flizy send 0.01 to 2348012345678',
         tg: '/send 0.01 to 2348012345678',
         meaning: 'Hold for a phone until they claim (you can cancel until then)',
@@ -247,6 +262,12 @@ export default function DocsPage() {
           Only a failed on-chain receipt is ignored. One phone can only produce one credit,
           even if they unlink and join again. Credit is a recorded number. It is not spendable
           yet.
+        </p>
+        <p className="text-base leading-relaxed text-muted">
+          Account → Pay me is a QR with your @username under it. A scan or that name
+          opens pay. Display name shows if you set one. The first time you pay someone,
+          Flizy says so before you confirm. After the payment lands, it offers to save
+          them so the next send is just their name.
         </p>
         <p className="text-base leading-relaxed text-muted">
           Home has an optional <span className="text-paper">Attach to claims I send</span> checkbox.

@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { track } from '../../../lib/analytics';
+import { CopyButton } from '../../../components/CopyButton';
+import { claimSharePath, claimShareText, telegramShareHref } from '../../../lib/claimShare.ts';
 
 type ClaimView = {
   amount_eth?: string;
@@ -19,6 +21,8 @@ type ClaimView = {
 export default function ClaimPage() {
   const params = useParams();
   const token = String(params.token || '');
+  const inviteRef = String(params.ref || '');
+  const [origin, setOrigin] = useState('');
   const [data, setData] = useState<ClaimView | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -38,6 +42,20 @@ export default function ClaimPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  const shareUrl = useMemo(() => {
+    const path = claimSharePath(token, inviteRef);
+    if (!path || !origin) return '';
+    return `${origin}${path}`;
+  }, [origin, token, inviteRef]);
+
+  const tgShare = shareUrl
+    ? telegramShareHref(shareUrl, claimShareText(shareUrl, data?.amount_eth))
+    : '';
 
   useEffect(() => {
     fetch('/api/dashboard')
@@ -108,6 +126,25 @@ export default function ClaimPage() {
                 </span>
               ) : null}
             </p>
+          ) : null}
+
+          {pending && shareUrl ? (
+            <div className="space-y-2 border-t border-border pt-4">
+              <p className="break-all font-mono text-xs text-paper">{shareUrl}</p>
+              <div className="flex flex-wrap gap-2">
+                <CopyButton value={shareUrl} label="Copy link" />
+                {tgShare ? (
+                  <a
+                    href={tgShare}
+                    className="btn btn-ghost text-sm no-underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Share on Telegram
+                  </a>
+                ) : null}
+              </div>
+            </div>
           ) : null}
 
           {data.carries_invite && pending ? (

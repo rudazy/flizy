@@ -115,6 +115,15 @@ describe('parseSendCommand platforms', () => {
     assert.equal(a.toRaw, 'john');
   });
 
+  it('parses a Flizy @username and a digit-leading pay code', () => {
+    const u = parseSendCommand('send 0.01 to @ludarep');
+    assert.equal(u.toRaw, 'ludarep');
+    assert.equal(u.platform, null);
+    const c = parseSendCommand('send 0.01 to 2K3M9Q');
+    assert.ok(c);
+    assert.equal(c.toRaw.toUpperCase(), '2K3M9Q');
+  });
+
   it('does not treat github alone as platform', () => {
     const a = parseSendCommand('send 0.01 to github');
     assert.equal(a.platform, null);
