@@ -12,6 +12,8 @@ import {
   explorerTxUrl,
 } from '../../../../lib/dexServer';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { getSupabase } from '../../../../lib/supabase';
+import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 
 const ROUTE_GET = 'GET /api/swap/liquidity';
 const ROUTE_POST = 'POST /api/swap/liquidity';
@@ -99,6 +101,20 @@ export async function POST(req: Request) {
         recipient: signer.address,
       });
 
+      try {
+        await maybeMarkFirstTx(getSupabase(), {
+          accountId,
+          kind: 'remove_liquidity',
+          amount: ethers.formatEther(liquidityWei),
+          ok: true,
+        });
+      } catch (hookErr) {
+        console.warn(
+          '[invite] first tx hook:',
+          hookErr instanceof Error ? hookErr.message : hookErr
+        );
+      }
+
       return NextResponse.json({
         ok: true,
         action: 'remove',
@@ -137,6 +153,20 @@ export async function POST(req: Request) {
       amountEthMin,
       recipient: signer.address,
     });
+
+    try {
+      await maybeMarkFirstTx(getSupabase(), {
+        accountId,
+        kind: 'add_liquidity',
+        amount: amountEth,
+        ok: true,
+      });
+    } catch (hookErr) {
+      console.warn(
+        '[invite] first tx hook:',
+        hookErr instanceof Error ? hookErr.message : hookErr
+      );
+    }
 
     return NextResponse.json({
       ok: true,

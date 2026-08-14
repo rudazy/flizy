@@ -99,6 +99,7 @@ export async function GET() {
     let invite: {
       code: string;
       url: string;
+      attributed: number;
       counted: number;
       attachOnClaims: boolean;
     } | null = null;

@@ -233,17 +233,19 @@ export default function DocsPage() {
           attached end the same way: <span className="text-paper">/claim/…/yourname</span>.
         </p>
         <p className="text-base leading-relaxed text-muted">
-          An invite counts once, when the person who used your link has done all of these:
+          Home shows two numbers. Used your link goes up when they create an account through
+          your invite. Credit at the top goes up by one only after they finish all of these:
         </p>
         <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
           <li>Signed up through your invite link (or a claim you sent with invite attached)</li>
           <li>Verified their email and set a Flizy username</li>
           <li>Bound a verified phone on WhatsApp or Telegram</li>
-          <li>Completed a transfer (claiming a hold they received counts)</li>
+          <li>Completed any confirmed Flizy tx (claim, send, buy, swap, add or remove liquidity)</li>
         </ul>
         <p className="text-base leading-relaxed text-muted">
-          One phone can only produce one counted invite, even if they unlink and join again. A
-          count is a recorded number. It is not spendable yet.
+          Only a failed on-chain receipt is ignored. One phone can only produce one credit,
+          even if they unlink and join again. Credit is a recorded number. It is not spendable
+          yet.
         </p>
         <p className="text-base leading-relaxed text-muted">
           Home has an optional <span className="text-paper">Attach to claims I send</span> checkbox.

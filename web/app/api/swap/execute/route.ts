@@ -13,6 +13,7 @@ import {
   assertSwapAllowed,
 } from '../../../../lib/dexServer';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 
 const ROUTE = 'POST /api/swap/execute';
 
@@ -122,6 +123,21 @@ export async function POST(req: Request) {
           .from('transfers')
           .update({ status: 'confirmed', tx_hash: result.txHash })
           .eq('id', logRow.id);
+      }
+
+      try {
+        const kind = side === 'buy' || side === 'sell' ? side : 'swap';
+        await maybeMarkFirstTx(supabase, {
+          accountId,
+          kind,
+          amount,
+          ok: true,
+        });
+      } catch (hookErr) {
+        console.warn(
+          '[invite] first tx hook:',
+          hookErr instanceof Error ? hookErr.message : hookErr
+        );
       }
 
       const feePct = `${(quote.feeBps / 100).toFixed(2)}%`;

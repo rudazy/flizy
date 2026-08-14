@@ -94,7 +94,8 @@ export default function DashboardHomePage() {
   if (!data) return null;
 
   const nativeBal = holdings?.holdings?.native;
-  const credit = data.account.balance_eth ?? 0;
+  const inviteCredit = data.invite?.counted ?? 0;
+  const inviteUsed = data.invite?.attributed ?? 0;
   const openSetup = checklist.filter((c) => !c.done);
   const recent = (activity || []).slice(0, 5);
 
@@ -192,7 +193,7 @@ export default function DashboardHomePage() {
           }
           href="/dashboard/wallet?s=balances"
         />
-        <AppStatusCell label="Credit" value={String(credit)} href="/dashboard/wallet?s=balances" />
+        <AppStatusCell label="Credit" value={String(inviteCredit)} />
         <AppStatusCell
           label="Trusted"
           value={String(data.trusted.length)}
@@ -215,7 +216,21 @@ export default function DashboardHomePage() {
         <>
           {data.invite ? (
             <AppSection title="Invite">
-              <p className="break-all font-mono text-sm text-paper">{data.invite.url}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="font-sans text-3xl tracking-wide text-paper">{inviteUsed}</p>
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                    Used your link
+                  </p>
+                </div>
+                <div>
+                  <p className="font-sans text-3xl tracking-wide text-paper">{inviteCredit}</p>
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                    Credited
+                  </p>
+                </div>
+              </div>
+              <p className="mt-4 break-all font-mono text-sm text-paper">{data.invite.url}</p>
               <div className="mt-3">
                 <CopyButton value={data.invite.url} label="Copy link" />
               </div>

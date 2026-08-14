@@ -25,6 +25,7 @@ const {
   maybeMarkOnboarded,
   maybeMarkFirstTx,
   tryCountInviteLocal,
+  inviteStatsFor,
   countedInvitesFor,
   inviteCodeIfAttachEnabled,
   collectCountablePhones,
@@ -103,37 +104,22 @@ describe('invite refs are usernames', () => {
 });
 
 describe('qualifying first tx', () => {
-  it('accepts a successful claim payout or outbound send above zero', () => {
-    assert.equal(
-      isQualifyingFirstTx({
-        accountId: INVITEE,
-        kind: QUALIFYING_KINDS.CLAIM_PAYOUT,
-        amount: '0.01',
-        ok: true,
-      }),
-      true
-    );
-    assert.equal(
-      isQualifyingFirstTx({
-        accountId: INVITEE,
-        kind: QUALIFYING_KINDS.OUTBOUND_SEND,
-        amount: 0.02,
-        ok: true,
-      }),
-      true
-    );
-  });
-
-  it('rejects swap, failure, hold, zero, self-deal and own wallet', () => {
+  it('accepts any confirmed on-chain Flizy receipt, including send', () => {
     const base = { accountId: INVITEE, amount: 0.01, ok: true };
-    assert.equal(isQualifyingFirstTx({ ...base, kind: 'swap' }), false);
+    assert.equal(isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.CLAIM_PAYOUT }), true);
+    assert.equal(isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.OUTBOUND_SEND }), true);
+    assert.equal(isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.SWAP }), true);
+    assert.equal(isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.BUY }), true);
+    assert.equal(isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.SELL }), true);
+    assert.equal(isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.ADD_LIQUIDITY }), true);
+    assert.equal(isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.REMOVE_LIQUIDITY }), true);
     assert.equal(
-      isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.OUTBOUND_SEND, ok: false }),
-      false
-    );
-    assert.equal(
-      isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.CLAIM_PAYOUT, amount: 0 }),
-      false
+      isQualifyingFirstTx({
+        ...base,
+        kind: QUALIFYING_KINDS.OUTBOUND_SEND,
+        destinationIsOwnWallet: true,
+      }),
+      true
     );
     assert.equal(
       isQualifyingFirstTx({
@@ -141,17 +127,19 @@ describe('qualifying first tx', () => {
         kind: QUALIFYING_KINDS.CLAIM_PAYOUT,
         counterpartyAccountId: INVITEE,
       }),
-      false
+      true
     );
+  });
+
+  it('rejects only a failed receipt or a non-receipt', () => {
+    const base = { accountId: INVITEE, amount: 0.01, ok: true };
     assert.equal(
-      isQualifyingFirstTx({
-        ...base,
-        kind: QUALIFYING_KINDS.OUTBOUND_SEND,
-        destinationIsOwnWallet: true,
-      }),
+      isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.OUTBOUND_SEND, ok: false }),
       false
     );
+    assert.equal(isQualifyingFirstTx({ ...base, kind: QUALIFYING_KINDS.SWAP, ok: false }), false);
     assert.equal(isQualifyingFirstTx({ accountId: INVITEE, kind: 'claim_hold', amount: 1, ok: true }), false);
+    assert.equal(isQualifyingFirstTx({ kind: QUALIFYING_KINDS.OUTBOUND_SEND, ok: true }), false);
   });
 });
 
@@ -181,6 +169,9 @@ describe('attribution is set once', () => {
     assert.equal(fake.db.tables.invite_attributions[0].inviter_account_id, INVITER);
     assert.equal(fake.db.tables.invite_attributions[0].source, INVITE_SOURCE);
     assert.ok(fake.db.tables.invite_events.some((e) => e.event_type === INVITE_EVENT.ATTRIBUTED));
+    const stats = await inviteStatsFor(fake.client, INVITER);
+    assert.equal(stats.attributed, 1);
+    assert.equal(stats.counted, 0);
   });
 
   it('does not attribute a missing or unknown code', async () => {
@@ -467,7 +458,11 @@ describe('web mirror agrees on the predicates', () => {
       { accountId: 'a', kind: 'claim_payout', amount: 1, ok: true },
       { accountId: 'a', kind: 'outbound_send', amount: 1, ok: true, destinationIsOwnWallet: true },
       { accountId: 'a', kind: 'swap', amount: 1, ok: true },
+      { accountId: 'a', kind: 'buy', amount: 1, ok: true },
+      { accountId: 'a', kind: 'add_liquidity', amount: 1, ok: true },
+      { accountId: 'a', kind: 'remove_liquidity', amount: 1, ok: true },
       { accountId: 'a', kind: 'claim_payout', amount: 0, ok: true },
+      { accountId: 'a', kind: 'claim_hold', amount: 1, ok: true },
     ];
     for (const c of cases) {
       assert.equal(web.isQualifyingFirstTx(c), isQualifyingFirstTx(c));

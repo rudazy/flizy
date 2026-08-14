@@ -39,10 +39,11 @@ export type DashboardData = {
   } | null;
   /** Claims this account can receive after proving phone / platform identity */
   pendingClaims?: PendingClaimItem[];
-  /** Personal invite link. Present after username is set. Count is friends activated. */
+  /** Personal invite link. attributed = signed up via link; counted = verified credit. */
   invite?: {
     code: string;
     url: string;
+    attributed: number;
     counted: number;
     attachOnClaims: boolean;
   } | null;

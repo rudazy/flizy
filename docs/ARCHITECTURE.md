@@ -140,7 +140,9 @@ Two rules do the heavy lifting:
 - Invites: the public ref is the Flizy `@username` (`/i/ludarep`, and
   `/claim/{token}/ludarep` when attach is on). Attribution is set once on signup from
   an httpOnly cookie or a typed username. A count is written by `try_count_invite` only
-  after onboarding, a currently bound verified phone, and a qualifying first tx.
+  after onboarding, a currently bound verified phone, and a first confirmed
+  Flizy receipt (claim, send, buy, sell, swap, add or remove liquidity).
+  Home Credit is that counted number. Used-your-link is attributed signups.
   `invite_phone_claims` remembers that E.164 forever so unlink cannot recycle a SIM for
   a second credit. FZ001 still only governs live binds.
 
@@ -218,7 +220,7 @@ sequenceDiagram
   Site->>DB: invite_attributions source invite_link or claim_link
   F->>Site: Verify email · set username
   F->>Chat: Link WhatsApp or Telegram · prove phone
-  F->>Chat: Qualifying send or claim payout
+  F->>Chat: First on-chain tx (claim, send, buy, swap, LP)
   Chat->>DB: try_count_invite
   Note over DB: Burns current E.164 into invite_phone_claims<br/>unlink cannot undo that
 ```

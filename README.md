@@ -220,15 +220,17 @@ flowchart LR
   S["Home: copy flizy.app/i/username"] --> J["Friend signs up through the link"]
   J --> O["Email verified + username set"]
   O --> P["Verified phone on WhatsApp or Telegram"]
-  P --> T["First qualifying transfer or claim"]
-  T --> C["Invite counted once"]
+  P --> T["First confirmed tx (failed receipts out)"]
+  T --> C["Credit +1 at the top"]
+  J -.->|same moment| U["Used your link +1"]
   S -.->|optional| K["Attach invite to claims I send"]
   K --> E["Claim link carries the same invite"]
   E --> J
 ```
 
-A counted invite is a recorded number, not spendable credit. One verified phone can only
-produce one count, even after unlink. Detail: [docs#invites](https://flizy.app/docs#invites).
+Used-your-link moves when they sign up through your invite. Credit at the top is the
+verified count (phone + first confirmed tx). It is not spendable. One verified phone
+can only produce one credit, even after unlink. Detail: [docs#invites](https://flizy.app/docs#invites).
 
 ### Link once, use both chats
 

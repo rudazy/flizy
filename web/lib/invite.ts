@@ -38,7 +38,14 @@ export const INVITE_EVENT = Object.freeze({
 export const QUALIFYING_KINDS = Object.freeze({
   CLAIM_PAYOUT: 'claim_payout',
   OUTBOUND_SEND: 'outbound_send',
+  SWAP: 'swap',
+  BUY: 'buy',
+  SELL: 'sell',
+  ADD_LIQUIDITY: 'add_liquidity',
+  REMOVE_LIQUIDITY: 'remove_liquidity',
 });
+
+const QUALIFYING_KIND_SET = new Set<string>(Object.values(QUALIFYING_KINDS));
 
 // `from` returns any on purpose: a structural SupabaseClient check recurses
 // through PostgREST generics until tsc bails. Same reason as username.ts.
@@ -108,19 +115,7 @@ export function isQualifyingFirstTx(p: {
 }): boolean {
   if (!p || !p.accountId) return false;
   if (p.ok !== true) return false;
-  const amount = Number(p.amount);
-  if (!Number.isFinite(amount) || amount <= 0) return false;
-
-  if (p.kind === QUALIFYING_KINDS.CLAIM_PAYOUT) {
-    if (p.counterpartyAccountId && p.counterpartyAccountId === p.accountId) return false;
-    return true;
-  }
-  if (p.kind === QUALIFYING_KINDS.OUTBOUND_SEND) {
-    if (p.destinationIsOwnWallet) return false;
-    if (p.counterpartyAccountId && p.counterpartyAccountId === p.accountId) return false;
-    return true;
-  }
-  return false;
+  return QUALIFYING_KIND_SET.has(String(p.kind || ''));
 }
 
 function normalizePhoneNumber(raw: unknown): string {
@@ -559,17 +554,29 @@ export async function tryCountInvite(supabase: InviteClient, inviteeAccountId: s
   }
 }
 
-export async function countedInvitesFor(supabase: InviteClient, inviterAccountId: string) {
-  if (!inviterAccountId) return 0;
+export async function inviteStatsFor(
+  supabase: InviteClient,
+  inviterAccountId: string
+): Promise<{ attributed: number; counted: number }> {
+  if (!inviterAccountId) return { attributed: 0, counted: 0 };
   const { data, error } = await supabase
     .from('invite_attributions')
     .select('invitee_account_id, counted_at')
     .eq('inviter_account_id', inviterAccountId);
   if (error) {
-    if (isMissingRelation(error)) return 0;
+    if (isMissingRelation(error)) return { attributed: 0, counted: 0 };
     throw new Error(`invite count read failed: ${error.message}`);
   }
-  return (data || []).filter((row: { counted_at?: string | null }) => row.counted_at).length;
+  const rows = (data || []) as Array<{ counted_at?: string | null }>;
+  return {
+    attributed: rows.length,
+    counted: rows.filter((row) => row.counted_at).length,
+  };
+}
+
+export async function countedInvitesFor(supabase: InviteClient, inviterAccountId: string) {
+  const stats = await inviteStatsFor(supabase, inviterAccountId);
+  return stats.counted;
 }
 
 export async function inviteCodeIfAttachEnabled(
@@ -596,10 +603,16 @@ export async function getInviteSummary(
   supabase: InviteClient,
   accountId: string,
   siteUrl: string
-): Promise<{ code: string; url: string; counted: number; attachOnClaims: boolean } | null> {
+): Promise<{
+  code: string;
+  url: string;
+  attributed: number;
+  counted: number;
+  attachOnClaims: boolean;
+} | null> {
   const issued = await ensureInviteCode(supabase, accountId);
   if (!issued.ok) return null;
-  const counted = await countedInvitesFor(supabase, accountId);
+  const stats = await inviteStatsFor(supabase, accountId);
   const base = String(siteUrl || '').replace(/\/$/, '');
   let attachOnClaims = false;
   try {
@@ -615,7 +628,8 @@ export async function getInviteSummary(
   return {
     code: issued.code,
     url: base ? `${base}/i/${issued.code}` : `/i/${issued.code}`,
-    counted,
+    attributed: stats.attributed,
+    counted: stats.counted,
     attachOnClaims,
   };
 }
