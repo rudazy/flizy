@@ -18,6 +18,8 @@ export function LoginForm() {
   const [next, setNext] = useState('/dashboard');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [needsCode, setNeedsCode] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -33,10 +35,19 @@ export function LoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+          ...(needsCode && code ? { code } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
+      if (data.needsCode) {
+        setNeedsCode(true);
+        setCode('');
+        return;
+      }
       track('login_completed');
       router.push(next);
     } catch (err) {
@@ -91,10 +102,67 @@ export function LoginForm() {
             autoComplete="current-password"
           />
         </div>
+        {needsCode ? (
+          <div>
+            <label className="label" htmlFor="login-code">
+              Login code
+            </label>
+            <input
+              id="login-code"
+              className="input font-mono"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="6-digit code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              required
+            />
+            <p className="mt-1.5 text-xs text-muted">
+              We emailed a code because this is a new browser or it has been a while. It expires
+              in 15 minutes.
+            </p>
+          </div>
+        ) : null}
         {error ? <div className="alert alert-error">{error}</div> : null}
-        <button className="btn btn-primary w-full" type="submit" disabled={loading}>
-          {loading ? t('auth.login.submitting') : t('auth.login.submit')}
+        <button
+          className="btn btn-primary w-full"
+          type="submit"
+          disabled={loading || (needsCode && code.length !== 6)}
+        >
+          {loading
+            ? t('auth.login.submitting')
+            : needsCode
+              ? 'Verify and sign in'
+              : t('auth.login.submit')}
         </button>
+        {needsCode ? (
+          <button
+            type="button"
+            className="btn btn-ghost w-full text-sm"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              setError('');
+              try {
+                const res = await fetch('/api/auth/login', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email, password }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Could not send code');
+                setCode('');
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Could not send code');
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            Send a new code
+          </button>
+        ) : null}
         <p className="text-center text-sm text-muted">
           {t('auth.login.newHere')}{' '}
           <Link

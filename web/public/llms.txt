@@ -13,6 +13,8 @@ testnet with source-verified contracts.
 - https://flizy.app/ : Product home and four-step overview
 - https://flizy.app/how-it-works : Full user guide and commands for both chat apps
 - https://flizy.app/docs : Trusted destinations, invite counting rules
+- https://flizy.app/terms : Terms of service
+- https://flizy.app/privacy : Privacy policy, including TikTok user.info.basic
 - https://flizy.app/signup : Create account (email + verification code + username)
 - https://flizy.app/login : Sign in
 - https://flizy.app/dashboard : Wallet, personal invite link, PIN, trusted people, chat link code

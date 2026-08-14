@@ -20,7 +20,9 @@ export async function GET(
     return new NextResponse('Invite not found.', { status: 404 });
   }
 
-  const res = NextResponse.redirect(new URL('/signup', _req.url), 302);
+  const dest = new URL('/signup', _req.url);
+  dest.searchParams.set('i', owned.code);
+  const res = NextResponse.redirect(dest, 302);
   attachInviteCookie(res, owned.code);
   return res;
 }

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
 import { verifyPassword } from '../../../../lib/cryptoPin';
-import { createSession } from '../../../../lib/cookies';
+import { createSession, hasTrustedLoginDevice } from '../../../../lib/cookies';
 import { toPublicAccount } from '../../../../lib/publicAccount';
 import { apiErrorBody } from '../../../../lib/apiError';
+import {
+  consumeEmailVerificationCode,
+  issueEmailVerificationCode,
+} from '../../../../lib/emailVerify.ts';
 
 const ROUTE = 'POST /api/auth/login';
 
@@ -14,6 +18,7 @@ export async function POST(req: Request) {
       .trim()
       .toLowerCase();
     const password = String(body.password || '');
+    const code = String(body.code || '').replace(/\D/g, '');
 
     const supabase = getSupabase();
     const { data, error } = await supabase
@@ -31,6 +36,41 @@ export async function POST(req: Request) {
     // wrong: this one stays as written.
     if (!data?.password_hash || !verifyPassword(password, data.password_hash)) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+
+    const remembered = hasTrustedLoginDevice(data.id);
+    if (!remembered && !code) {
+      const issued = await issueEmailVerificationCode({
+        accountId: data.id,
+        email: data.email,
+        purpose: 'login',
+      });
+      if (!issued.ok) {
+        return NextResponse.json(
+          { error: issued.error, code: issued.code || 'LOGIN_CODE' },
+          { status: issued.status }
+        );
+      }
+      return NextResponse.json({
+        needsCode: true,
+        email: data.email,
+        ...(issued.devCode ? { devCode: issued.devCode } : {}),
+      });
+    }
+
+    if (!remembered && code) {
+      const consumed = await consumeEmailVerificationCode({
+        accountId: data.id,
+        email: data.email,
+        purpose: 'login',
+        code,
+      });
+      if (!consumed.ok) {
+        return NextResponse.json(
+          { error: consumed.error, code: consumed.code || 'LOGIN_CODE' },
+          { status: consumed.status }
+        );
+      }
     }
 
     await createSession(data.id);

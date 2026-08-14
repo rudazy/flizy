@@ -233,8 +233,9 @@ export default function DocsPage() {
           attached end the same way: <span className="text-paper">/claim/…/yourname</span>.
         </p>
         <p className="text-base leading-relaxed text-muted">
-          Home shows two numbers. Used your link goes up when they create an account through
-          your invite. Credit at the top goes up by one only after they finish all of these:
+          Home Credit is the verified invite count. Account → Profile lists Invite (used your
+          link) and Credit. Invite on Home is only the link. Credit goes up by one only after
+          they finish all of these:
         </p>
         <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
           <li>Signed up through your invite link (or a claim you sent with invite attached)</li>

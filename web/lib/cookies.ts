@@ -14,6 +14,12 @@
 import { cookies } from 'next/headers';
 import { createHash, randomBytes } from 'crypto';
 import { getSupabase } from './supabase';
+import {
+  LOGIN_DEVICE_COOKIE,
+  LOGIN_DEVICE_TTL_MS,
+  buildLoginDeviceValue,
+  loginDeviceMatches,
+} from './loginDevice.ts';
 
 const COOKIE = 'flizy_session';
 /** Cookie written by the pre-session build. Cleared on sight, never trusted. */
@@ -52,6 +58,20 @@ export async function createSession(accountId: string): Promise<void> {
     maxAge: Math.floor(SESSION_TTL_MS / 1000),
   });
   jar.set(LEGACY_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0 });
+  const device = buildLoginDeviceValue(accountId, Date.now());
+  if (device) {
+    jar.set(LOGIN_DEVICE_COOKIE, device, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: Math.floor(LOGIN_DEVICE_TTL_MS / 1000),
+    });
+  }
+}
+
+export function hasTrustedLoginDevice(accountId: string): boolean {
+  return loginDeviceMatches(cookies().get(LOGIN_DEVICE_COOKIE)?.value || '', accountId);
 }
 
 /**

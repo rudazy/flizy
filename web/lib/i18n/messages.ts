@@ -53,7 +53,7 @@ const en = {
   // Account profile / username / language
   'account.profile': 'Profile',
   'account.profileHelper':
-    'Email, display name (any language), and Flizy @username (letters and numbers only).',
+    'Email, extra addresses, invite and credit. Username is the last line.',
   'account.username': 'Username',
   'account.usernameHint':
     '3–24 characters, start with a letter, a–z and 0–9 only. Change at most once every 30 days.',
@@ -118,7 +118,7 @@ const ko: Record<MessageKey, string> = {
 
   'account.profile': '프로필',
   'account.profileHelper':
-    '이메일, 표시 이름(모든 언어), Flizy @username(영문·숫자만).',
+    '이메일, 추가 주소, 초대와 크레딧. 사용자 이름은 맨 아래 줄입니다.',
   'account.username': '사용자 이름',
   'account.usernameHint':
     '3–24자, 영문으로 시작, a–z·0–9만. 30일에 한 번만 변경할 수 있습니다.',
@@ -180,7 +180,7 @@ const zh: Record<MessageKey, string> = {
   'nav.swap': '兑换',
 
   'account.profile': '资料',
-  'account.profileHelper': '邮箱、显示名（任意语言）与 Flizy @username（仅字母数字）。',
+  'account.profileHelper': '邮箱、额外地址、邀请与积分。用户名在最后一行。',
   'account.username': '用户名',
   'account.usernameHint': '3–24 位，以字母开头，仅 a–z、0–9。每 30 天最多改一次。',
   'account.usernameCooldown': '可在 {date} 之后再次修改用户名。',

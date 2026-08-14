@@ -74,6 +74,7 @@ export default function AccountPage() {
   const [verifyTarget, setVerifyTarget] = useState<'primary' | string>('primary');
   const [addEmailOpen, setAddEmailOpen] = useState(false);
   const [addEmailStep, setAddEmailStep] = useState<'email' | 'code'>('email');
+  const [usernameOpen, setUsernameOpen] = useState(false);
 
   // Smart default slide when no ?s= — open the first thing that still needs work.
   const defaultSlide = useMemo((): SlideId => {
@@ -354,18 +355,13 @@ export default function AccountPage() {
 
       {/* One slide at a time — chips switch the panel, they do not scroll the page */}
       {slide === 'profile' ? (
-        <AppSection
-          title={t('account.profile')}
-          helper={t('account.profileHelper')}
-          badge={data.account.username ? `@${data.account.username}` : 'Username?'}
-          badgeTone={data.account.username ? 'lime' : 'gold'}
-        >
-          <p className="text-sm text-paper">{data.account.email}</p>
-          {data.account.display_name ? (
-            <p className="mt-1 text-xs text-muted">{data.account.display_name}</p>
+        <AppSection title={t('account.profile')} helper={t('account.profileHelper')}>
+          {data.account.display_name &&
+          data.account.display_name.toLowerCase() !== String(data.account.username || '').toLowerCase() ? (
+            <p className="mb-4 text-sm text-paper">{data.account.display_name}</p>
           ) : null}
 
-          <div className="mt-4 border-t border-line pt-4 space-y-3">
+          <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted">Emails</p>
             <ul className="space-y-2 text-sm">
               <li className="flex flex-wrap items-center justify-between gap-2">
@@ -596,45 +592,79 @@ export default function AccountPage() {
             )}
           </div>
 
-          <form onSubmit={onUsername} className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
-            <div>
-              <label className="label" htmlFor="flizy-username">
-                {t('account.username')}
-              </label>
-              <input
-                id="flizy-username"
-                className="input"
-                placeholder="letters and numbers only"
-                value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value.replace(/[^a-zA-Z0-9@]/g, ''))}
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
-                maxLength={24}
-                required
-                disabled={!canChangeUsername}
-              />
-              <p className="mt-1.5 text-xs text-muted">{t('account.usernameHint')}</p>
-              {!canChangeUsername && nextChange ? (
-                <p className="mt-1.5 text-xs text-gold">
-                  {t('account.usernameCooldown', { date: nextChange })}
-                </p>
-              ) : null}
+          <div className="mt-4 border-t border-border pt-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-sans text-sm tracking-wide text-paper">Invite</span>
+              <span className="font-sans text-sm tracking-wide text-paper">
+                {data.invite?.attributed ?? 0}
+              </span>
             </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="btn btn-primary w-full py-3 font-semibold sm:w-auto sm:px-6"
-                disabled={busy === 'username' || !canChangeUsername}
-              >
-                {busy === 'username'
-                  ? t('account.usernameSaving')
-                  : data.account.username
-                    ? t('account.usernameUpdate')
-                    : t('account.usernameSave')}
-              </button>
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-sans text-sm tracking-wide text-paper">Credit</span>
+              <span className="font-sans text-sm tracking-wide text-paper">
+                {data.invite?.counted ?? 0}
+              </span>
             </div>
-          </form>
+          </div>
+
+          <div className="mt-4 border-t border-border pt-4">
+            <div className="flex items-start justify-between gap-3">
+              <span className="font-sans text-sm tracking-wide text-paper">Username</span>
+              <div className="flex flex-col items-end gap-1.5">
+                <span className="font-mono text-sm text-paper">
+                  {data.account.username ? `@${data.account.username}` : '—'}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost !px-2 !py-0.5 text-[11px] leading-none"
+                  onClick={() => setUsernameOpen((open) => !open)}
+                  aria-expanded={usernameOpen}
+                >
+                  Change username
+                </button>
+              </div>
+            </div>
+            {usernameOpen ? (
+              <div className="mt-3 space-y-3">
+                {nextChange ? (
+                  <p className="text-xs text-gold">
+                    {t('account.usernameCooldown', { date: nextChange })}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted">{t('account.usernameHint')}</p>
+                )}
+                {canChangeUsername ? (
+                  <form onSubmit={onUsername} className="grid gap-2">
+                    <input
+                      id="flizy-username"
+                      className="input"
+                      placeholder="letters and numbers only"
+                      value={usernameInput}
+                      onChange={(e) =>
+                        setUsernameInput(e.target.value.replace(/[^a-zA-Z0-9@]/g, ''))
+                      }
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      maxLength={24}
+                      required
+                    />
+                    <button
+                      type="submit"
+                      className="btn btn-primary w-full py-3 font-semibold"
+                      disabled={busy === 'username'}
+                    >
+                      {busy === 'username'
+                        ? t('account.usernameSaving')
+                        : data.account.username
+                          ? t('account.usernameUpdate')
+                          : t('account.usernameSave')}
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </AppSection>
       ) : null}
 

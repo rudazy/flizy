@@ -8,7 +8,7 @@ import { getSupabase } from './supabase.ts';
 import { normalizeEmail, parseEmail, isValidEmail } from './email.ts';
 import { sendMail } from './sendMail.ts';
 
-export type EmailVerifyPurpose = 'primary' | 'secondary';
+export type EmailVerifyPurpose = 'primary' | 'secondary' | 'login';
 
 const CODE_TTL_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 8;
@@ -133,9 +133,10 @@ export async function issueEmailVerificationCode(p: {
     return { ok: false, error: 'Could not start verification.', status: 500 };
   }
 
-  const subject = 'Your Flizy verification code';
+  const isLogin = p.purpose === 'login';
+  const subject = isLogin ? 'Your Flizy login code' : 'Your Flizy verification code';
   const text = [
-    'Flizy email verification',
+    isLogin ? 'Flizy login' : 'Flizy email verification',
     '',
     `Your code: ${code}`,
     '',
@@ -249,6 +250,10 @@ export async function consumeEmailVerificationCode(p: {
     .from('email_verifications')
     .update({ consumed_at: now })
     .eq('id', row.id);
+
+  if (p.purpose === 'login') {
+    return { ok: true };
+  }
 
   if (p.purpose === 'primary') {
     const { data: acc, error: aErr } = await supabase

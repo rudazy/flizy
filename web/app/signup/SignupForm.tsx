@@ -33,8 +33,23 @@ export function SignupForm() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     setNext(safeNext(q.get('next')));
-    const fromQuery = q.get('invite') || q.get('i') || '';
-    if (fromQuery) setInviteCode(fromQuery);
+    const fromQuery = (q.get('invite') || q.get('i') || '').replace(/^@/, '');
+    if (fromQuery) {
+      setInviteCode(fromQuery);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/invite/pending', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((body) => {
+        if (!cancelled && body?.code) setInviteCode(String(body.code));
+      })
+      .catch(() => {
+        /* field stays empty; cookie still attributes on submit */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const mismatch = confirmPassword.length > 0 && password !== confirmPassword;

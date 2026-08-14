@@ -26,6 +26,12 @@ export function SiteFooter() {
           <Link href="/docs" className="text-muted no-underline hover:text-lime">
             Docs
           </Link>
+          <Link href="/terms" className="text-muted no-underline hover:text-lime">
+            Terms
+          </Link>
+          <Link href="/privacy" className="text-muted no-underline hover:text-lime">
+            Privacy
+          </Link>
           <a
             href="https://x.com/Flizyapp"
             className="text-muted no-underline hover:text-lime"
