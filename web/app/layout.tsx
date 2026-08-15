@@ -5,6 +5,7 @@ import { Analytics } from '../components/Analytics';
 import { AppChrome } from '../components/AppChrome';
 import { JsonLd } from '../components/JsonLd';
 import { LocaleProvider } from '../components/LocaleProvider';
+import { hasSessionCookie } from '../lib/cookies';
 import { OG_IMAGE } from '../lib/seo';
 import './globals.css';
 
@@ -97,13 +98,14 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const signedIn = hasSessionCookie();
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="page-shell font-mono antialiased">
         <JsonLd />
         <Analytics />
         <LocaleProvider>
-          <AppChrome>{children}</AppChrome>
+          <AppChrome signedIn={signedIn}>{children}</AppChrome>
         </LocaleProvider>
       </body>
     </html>

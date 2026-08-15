@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { HowToCallBot } from '../components/HowToCallBot';
+import { ResumeChatLink } from '../components/ResumeChatLink';
+import { hasSessionCookie } from '../lib/cookies';
 
 /**
  * Page order is deliberate: promise → proof → audience → mechanism → funding.
@@ -62,8 +64,10 @@ const FUND_STEPS = [
 ];
 
 export default function HomePage() {
+  const signedIn = hasSessionCookie();
   return (
     <div className="fade-up space-y-12 md:space-y-24">
+      {signedIn ? <ResumeChatLink /> : null}
       {/* Hero — one promise, one proof point, one primary action */}
       <section className="hero-grid relative -mx-6 px-6 py-12 md:py-24">
         <div className="max-w-3xl">
@@ -85,19 +89,38 @@ export default function HomePage() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3 md:mt-10">
-            <Link href="/signup" className="btn btn-primary">
-              Create free account
-            </Link>
-            <Link href="/how-it-works" className="btn btn-ghost">
-              See how it works
-            </Link>
+            {signedIn ? (
+              <>
+                <Link href="/dashboard" className="btn btn-primary">
+                  Open app
+                </Link>
+                <Link href="/dashboard/account?s=chat" className="btn btn-ghost">
+                  Chat apps
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/signup" className="btn btn-primary">
+                  Create free account
+                </Link>
+                <Link href="/how-it-works" className="btn btn-ghost">
+                  See how it works
+                </Link>
+              </>
+            )}
           </div>
 
           <p className="mt-5 text-xs text-muted">
-            Free to start. No seed phrases in chat. Running on GIWA Sepolia testnet.{' '}
-            <Link href="/login" className="text-muted underline-offset-4 hover:text-lime">
-              Already have an account?
-            </Link>
+            {signedIn ? (
+              'You are signed in. Continue in the app.'
+            ) : (
+              <>
+                Free to start. No seed phrases in chat. Running on GIWA Sepolia testnet.{' '}
+                <Link href="/login" className="text-muted underline-offset-4 hover:text-lime">
+                  Already have an account?
+                </Link>
+              </>
+            )}
           </p>
         </div>
       </section>

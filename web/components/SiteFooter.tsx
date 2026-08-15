@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { GIWA_FAUCET_URL } from '../lib/botPublic';
 
-export function SiteFooter() {
+export function SiteFooter({ signedIn = false }: { signedIn?: boolean }) {
   return (
     <footer className="mt-auto border-t border-border">
       <div className="mx-auto flex max-w-[1200px] flex-col gap-6 px-6 py-12 sm:flex-row sm:items-center sm:justify-between">
@@ -40,9 +40,11 @@ export function SiteFooter() {
           >
             X
           </a>
-          <Link href="/signup" className="text-muted no-underline hover:text-lime">
-            Signup
-          </Link>
+          {signedIn ? null : (
+            <Link href="/signup" className="text-muted no-underline hover:text-lime">
+              Signup
+            </Link>
+          )}
           <Link href="/dashboard" className="text-muted no-underline hover:text-lime">
             App
           </Link>

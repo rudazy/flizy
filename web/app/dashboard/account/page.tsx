@@ -16,6 +16,12 @@ import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { shortAddr } from '../../../lib/dashboardTypes';
 import { PayIdentity } from '../../../components/PayIdentity';
 import type { LocaleCode } from '../../../lib/locale';
+import {
+  clearAwaitingChatLink,
+  markAwaitingChatLink,
+  peekAwaitingChatLink,
+  type ChatLinkChannel,
+} from '../../../lib/chatLinkAwait.ts';
 
 const SLIDES = [
   'profile',
@@ -77,6 +83,7 @@ export default function AccountPage() {
   const [addEmailOpen, setAddEmailOpen] = useState(false);
   const [addEmailStep, setAddEmailStep] = useState<'email' | 'code'>('email');
   const [usernameOpen, setUsernameOpen] = useState(false);
+  const [awaitingChat, setAwaitingChat] = useState<ChatLinkChannel | null>(null);
 
   // Smart default slide when no ?s= — open the first thing that still needs work.
   const defaultSlide = useMemo((): SlideId => {
@@ -156,10 +163,61 @@ export default function AccountPage() {
     }
   }, [data?.account?.locale, locale]);
 
+  useEffect(() => {
+    setAwaitingChat(peekAwaitingChatLink());
+  }, []);
+
   // OAuth error/status lands with ?github= — always show Platforms slide.
+  // Chat link return (?telegram=linked / ?whatsapp=linked) opens Chat.
   useEffect(() => {
     if (search.get('github')) setSlide('platforms');
-  }, [search, setSlide]);
+    const tg = search.get('telegram');
+    const wa = search.get('whatsapp');
+    if (tg === 'linked' || wa === 'linked') {
+      setSlide('chat');
+      setMsg(tg === 'linked' ? 'Telegram connected.' : 'WhatsApp connected.');
+      clearAwaitingChatLink();
+      setAwaitingChat(null);
+      const params = new URLSearchParams(search.toString());
+      params.delete('telegram');
+      params.delete('whatsapp');
+      const rest = params.toString();
+      window.history.replaceState({}, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
+    }
+  }, [search, setSlide, setMsg]);
+
+  // After they tap Link Telegram/WhatsApp, poll until that chat appears.
+  useEffect(() => {
+    if (!awaitingChat) return;
+    setSlide('chat');
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await fetch('/api/identity', { cache: 'no-store' });
+        if (!res.ok) return;
+        const body = await res.json().catch(() => ({}));
+        const rows = Array.isArray(body.identities) ? body.identities : [];
+        const chats = rows.filter(
+          (r: { channel: string }) => r.channel === 'whatsapp' || r.channel === 'telegram'
+        );
+        if (cancelled) return;
+        setChatLinks(chats);
+        if (chats.some((r: { channel: string }) => r.channel === awaitingChat)) {
+          clearAwaitingChatLink();
+          setAwaitingChat(null);
+          setMsg(awaitingChat === 'telegram' ? 'Telegram connected.' : 'WhatsApp connected.');
+        }
+      } catch {
+        /* next tick */
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [awaitingChat, setMsg, setSlide]);
 
   if (!data) return null;
 
@@ -829,6 +887,10 @@ export default function AccountPage() {
                 className="btn btn-primary flex w-full items-center justify-center py-3 text-sm font-semibold no-underline"
                 target="_blank"
                 rel="noreferrer"
+                onClick={() => {
+                  markAwaitingChatLink('whatsapp');
+                  setAwaitingChat('whatsapp');
+                }}
               >
                 Link WhatsApp
               </a>
@@ -838,11 +900,21 @@ export default function AccountPage() {
                   className="btn btn-primary flex w-full items-center justify-center py-3 text-sm font-semibold no-underline"
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => {
+                  markAwaitingChatLink('telegram');
+                  setAwaitingChat('telegram');
+                }}
                 >
                   Link Telegram
                 </a>
               ) : null}
               <CopyButton value={`flizy link ${data.link.code}`} label="Copy message" />
+              {awaitingChat ? (
+                <p className="text-xs text-muted">
+                  Waiting for {awaitingChat === 'telegram' ? 'Telegram' : 'WhatsApp'}. After
+                  you start the bot, this page will show connected.
+                </p>
+              ) : null}
             </div>
           ) : null}
         </AppSection>

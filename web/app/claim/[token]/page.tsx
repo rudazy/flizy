@@ -27,6 +27,7 @@ export default function ClaimPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [payerHandle, setPayerHandle] = useState('');
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -58,8 +59,17 @@ export default function ClaimPage() {
     : '';
 
   useEffect(() => {
-    fetch('/api/dashboard')
-      .then((r) => setLoggedIn(r.ok))
+    fetch('/api/dashboard', { cache: 'no-store' })
+      .then(async (r) => {
+        if (!r.ok) {
+          setLoggedIn(false);
+          return;
+        }
+        const body = await r.json().catch(() => ({}));
+        const mine = String(body?.account?.username || '').toLowerCase();
+        if (mine) setPayerHandle(`@${mine}`);
+        setLoggedIn(true);
+      })
       .catch(() => setLoggedIn(false));
   }, []);
 
@@ -104,6 +114,14 @@ export default function ClaimPage() {
         Money held for a phone or platform. Phone holds are claimed in WhatsApp or Telegram after
         that number is proven on that chat. Platform holds can be claimed here after you link.
       </p>
+      {loggedIn === null ? <p className="text-sm text-muted">Checking your account…</p> : null}
+      {loggedIn ? (
+        <p className="text-sm text-muted">
+          {payerHandle
+            ? `Signed in as ${payerHandle}.`
+            : 'Signed in. This claim pays out to your Flizy wallet.'}
+        </p>
+      ) : null}
 
       {!data ? <p className="text-muted">Loading…</p> : null}
       {data?.error ? <p className="text-gold">{data.error}</p> : null}
@@ -168,14 +186,14 @@ export default function ClaimPage() {
           {pending && isPhone ? (
             <>
               <ol className="list-decimal space-y-2 pl-4 text-muted">
-                <li>Create or log in to your Flizy account</li>
+                {loggedIn ? null : <li>Create or log in to your Flizy account</li>}
                 <li>Link WhatsApp or Telegram from the dashboard (with this number proven)</li>
                 <li>
                   In that chat send <span className="font-mono text-paper">flizy claim</span>
                 </li>
               </ol>
               <div className="flex flex-col gap-2">
-                {!loggedIn ? (
+                {loggedIn === false ? (
                   <>
                     <Link
                       href={`/signup?next=${encodeURIComponent(`/claim/${token}`)}`}
@@ -190,11 +208,12 @@ export default function ClaimPage() {
                       Log in
                     </Link>
                   </>
-                ) : (
+                ) : null}
+                {loggedIn ? (
                   <Link href="/dashboard/account?s=chat" className="btn btn-primary no-underline">
                     Open chat link options
                   </Link>
-                )}
+                ) : null}
               </div>
               <p className="text-xs text-muted">
                 Web payout is off for phone holds on purpose — the number is proven only in chat.
@@ -205,7 +224,7 @@ export default function ClaimPage() {
           {pending && canWeb ? (
             <>
               <ol className="list-decimal space-y-2 pl-4 text-muted">
-                <li>Create or log in to your Flizy account</li>
+                {loggedIn ? null : <li>Create or log in to your Flizy account</li>}
                 <li>Link the matching platform (Account → Platforms)</li>
                 <li>Claim below — or in chat: flizy claim</li>
               </ol>
@@ -219,7 +238,8 @@ export default function ClaimPage() {
                 >
                   {busy ? 'Claiming…' : 'Claim to my wallet'}
                 </button>
-              ) : (
+              ) : null}
+              {loggedIn === false ? (
                 <div className="flex flex-col gap-2">
                   <Link
                     href={`/signup?next=${encodeURIComponent(`/claim/${token}`)}`}
@@ -234,7 +254,7 @@ export default function ClaimPage() {
                     Log in
                   </Link>
                 </div>
-              )}
+              ) : null}
             </>
           ) : null}
 

@@ -14,6 +14,7 @@ export function PayLanding({
 }) {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [self, setSelf] = useState(false);
+  const [payerHandle, setPayerHandle] = useState('');
   const [amount, setAmount] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -39,6 +40,7 @@ export function PayLanding({
         const body = await res.json().catch(() => ({}));
         setLoggedIn(true);
         const mine = String(body?.account?.username || '').toLowerCase();
+        if (mine) setPayerHandle(`@${mine}`);
         if (username && mine === username.toLowerCase()) {
           setSelf(true);
           return;
@@ -48,6 +50,10 @@ export function PayLanding({
         });
         const info = await prev.json().catch(() => ({}));
         if (prev.ok) {
+          if (info.self) {
+            setSelf(true);
+            return;
+          }
           setFirstPay(Boolean(info.firstPay));
           setAlreadySaved(Boolean(info.alreadySaved));
         }
@@ -123,6 +129,11 @@ export function PayLanding({
 
       {loggedIn && !self && !ok ? (
         <form onSubmit={onPay} className="card space-y-4 p-6">
+          <p className="text-sm text-muted">
+            {payerHandle
+              ? `Signed in as ${payerHandle}. This send comes from your Flizy wallet.`
+              : 'Signed in. This send comes from your Flizy wallet.'}
+          </p>
           {firstPay ? (
             <div className="alert alert-warn text-sm">
               First payment. You have not paid {handle} before. Confirm the name

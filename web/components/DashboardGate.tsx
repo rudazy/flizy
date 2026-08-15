@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useDashboard } from './DashboardProvider';
 import { AppBottomNav } from './AppBottomNav';
@@ -15,6 +16,10 @@ function hasUsername(data: { account?: { username?: string | null } }): boolean 
 
 export function DashboardGate({ children }: { children: ReactNode }) {
   const { data, error, msg } = useDashboard();
+  const pathname = usePathname() || '/dashboard';
+  const search = useSearchParams();
+  const nextPath = `${pathname}${search.toString() ? `?${search.toString()}` : ''}`;
+  const loginHref = `/login?next=${encodeURIComponent(nextPath.startsWith('/') ? nextPath : '/dashboard')}`;
 
   if (error && !data) {
     return (
@@ -22,7 +27,7 @@ export function DashboardGate({ children }: { children: ReactNode }) {
         <h1 className="font-sans text-3xl tracking-wide text-paper">Dashboard</h1>
         <div className="alert alert-warn">{error}</div>
         <div className="flex gap-3">
-          <Link href="/login" className="btn btn-primary">
+          <Link href={loginHref} className="btn btn-primary">
             Log in
           </Link>
           <Link href="/signup" className="btn btn-ghost">

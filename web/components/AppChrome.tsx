@@ -6,7 +6,13 @@ import { SiteHeader } from './SiteHeader';
 import { SiteFooter } from './SiteFooter';
 import { PwaRegister } from './PwaRegister';
 
-export function AppChrome({ children }: { children: ReactNode }) {
+export function AppChrome({
+  children,
+  signedIn = false,
+}: {
+  children: ReactNode;
+  signedIn?: boolean;
+}) {
   const pathname = usePathname() || '';
   const isApp = pathname.startsWith('/dashboard');
 
@@ -24,9 +30,9 @@ export function AppChrome({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader signedIn={signedIn} />
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 py-12 md:py-16">{children}</main>
-      <SiteFooter />
+      <SiteFooter signedIn={signedIn} />
       <PwaRegister />
     </>
   );

@@ -27,6 +27,14 @@ const LEGACY_COOKIE = 'flizy_account';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Cookie present, not a live session. Use only for chrome (hide Log in).
+ * Auth still goes through getAccountIdFromCookie.
+ */
+export function hasSessionCookie(): boolean {
+  return Boolean(cookies().get(COOKIE)?.value);
+}
+
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }

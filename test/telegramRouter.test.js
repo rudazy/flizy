@@ -330,6 +330,10 @@ describe('end to end through the shared router', () => {
 
     const joined = sent.map((s) => s.text).join('\n');
     assert.match(joined, /Telegram connected to Flizy/);
+    assert.match(joined, /\/dashboard\/account\?s=chat&telegram=linked/);
+    const open = sent.find((s) => s.opts?.buttons);
+    assert.equal(open?.opts.buttons[0][0].label, 'Open Flizy');
+    assert.match(open?.opts.buttons[0][0].url || '', /\/dashboard\/account\?s=chat&telegram=linked/);
     assert.ok(sent.some((s) => s.phoneRequest), 'should prompt for the contact share');
   });
 
@@ -441,6 +445,21 @@ describe('Telegram API helpers', () => {
       ],
     ]);
     assert.deepEqual(markup.inline_keyboard[0][0], { text: 'Confirm', callback_data: 'confirm' });
+  });
+
+  it('maps an https url onto an open-link button', () => {
+    const markup = inlineKeyboard([
+      [{ label: 'Open Flizy', url: 'https://flizy.app/dashboard/account?s=chat&telegram=linked' }],
+    ]);
+    assert.deepEqual(markup.inline_keyboard[0][0], {
+      text: 'Open Flizy',
+      url: 'https://flizy.app/dashboard/account?s=chat&telegram=linked',
+    });
+  });
+
+  it('rejects a non-https url button and falls back to callback data', () => {
+    const markup = inlineKeyboard([[{ label: 'Nope', url: 'javascript:alert(1)', value: 'noop' }]]);
+    assert.deepEqual(markup.inline_keyboard[0][0], { text: 'Nope', callback_data: 'noop' });
   });
 
   it('builds a contact-share keyboard, not a text prompt', () => {
