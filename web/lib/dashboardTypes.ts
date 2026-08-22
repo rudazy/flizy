@@ -1,6 +1,7 @@
 export type PendingClaimItem = {
   id: string;
   amountEth: string;
+  asset?: string;
   status: string;
   label: string;
   counterparty: string | null;

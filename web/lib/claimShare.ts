@@ -20,9 +20,14 @@ export function telegramShareHref(url: string, text: string): string {
   return `https://t.me/share/url?${q.toString()}`;
 }
 
-export function claimShareText(url: string, amountEth?: string | null): string {
+export function claimShareText(
+  url: string,
+  amountEth?: string | null,
+  asset?: string | null
+): string {
   const amt = String(amountEth || '').trim();
+  const sym = String(asset || 'ETH').trim().toUpperCase() || 'ETH';
   const link = String(url || '').trim();
-  if (amt) return `You have ${amt} ETH waiting on Flizy. Claim: ${link}`;
+  if (amt) return `You have ${amt} ${sym} waiting on Flizy. Claim: ${link}`;
   return `You have funds waiting on Flizy. Claim: ${link}`;
 }

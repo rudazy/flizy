@@ -6,6 +6,7 @@
 import { channelLabel } from './claimRecipient.ts';
 import { displaySafeLabel } from './sanitize.ts';
 import { normalizeEmail, isValidEmail, maskEmail } from './email.ts';
+import { formatClaimAmount } from './claimAmount.ts';
 
 export type ClaimMatchRow = {
   to_wa_hint?: string | null;
@@ -118,14 +119,15 @@ export function claimViaLine(claim: ClaimMatchRow): string | null {
 
 export function formatClaimClaimedNotice(p: {
   amountEth: string | number;
+  asset?: string | null;
   byLabel?: string | null;
   viaLine?: string | null;
   explorerUrl?: string | null;
 }): string {
-  const amount = String(p.amountEth ?? '').trim() || '?';
+  const amount = formatClaimAmount({ amount_eth: p.amountEth, asset: p.asset });
   const by = String(p.byLabel || '').trim() || 'someone';
   const via = String(p.viaLine || '').trim();
-  const lines = ['Claim delivered on Flizy.', `${amount} ETH claimed by ${by}.`];
+  const lines = ['Claim delivered on Flizy.', `${amount} claimed by ${by}.`];
   if (via) lines.push(`You sent this to ${via}.`);
   lines.push('', 'Funds left escrow for their agent wallet.');
   if (p.explorerUrl) lines.push(String(p.explorerUrl));

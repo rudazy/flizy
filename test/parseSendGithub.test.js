@@ -68,7 +68,7 @@ describe('parseSendCommand platforms', () => {
     const a = parseSendCommand('send 10 FLZ to @alice_crypto on telegram');
     assert.equal(a.platform, 'telegram');
     assert.equal(a.asset, 'FLZ');
-    // Token claims to unlinked platforms are rejected later; parse still accepts.
+    // Parse accepts listed-token identity holds (FLZ first).
     assert.equal(a.toRaw, 'alice_crypto');
   });
 

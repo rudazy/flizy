@@ -28,4 +28,15 @@ describe('claim share', () => {
     assert.equal(q.get('url'), 'https://flizy.app/claim/tok_1/ludarep');
     assert.equal(q.get('text'), 'Claim funds');
   });
+
+  it('share text names the asset', () => {
+    assert.match(
+      web.claimShareText('https://flizy.app/claim/t', '10', 'FLZ'),
+      /10 FLZ waiting/
+    );
+    assert.match(
+      web.claimShareText('https://flizy.app/claim/t', '0.01'),
+      /0\.01 ETH waiting/
+    );
+  });
 });

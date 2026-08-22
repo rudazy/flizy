@@ -13,7 +13,7 @@ const ROUTE = 'GET /api/history';
 
 /** Claim columns needed for rail labels (phone vs GitHub vs X). */
 const CLAIM_SELECT =
-  'id, from_account_id, to_account_id, to_wa_hint, to_channel, to_external_id, to_display_handle, amount_eth, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at';
+  'id, from_account_id, to_account_id, to_wa_hint, to_channel, to_external_id, to_display_handle, amount_eth, asset, token_address, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at';
 
 export type ActivityItem = {
   id: string;
@@ -124,7 +124,7 @@ function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityI
     type,
     direction,
     amount,
-    asset: 'ETH',
+    asset: String(row.asset || 'ETH').toUpperCase(),
     counterparty: claimHistoryCounterparty(row),
     status,
     txHash,

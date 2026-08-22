@@ -13,6 +13,7 @@ import { parseEmail } from './email.ts';
 export type PendingClaimSummary = {
   id: string;
   amountEth: string;
+  asset: string;
   status: string;
   label: string;
   counterparty: string | null;
@@ -93,7 +94,7 @@ export async function listPendingClaimSummaries(
     supabase
       .from('claims')
       .select(
-        'id, amount_eth, status, created_at, claim_token, to_wa_hint, to_channel, to_external_id, to_display_handle, to_email'
+        'id, amount_eth, asset, token_address, status, created_at, claim_token, to_wa_hint, to_channel, to_external_id, to_display_handle, to_email'
       )
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
@@ -179,6 +180,7 @@ export async function listPendingClaimSummaries(
     return {
       id: String(c.id),
       amountEth: String(c.amount_eth ?? ''),
+      asset: String(c.asset || 'ETH').toUpperCase(),
       status: String(c.status || 'pending'),
       label,
       counterparty: peer ? `${rail} ${peer}` : rail,

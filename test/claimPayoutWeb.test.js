@@ -75,6 +75,18 @@ describe('formatClaimClaimedNotice', () => {
     assert.match(t, /claimed by @alice/);
     assert.match(t, /You sent this to GitHub @rudazy/);
     assert.match(t, /example\/tx\/1/);
+    assert.match(t, /0\.05 ETH claimed/);
+  });
+
+  it('names a listed token when the hold was not ETH', () => {
+    const t = web.formatClaimClaimedNotice({
+      amountEth: '10',
+      asset: 'FLZ',
+      byLabel: '@alice',
+      viaLine: 'Telegram @bob',
+    });
+    assert.match(t, /10 FLZ claimed by @alice/);
+    assert.doesNotMatch(t, /10 ETH claimed/);
   });
 });
 

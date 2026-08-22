@@ -384,7 +384,7 @@ export default function DashboardHomePage() {
                           {Number(c.amountEth).toLocaleString(undefined, {
                             maximumFractionDigits: 6,
                           })}{' '}
-                          ETH
+                          {c.asset || 'ETH'}
                         </p>
                       </div>
                       {phoneOnly ? (

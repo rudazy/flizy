@@ -73,6 +73,11 @@ const CMD_GROUPS: Array<{
         tg: '/send 10 FLZ to john',
         meaning: 'Send FLZ to a trusted name (when you hold FLZ)',
       },
+      {
+        wa: 'flizy send 10 FLZ to @user on telegram',
+        tg: '/send 10 FLZ to @user on telegram',
+        meaning: 'Hold FLZ for that Telegram account until they claim (same as ETH holds)',
+      },
       { wa: 'confirm', tg: 'confirm or tap Confirm', meaning: 'Approve the plan' },
       { wa: 'cancel', tg: 'cancel', meaning: 'Abort the pending plan' },
     ],

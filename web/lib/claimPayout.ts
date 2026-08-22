@@ -26,11 +26,20 @@ import {
   type ClaimMatchRow,
 } from './claimMatch.ts';
 import { parseEmail } from './email.ts';
+import { isNativeClaim, claimAssetSymbol } from './claimAmount.ts';
+
+const ERC20_ABI = [
+  'function transfer(address to, uint256 amount) returns (bool)',
+  'function balanceOf(address) view returns (uint256)',
+  'function decimals() view returns (uint8)',
+];
 
 export type ClaimRow = ClaimMatchRow & {
   id: string;
   status: string;
   amount_eth: string | number;
+  asset?: string | null;
+  token_address?: string | null;
   from_account_id: string;
   claim_token?: string | null;
   chain_id?: number | null;
@@ -263,26 +272,17 @@ export async function executeWebClaimPayout(p: {
   let submitted = false;
 
   try {
-    const amountWei = ethers.parseEther(String(held.amount_eth));
-    if (amountWei <= 0n) {
-      await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-      return { ok: false, error: 'Invalid claim amount.', status: 400 };
-    }
-
     const toAddress = await ensureAgentAddress(accountId);
     // Touch derivation so secret is validated even if we only send TO the address
     void deriveAgentPrivateKey(accountId);
 
     const escrow = getEscrowWallet(provider);
-    const escBal = await provider.getBalance(escrow.address);
-    if (escBal < amountWei + gasBufferWei()) {
-      await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-      return {
-        ok: false,
-        error: 'Payout temporarily unavailable. Try again later.',
-        status: 503,
-      };
-    }
+    const gasBuffer = gasBufferWei();
+    const escEth = await provider.getBalance(escrow.address);
+    const tokenAddr = held.token_address && ethers.isAddress(String(held.token_address))
+      ? ethers.getAddress(String(held.token_address))
+      : null;
+    const native = isNativeClaim(held as ClaimRow) && !tokenAddr;
 
     const network = await provider.getNetwork();
     if (Number(network.chainId) !== chain.chainId) {
@@ -290,10 +290,60 @@ export async function executeWebClaimPayout(p: {
       return { ok: false, error: 'Network mismatch. Try again shortly.', status: 503 };
     }
 
-    const tx = await escrow.sendTransaction({
-      to: toAddress,
-      value: amountWei,
-    });
+    let tx: ethers.TransactionResponse;
+    if (native) {
+      const amountWei = ethers.parseEther(String(held.amount_eth));
+      if (amountWei <= 0n) {
+        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+        return { ok: false, error: 'Invalid claim amount.', status: 400 };
+      }
+      if (escEth < amountWei + gasBuffer) {
+        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+        return {
+          ok: false,
+          error: 'Payout temporarily unavailable. Try again later.',
+          status: 503,
+        };
+      }
+      tx = await escrow.sendTransaction({
+        to: toAddress,
+        value: amountWei,
+      });
+    } else {
+      if (!tokenAddr) {
+        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+        return {
+          ok: false,
+          error: `This ${claimAssetSymbol(held as ClaimRow)} claim has no token on record.`,
+          status: 400,
+        };
+      }
+      if (escEth < gasBuffer) {
+        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+        return {
+          ok: false,
+          error: 'Payout temporarily unavailable. Try again later.',
+          status: 503,
+        };
+      }
+      const erc20 = new ethers.Contract(tokenAddr, ERC20_ABI, escrow);
+      const decimals = Number(await erc20.decimals());
+      const amountTok = ethers.parseUnits(String(held.amount_eth), decimals);
+      if (amountTok <= 0n) {
+        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+        return { ok: false, error: 'Invalid claim amount.', status: 400 };
+      }
+      const tokBal = await erc20.balanceOf(escrow.address);
+      if (tokBal < amountTok) {
+        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+        return {
+          ok: false,
+          error: 'Payout temporarily unavailable. Try again later.',
+          status: 503,
+        };
+      }
+      tx = await erc20.transfer(toAddress, amountTok);
+    }
     submitted = true;
 
     const receipt = await tx.wait(1);
@@ -341,6 +391,7 @@ export async function executeWebClaimPayout(p: {
         updated.from_account_id,
         formatClaimClaimedNotice({
           amountEth: updated.amount_eth,
+          asset: updated.asset,
           byLabel,
           viaLine,
           explorerUrl,

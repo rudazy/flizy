@@ -57,6 +57,22 @@ describe('pending liability is what escrow owes users', () => {
     assert.equal(l.count, 2);
     assert.equal(l.liabilityEth, '0.75');
   });
+
+  it('does not count listed-token holds as ETH liability', async () => {
+    seedClaims([
+      { id: 'c1', amount_eth: '1.0', status: 'pending', asset: 'ETH' },
+      {
+        id: 'c2',
+        amount_eth: '50',
+        status: 'pending',
+        asset: 'FLZ',
+        token_address: '0x308be8f71DA695f18E70D2243A446e1fD1566BA6',
+      },
+    ]);
+    const l = await getPendingClaimsLiability();
+    assert.equal(l.count, 1);
+    assert.equal(l.liabilityEth, '1.0');
+  });
 });
 
 describe('ok answers "can escrow cover what it owes"', () => {

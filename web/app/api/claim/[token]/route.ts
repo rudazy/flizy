@@ -16,6 +16,7 @@ export async function GET(_req: Request, ctx: { params: { token: string } }) {
     const carriesInvite = isInviteCodeFormat(stored);
     const body = {
       amount_eth: claim.amount_eth,
+      asset: String(claim.asset || 'ETH').toUpperCase(),
       status: claim.status,
       chain_id: claim.chain_id,
       // Never the full phone, and never the raw platform id. A phone is masked

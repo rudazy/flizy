@@ -255,7 +255,7 @@ Bare `confirm` and `cancel` work on both.
 | `link CODE` | Bind this chat to your account |
 | `me` · `balance` · `deposit` · `history` | Account and wallet |
 | `add wallet 0x…` | Start the approved-destination flow |
-| `send AMOUNT to name \| 0x… \| phone \| email \| @user on github` | Transfer, or hold a claim |
+| `send AMOUNT [FLZ] to name \| phone \| email \| @user on telegram` | Transfer, or hold a claim (ETH default; listed tokens too) |
 | `claim` · `cancel claims` | Receive or cancel holds |
 | `request` · `pay` · `requests` | Payment requests |
 | `buy AMOUNT FLZ` · `sell AMOUNT FLZ` | Trade against the pool |

@@ -9,6 +9,7 @@ import { claimSharePath, claimShareText, telegramShareHref } from '../../../lib/
 
 type ClaimView = {
   amount_eth?: string;
+  asset?: string;
   status?: string;
   error?: string;
   recipient?: string;
@@ -55,7 +56,7 @@ export default function ClaimPage() {
   }, [origin, token, inviteRef]);
 
   const tgShare = shareUrl
-    ? telegramShareHref(shareUrl, claimShareText(shareUrl, data?.amount_eth))
+    ? telegramShareHref(shareUrl, claimShareText(shareUrl, data?.amount_eth, data?.asset))
     : '';
 
   useEffect(() => {
@@ -130,7 +131,9 @@ export default function ClaimPage() {
         <div className="card space-y-4 p-6 text-sm">
           <p>
             Amount:{' '}
-            <span className="font-sans text-lg text-lime">{data.amount_eth} ETH</span>
+            <span className="font-sans text-lg text-lime">
+              {data.amount_eth} {data.asset || 'ETH'}
+            </span>
           </p>
           <p className="text-muted">
             Status: <span className="text-paper">{data.status}</span>
