@@ -64,10 +64,6 @@ const EXPECTED_INDEXES = declared.indexes;
 // Tables the migrations explicitly enable RLS on.
 const EXPECTED_RLS_ON = declared.rlsEnabled;
 
-// Tables no migration ever enables RLS on. Derived rather than listed, so a
-// newly unprotected table is reported as a note instead of passing silently.
-const KNOWN_RLS_GAPS = EXPECTED_TABLES.filter((t) => !EXPECTED_RLS_ON.includes(t));
-
 const problems = [];
 const notes = [];
 
@@ -183,18 +179,8 @@ async function main() {
   console.log(`  enabled  (${rlsOn.length}): ${rlsOn.join(', ') || 'none'}`);
   console.log(`  disabled (${rlsOff.length}): ${rlsOff.join(', ') || 'none'}`);
 
-  const unexpectedOff = rlsOff.filter(
-    (t) => !KNOWN_RLS_GAPS.includes(t) && EXPECTED_TABLES.includes(t)
-  );
-  if (unexpectedOff.length) {
-    problems.push(`RLS off on unexpected tables -> ${unexpectedOff.join(', ')}`);
-  }
-  const gapsPresent = KNOWN_RLS_GAPS.filter((t) => rlsOff.includes(t));
-  if (gapsPresent.length) {
-    notes.push(
-      `RLS off on ${gapsPresent.join(', ')} - matches the migrations, which never ` +
-        `enable it on these two. Pre-existing, also true in production. Worth closing separately.`
-    );
+  if (rlsOff.length) {
+    problems.push(`RLS off on public tables -> ${rlsOff.join(', ')}`);
   }
 
   const policies = await q(

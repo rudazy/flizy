@@ -325,8 +325,7 @@ describe('this repository', () => {
   it('derives the RLS gap list rather than carrying it by hand', () => {
     const declared = declaredObjects(MIGRATIONS_DIR);
     const gaps = declared.tables.filter((t) => !declared.rlsEnabled.includes(t));
-    // Pre-existing and also true in production. Recorded so a third one is news.
-    assert.deepEqual(gaps, ['account_emails', 'email_verifications']);
+    assert.deepEqual(gaps, []);
   });
 
   it('says reserved_usernames has RLS enabled, which the old hand list missed', () => {

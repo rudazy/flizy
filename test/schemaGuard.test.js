@@ -38,6 +38,7 @@ function presentFor(manifest, omit = []) {
     if (dropped.has(object.name)) continue;
     present[bucket[object.kind]].push(object.name);
   }
+  present.rls_enabled = [...present.tables];
   return present;
 }
 
@@ -120,6 +121,7 @@ describe('the failure message', () => {
       web.formatGuardUnavailable('boom', '20260812000000_schema_guard.sql'),
       bot.formatGuardUnavailable('boom', '20260812000000_schema_guard.sql')
     );
+    assert.equal(web.formatRlsOff(['account_emails']), bot.formatRlsOff(['account_emails']));
   });
 });
 
@@ -165,6 +167,29 @@ describe('assertSchema', () => {
       () => bot.assertSchema(supabase, { manifest: botManifest }),
       /fetch failed/
     );
+  });
+
+  it('throws when a public table has RLS off', async () => {
+    const payload = presentFor(botManifest);
+    payload.rls_enabled = payload.rls_enabled.filter((t) => t !== 'accounts');
+    const supabase = fakeSupabase(payload);
+    await assert.rejects(
+      () => bot.assertSchema(supabase, { manifest: botManifest }),
+      (err) => {
+        assert.equal(err.schemaGuard, true);
+        assert.match(err.message, /row level security off/);
+        assert.match(err.message, /table accounts/);
+        return true;
+      }
+    );
+  });
+
+  it('web checkSchema fails the same way when RLS is off', async () => {
+    const payload = presentFor(botManifest);
+    payload.rls_enabled = payload.rls_enabled.filter((t) => t !== 'accounts');
+    const result = await web.checkSchema(fakeSupabase(payload), botManifest);
+    assert.equal(result.ok, false);
+    assert.equal(result.message, bot.formatRlsOff(['accounts']));
   });
 });
 

@@ -180,13 +180,13 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/dailyLimits.js, lib/router.js, lib/transferLog.js"
+      "requiredBy": "lib/dailyLimits.js, lib/payCode.js, lib/router.js, lib/transferLog.js"
     },
     {
       "kind": "table",
       "name": "trusted_addresses",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "lib/router.js, lib/trusted.js"
+      "requiredBy": "lib/payCode.js, lib/router.js, lib/trusted.js"
     },
     {
       "kind": "table",

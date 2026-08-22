@@ -83,6 +83,36 @@ export function formatMissing(missing, surface) {
   return lines.join('\n');
 }
 
+/**
+ * Public tables with RLS off. PostgREST will serve these to anon if they also
+ * have grants, which new tables in public usually do.
+ * @param {Record<string, string[]>} present
+ * @returns {string[]}
+ */
+export function diffRlsOff(present) {
+  const rls = new Set(present.rls_enabled || []);
+  return (present.tables || []).filter((name) => !rls.has(name)).sort();
+}
+
+/** Operator-facing failure when any public table has RLS off. */
+export function formatRlsOff(tables) {
+  const lines = [
+    `SCHEMA GUARD: ${tables.length} public table` +
+      `${tables.length === 1 ? '' : 's'} ${tables.length === 1 ? 'has' : 'have'}` +
+      ' row level security off.',
+    '',
+  ];
+  for (const name of tables) {
+    lines.push(`  table ${name}`);
+  }
+  lines.push('');
+  lines.push(
+    'Enable RLS with no policies (service_role still bypasses). A table with'
+  );
+  lines.push('RLS off and default grants is readable and writable from the internet.');
+  return lines.join('\n');
+}
+
 /** Failure when the guard's own function is not there yet. */
 export function formatGuardUnavailable(reason, providedBy) {
   return [
@@ -143,10 +173,29 @@ export async function checkSchema(supabase, manifest) {
   }
 
   const missing = diffObjects(manifest.objects, data);
+  if (missing.length) {
+    return {
+      ...base,
+      ok: false,
+      missing,
+      message: formatMissing(missing, manifest.surface),
+    };
+  }
+
+  const rlsOff = diffRlsOff(data);
+  if (rlsOff.length) {
+    return {
+      ...base,
+      ok: false,
+      missing: [],
+      message: formatRlsOff(rlsOff),
+    };
+  }
+
   return {
     ...base,
-    ok: missing.length === 0,
-    missing,
-    message: missing.length ? formatMissing(missing, manifest.surface) : null,
+    ok: true,
+    missing: [],
+    message: null,
   };
 }
