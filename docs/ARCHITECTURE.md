@@ -329,9 +329,11 @@ escrow_on_chain_balance >= sum(pending claims amount)  (+ gas for next payout)
 
 Hold: agent → escrow. Cancel: escrow → sender agent. Claim: escrow → recipient agent.
 
-Smart wallet contracts (`contracts/src/FlizyWallet*.sol`) exist in-repo for a future on-chain
-allowlist / session-key path. They are **not** live custody today. Production custody upgrade
-is roadmap Stage 7 — not an architecture rewrite of the engine.
+Live custody is per-account derived EOAs. `contracts/src/FlizyWallet.sol` is
+scaffold, not deployed, and not the upgrade path. Do not extend it.
+`lib/smartAccount.js` is a Kernel research smoke, not wired into the engine.
+P-256 / WebAuthn verification on GIWA Sepolia is measured in
+[PASSKEY-P256-GIWA.md](PASSKEY-P256-GIWA.md).
 
 ---
 

@@ -206,11 +206,11 @@ Being precise about this matters more than sounding finished.
 
 - This is a **testnet product** on GIWA Sepolia. Do not treat it as production custody.
 - Agent wallets are currently **server-derived EOAs**. Keys are held server side, so the
-  current model is custodial. Session-key smart wallet contracts are in this repo
-  (`contracts/src/FlizyWallet.sol`) and are the next custody milestone.
+  current model is custodial. Do not read that as self-custody.
+- `contracts/src/FlizyWallet.sol` is scaffold, not deployed, and **not** the upgrade path.
+  Do not extend it. Kernel helpers in this repo are research smokes, not the live engine.
 - The approved-destination allowlist is enforced **at the policy layer today**, not yet on
-  chain. Moving that enforcement into the smart wallet, so the rule holds even if the
-  backend is compromised, is the next security milestone.
+  chain. Moving that onto a smart account is the next security milestone.
 
 ---
 
@@ -304,12 +304,14 @@ pair and router build on one compiler rather than the canonical 0.5.16 / 0.6.6 s
 **Treasury / fee destination:** [`0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B`](https://sepolia-explorer.giwa.io/address/0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B)
 **Seed liquidity:** 1.2 ETH and 60,000 FLZ, starting near 50,000 FLZ per ETH.
 
-Also in the repository, not yet required on chain:
+Also in the repository, not live custody:
 
-| Contract | Path | Status |
-|----------|------|--------|
-| FlizyWallet | `contracts/src/FlizyWallet.sol` | Foundry tests; deploys when session-key custody ships |
-| FlizyWalletFactory | `contracts/src/FlizyWalletFactory.sol` | CREATE2 factory for future smart wallets |
+| Item | Path | Status |
+|------|------|--------|
+| FlizyWallet | `contracts/src/FlizyWallet.sol` | Scaffold. Not deployed. Do not extend |
+| FlizyWalletFactory | `contracts/src/FlizyWalletFactory.sol` | Same. Do not deploy for users |
+| Kernel v3.3 smoke | `lib/smartAccount.js`, `deployments/giwa-sepolia-kernel.json` | Research only. Not the live engine |
+| P-256 / WebAuthn on GIWA Sepolia | `docs/PASSKEY-P256-GIWA.md` | Measured. RIP-7212 at 0x100 is a real verifier |
 
 ---
 
@@ -321,6 +323,7 @@ lib/                      router, policy, identity, claims, swap
 web/                      Next.js site and dashboard
 contracts/                Solidity sources and Foundry tests
 supabase/migrations/      database schema
+deployments/              live addresses (DEX) and Kernel research pin
 docs/                     architecture, operations, fee mechanics
 ```
 
@@ -345,7 +348,7 @@ Full setup, deployment and configuration: [docs/OPERATIONS.md](docs/OPERATIONS.m
 | Horizon | Focus |
 |---------|-------|
 | **Now** | GIWA Sepolia: chat payments, identity claims (phone, email, GitHub, Discord, X, Telegram), invites with a phone-permanence count, FLZ swap and liquidity, both chat apps on one engine |
-| **Next** | Identity send for listed tokens (FLZ first), then NFTs, on the same escrow. Then on-chain enforcement of approved destinations through session-key smart wallets |
+| **Next** | Identity send for listed tokens (FLZ first), then NFTs, on the same escrow. Testers stay on derived EOAs until a smart-account path is live |
 | **Then** | More tokens through the pair registry, then more EVM chains through the chain registry. Same policy path, no new AMM |
 
 ---

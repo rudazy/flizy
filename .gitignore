@@ -69,6 +69,9 @@ docs/ROADMAP.md
 docs/DECISIONS.md
 docs/FUTURE-SYSTEMS.md
 docs/README.md
+docs/PROJECT.md
+docs/NFT-COLLECTIONS.md
+docs/SMART-ACCOUNTS-ASSESSMENT.md
 # Dev staging runbook (private). Maps two remotes, two DBs, env layout.
 docs/DEV-ENVIRONMENT.md
 # Staged build plans (private). Glob covers future stages, not just this one.
@@ -100,6 +103,8 @@ contracts/cache/
 contracts/broadcast/
 contracts/cache/**
 contracts/broadcast/**
+scripts/p256-probe/cache/
+scripts/p256-probe/out/
 # forge-std is vendored via submodule/path; do not require committing broadcast
 # contracts/lib/ may be present locally; prefer lockfile + install
 contracts/lib/

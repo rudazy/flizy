@@ -1,0 +1,15 @@
+{
+  "chainId": 91342,
+  "chainName": "GIWA Sepolia",
+  "note": "RESEARCH ONLY. Preinstalled Kernel v3.3 + EntryPoint v0.7. ECDSA validator is the v3.1 singleton already on this chain. Not FlizyWallet.sol. Do not cut the engine over.",
+  "entryPointV07": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+  "kernel": {
+    "version": "3.3",
+    "metaFactory": "0xd703aaE79538628d27099B8c4f621bE4CCd142d5",
+    "factory": "0x2577507b78c2008Ff367261CB6285d44ba5eF2E9",
+    "implementation": "0xd6CEDDe84be40893d153Be9d467CD6aD37875b28"
+  },
+  "ecdsaValidator": "0x845ADb2C711129d4f3966735eD98a9F09fC4cE57",
+  "ecdsaValidatorNote": "Kernel v3.1 ECDSAValidator, live on this chain. Root validator for first Sepolia smokes. Sudo key is not the user wallet.",
+  "hookModuleInstalled": "0x0000000000000000000000000000000000000001"
+}

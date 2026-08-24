@@ -1,18 +1,10 @@
-# Flizy smart wallet (Phase 2)
+# Flizy contracts
 
-Ludarep confirmed Phase 2.
+DEX (Uniswap V2 port + FlizyFeeRouter) is live on GIWA Sepolia. Addresses:
+`deployments/giwa-sepolia.json`.
 
-Target: smart contract wallet per account with session keys.
-
-## Goals
-
-- Session key can swap on approved DEX routers.
-- Session key can only transfer out to allowlisted addresses (on-chain).
-- Deterministic deploy (CREATE2) so the address is identical on every EVM chain.
-
-## Status
-
-Scaffold only. Implementation starts after Phase 0 and Phase 1 land and the bot identity model is stable.
+`FlizyWallet.sol` / `FlizyWalletFactory.sol` are scaffold. **Do not extend.
+Do not deploy for users.** Live user wallets today are server-derived EOAs.
 
 ## Tooling
 
