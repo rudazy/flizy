@@ -19,6 +19,7 @@ export default function WalletPage() {
   const [slide, setSlide] = useSlide(SLIDES, 'balances');
 
   const tokens = holdings?.holdings?.tokens || [];
+  const nfts = holdings?.holdings?.nfts || [];
   const flz = useMemo(
     () => tokens.find((t) => String(t.symbol || '').toUpperCase() === 'FLZ'),
     [tokens]
@@ -58,6 +59,20 @@ export default function WalletPage() {
               {Number(flz.balance).toPrecision(6)} <span className="text-base text-muted">FLZ</span>
             </p>
           ) : null}
+          {nfts.map((n) => {
+            const line =
+              n.balance == null
+                ? n.error || 'unavailable'
+                : n.ids?.length
+                  ? n.ids.map((id) => `#${id}`).join(' · ')
+                  : n.balance;
+            return (
+              <p key={n.address} className="mt-1.5 font-sans text-xl tracking-wide text-paper">
+                {line}{' '}
+                <span className="text-base text-muted">{n.ticker}</span>
+              </p>
+            );
+          })}
           <p className="mt-2 text-xs text-muted">
             {holdings?.holdings?.chain?.name || 'GIWA Sepolia'}
             {Number(data.account.balance_eth || 0) > 0
@@ -103,7 +118,7 @@ export default function WalletPage() {
               </ul>
             ) : (
               <p className="mt-1 text-xs text-muted">
-                {holdings?.holdings?.note || 'FLZ appears after you buy or receive tokens.'}
+                {holdings?.holdings?.note || 'FLZ and listed NFTs appear after you receive them.'}
               </p>
             )}
           </div>

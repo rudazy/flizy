@@ -16,7 +16,7 @@ process.env.PRIVATE_KEY =
 process.env.WALLET_DERIVATION_SECRET =
   process.env.WALLET_DERIVATION_SECRET || 'test-derivation-secret-32chars!!';
 
-const { parseSendCommand, parseNftSendCommand } = require('../lib/router');
+const { parseSendCommand, parseNftSendCommand, parseMintCommand } = require('../lib/router');
 
 describe('parseSendCommand platforms', () => {
   it('parses preferred form: to @login on github', () => {
@@ -172,6 +172,22 @@ describe('parseNftSendCommand', () => {
   it('does not parse a token send as an NFT send', () => {
     assert.equal(parseNftSendCommand('send 10 FLZ to @bob on telegram'), null);
     assert.equal(parseNftSendCommand('nft send giwaforge to @bob on telegram'), null);
+  });
+});
+
+describe('parseMintCommand', () => {
+  it('parses mint 1 giwaforge', () => {
+    const a = parseMintCommand('mint 1 giwaforge');
+    assert.equal(a.ticker, 'giwaforge');
+    assert.equal(a.count, 1);
+    assert.equal(parseMintCommand('mint giwaforge').count, 1);
+    assert.equal(parseMintCommand('nft mint 1 giwaforge').ticker, 'giwaforge');
+  });
+
+  it('parses a count other than 1 so the handler can refuse it', () => {
+    const a = parseMintCommand('mint 2 giwaforge');
+    assert.equal(a.count, 2);
+    assert.equal(parseMintCommand('send 1 giwaforge'), null);
   });
 });
 

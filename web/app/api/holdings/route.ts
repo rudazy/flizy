@@ -3,6 +3,7 @@ import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 import { getDexAddresses } from '../../../lib/dexServer';
 import { apiErrorBody } from '../../../lib/apiError';
+import { loadNftHoldings } from '../../../lib/listedNfts.ts';
 
 const ROUTE = 'GET /api/holdings';
 
@@ -40,6 +41,7 @@ export async function GET() {
       balance: string | null;
       error?: string;
     }> = [];
+    let nfts: Awaited<ReturnType<typeof loadNftHoldings>> = [];
 
     if (account.agent_wallet_address && ethers.isAddress(account.agent_wallet_address)) {
       const provider = new ethers.JsonRpcProvider(rpc, chainId);
@@ -98,6 +100,8 @@ export async function GET() {
           });
         }
       }
+
+      nfts = await loadNftHoldings(provider, wallet);
     }
 
     return NextResponse.json({
@@ -107,8 +111,9 @@ export async function GET() {
         chain: { name: 'GIWA Sepolia', chainId, explorerBaseUrl: explorer },
         native,
         tokens,
+        nfts,
         note:
-          tokens.length === 0
+          tokens.length === 0 && !nfts.length
             ? 'Native balance shown. FLZ appears once the agent wallet is funded and DEX is live.'
             : null,
       },

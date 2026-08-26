@@ -93,6 +93,13 @@ export type HoldingsData = {
     chain: { name: string; chainId: number; explorerBaseUrl: string };
     native: { symbol: string; balance: string } | null;
     tokens: Array<{ symbol: string; address: string | null; balance: string | null; error?: string }>;
+    nfts?: Array<{
+      ticker: string;
+      address: string;
+      balance: string | null;
+      ids: string[];
+      error?: string;
+    }>;
     note?: string | null;
   };
 };

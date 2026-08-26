@@ -83,6 +83,11 @@ const CMD_GROUPS: Array<{
         tg: '/nft send giwaforge 1842 to @bob on telegram',
         meaning: 'Hold a listed NFT until they claim (same escrow as ETH/FLZ). Collections studio is not this command.',
       },
+      {
+        wa: 'flizy mint 1 giwaforge',
+        tg: '/mint 1 giwaforge',
+        meaning: 'Mint one test NFT to your Flizy wallet. One per wallet. No ETH needed in chat.',
+      },
       { wa: 'confirm', tg: 'confirm or tap Confirm', meaning: 'Approve the plan' },
       { wa: 'cancel', tg: 'cancel', meaning: 'Abort the pending plan' },
     ],

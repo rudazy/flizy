@@ -58,4 +58,30 @@ contract GiwaforgeTest is Test {
         vm.expectRevert(Giwaforge.NotTokenOwner.selector);
         nft.ownerOf(1);
     }
+
+    function testPublicClaimOnePerWallet() public {
+        vm.prank(alice);
+        nft.claim();
+        assertEq(nft.ownerOf(1), alice);
+        assertEq(nft.claimed(alice), true);
+        assertEq(nft.totalSupply(), 1);
+
+        vm.prank(alice);
+        vm.expectRevert(Giwaforge.AlreadyClaimed.selector);
+        nft.claim();
+
+        vm.prank(bob);
+        nft.claim();
+        assertEq(nft.ownerOf(2), bob);
+    }
+
+    function testOwnerClaimToFrontsGas() public {
+        nft.claimTo(alice);
+        assertEq(nft.ownerOf(1), alice);
+        assertEq(nft.claimed(alice), true);
+
+        vm.prank(bob);
+        vm.expectRevert(Giwaforge.NotOwner.selector);
+        nft.claimTo(bob);
+    }
 }

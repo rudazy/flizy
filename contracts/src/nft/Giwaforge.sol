@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @notice Testnet ERC-721 for Flizy identity send. Cap 500. Owner mints in batches.
+/// @notice Testnet ERC-721 for Flizy identity send. Cap 500.
+/// Anyone may claim one NFT per wallet. Owner can still batch-mint for ops.
 /// Not the collections studio. Listed in chat as ticker `giwaforge`.
 contract Giwaforge {
     string public constant name = "Giwaforge";
@@ -11,6 +12,7 @@ contract Giwaforge {
 
     address public immutable owner;
     uint256 public totalSupply;
+    mapping(address => bool) public claimed;
 
     mapping(uint256 => address) private _ownerOf;
     mapping(address => uint256) private _balanceOf;
@@ -29,6 +31,7 @@ contract Giwaforge {
     error NotAuthorized();
     error ZeroAddress();
     error SameAddress();
+    error AlreadyClaimed();
 
     constructor() {
         owner = msg.sender;
@@ -76,6 +79,29 @@ contract Giwaforge {
             emit Transfer(address(0), to, next);
         }
         totalSupply = next;
+    }
+
+    /// @notice One NFT to the caller. Reverts if this wallet already claimed.
+    function claim() external {
+        _claimTo(msg.sender);
+    }
+
+    /// @notice One NFT to `to`, paid by the owner (Flizy fronts gas for new chats).
+    function claimTo(address to) external {
+        if (msg.sender != owner) revert NotOwner();
+        _claimTo(to);
+    }
+
+    function _claimTo(address to) internal {
+        if (to == address(0)) revert BadTo();
+        if (claimed[to]) revert AlreadyClaimed();
+        if (totalSupply >= MAX_SUPPLY) revert Cap();
+        claimed[to] = true;
+        uint256 id = totalSupply + 1;
+        totalSupply = id;
+        _ownerOf[id] = to;
+        _balanceOf[to] += 1;
+        emit Transfer(address(0), to, id);
     }
 
     function approve(address spender, uint256 tokenId) external {

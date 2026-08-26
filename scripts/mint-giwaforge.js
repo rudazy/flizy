@@ -30,7 +30,7 @@ const rpc =
   process.env.CHAIN_GIWA_SEPOLIA_RPC ||
   'https://sepolia-rpc.giwa.io';
 const collection =
-  process.env.GIWAFORGE_ADDRESS || '0xEA1950D3Bf4C81BF80D43FE4F2553E1D2A4c312f';
+  process.env.GIWAFORGE_ADDRESS || '0xa613FcF6FE09442391b07F87b82c24a539bCCB2A';
 
 const forge = process.env.FORGE_PATH || 'C:\\Users\\Ludarep\\.foundry\\bin\\forge.exe';
 const contractsDir = path.join(__dirname, '..', 'contracts');

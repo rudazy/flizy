@@ -99,7 +99,11 @@ describe('resolveListedNft empty registry', () => {
     else process.env.CHAIN_GIWA_SEPOLIA_NFTS = prev;
   });
 
-  it('errors listed-only when nothing is configured', () => {
-    assert.throws(() => resolveListedNft('giwaforge', 'giwa_sepolia'), /No listed collections/);
+  it('falls back to the testnet giwaforge collection', () => {
+    const list = listedNfts('giwa_sepolia');
+    assert.equal(list.length, 1);
+    assert.equal(list[0].ticker, 'giwaforge');
+    const a = resolveListedNft('giwaforge', 'giwa_sepolia');
+    assert.equal(a.ticker, 'giwaforge');
   });
 });
