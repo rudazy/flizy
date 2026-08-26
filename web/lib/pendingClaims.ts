@@ -14,6 +14,7 @@ export type PendingClaimSummary = {
   id: string;
   amountEth: string;
   asset: string;
+  nftTokenId?: string | null;
   status: string;
   label: string;
   counterparty: string | null;
@@ -181,6 +182,7 @@ export async function listPendingClaimSummaries(
       id: String(c.id),
       amountEth: String(c.amount_eth ?? ''),
       asset: String(c.asset || 'ETH').toUpperCase(),
+      nftTokenId: c.nft_token_id != null && c.nft_token_id !== '' ? String(c.nft_token_id) : null,
       status: String(c.status || 'pending'),
       label,
       counterparty: peer ? `${rail} ${peer}` : rail,

@@ -2,6 +2,7 @@ export type PendingClaimItem = {
   id: string;
   amountEth: string;
   asset?: string;
+  nftTokenId?: string | null;
   status: string;
   label: string;
   counterparty: string | null;

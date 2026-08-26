@@ -6,10 +6,12 @@ import Link from 'next/link';
 import { track } from '../../../lib/analytics';
 import { CopyButton } from '../../../components/CopyButton';
 import { claimSharePath, claimShareText, telegramShareHref } from '../../../lib/claimShare.ts';
+import { formatClaimAmount } from '../../../lib/claimAmount.ts';
 
 type ClaimView = {
   amount_eth?: string;
   asset?: string;
+  nft_token_id?: string | null;
   status?: string;
   error?: string;
   recipient?: string;
@@ -56,7 +58,10 @@ export default function ClaimPage() {
   }, [origin, token, inviteRef]);
 
   const tgShare = shareUrl
-    ? telegramShareHref(shareUrl, claimShareText(shareUrl, data?.amount_eth, data?.asset))
+    ? telegramShareHref(
+        shareUrl,
+        claimShareText(shareUrl, data?.amount_eth, data?.asset, data?.nft_token_id)
+      )
     : '';
 
   useEffect(() => {
@@ -132,7 +137,11 @@ export default function ClaimPage() {
           <p>
             Amount:{' '}
             <span className="font-sans text-lg text-lime">
-              {data.amount_eth} {data.asset || 'ETH'}
+              {formatClaimAmount({
+                amount_eth: data.amount_eth,
+                asset: data.asset,
+                nft_token_id: data.nft_token_id,
+              })}
             </span>
           </p>
           <p className="text-muted">

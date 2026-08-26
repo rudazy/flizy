@@ -120,11 +120,17 @@ export function claimViaLine(claim: ClaimMatchRow): string | null {
 export function formatClaimClaimedNotice(p: {
   amountEth: string | number;
   asset?: string | null;
+  nftTokenId?: string | number | null;
+  nft_token_id?: string | number | null;
   byLabel?: string | null;
   viaLine?: string | null;
   explorerUrl?: string | null;
 }): string {
-  const amount = formatClaimAmount({ amount_eth: p.amountEth, asset: p.asset });
+  const amount = formatClaimAmount({
+    amount_eth: p.amountEth,
+    asset: p.asset,
+    nft_token_id: p.nftTokenId != null ? p.nftTokenId : p.nft_token_id,
+  });
   const by = String(p.byLabel || '').trim() || 'someone';
   const via = String(p.viaLine || '').trim();
   const lines = ['Claim delivered on Flizy.', `${amount} claimed by ${by}.`];

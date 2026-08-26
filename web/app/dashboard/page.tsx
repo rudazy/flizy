@@ -18,6 +18,7 @@ import { useDashboard } from '../../components/DashboardProvider';
 import { useLocale } from '../../components/LocaleProvider';
 import { shortAddr } from '../../lib/dashboardTypes';
 import { CopyButton } from '../../components/CopyButton';
+import { formatClaimAmount } from '../../lib/claimAmount.ts';
 
 const SLIDES = ['overview', 'claims', 'go', 'recent'] as const;
 
@@ -380,11 +381,15 @@ export default function DashboardHomePage() {
                           {kindLine}
                         </p>
                         <p className="mt-1 font-sans text-sm text-lime">
-                          +
-                          {Number(c.amountEth).toLocaleString(undefined, {
-                            maximumFractionDigits: 6,
-                          })}{' '}
-                          {c.asset || 'ETH'}
+                          {c.nftTokenId
+                            ? formatClaimAmount({
+                                amount_eth: c.amountEth,
+                                asset: c.asset,
+                                nft_token_id: c.nftTokenId,
+                              })
+                            : `+${Number(c.amountEth).toLocaleString(undefined, {
+                                maximumFractionDigits: 6,
+                              })} ${c.asset || 'ETH'}`}
                         </p>
                       </div>
                       {phoneOnly ? (

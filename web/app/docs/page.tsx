@@ -78,6 +78,11 @@ const CMD_GROUPS: Array<{
         tg: '/send 10 FLZ to @user on telegram',
         meaning: 'Hold FLZ for that Telegram account until they claim (same as ETH holds)',
       },
+      {
+        wa: 'flizy nft send giwaforge 1842 to @bob on telegram',
+        tg: '/nft send giwaforge 1842 to @bob on telegram',
+        meaning: 'Hold a listed NFT until they claim (same escrow as ETH/FLZ). Collections studio is not this command.',
+      },
       { wa: 'confirm', tg: 'confirm or tap Confirm', meaning: 'Approve the plan' },
       { wa: 'cancel', tg: 'cancel', meaning: 'Abort the pending plan' },
     ],

@@ -9,6 +9,7 @@ const {
   claimAssetSymbol,
   formatClaimAmount,
   isNativeClaim,
+  isNftClaim,
 } = require('../lib/claimAmount');
 const { buildClaimPlan, formatClaimPlanPreview, assertPlanFunded } = require('../lib/engine/plan');
 const { createSendIntent } = require('../lib/engine/intent');
@@ -37,6 +38,18 @@ describe('claimAssetSymbol / formatClaimAmount', () => {
       isNativeClaim({ amount_eth: '10', asset: 'FLZ', token_address: '0x' + '11'.repeat(20) }),
       false
     );
+  });
+
+  it('renders NFT holds as ticker #id', () => {
+    const row = {
+      amount_eth: '1',
+      asset: 'GIWAFORGE',
+      token_address: '0x' + '11'.repeat(20),
+      nft_token_id: '1842',
+    };
+    assert.equal(formatClaimAmount(row), 'giwaforge #1842');
+    assert.equal(isNftClaim(row), true);
+    assert.equal(isNativeClaim(row), false);
   });
 });
 
@@ -105,6 +118,41 @@ describe('FLZ claim plan', () => {
   });
 });
 
+describe('NFT claim plan', () => {
+  it('preview names the NFT, not 1 ETH', () => {
+    const { platformRecipient } = require('../lib/claimRecipient');
+    const intent = createSendIntent({
+      actor,
+      amountEth: '1',
+      toLabel: '@bob (Telegram)',
+      asset: 'GIWAFORGE',
+    });
+    const recipient = platformRecipient('telegram', '111222333', 'bob');
+    const plan = buildClaimPlan({
+      intent,
+      policy: { decision: 'ALLOW_WITH_CONFIRM' },
+      chain: { chainId: 91342, chainName: 'GIWA Sepolia', nativeSymbol: 'ETH' },
+      fromAddress: '0x3333333333333333333333333333333333333333',
+      recipient,
+      fromBalanceEth: '1',
+      tokenAddress: '0x' + '11'.repeat(20),
+      tokenSymbol: 'GIWAFORGE',
+      nftTokenId: '1842',
+    });
+    assert.equal(plan.route.nftTokenId, '1842');
+    const preview = formatClaimPlanPreview(plan);
+    assert.match(preview, /giwaforge #1842/);
+    assert.doesNotMatch(preview, /Amount:\s+1 ETH/);
+    assert.match(preview, /Hold giwaforge #1842/);
+
+    const funded = assertPlanFunded(plan, '1', '0.0001', { nftOwned: true });
+    assert.equal(funded.ok, true);
+    const missing = assertPlanFunded(plan, '1', '0.0001', { nftOwned: false });
+    assert.equal(missing.ok, false);
+    assert.match(missing.message, /You do not hold giwaforge #1842/);
+  });
+});
+
 describe('claim copy uses the row asset', () => {
   it('menu and claimed notice say FLZ', () => {
     const menu = formatClaimsMenu(
@@ -147,5 +195,33 @@ describe('claim copy uses the row asset', () => {
     );
     assert.match(t, /10 FLZ/);
     assert.doesNotMatch(t, /10 ETH/);
+  });
+
+  it('menu and claimed notice say giwaforge #1842', () => {
+    const menu = formatClaimsMenu(
+      [
+        {
+          to_channel: 'telegram',
+          to_external_id: '1',
+          to_display_handle: 'bob',
+          amount_eth: '1',
+          asset: 'GIWAFORGE',
+          nft_token_id: '1842',
+          created_at: new Date().toISOString(),
+        },
+      ],
+      'outgoing'
+    );
+    assert.match(menu, /giwaforge #1842/);
+    assert.doesNotMatch(menu, /1 GIWAFORGE/);
+
+    const notice = formatClaimClaimedNotice({
+      amountEth: '1',
+      asset: 'GIWAFORGE',
+      nftTokenId: '1842',
+      byLabel: '@bob',
+      viaLine: 'Telegram @bob',
+    });
+    assert.match(notice, /giwaforge #1842 claimed by @bob/);
   });
 });

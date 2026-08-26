@@ -16,7 +16,7 @@ process.env.PRIVATE_KEY =
 process.env.WALLET_DERIVATION_SECRET =
   process.env.WALLET_DERIVATION_SECRET || 'test-derivation-secret-32chars!!';
 
-const { parseSendCommand } = require('../lib/router');
+const { parseSendCommand, parseNftSendCommand } = require('../lib/router');
 
 describe('parseSendCommand platforms', () => {
   it('parses preferred form: to @login on github', () => {
@@ -128,6 +128,50 @@ describe('parseSendCommand platforms', () => {
     const a = parseSendCommand('send 0.01 to github');
     assert.equal(a.platform, null);
     assert.equal(a.toRaw, 'github');
+  });
+});
+
+describe('parseNftSendCommand', () => {
+  it('parses nft send ticker id to @user on telegram', () => {
+    const a = parseNftSendCommand('nft send giwaforge 1842 to @bob on telegram');
+    assert.ok(a);
+    assert.equal(a.isNft, true);
+    assert.equal(a.nftTicker, 'giwaforge');
+    assert.equal(a.nftTokenId, '1842');
+    assert.equal(a.amountEth, '1');
+    assert.equal(a.platform, 'telegram');
+    assert.equal(a.toRaw, 'bob');
+    assert.equal(a.isPhone, false);
+    assert.equal(a.isAddress, false);
+  });
+
+  it('accepts #id and listed-token-shaped rest of the send', () => {
+    const a = parseNftSendCommand('nft send giwaforge #01842 to bob on tg');
+    assert.equal(a.nftTokenId, '1842');
+    assert.equal(a.platform, 'telegram');
+    assert.equal(a.toRaw, 'bob');
+  });
+
+  it('reuses phone, email, github, and alias targets', () => {
+    const phone = parseNftSendCommand('nft send giwaforge 1 to 2348012345678');
+    assert.equal(phone.isPhone, true);
+    assert.equal(phone.toRaw, '2348012345678');
+
+    const email = parseNftSendCommand('nft send giwaforge 2 to friend@email.com');
+    assert.equal(email.isEmail, true);
+
+    const gh = parseNftSendCommand('nft send giwaforge 3 to @rudazy on github');
+    assert.equal(gh.platform, 'github');
+    assert.equal(gh.toRaw, 'rudazy');
+
+    const alias = parseNftSendCommand('nft send giwaforge 4 to john');
+    assert.equal(alias.toRaw, 'john');
+    assert.equal(alias.platform, null);
+  });
+
+  it('does not parse a token send as an NFT send', () => {
+    assert.equal(parseNftSendCommand('send 10 FLZ to @bob on telegram'), null);
+    assert.equal(parseNftSendCommand('nft send giwaforge to @bob on telegram'), null);
   });
 });
 

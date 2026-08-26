@@ -16,6 +16,7 @@ export function PayLanding({
   const [self, setSelf] = useState(false);
   const [payerHandle, setPayerHandle] = useState('');
   const [amount, setAmount] = useState('');
+  const [asset, setAsset] = useState<'ETH' | 'FLZ'>('ETH');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -70,7 +71,7 @@ export function PayLanding({
       const res = await fetch('/api/pay/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: refSlug, amount, password }),
+        body: JSON.stringify({ ref: refSlug, amount, password, asset }),
       });
       const body = await res.json().catch(() => ({}));
       if (res.status === 401) {
@@ -141,14 +142,31 @@ export function PayLanding({
             </div>
           ) : null}
           <div>
+            <p className="label" id="pay-asset-label">
+              Asset
+            </p>
+            <div className="mt-1 flex gap-2" role="group" aria-labelledby="pay-asset-label">
+              {(['ETH', 'FLZ'] as const).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className={asset === opt ? 'btn btn-primary flex-1 py-2' : 'btn btn-ghost flex-1 py-2'}
+                  onClick={() => setAsset(opt)}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
             <label className="label" htmlFor="pay-amount">
-              Amount (ETH)
+              Amount ({asset})
             </label>
             <input
               id="pay-amount"
               className="input"
               inputMode="decimal"
-              placeholder="0.01"
+              placeholder={asset === 'FLZ' ? '10' : '0.01'}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               required
@@ -170,7 +188,7 @@ export function PayLanding({
           </div>
           {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
           <button type="submit" className="btn btn-primary w-full py-3 font-semibold" disabled={busy}>
-            {busy ? 'Paying…' : `Pay ${handle}`}
+            {busy ? 'Paying…' : `Pay ${handle} in ${asset}`}
           </button>
         </form>
       ) : null}

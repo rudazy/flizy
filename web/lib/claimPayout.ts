@@ -26,12 +26,17 @@ import {
   type ClaimMatchRow,
 } from './claimMatch.ts';
 import { parseEmail } from './email.ts';
-import { isNativeClaim, claimAssetSymbol } from './claimAmount.ts';
+import { isNativeClaim, claimAssetSymbol, nftTokenIdOf } from './claimAmount.ts';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
   'function balanceOf(address) view returns (uint256)',
   'function decimals() view returns (uint8)',
+];
+
+const ERC721_ABI = [
+  'function ownerOf(uint256 tokenId) view returns (address)',
+  'function transferFrom(address from, address to, uint256 tokenId)',
 ];
 
 export type ClaimRow = ClaimMatchRow & {
@@ -40,6 +45,7 @@ export type ClaimRow = ClaimMatchRow & {
   amount_eth: string | number;
   asset?: string | null;
   token_address?: string | null;
+  nft_token_id?: string | null;
   from_account_id: string;
   claim_token?: string | null;
   chain_id?: number | null;
@@ -282,7 +288,9 @@ export async function executeWebClaimPayout(p: {
     const tokenAddr = held.token_address && ethers.isAddress(String(held.token_address))
       ? ethers.getAddress(String(held.token_address))
       : null;
-    const native = isNativeClaim(held as ClaimRow) && !tokenAddr;
+    const nftId = nftTokenIdOf(held as ClaimRow);
+    const isNft = nftId != null;
+    const native = !isNft && isNativeClaim(held as ClaimRow) && !tokenAddr;
 
     const network = await provider.getNetwork();
     if (Number(network.chainId) !== chain.chainId) {
@@ -291,7 +299,44 @@ export async function executeWebClaimPayout(p: {
     }
 
     let tx: ethers.TransactionResponse;
-    if (native) {
+    if (isNft) {
+      if (!tokenAddr) {
+        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+        return {
+          ok: false,
+          error: `This ${claimAssetSymbol(held as ClaimRow)} claim has no collection on record.`,
+          status: 400,
+        };
+      }
+      if (escEth < gasBuffer) {
+        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+        return {
+          ok: false,
+          error: 'Payout temporarily unavailable. Try again later.',
+          status: 503,
+        };
+      }
+      const nft = new ethers.Contract(tokenAddr, ERC721_ABI, escrow);
+      try {
+        const owner = await nft.ownerOf(nftId);
+        if (ethers.getAddress(String(owner)) !== ethers.getAddress(escrow.address)) {
+          await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+          return {
+            ok: false,
+            error: 'Payout temporarily unavailable. Try again later.',
+            status: 503,
+          };
+        }
+      } catch {
+        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+        return {
+          ok: false,
+          error: 'Payout temporarily unavailable. Try again later.',
+          status: 503,
+        };
+      }
+      tx = await nft.transferFrom(escrow.address, toAddress, nftId);
+    } else if (native) {
       const amountWei = ethers.parseEther(String(held.amount_eth));
       if (amountWei <= 0n) {
         await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
@@ -392,6 +437,7 @@ export async function executeWebClaimPayout(p: {
         formatClaimClaimedNotice({
           amountEth: updated.amount_eth,
           asset: updated.asset,
+          nftTokenId: updated.nft_token_id,
           byLabel,
           viaLine,
           explorerUrl,

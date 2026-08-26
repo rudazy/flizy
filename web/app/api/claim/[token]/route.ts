@@ -17,6 +17,7 @@ export async function GET(_req: Request, ctx: { params: { token: string } }) {
     const body = {
       amount_eth: claim.amount_eth,
       asset: String(claim.asset || 'ETH').toUpperCase(),
+      nft_token_id: claim.nft_token_id ? String(claim.nft_token_id) : null,
       status: claim.status,
       chain_id: claim.chain_id,
       // Never the full phone, and never the raw platform id. A phone is masked
