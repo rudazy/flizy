@@ -1,0 +1,29 @@
+{
+  "chainId": 91342,
+  "chainName": "GIWA Sepolia",
+  "explorer": "https://sepolia-explorer.giwa.io",
+  "deployedAt": "2026-08-26",
+  "collections": {
+    "giwaforge": {
+      "address": "0xEA1950D3Bf4C81BF80D43FE4F2553E1D2A4c312f",
+      "name": "Giwaforge",
+      "symbol": "FORGE",
+      "maxSupply": 500,
+      "owner": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+      "firstMint": {
+        "to": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+        "count": 20,
+        "ids": "1-20"
+      },
+      "deployTx": "0x3498a6c629e99797ad1389ff7af206aa0654cae92c5648a2d350bc8ece464db0",
+      "mintTx": "0xdfdbfca1307a529a17d68845f9ad708b03fa787dcbe28c225e66f85c9353173b",
+      "explorer": "https://sepolia-explorer.giwa.io/address/0xEA1950D3Bf4C81BF80D43FE4F2553E1D2A4c312f"
+    }
+  },
+  "env": "CHAIN_GIWA_SEPOLIA_NFTS=giwaforge:0xEA1950D3Bf4C81BF80D43FE4F2553E1D2A4c312f",
+  "notes": [
+    "Testnet identity-send collection. Cap 500. Owner mint in batches of at most 50.",
+    "Not the collections studio. Chat ticker is giwaforge.",
+    "Ids 1-20 sit on the ops/treasury address until minted or transferred to a Flizy agent wallet."
+  ]
+}
