@@ -209,6 +209,7 @@ describe('canonicalizeCommand — must not touch anything else', () => {
     'send 10 FLZ to ama',
     'nft send giwaforge 1842 to @bob on telegram',
     'mint 1 giwaforge',
+    'mint 1 giwaforge nft',
     'request 0.01 from john',
     'add ama 0x1111111111111111111111111111111111111111',
     'save ama 0x1111111111111111111111111111111111111111',
@@ -293,6 +294,7 @@ describe('the WhatsApp wake gate sees loose commands', () => {
     'add 0x1111111111111111111111111111111111111111',
     'nft send giwaforge 1842 to @bob on telegram',
     'mint 1 giwaforge',
+    'mint 1 giwaforge nft',
   ];
 
   for (const cmd of woken) {

@@ -86,7 +86,7 @@ const CMD_GROUPS: Array<{
       {
         wa: 'flizy mint 1 giwaforge',
         tg: '/mint 1 giwaforge',
-        meaning: 'Mint one test NFT to your Flizy wallet. One per wallet. No ETH needed in chat.',
+        meaning: 'Mint one test NFT to your Flizy wallet. One per wallet. No ETH needed in chat. "mint 1 giwaforge nft" is the same.',
       },
       { wa: 'confirm', tg: 'confirm or tap Confirm', meaning: 'Approve the plan' },
       { wa: 'cancel', tg: 'cancel', meaning: 'Abort the pending plan' },

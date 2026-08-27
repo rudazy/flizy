@@ -182,6 +182,9 @@ describe('parseMintCommand', () => {
     assert.equal(a.count, 1);
     assert.equal(parseMintCommand('mint giwaforge').count, 1);
     assert.equal(parseMintCommand('nft mint 1 giwaforge').ticker, 'giwaforge');
+    const trail = parseMintCommand('mint 1 giwaforge nft');
+    assert.equal(trail.ticker, 'giwaforge');
+    assert.equal(trail.count, 1);
   });
 
   it('parses a count other than 1 so the handler can refuse it', () => {

@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
 import { AppTopBar } from '../../../components/AppTopBar';
 import {
   AppPage,
@@ -20,10 +19,6 @@ export default function WalletPage() {
 
   const tokens = holdings?.holdings?.tokens || [];
   const nfts = holdings?.holdings?.nfts || [];
-  const flz = useMemo(
-    () => tokens.find((t) => String(t.symbol || '').toUpperCase() === 'FLZ'),
-    [tokens]
-  );
 
   if (!data) return null;
 
@@ -54,25 +49,6 @@ export default function WalletPage() {
           ) : (
             <p className="font-sans text-2xl text-muted">No balance yet</p>
           )}
-          {flz && flz.balance != null ? (
-            <p className="mt-1.5 font-sans text-xl tracking-wide text-paper">
-              {Number(flz.balance).toPrecision(6)} <span className="text-base text-muted">FLZ</span>
-            </p>
-          ) : null}
-          {nfts.map((n) => {
-            const line =
-              n.balance == null
-                ? n.error || 'unavailable'
-                : n.ids?.length
-                  ? n.ids.map((id) => `#${id}`).join(' · ')
-                  : n.balance;
-            return (
-              <p key={n.address} className="mt-1.5 font-sans text-xl tracking-wide text-paper">
-                {line}{' '}
-                <span className="text-base text-muted">{n.ticker}</span>
-              </p>
-            );
-          })}
           <p className="mt-2 text-xs text-muted">
             {holdings?.holdings?.chain?.name || 'GIWA Sepolia'}
             {Number(data.account.balance_eth || 0) > 0
@@ -118,8 +94,29 @@ export default function WalletPage() {
               </ul>
             ) : (
               <p className="mt-1 text-xs text-muted">
-                {holdings?.holdings?.note || 'FLZ and listed NFTs appear after you receive them.'}
+                {holdings?.holdings?.note || 'FLZ appears after you buy or receive tokens.'}
               </p>
+            )}
+          </div>
+
+          <div className="mt-5">
+            <p className="label">NFTs</p>
+            {nfts.length ? (
+              <ul className="mt-2 space-y-0">
+                {nfts.map((n) => (
+                  <li
+                    key={n.address}
+                    className="flex items-center justify-between border-b border-border py-2.5 text-sm first:pt-0 last:border-0 last:pb-0"
+                  >
+                    <span className="text-muted">{n.ticker}</span>
+                    <span className="font-mono text-paper">
+                      {n.balance == null ? n.error || 'n/a' : n.balance}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-xs text-muted">Listed NFTs appear after you mint or receive them.</p>
             )}
           </div>
         </AppSection>
