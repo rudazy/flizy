@@ -62,6 +62,7 @@ That is the product. Everything below serves it.
 | --- | --- | --- |
 | Send to a saved name | `flizy send 0.01 to john` | `/send 0.01 to john` |
 | Pay a Flizy account | `flizy pay 0.01 to @ludarep` | `/pay 0.01 to @ludarep` |
+| Send an NFT you hold | `flizy send giwaforge to john` | `/send giwaforge to john` |
 | Confirm | reply `confirm` | tap Confirm, or type it |
 | Receive to your number | automatic once linked | share your number once with `/phone` |
 | Lock this device | `flizy lock` | `/lock` |
@@ -94,7 +95,10 @@ From there the destination decides the settlement:
 
 ```mermaid
 flowchart TB
-  START["send / pay"] --> KIND{Who is the destination?}
+  START["send / pay"] --> WHAT{Was an amount named?}
+  WHAT -->|yes| KIND{Who is the destination?}
+  WHAT -->|"no, just a ticker"| READ["Read the wallet:<br/>token or NFT, then which token id"]
+  READ --> KIND
 
   KIND -->|"saved name"| TRUST["Trusted list<br/>password-gated on the site"]
   KIND -->|"@username, pay code, or QR"| ID["Flizy account<br/>their agent wallet"]
@@ -234,6 +238,11 @@ already on Flizy they are notified in chat. If not, you share a claim link. Mone
 lands in someone's wallet unannounced, and a number that is not on Flizy is never messaged
 out of the blue.
 
+**Naming an asset is enough.** `flizy send giwaforge to john` carries no amount and no
+token id, so Flizy reads your wallet and asks for whatever is missing: token or NFT if you
+hold both, then which token id if you hold several. One NFT and it goes straight to the
+plan. Nothing is picked for you, and the plan still names the exact id before you confirm.
+
 Home has an optional **Attach to claims I send** checkbox, off by default. When on, new
 holds carry your invite so someone who joins from that claim can count as a referred
 friend. How a count is earned: [docs on the site](https://flizy.app/docs#invites).
@@ -256,6 +265,9 @@ Bare `confirm` and `cancel` work on both.
 | `me` · `balance` · `deposit` · `history` | Account and wallet |
 | `add wallet 0x…` | Start the approved-destination flow |
 | `send AMOUNT [FLZ] to name \| phone \| email \| @user on telegram` | Transfer, or hold a claim (ETH default; listed tokens too) |
+| `send TICKER to …` | No amount: Flizy reads your wallet and asks token or NFT, then which id. Add `nft` (`send giwaforge nft to …`) to skip straight to the collection |
+| `nft send TICKER ID to …` | Send one listed NFT by token id |
+| `mint 1 giwaforge` | One test NFT per wallet |
 | `claim` · `cancel claims` | Receive or cancel holds |
 | `request` · `pay` · `requests` | Payment requests |
 | `buy AMOUNT FLZ` · `sell AMOUNT FLZ` | Trade against the pool |
@@ -347,8 +359,8 @@ Full setup, deployment and configuration: [docs/OPERATIONS.md](docs/OPERATIONS.m
 
 | Horizon | Focus |
 |---------|-------|
-| **Now** | GIWA Sepolia: chat payments, identity claims (phone, email, GitHub, Discord, X, Telegram), invites with a phone-permanence count, FLZ swap and liquidity, both chat apps on one engine |
-| **Next** | Identity send for listed tokens (FLZ first), then NFTs, on the same escrow. Testers stay on derived EOAs until a smart-account path is live |
+| **Now** | GIWA Sepolia: chat payments, identity claims (phone, email, GitHub, Discord, X, Telegram), identity send for listed tokens and NFTs on the same escrow, invites with a phone-permanence count, FLZ swap and liquidity, both chat apps on one engine |
+| **Next** | A smart-account path so testers move off derived EOAs, with the policy gate unchanged |
 | **Then** | More tokens through the pair registry, then more EVM chains through the chain registry. Same policy path, no new AMM |
 
 ---
