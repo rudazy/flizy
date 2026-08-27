@@ -287,8 +287,33 @@ describe('parseSendNamedAssetCommand', () => {
     assert.equal(phone.isPhone, true);
   });
 
-  it('marks "nft send" as NFT-only so a same-named token is skipped', () => {
-    assert.equal(parseSendNamedAssetCommand('nft send giwaforge to a@b.com').nftOnly, true);
+  it('takes the word "nft" wherever it reads naturally, and always means the collection', () => {
+    for (const form of [
+      'nft send giwaforge to a@b.com',
+      'send nft giwaforge to a@b.com',
+      'send giwaforge nft to a@b.com',
+      'send giwaforge nfts to a@b.com',
+    ]) {
+      const p = parseSendNamedAssetCommand(form);
+      assert.ok(p, `${form} should parse`);
+      assert.equal(p.ticker, 'giwaforge', form);
+      assert.equal(p.nftOnly, true, form);
+      assert.equal(p.toRaw, 'a@b.com', form);
+    }
+  });
+
+  it('reads a Telegram handle the short way people type it', () => {
+    // "tg" for telegram, no leading @ -- both already accepted by
+    // parseSendCommand, which this reuses rather than re-implements.
+    const p = parseSendNamedAssetCommand('send giwaforge nft to ludareq on tg');
+    assert.equal(p.ticker, 'giwaforge');
+    assert.equal(p.nftOnly, true);
+    assert.equal(p.platform, 'telegram');
+    assert.equal(p.toRaw, 'ludareq');
+  });
+
+  it('does not read "nft" itself as the ticker when one follows it', () => {
+    assert.equal(parseSendNamedAssetCommand('send nft giwaforge to a@b.com').ticker, 'giwaforge');
   });
 
   it('never takes an amount send, which stays parseSendCommand"s job', () => {
@@ -340,6 +365,21 @@ describe('send <ticker> to <person>', () => {
     const sent = await say(`flizy send giwaforge to ${RECIPIENT_EMAIL}`);
 
     assert.match(lastText(sent), /do not hold giwaforge/i);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('asking for the NFT while holding only the token says which you have', async () => {
+    holdingsAnswer = {
+      ticker: 'giwaforge',
+      token: { symbol: 'GIWAFORGE', balance: '250.0', native: false },
+      nft: null,
+    };
+    const sent = await say(`flizy send giwaforge nft to ${RECIPIENT_EMAIL}`);
+
+    const msg = lastText(sent);
+    assert.match(msg, /do not hold any giwaforge NFTs/i);
+    assert.match(msg, /250\.0 giwaforge as a token/i, 'must not deny a balance they can see');
+    assert.match(msg, /send giwaforge to friend@example\.com/, 'and name the way to send it');
     assert.equal(claimHoldCalls.length, 0);
   });
 
@@ -478,12 +518,15 @@ describe('when the ticker is both a token and a collection', () => {
     assert.match(lastText(sent), /You have 250\.0/);
   });
 
-  it('"nft send" skips the question entirely', async () => {
-    holdingsAnswer = both();
-    const sent = await say(`flizy nft send giwaforge to ${RECIPIENT_EMAIL}`);
+  it('naming the nft skips the question entirely, in any of its wordings', async () => {
+    for (const form of ['nft send giwaforge', 'send nft giwaforge', 'send giwaforge nft']) {
+      router.discardPendingFlows(`whatsapp:${SENDER_WA}`);
+      holdingsAnswer = both();
+      const sent = await say(`flizy ${form} to ${RECIPIENT_EMAIL}`);
 
-    assert.match(lastText(sent), /Which giwaforge do you want to send\?/i);
-    assert.doesNotMatch(textOf(sent).join('\n'), /token and as NFTs/i);
+      assert.match(lastText(sent), /Which giwaforge do you want to send\?/i, form);
+      assert.doesNotMatch(textOf(sent).join('\n'), /token and as NFTs/i, form);
+    }
   });
 });
 
