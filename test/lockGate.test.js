@@ -36,7 +36,10 @@ require.cache[runtimePath] = {
       nativeSymbol: 'ETH',
       rpcUrl: 'http://localhost:0',
     },
-    supabase: { from: (table) => fake.client.from(table) },
+    supabase: {
+      from: (table) => fake.client.from(table),
+      rpc: (name, args) => fake.client.rpc(name, args),
+    },
     provider: {},
     opsWallet: { address: '0x3333333333333333333333333333333333333333' },
     escrowWallet: { address: '0x4444444444444444444444444444444444444444' },

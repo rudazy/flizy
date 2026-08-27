@@ -16,7 +16,12 @@ process.env.PRIVATE_KEY =
 process.env.WALLET_DERIVATION_SECRET =
   process.env.WALLET_DERIVATION_SECRET || 'test-derivation-secret-32chars!!';
 
-const { parseSendCommand, parseNftSendCommand, parseMintCommand } = require('../lib/router');
+const {
+  parseSendCommand,
+  parseNftSendCommand,
+  parseSendNamedAssetCommand,
+  parseMintCommand,
+} = require('../lib/router');
 
 describe('parseSendCommand platforms', () => {
   it('parses preferred form: to @login on github', () => {

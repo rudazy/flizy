@@ -437,7 +437,8 @@ async function handleIncomingMessage(message) {
 
     // WhatsApp is a shared inbox: stay silent unless this is clearly for us
     const flow = router.pendingFlowFor(ctx.key);
-    const midFlow = flow.walletAdd || flow.claimMenu || flow.unlock;
+    const midFlow =
+      flow.walletAdd || flow.claimMenu || flow.unlock || flow.choice || flow.namedSend;
     if (!router.isFlizyCommand(ctx, rawText) && !midFlow) {
       return;
     }

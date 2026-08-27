@@ -32,7 +32,10 @@ require.cache[runtimePath] = {
       nativeSymbol: 'ETH',
       rpcUrl: 'http://localhost:0',
     },
-    supabase: { from: (table) => fake.client.from(table) },
+    supabase: {
+      from: (table) => fake.client.from(table),
+      rpc: (name, args) => fake.client.rpc(name, args),
+    },
     provider: {},
     opsWallet: { address: '0x3333333333333333333333333333333333333333' },
     escrowWallet: { address: '0x4444444444444444444444444444444444444444' },
@@ -465,5 +468,36 @@ describe('Telegram API helpers', () => {
   it('builds a contact-share keyboard, not a text prompt', () => {
     const markup = requestContactKeyboard();
     assert.equal(markup.keyboard[0][0].request_contact, true);
+  });
+});
+
+/**
+ * Inline buttons are a shortcut for words the user could type, so the set of
+ * values a button may send is closed. Numbered picks had to be added when the
+ * NFT chooser started drawing them: until then any callback that was not
+ * confirm/cancel was dropped, and tapping "2" on Telegram did nothing at all.
+ */
+describe('Telegram inline button callbacks', () => {
+  const { TelegramBot } = require('../lib/telegram/bot');
+
+  it('accepts confirm and cancel', () => {
+    assert.equal(TelegramBot.isAllowedCallback('confirm'), true);
+    assert.equal(TelegramBot.isAllowedCallback('cancel'), true);
+  });
+
+  it('accepts the numbered picks the choice prompts draw', () => {
+    for (const n of ['1', '2', '9', '10', '20']) {
+      assert.equal(TelegramBot.isAllowedCallback(n), true, `${n} should be tappable`);
+    }
+  });
+
+  it('refuses anything outside that set', () => {
+    for (const bad of ['0', '21', '', '1 ', 'send 1 to 0xdead', 'confirm cancel', '-1', '1.5']) {
+      assert.equal(
+        TelegramBot.isAllowedCallback(bad),
+        false,
+        `${JSON.stringify(bad)} must not be a button value`
+      );
+    }
   });
 });

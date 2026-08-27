@@ -96,6 +96,29 @@ class Query {
     return this;
   }
 
+  /**
+   * PostgREST .not(column, operator, value). Only the operators the app uses
+   * are implemented; anything else throws rather than filtering nothing, so a
+   * new call site fails loudly here instead of silently matching every row.
+   */
+  not(col, op, value) {
+    const operator = String(op || '').toLowerCase();
+    if (operator === 'is') {
+      this.filters.push((r) => (r[col] ?? null) !== value);
+      return this;
+    }
+    if (operator === 'eq') {
+      this.filters.push((r) => String(r[col] ?? '') !== String(value ?? ''));
+      return this;
+    }
+    if (operator === 'in') {
+      const list = (value || []).map((v) => String(v));
+      this.filters.push((r) => !list.includes(String(r[col] ?? '')));
+      return this;
+    }
+    throw new Error(`fakeSupabase: .not(${col}, ${op}) is not implemented`);
+  }
+
   or() {
     return this;
   }
@@ -252,6 +275,37 @@ function createFakeSupabase(seed = {}) {
       }
       row.balance_eth = balance - amount;
       return { data: [{ success: true, new_balance: row.balance_eth }], error: null };
+    },
+
+    /**
+     * 20260827000000_account_tx_locks.sql. One in-flight money move per
+     * account: the insert is the lock, and a stale row older than the timeout
+     * is cleared first so a crashed request cannot freeze the account.
+     */
+    try_account_tx_lock({ p_account_id, p_kind }) {
+      if (!p_account_id) return { data: false, error: null };
+      if (!db.tables.account_tx_locks) db.tables.account_tx_locks = [];
+      const rows = db.tables.account_tx_locks;
+      const staleBefore = Date.now() - 2 * 60 * 1000;
+      for (let i = rows.length - 1; i >= 0; i -= 1) {
+        if (new Date(rows[i].created_at).getTime() < staleBefore) rows.splice(i, 1);
+      }
+      if (rows.some((r) => String(r.account_id) === String(p_account_id))) {
+        return { data: false, error: null };
+      }
+      rows.push({
+        account_id: String(p_account_id),
+        kind: String(p_kind || 'tx').trim() || 'tx',
+        created_at: new Date().toISOString(),
+      });
+      return { data: true, error: null };
+    },
+
+    release_account_tx_lock({ p_account_id }) {
+      const rows = db.tables.account_tx_locks || [];
+      const i = rows.findIndex((r) => String(r.account_id) === String(p_account_id));
+      if (i >= 0) rows.splice(i, 1);
+      return { data: null, error: null };
     },
 
     credit_user_balance({ p_user_id, p_amount }) {
