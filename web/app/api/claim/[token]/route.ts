@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getClaimByToken } from '../../../../lib/claims';
-import { publicRecipientLabel } from '../../../../lib/claimRecipient';
+import { publicClaimAccess, publicRecipientLabel } from '../../../../lib/claimRecipient';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { INVITE_SOURCE_CLAIM, isInviteCodeFormat, normalizeInviteCode } from '../../../../lib/invite.ts';
 import { attachInviteCookie } from '../../../../lib/inviteCookie.ts';
@@ -11,7 +11,7 @@ export async function GET(_req: Request, ctx: { params: { token: string } }) {
   try {
     const claim = await getClaimByToken(ctx.params.token);
     if (!claim) return NextResponse.json({ error: 'Claim not found' }, { status: 404 });
-    const isPlatform = Boolean(claim.to_channel);
+    const access = publicClaimAccess(claim);
     const stored = normalizeInviteCode(claim.invite_code);
     const carriesInvite = isInviteCodeFormat(stored);
     const body = {
@@ -22,11 +22,12 @@ export async function GET(_req: Request, ctx: { params: { token: string } }) {
       chain_id: claim.chain_id,
       // Never the full phone, and never the raw platform id. A phone is masked
       // to the last 4; a platform claim shows the handle the sender typed, which
-      // is what lets the recipient recognize the claim as theirs.
+      // is what lets the recipient recognize the claim as theirs. Emails are
+      // partially masked in publicRecipientLabel.
       recipient: publicRecipientLabel(claim),
-      recipient_kind: isPlatform ? 'platform' : 'phone',
+      recipient_kind: access.recipient_kind,
       // Phone holds: show on web, payout only in WA/TG after number is proven there.
-      can_claim_on_web: isPlatform,
+      can_claim_on_web: access.can_claim_on_web,
       // Kept so an already-deployed page keeps rendering while it catches up.
       to_wa_hint: claim.to_wa_hint
         ? `...${String(claim.to_wa_hint).slice(-4)}`

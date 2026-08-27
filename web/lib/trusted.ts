@@ -40,7 +40,7 @@ export async function addTrusted(accountId: string, address: string, label: stri
       },
       { onConflict: 'account_id,address' }
     )
-    .select('*')
+    .select('address, label')
     .single();
   if (error) throw new Error(error.message);
   return data;

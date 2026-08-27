@@ -6,11 +6,7 @@ import { useRouter } from 'next/navigation';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { track } from '../../lib/analytics';
 import type { LocaleCode } from '../../lib/locale';
-
-function safeNext(raw: string | null): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/dashboard';
-  return raw;
-}
+import { safeNext } from '../../lib/safeNext.ts';
 
 export function LoginForm() {
   const router = useRouter();

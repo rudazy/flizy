@@ -117,8 +117,9 @@ export default function ClaimPage() {
     <div className="mx-auto max-w-md space-y-6">
       <h1 className="font-sans text-3xl tracking-wide text-paper">Claim funds</h1>
       <p className="text-sm text-muted">
-        Money held for a phone or platform. Phone holds are claimed in WhatsApp or Telegram after
-        that number is proven on that chat. Platform holds can be claimed here after you link.
+        Money held for a phone, email, or platform. Phone holds are claimed in WhatsApp or Telegram
+        after that number is proven on that chat. Email and platform holds can be claimed here after
+        you log in (and link, for platforms).
       </p>
       {loggedIn === null ? <p className="text-sm text-muted">Checking your account…</p> : null}
       {loggedIn ? (

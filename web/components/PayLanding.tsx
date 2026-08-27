@@ -27,6 +27,7 @@ export function PayLanding({
   const [saving, setSaving] = useState(false);
   const [saveSkipped, setSaveSkipped] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [savePassword, setSavePassword] = useState('');
 
   const handle = username ? `@${username}` : 'this Flizy account';
   const next = `/pay/${encodeURIComponent(refSlug)}`;
@@ -211,10 +212,24 @@ export function PayLanding({
               <p className="text-sm text-paper">
                 Save {handle} as a trusted contact so the next send is just their name.
               </p>
+              <div>
+                <label className="label" htmlFor="save-password">
+                  Account password
+                </label>
+                <input
+                  id="save-password"
+                  className="input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={savePassword}
+                  onChange={(e) => setSavePassword(e.target.value)}
+                  required
+                />
+              </div>
               <button
                 type="button"
                 className="btn btn-primary w-full py-3 font-semibold"
-                disabled={saving}
+                disabled={saving || !savePassword}
                 onClick={async () => {
                   setSaving(true);
                   setMsg('');
@@ -222,12 +237,13 @@ export function PayLanding({
                     const res = await fetch('/api/pay/save', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ ref: refSlug }),
+                      body: JSON.stringify({ ref: refSlug, password: savePassword }),
                     });
                     const body = await res.json().catch(() => ({}));
                     if (!res.ok) throw new Error(body.error || 'Could not save');
                     setAlreadySaved(true);
                     setJustSaved(true);
+                    setSavePassword('');
                   } catch (err) {
                     setMsg(err instanceof Error ? err.message : 'Could not save');
                   } finally {

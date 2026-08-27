@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
+import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import {
   getWebChain,
   getDexAddresses,
@@ -14,15 +16,24 @@ import {
 } from '../../../../lib/dexServer';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
+import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
 
 const ROUTE = 'POST /api/swap/execute';
 
 export async function POST(req: Request) {
   try {
+    const denied = rejectIfCrossOrigin(req);
+    if (denied) return denied;
+
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
     const body = await req.json();
+    const supabase = getSupabase();
+    const auth = await requirePassword(supabase, accountId, String(body.password || ''), 'swap');
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
+    }
     const amount = String(body.amount || '');
     const side = String(body.side || 'swap');
     const tokenInRaw = String(body.tokenIn || 'ETH');
@@ -55,7 +66,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
     }
 
-    const supabase = getSupabase();
     const { data: account } = await supabase
       .from('accounts')
       .select('id')
@@ -63,6 +73,12 @@ export async function POST(req: Request) {
       .single();
     if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
 
+    const lock = await tryAccountTxLock(supabase, accountId, 'swap');
+    if (!lock.ok) {
+      return NextResponse.json({ error: lock.error }, { status: 409 });
+    }
+
+    try {
     const quote = await quoteSwap({
       provider,
       amountIn,
@@ -165,6 +181,9 @@ export async function POST(req: Request) {
           .eq('id', logRow.id);
       }
       throw swapErr;
+    }
+    } finally {
+      await releaseAccountTxLock(supabase, accountId);
     }
   } catch (err) {
     // Covers the rethrown swap failure above. The full revert reason is written

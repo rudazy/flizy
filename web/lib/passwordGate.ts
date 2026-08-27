@@ -13,10 +13,17 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // Explicit extension: this module is also loaded straight by node --test,
 // which does not resolve an extensionless relative specifier.
 import { verifyPassword } from './cryptoPin.ts';
+import {
+  clearFailedLogins,
+  loginLockState,
+  loginLockedMessage,
+  LOGIN_LOCKED,
+  recordFailedLogin,
+} from './loginAttempts.ts';
 
 export type PasswordGateResult =
   | { ok: true }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; code?: string };
 
 /**
  * @param supabase service-role client
@@ -35,15 +42,39 @@ export async function requirePassword(
   }
   const { data, error } = await supabase
     .from('accounts')
-    .select('password_hash')
+    .select('password_hash, email')
     .eq('id', accountId)
     .single();
   if (error || !data?.password_hash) {
     return { ok: false, status: 400, error: 'Could not verify account' };
   }
+  const email = String(data.email || '').trim();
+  if (email) {
+    const lock = await loginLockState(supabase, email);
+    if (lock.locked && lock.retryAfterText) {
+      return {
+        ok: false,
+        status: 429,
+        error: loginLockedMessage(lock.retryAfterText),
+        code: LOGIN_LOCKED,
+      };
+    }
+  }
   if (!verifyPassword(password, data.password_hash)) {
+    if (email) {
+      const recorded = await recordFailedLogin(supabase, email);
+      if (recorded.retryAfterText) {
+        return {
+          ok: false,
+          status: 429,
+          error: loginLockedMessage(recorded.retryAfterText),
+          code: LOGIN_LOCKED,
+        };
+      }
+    }
     return { ok: false, status: 401, error: 'Incorrect password' };
   }
+  if (email) await clearFailedLogins(supabase, email);
   return { ok: true };
 }
 

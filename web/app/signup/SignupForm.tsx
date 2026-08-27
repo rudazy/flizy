@@ -9,11 +9,7 @@ import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { track } from '../../lib/analytics';
 import { validatePassword } from '../../lib/passwordPolicy';
 import type { LocaleCode } from '../../lib/locale';
-
-function safeNext(raw: string | null): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/dashboard?welcome=1';
-  return raw;
-}
+import { safeNext } from '../../lib/safeNext.ts';
 
 /**
  * Stage 1 only: email + password.
@@ -32,7 +28,7 @@ export function SignupForm() {
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    setNext(safeNext(q.get('next')));
+    setNext(safeNext(q.get('next'), '/dashboard?welcome=1'));
     const fromQuery = (q.get('invite') || q.get('i') || '').replace(/^@/, '');
     if (fromQuery) {
       setInviteCode(fromQuery);

@@ -15,13 +15,29 @@ const MAX_ATTEMPTS = 8;
 const MIN_RESEND_MS = 45 * 1000;
 const MAX_OPEN_PER_HOUR = 8;
 
+function isProd(): boolean {
+  return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+}
+
+/**
+ * Pepper for email-code hashes.
+ *
+ * Dedicated EMAIL_CODE_SECRET, else OAUTH_STATE_SECRET (already required for
+ * GitHub linking). Never WALLET_DERIVATION_SECRET: that key derives every
+ * agent wallet, and hashing login codes with it widens the one secret that
+ * must never leak. Hardcoded only outside production.
+ */
 function pepper(): string {
-  return (
-    process.env.EMAIL_CODE_SECRET ||
-    process.env.OAUTH_STATE_SECRET ||
-    process.env.WALLET_DERIVATION_SECRET ||
-    'flizy-email-code-dev'
-  );
+  const dedicated = process.env.EMAIL_CODE_SECRET || '';
+  if (dedicated.length >= 32) return dedicated;
+  const oauth = process.env.OAUTH_STATE_SECRET || '';
+  if (oauth.length >= 32) return oauth;
+  if (isProd()) {
+    throw new Error(
+      'EMAIL_CODE_SECRET or OAUTH_STATE_SECRET (32+ chars) is required to hash email codes'
+    );
+  }
+  return 'flizy-email-code-dev';
 }
 
 export function hashEmailCode(code: string): string {
@@ -115,7 +131,7 @@ export async function issueEmailVerificationCode(p: {
     .update({ consumed_at: new Date().toISOString() })
     .eq('account_id', p.accountId)
     .eq('purpose', p.purpose)
-    .ilike('email', email)
+    .eq('email', email)
     .is('consumed_at', null);
 
   const code = generateEmailCode();
@@ -197,7 +213,7 @@ export async function consumeEmailVerificationCode(p: {
     .select('id, code_hash, expires_at, attempts, consumed_at')
     .eq('account_id', p.accountId)
     .eq('purpose', p.purpose)
-    .ilike('email', email)
+    .eq('email', email)
     .is('consumed_at', null)
     .order('created_at', { ascending: false })
     .limit(1);
@@ -286,7 +302,7 @@ export async function consumeEmailVerificationCode(p: {
       .from('account_emails')
       .update({ verified_at: now })
       .eq('account_id', p.accountId)
-      .ilike('email', email)
+      .eq('email', email)
       .select('id')
       .maybeSingle();
     if (sErr || !sec) {

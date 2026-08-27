@@ -3,10 +3,9 @@
 /**
  * Content Security Policy.
  *
- * Shipped report-only first: GA4 and Clarity inject scripts at runtime, and Next's
- * inline bootstrap needs 'unsafe-inline', so enforcing immediately risks breaking
- * analytics or hydration in production. Watch violation reports for a week, then
- * rename the header to 'Content-Security-Policy' to enforce.
+ * Enforced. 'unsafe-inline' remains because Next's bootstrap and gtag/clarity
+ * snippets still inject scripts. That does not stop a determined XSS, but
+ * object-src, base-uri, form-action and frame-ancestors now bind.
  *
  * frame-ancestors 'none' is the CSP equivalent of X-Frame-Options: DENY. Both are
  * sent — older browsers honour only the latter.
@@ -29,7 +28,7 @@ const csp = [
 ].join('; ');
 
 const securityHeaders = [
-  { key: 'Content-Security-Policy-Report-Only', value: csp },
+  { key: 'Content-Security-Policy', value: csp },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },

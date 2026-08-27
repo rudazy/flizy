@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AppTopBar } from '../../../components/AppTopBar';
 import { AppDesktopTabs } from '../../../components/AppBottomNav';
+import { PasswordField } from '../../../components/PasswordField';
 
 type Token = 'ETH' | 'FLZ';
 
@@ -57,6 +58,7 @@ export default function SwapPage() {
   const [lpFlz, setLpFlz] = useState('2500');
   const [lpBase, setLpBase] = useState<'ETH' | 'FLZ'>('ETH');
   const [lpPercent, setLpPercent] = useState(100);
+  const [password, setPassword] = useState('');
   const [lpPosition, setLpPosition] = useState<{
     lpBalanceFormatted: string;
     ethShare: string;
@@ -221,6 +223,7 @@ export default function SwapPage() {
           amount: amountIn,
           tokenIn,
           tokenOut,
+          password,
         }),
       });
       const data = await res.json();
@@ -252,6 +255,7 @@ export default function SwapPage() {
           amountEth: lpEth,
           amountToken: lpFlz,
           token: 'FLZ',
+          password,
         }),
       });
       const data = await res.json();
@@ -277,7 +281,7 @@ export default function SwapPage() {
       const res = await fetch('/api/swap/liquidity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'remove', percent }),
+        body: JSON.stringify({ action: 'remove', percent, password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -434,10 +438,17 @@ export default function SwapPage() {
             )}
           </div>
 
+          <PasswordField
+            label="Account password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            required
+          />
           <button
             type="button"
             className="btn btn-primary mt-3 w-full py-3.5 text-base font-semibold"
-            disabled={busy || quoting || !quote}
+            disabled={busy || quoting || !quote || !password}
             onClick={runSwap}
           >
             {ctaLabel}
@@ -474,6 +485,13 @@ export default function SwapPage() {
               ? 'Deposit ETH + FLZ. LP tokens go to your agent wallet. Site only. No protocol fee on add.'
               : 'Burn LP tokens to withdraw ETH + FLZ to your agent wallet. Site only. No protocol fee on remove.'}
           </p>
+          <PasswordField
+            label="Account password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            required
+          />
 
           {price ? (
             <div className="rounded-md border border-border bg-ink/50 px-3 py-2 font-mono text-[11px] text-muted">
@@ -533,7 +551,7 @@ export default function SwapPage() {
               <button
                 type="button"
                 className="btn btn-primary w-full py-3.5 text-base font-semibold"
-                disabled={busy || !(Number(lpEth) > 0) || !(Number(lpFlz) > 0)}
+                disabled={busy || !password || !(Number(lpEth) > 0) || !(Number(lpFlz) > 0)}
                 onClick={runLiquidity}
               >
                 {busy ? 'Adding...' : 'Supply liquidity'}
@@ -610,6 +628,7 @@ export default function SwapPage() {
                 className="btn btn-primary w-full py-3.5 text-base font-semibold"
                 disabled={
                   busy ||
+                  !password ||
                   !lpPosition ||
                   !(Number(lpPosition.lpBalanceFormatted) > 0) ||
                   !(lpPercent > 0)

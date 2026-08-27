@@ -14,11 +14,15 @@ import {
   getClaimById,
 } from '../../../../lib/claimPayout';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 
 const ROUTE = 'POST /api/claim/payout';
 
 export async function POST(req: Request) {
   try {
+    const denied = rejectIfCrossOrigin(req);
+    if (denied) return denied;
+
     const accountId = await getAccountIdFromCookie();
     if (!accountId) {
       return NextResponse.json({ error: 'Log in to claim funds.' }, { status: 401 });

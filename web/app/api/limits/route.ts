@@ -1,23 +1,22 @@
 import { NextResponse } from 'next/server';
 import { getSupabase } from '../../../lib/supabase';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
-import { verifyPassword } from '../../../lib/cryptoPin';
+import { requirePassword } from '../../../lib/passwordGate.ts';
+import { rejectIfCrossOrigin } from '../../../lib/requestOrigin.ts';
 import { apiErrorBody } from '../../../lib/apiError';
 
 const ROUTE = 'POST /api/limits';
 
 export async function POST(req: Request) {
   try {
+    const denied = rejectIfCrossOrigin(req);
+    if (denied) return denied;
+
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
     const body = await req.json();
-    const password = String(body.password || '');
     const raw = body.daily_send_limit_eth;
-
-    if (!password) {
-      return NextResponse.json({ error: 'Password required' }, { status: 400 });
-    }
 
     let daily: number | null;
     if (raw === null || raw === '' || raw === undefined) {
@@ -36,16 +35,14 @@ export async function POST(req: Request) {
     }
 
     const supabase = getSupabase();
-    const { data: account, error: aErr } = await supabase
-      .from('accounts')
-      .select('id, password_hash')
-      .eq('id', accountId)
-      .single();
-    if (aErr || !account?.password_hash) {
-      return NextResponse.json({ error: 'Could not verify account' }, { status: 400 });
-    }
-    if (!verifyPassword(password, account.password_hash)) {
-      return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
+    const auth = await requirePassword(
+      supabase,
+      accountId,
+      String(body.password || ''),
+      'change your send limit'
+    );
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
     }
 
     const { error } = await supabase

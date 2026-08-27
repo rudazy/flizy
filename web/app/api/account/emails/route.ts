@@ -116,10 +116,7 @@ export async function POST(req: Request) {
       .eq('email', email)
       .maybeSingle();
     if (takenPrimary?.id && takenPrimary.id !== accountId) {
-      return NextResponse.json(
-        { error: 'That email is already registered to another Flizy account.' },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: 'Could not add that email.' }, { status: 400 });
     }
 
     const { data, error } = await supabase
@@ -134,10 +131,7 @@ export async function POST(req: Request) {
 
     if (error) {
       if (error.code === '23505') {
-        return NextResponse.json(
-          { error: 'That email is already on a Flizy account.' },
-          { status: 409 }
-        );
+        return NextResponse.json({ error: 'Could not add that email.' }, { status: 400 });
       }
       return NextResponse.json(apiErrorBody(`POST ${ROUTE}`, error), { status: 500 });
     }

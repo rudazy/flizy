@@ -3,11 +3,13 @@ import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
 import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { isSavedMerchant, resolvePayRef } from '../../../../lib/payCode.ts';
 import { deriveAgentWallet, getWebChain, explorerTxUrl, resolveToken } from '../../../../lib/dexServer';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { normalizePayAsset } from '../../../../lib/payAsset.ts';
+import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -27,6 +29,9 @@ function gasBufferWei(): bigint {
 
 export async function POST(req: Request) {
   try {
+    const denied = rejectIfCrossOrigin(req);
+    if (denied) return denied;
+
     const payerId = await getAccountIdFromCookie();
     if (!payerId) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
@@ -36,7 +41,7 @@ export async function POST(req: Request) {
     const supabase = getSupabase();
     const gate = await requirePassword(supabase, payerId, String(body.password || ''), 'pay');
     if (!gate.ok) {
-      return NextResponse.json({ error: gate.error }, { status: gate.status });
+      return NextResponse.json({ error: gate.error, code: gate.code }, { status: gate.status });
     }
 
     const merchant = await resolvePayRef(supabase, body.ref);
@@ -64,6 +69,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'That account has no wallet yet.' }, { status: 400 });
     }
 
+    const lock = await tryAccountTxLock(supabase, payerId, 'pay');
+    if (!lock.ok) {
+      return NextResponse.json({ error: lock.error }, { status: 409 });
+    }
+
+    try {
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
     const signer = deriveAgentWallet(payerId).connect(provider);
@@ -229,6 +240,9 @@ export async function POST(req: Request) {
       to: merchant.username ? `@${merchant.username}` : 'account',
       alreadySaved,
     });
+    } finally {
+      await releaseAccountTxLock(supabase, payerId);
+    }
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }

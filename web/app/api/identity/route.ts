@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 import { requirePassword } from '../../../lib/passwordGate.ts';
+import { rejectIfCrossOrigin } from '../../../lib/requestOrigin.ts';
 import { displaySafeLabel } from '../../../lib/sanitize.ts';
 import { unlinkChannelIdentity, BindError } from '../../../lib/channelBind.ts';
 import { apiErrorBody } from '../../../lib/apiError';
@@ -61,6 +62,9 @@ export async function GET() {
 
 export async function DELETE(req: Request) {
   try {
+    const denied = rejectIfCrossOrigin(req);
+    if (denied) return denied;
+
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
@@ -77,7 +81,7 @@ export async function DELETE(req: Request) {
     const supabase = getSupabase();
     const auth = await requirePassword(supabase, accountId, password, 'unlink an account');
     if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
+      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
     }
 
     const res = await unlinkChannelIdentity(supabase, { accountId, channel });

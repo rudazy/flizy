@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { hashPin } from '../../../lib/cryptoPin';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { clearChatPinLockout, requirePassword } from '../../../lib/passwordGate';
+import { rejectIfCrossOrigin } from '../../../lib/requestOrigin.ts';
 import { apiErrorBody } from '../../../lib/apiError';
 
 const ROUTE = 'POST /api/pin';
@@ -20,6 +21,9 @@ const ROUTE = 'POST /api/pin';
  */
 export async function POST(req: Request) {
   try {
+    const denied = rejectIfCrossOrigin(req);
+    if (denied) return denied;
+
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     const body = await req.json();
@@ -36,7 +40,7 @@ export async function POST(req: Request) {
       'change your unlock PIN'
     );
     if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
+      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
     }
 
     const unlock_pin_hash = hashPin(pin);

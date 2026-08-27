@@ -133,6 +133,13 @@ export async function clearAccountCookie(): Promise<void> {
 
   jar.set(COOKIE, '', { httpOnly: true, path: '/', maxAge: 0 });
   jar.set(LEGACY_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0 });
+  jar.set(LOGIN_DEVICE_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
 }
 
 /**

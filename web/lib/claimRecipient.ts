@@ -44,6 +44,26 @@ type ClaimRow = {
  * recognize the claim as theirs, so it is shown. The numeric platform id is
  * never shown: nothing on a public page needs it. Emails are partially masked.
  */
+export type PublicClaimKind = 'platform' | 'email' | 'phone';
+
+/**
+ * How the public claim page names the hold and whether the Claim button
+ * belongs on the site. Phone holds are chat-only; email and platform pays
+ * out after the logged-in account proves that identity.
+ */
+export function publicClaimAccess(claim: ClaimRow | null): {
+  recipient_kind: PublicClaimKind;
+  can_claim_on_web: boolean;
+} {
+  if (claim?.to_channel) {
+    return { recipient_kind: 'platform', can_claim_on_web: true };
+  }
+  if (claim?.to_email) {
+    return { recipient_kind: 'email', can_claim_on_web: true };
+  }
+  return { recipient_kind: 'phone', can_claim_on_web: false };
+}
+
 export function publicRecipientLabel(claim: ClaimRow | null): string | undefined {
   if (!claim) return undefined;
 

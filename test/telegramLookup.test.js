@@ -12,6 +12,8 @@ const {
   profileFromChat,
   telegramInvalidMessage,
   telegramNotFoundMessage,
+  ilikeLiteral,
+  exactHandleRows,
 } = require('../lib/telegramLookup');
 
 describe('normalizeTelegramUsername', () => {
@@ -24,6 +26,23 @@ describe('normalizeTelegramUsername', () => {
     assert.equal(normalizeTelegramUsername('ab'), '');
     assert.equal(normalizeTelegramUsername('12345'), '');
     assert.equal(normalizeTelegramUsername('a-b_cd'), '');
+  });
+});
+
+describe('linked handle match is exact, not ILIKE', () => {
+  it('escapes _ so alice_crypto cannot match aliceXcrypto', () => {
+    assert.equal(ilikeLiteral('alice_crypto'), 'alice\\_crypto');
+    assert.equal(ilikeLiteral('100%fun'), '100\\%fun');
+  });
+
+  it('drops lookalike rows that ILIKE would have kept', () => {
+    const rows = [
+      { display_handle: 'alice1crypto', external_id: '1' },
+      { display_handle: 'Alice_Crypto', external_id: '2' },
+    ];
+    const exact = exactHandleRows(rows, 'alice_crypto');
+    assert.equal(exact.length, 1);
+    assert.equal(exact[0].external_id, '2');
   });
 });
 

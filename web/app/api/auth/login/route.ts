@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
-import { verifyPassword } from '../../../../lib/cryptoPin';
+import { hashPassword, verifyPassword } from '../../../../lib/cryptoPin';
 import { createSession, hasTrustedLoginDevice } from '../../../../lib/cookies';
 import { toPublicAccount } from '../../../../lib/publicAccount';
 import { apiErrorBody } from '../../../../lib/apiError';
@@ -8,8 +8,29 @@ import {
   consumeEmailVerificationCode,
   issueEmailVerificationCode,
 } from '../../../../lib/emailVerify.ts';
+import {
+  clearFailedLogins,
+  loginLockState,
+  loginLockedMessage,
+  LOGIN_LOCKED,
+  recordFailedLogin,
+} from '../../../../lib/loginAttempts.ts';
 
 const ROUTE = 'POST /api/auth/login';
+
+/** Same cost as a real check so an unknown email is not the fast 401. */
+let dummyHash: string | null = null;
+function dummyPasswordHash(): string {
+  if (!dummyHash) dummyHash = hashPassword('flizy-login-timing-dummy');
+  return dummyHash;
+}
+
+function lockedResponse(retryAfterText: string) {
+  return NextResponse.json(
+    { error: loginLockedMessage(retryAfterText), code: LOGIN_LOCKED },
+    { status: 429 }
+  );
+}
 
 export async function POST(req: Request) {
   try {
@@ -21,6 +42,14 @@ export async function POST(req: Request) {
     const code = String(body.code || '').replace(/\D/g, '');
 
     const supabase = getSupabase();
+
+    if (email) {
+      const lock = await loginLockState(supabase, email);
+      if (lock.locked && lock.retryAfterText) {
+        return lockedResponse(lock.retryAfterText);
+      }
+    }
+
     const { data, error } = await supabase
       .from('accounts')
       .select('id, email, email_verified_at, password_hash, display_name')
@@ -33,8 +62,17 @@ export async function POST(req: Request) {
       return NextResponse.json(apiErrorBody(ROUTE, error), { status: 500 });
     }
     // Deliberately identical whether the email is unknown or the password is
-    // wrong: this one stays as written.
-    if (!data?.password_hash || !verifyPassword(password, data.password_hash)) {
+    // wrong: this one stays as written. Unknown addresses still pay scrypt so
+    // the 401 is not the cheap path, then they climb the same lockout ladder.
+    const stored = data?.password_hash || dummyPasswordHash();
+    const matches = verifyPassword(password, stored);
+    if (!data?.password_hash || !matches) {
+      if (email) {
+        const recorded = await recordFailedLogin(supabase, email);
+        if (recorded.retryAfterText) {
+          return lockedResponse(recorded.retryAfterText);
+        }
+      }
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
@@ -74,6 +112,7 @@ export async function POST(req: Request) {
     }
 
     await createSession(data.id);
+    await clearFailedLogins(supabase, data.email);
     return NextResponse.json({
       account: toPublicAccount({
         email: data.email,

@@ -46,6 +46,12 @@
     },
     {
       "kind": "function",
+      "name": "release_account_tx_lock",
+      "providedBy": "20260827000000_account_tx_locks.sql",
+      "requiredBy": "lib/accountTxLock.js"
+    },
+    {
+      "kind": "function",
       "name": "schema_guard_objects",
       "providedBy": "20260812000000_schema_guard.sql",
       "requiredBy": "lib/schemaGuard.js"
@@ -55,6 +61,12 @@
       "name": "set_updated_at",
       "providedBy": "20260721000000_create_users.sql",
       "requiredBy": "executed by trigger users_set_updated_at"
+    },
+    {
+      "kind": "function",
+      "name": "try_account_tx_lock",
+      "providedBy": "20260827000000_account_tx_locks.sql",
+      "requiredBy": "lib/accountTxLock.js"
     },
     {
       "kind": "function",

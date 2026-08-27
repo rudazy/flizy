@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
+import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import {
   getWebChain,
   getDexAddresses,
@@ -14,6 +16,7 @@ import {
 import { apiErrorBody } from '../../../../lib/apiError';
 import { getSupabase } from '../../../../lib/supabase';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
+import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
 
 const ROUTE_GET = 'GET /api/swap/liquidity';
 const ROUTE_POST = 'POST /api/swap/liquidity';
@@ -53,10 +56,30 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
+    const denied = rejectIfCrossOrigin(req);
+    if (denied) return denied;
+
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
+    const supabase = getSupabase();
     const body = await req.json();
+    const auth = await requirePassword(
+      supabase,
+      accountId,
+      String(body.password || ''),
+      'change liquidity'
+    );
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
+    }
+
+    const lock = await tryAccountTxLock(supabase, accountId, 'liquidity');
+    if (!lock.ok) {
+      return NextResponse.json({ error: lock.error }, { status: 409 });
+    }
+
+    try {
     const action = String(body.action || 'add').toLowerCase();
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
@@ -176,6 +199,9 @@ export async function POST(req: Request) {
       pair: dex.pair,
       note: 'Liquidity added. LP tokens are in your agent wallet.',
     });
+    } finally {
+      await releaseAccountTxLock(supabase, accountId);
+    }
   } catch (err) {
     // The deliberate 400s above ("No LP tokens to remove", "Invalid amounts")
     // are user-facing on purpose and are untouched.

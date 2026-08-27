@@ -97,6 +97,14 @@ Thumbs.db
 .vscode/
 *.swp
 
+# Local agent / pentest output (never public)
+.claude/
+.grok/
+strix_runs/
+.strix/
+.venv/
+**/__pycache__/
+
 # Foundry: build + forge broadcast can include deploy receipts; keep addresses in deployments/
 contracts/out/
 contracts/cache/

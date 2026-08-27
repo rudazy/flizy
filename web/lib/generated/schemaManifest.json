@@ -34,6 +34,12 @@
     },
     {
       "kind": "function",
+      "name": "release_account_tx_lock",
+      "providedBy": "20260827000000_account_tx_locks.sql",
+      "requiredBy": "web/lib/accountTxLock.ts"
+    },
+    {
+      "kind": "function",
       "name": "schema_guard_objects",
       "providedBy": "20260812000000_schema_guard.sql",
       "requiredBy": "web/lib/schemaGuard.mjs"
@@ -43,6 +49,12 @@
       "name": "set_updated_at",
       "providedBy": "20260721000000_create_users.sql",
       "requiredBy": "executed by trigger accounts_set_updated_at"
+    },
+    {
+      "kind": "function",
+      "name": "try_account_tx_lock",
+      "providedBy": "20260827000000_account_tx_locks.sql",
+      "requiredBy": "web/lib/accountTxLock.ts"
     },
     {
       "kind": "function",
@@ -66,7 +78,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/trusted/route.ts, web/lib/claimPayout.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts"
+      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/lib/claimPayout.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts"
     },
     {
       "kind": "table",
@@ -127,6 +139,12 @@
       "name": "link_codes",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
       "requiredBy": "web/app/api/dashboard/route.ts, web/lib/identity.ts"
+    },
+    {
+      "kind": "table",
+      "name": "login_attempts",
+      "providedBy": "20260827010000_login_attempts.sql",
+      "requiredBy": "web/lib/loginAttempts.ts"
     },
     {
       "kind": "table",

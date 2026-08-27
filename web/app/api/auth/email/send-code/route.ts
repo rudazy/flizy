@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         .from('account_emails')
         .select('id, verified_at')
         .eq('account_id', accountId)
-        .ilike('email', email)
+        .eq('email', email)
         .maybeSingle();
       if (error) throw new Error(error.message);
       if (!row) {

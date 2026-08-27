@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
     if (error) {
       if (String(error.message).includes('duplicate') || error.code === '23505') {
-        return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
+        return NextResponse.json({ error: 'Could not create that account.' }, { status: 400 });
       }
       return NextResponse.json(apiErrorBody(ROUTE, error), { status: 500 });
     }

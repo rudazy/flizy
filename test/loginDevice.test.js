@@ -35,4 +35,26 @@ describe('login device token', () => {
     assert.equal(web.loginDeviceMatches(value.slice(0, -2) + 'ff', ACCOUNT, now), false);
     assert.equal(web.loginDeviceMatches('', ACCOUNT, now), false);
   });
+
+  it('does not sign with WALLET_DERIVATION_SECRET when oauth/email peppers are absent', () => {
+    const savedOauth = process.env.OAUTH_STATE_SECRET;
+    const savedEmail = process.env.EMAIL_CODE_SECRET;
+    const savedWallet = process.env.WALLET_DERIVATION_SECRET;
+    try {
+      delete process.env.OAUTH_STATE_SECRET;
+      delete process.env.EMAIL_CODE_SECRET;
+      process.env.WALLET_DERIVATION_SECRET = 'a'.repeat(48);
+      const now = 1_700_000_000_000;
+      const value = web.buildLoginDeviceValue(ACCOUNT, now);
+      assert.equal(value, '');
+      assert.equal(web.loginDeviceMatches('x.1.dead', ACCOUNT, now), false);
+    } finally {
+      if (savedOauth === undefined) delete process.env.OAUTH_STATE_SECRET;
+      else process.env.OAUTH_STATE_SECRET = savedOauth;
+      if (savedEmail === undefined) delete process.env.EMAIL_CODE_SECRET;
+      else process.env.EMAIL_CODE_SECRET = savedEmail;
+      if (savedWallet === undefined) delete process.env.WALLET_DERIVATION_SECRET;
+      else process.env.WALLET_DERIVATION_SECRET = savedWallet;
+    }
+  });
 });

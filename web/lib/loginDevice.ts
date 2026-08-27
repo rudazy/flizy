@@ -1,8 +1,9 @@
 /**
  * Remembered browser for login codes.
  *
- * Survives logout. Same browser within 30 days skips the email code.
- * A new browser, or a cookie older than 30 days, requires a code.
+ * Cleared on logout. Same browser within 30 days skips the email code
+ * while the cookie is present. A new browser, logout, or a cookie older
+ * than 30 days, requires a code.
  */
 
 import { createHmac } from 'crypto';
@@ -10,13 +11,20 @@ import { createHmac } from 'crypto';
 export const LOGIN_DEVICE_COOKIE = 'flizy_device';
 export const LOGIN_DEVICE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * HMAC key for the remembered-browser cookie.
+ *
+ * OAUTH_STATE_SECRET first (already required for GitHub linking), else
+ * EMAIL_CODE_SECRET. Never WALLET_DERIVATION_SECRET: signing a cookie with
+ * the wallet-derivation key widens the one secret that must never leak.
+ * Missing secret means no cookie is written and every login needs a code.
+ */
 function deviceSecret(): string {
-  return (
-    process.env.OAUTH_STATE_SECRET ||
-    process.env.EMAIL_CODE_SECRET ||
-    process.env.WALLET_DERIVATION_SECRET ||
-    ''
-  );
+  const oauth = process.env.OAUTH_STATE_SECRET || '';
+  if (oauth.length >= 32) return oauth;
+  const email = process.env.EMAIL_CODE_SECRET || '';
+  if (email.length >= 32) return email;
+  return '';
 }
 
 function sign(body: string): string {
