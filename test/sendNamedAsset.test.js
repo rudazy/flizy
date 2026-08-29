@@ -984,3 +984,35 @@ describe('the by-id form with several ids', () => {
     assert.equal(claimHoldCalls[0].nftTokenId, '1124');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Sending to a name nobody saved
+// ---------------------------------------------------------------------------
+
+describe('sending to a name that is not saved', () => {
+  it('offers the routes that need no address before offering to save one', async () => {
+    const sent = await say('flizy send 0.01 to john');
+    const msg = lastText(sent);
+
+    assert.match(msg, /No saved name "john"/i);
+
+    // The old copy only ever said "add a trusted address" / "save john 0x…",
+    // which is what taught people Flizy needs an address at all. Every one of
+    // these routes works with nothing saved, and they have to come first.
+    assert.match(msg, /do not need their address/i);
+    assert.match(msg, /flizy send 0\.01 to 2348012345678/, 'a phone');
+    assert.match(msg, /flizy send 0\.01 to john@email\.com/, 'an email');
+    assert.match(msg, /flizy send 0\.01 to @john on telegram/, 'a Telegram user');
+    assert.match(msg, /holds it until they claim/i, 'and say what happens next');
+
+    // Saving an address is still offered, just not as the only way out.
+    const claimRoute = msg.indexOf('on telegram');
+    const saveRoute = msg.indexOf(`save john`);
+    assert.ok(claimRoute !== -1 && saveRoute !== -1, 'both routes should be present');
+    assert.ok(claimRoute < saveRoute, 'the no-setup routes must come first');
+
+    // It is the recipient's address you save under their name, not your own.
+    assert.match(msg, /0xTheirAddress/);
+    assert.doesNotMatch(msg, /0xYourAddress/);
+  });
+});

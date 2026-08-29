@@ -299,7 +299,10 @@ describe('end to end through the shared router', () => {
     await router.handle(telegramCtx(first), '/help');
     const welcome = first.map((s) => s.text).join('\n');
     assert.match(welcome, /Welcome to Flizy/);
-    assert.match(welcome, /\/send 0\.001 to ama/);
+    // Slash style, and a destination that needs no setup. The greeting used to
+    // lead with a saved name, which taught a brand new user with nothing saved
+    // that they had to go store an address before they could send anything.
+    assert.match(welcome, /\/send 0\.001 to @friend on telegram/);
     // A first message of /help must still answer the question it asked: the
     // greeting on its own left a new user with no command list.
     assert.match(welcome, /\/send 0\.01 to john/, 'first /help must include the command list');
