@@ -63,6 +63,7 @@ That is the product. Everything below serves it.
 | Send to a saved name | `flizy send 0.01 to john` | `/send 0.01 to john` |
 | Pay a Flizy account | `flizy pay 0.01 to @ludarep` | `/pay 0.01 to @ludarep` |
 | Send an NFT you hold | `flizy send giwaforge to john` | `/send giwaforge to john` |
+| Send several at once | `flizy send 2 giwaforge to john` | `/send 2 giwaforge to john` |
 | Confirm | reply `confirm` | tap Confirm, or type it |
 | Receive to your number | automatic once linked | share your number once with `/phone` |
 | Lock this device | `flizy lock` | `/lock` |
@@ -243,6 +244,14 @@ token id, so Flizy reads your wallet and asks for whatever is missing: token or 
 hold both, then which token id if you hold several. One NFT and it goes straight to the
 plan. Nothing is picked for you, and the plan still names the exact id before you confirm.
 
+**A number in front means how many.** `flizy send 2 giwaforge to john` sends two of them.
+An ERC-721 moves one token id per transaction, so two NFTs is two transactions and two
+confirms: Flizy names the ids it is about to move, sends the first once you confirm, then
+comes straight back for the next. Hold more than you asked for and it lists them so you
+choose each one; hold exactly as many and there is nothing to choose. Ask for more than
+you have and it sends nothing at all. Name the ids yourself with
+`send 2 giwaforge 1123 1128 to john` or `nft send giwaforge 1123 1128 to john`.
+
 Home has an optional **Attach to claims I send** checkbox, off by default. When on, new
 holds carry your invite so someone who joins from that claim can count as a referred
 friend. How a count is earned: [docs on the site](https://flizy.app/docs#invites).
@@ -266,7 +275,8 @@ Bare `confirm` and `cancel` work on both.
 | `add wallet 0x…` | Start the approved-destination flow |
 | `send AMOUNT [FLZ] to name \| phone \| email \| @user on telegram` | Transfer, or hold a claim (ETH default; listed tokens too) |
 | `send TICKER to …` | No amount: Flizy reads your wallet and asks token or NFT, then which id. Add `nft` (`send giwaforge nft to …`) to skip straight to the collection |
-| `nft send TICKER ID to …` | Send one listed NFT by token id |
+| `send N TICKER to …` | Send N NFTs from that collection, one confirm each |
+| `nft send TICKER ID [ID …] to …` | Send listed NFTs by token id |
 | `mint 1 giwaforge` | One test NFT per wallet |
 | `claim` · `cancel claims` | Receive or cancel holds |
 | `request` · `pay` · `requests` | Payment requests |

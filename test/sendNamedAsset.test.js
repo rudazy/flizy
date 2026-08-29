@@ -106,6 +106,20 @@ require.cache[executeClaimPath].exports = {
   ...realExecuteClaim,
   executeClaimHold: async (args) => {
     claimHoldCalls.push(args);
+    // Escrow takes custody the moment the hold lands, so the id leaves the
+    // wallet. A counted send re-reads holdings between rounds and has to see it
+    // gone, or it would offer the same NFT twice.
+    if (args.nftTokenId && holdingsAnswer.nft) {
+      const left = (holdingsAnswer.nft.ids || []).filter(
+        (id) => String(id) !== String(args.nftTokenId)
+      );
+      holdingsAnswer = {
+        ...holdingsAnswer,
+        nft: left.length
+          ? { ...holdingsAnswer.nft, ids: left, balance: String(left.length) }
+          : null,
+      };
+    }
     return { ok: true, claimUrl: 'https://flizy.test/claim/tok_1', txHash: '0xdead' };
   },
 };
@@ -709,5 +723,264 @@ describe('holding a giwaforge in escrow', () => {
     assert.equal(ethers.getAddress(call.args[0]), ethers.getAddress(agentAddress()));
     assert.equal(ethers.getAddress(call.args[1]), ethers.getAddress(ESCROW.address));
     assert.equal(call.args[2], 2n, 'the id the sender picked, not a re-derived one');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Counted sends: send 2 giwaforge to <person>
+// ---------------------------------------------------------------------------
+
+describe('a count in front of the ticker', () => {
+  const { parseSendCommand, parseNftSendCommand } = router;
+
+  it('reads the count that used to fall through to the token path', () => {
+    // This exact command answered "Unknown token GIWAFORGE. Listed: ETH, FLZ."
+    // because only parseSendCommand matched it, as two units of an ERC-20.
+    const p = parseSendNamedAssetCommand('send 2 giwaforge to @bob on telegram');
+    assert.equal(p.count, 2);
+    assert.equal(p.ticker, 'giwaforge');
+    assert.equal(p.platform, 'telegram');
+    assert.equal(p.ids, null);
+  });
+
+  it('takes the nft word before, after, or in the lead position', () => {
+    for (const text of [
+      'send 2 giwaforge nft to @bob on telegram',
+      'send 2 giwaforge nfts to @bob on telegram',
+      'send 2 nft giwaforge to @bob on telegram',
+      'send 2 nfts giwaforge to @bob on telegram',
+      'nft send 2 giwaforge to @bob on telegram',
+    ]) {
+      const p = parseSendNamedAssetCommand(text);
+      assert.ok(p, `should parse: ${text}`);
+      assert.equal(p.count, 2, text);
+      assert.equal(p.ticker, 'giwaforge', text);
+      assert.equal(p.nftOnly, true, `${text} should pin the collection`);
+    }
+  });
+
+  it('reads an explicit id list, with or without a count', () => {
+    const both = parseSendNamedAssetCommand('send 2 giwaforge 1123 1128 to @bob on telegram');
+    assert.deepEqual(both.ids, ['1123', '1128']);
+    assert.equal(both.count, 2);
+
+    const idsOnly = parseSendNamedAssetCommand('send giwaforge 1123 to @bob on telegram');
+    assert.deepEqual(idsOnly.ids, ['1123']);
+    assert.equal(idsOnly.count, null);
+
+    const hashed = parseNftSendCommand('nft send giwaforge #1123 #1128 to @bob on telegram');
+    assert.deepEqual(hashed.nftTokenIds, ['1123', '1128']);
+    assert.equal(hashed.nftTokenId, '1123', 'single-id shape stays intact for the old path');
+  });
+
+  it('leaves a counted listed token on the fungible path', () => {
+    // The bug fixed here must not swallow `send 2 FLZ to bob`, which has always
+    // been an ordinary amount and has to keep going to parseSendCommand.
+    for (const text of [
+      'send 2 flz to @bob on telegram',
+      'send 2 FLIZY to @bob on telegram',
+      'send 2 eth to @bob on telegram',
+      'send 0.001 eth to @bob on telegram',
+    ]) {
+      assert.equal(parseSendNamedAssetCommand(text), null, `${text} is a token amount`);
+      assert.ok(parseSendCommand(text), `${text} must still parse as a plain send`);
+    }
+  });
+
+  it('still asks how much for an amount-less token', () => {
+    const p = parseSendNamedAssetCommand('send flz to @bob on telegram');
+    assert.ok(p, 'no count means the named-asset path still owns it');
+    assert.equal(p.count, null);
+  });
+
+  it('parses a count of zero and a repeated id so the handler can name them', () => {
+    assert.equal(parseSendNamedAssetCommand('send 0 giwaforge to @bob on telegram').count, 0);
+    assert.deepEqual(
+      parseSendNamedAssetCommand('send 2 giwaforge 1123 1123 to @bob on telegram').ids,
+      ['1123', '1123']
+    );
+  });
+});
+
+describe('sending a counted batch of NFTs', () => {
+  beforeEach(() => {
+    ownedTokenIds = new Set(['1120', '1124', '1136', '1140']);
+  });
+
+  it('holding exactly what was asked, names both then confirms them one at a time', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124]) };
+
+    const first = await say(`flizy send 2 giwaforge to ${RECIPIENT_EMAIL}`);
+    const opening = textOf(first).join('\n');
+    assert.match(opening, /You have 2 giwaforge: 1120 and 1124/);
+    assert.match(opening, /Sending 1 of 2: giwaforge 1120/);
+    assert.match(lastText(first), /Claim plan/i, 'and goes straight to the confirm');
+    assert.equal(claimHoldCalls.length, 0, 'nothing moves before the first confirm');
+
+    const second = await say('confirm');
+    assert.equal(claimHoldCalls.length, 1, 'one confirm sends exactly one NFT');
+    assert.equal(claimHoldCalls[0].nftTokenId, '1120');
+    const next = textOf(second).join('\n');
+    assert.match(next, /Claim held/i);
+    assert.match(next, /1 left: giwaforge 1124/, 'must come straight back for the second');
+    assert.match(lastText(second), /Claim plan/i);
+
+    const third = await say('confirm');
+    assert.equal(claimHoldCalls.length, 2);
+    assert.equal(claimHoldCalls[1].nftTokenId, '1124', 'the id it offered, not a re-picked one');
+    assert.match(lastText(third), /Both sent[\s\S]*1120 and 1124/);
+  });
+
+  it('holding more than asked, picks each round from what is left', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124, 1136, 1140]) };
+
+    const first = await say(`flizy send 2 giwaforge to ${RECIPIENT_EMAIL}`);
+    const ask = lastText(first);
+    assert.match(ask, /Which giwaforge next\? \(1 of 2\)/);
+    assert.match(ask, /1\. giwaforge 1120/);
+    assert.match(ask, /4\. giwaforge 1140/);
+    assert.equal(claimHoldCalls.length, 0);
+
+    await say('2');
+    const afterPick = await say('confirm');
+    assert.equal(claimHoldCalls.length, 1);
+    assert.equal(claimHoldCalls[0].nftTokenId, '1124', 'the one they picked');
+
+    const round2 = textOf(afterPick).join('\n');
+    assert.match(round2, /Which giwaforge next\? \(2 of 2\)/);
+    assert.doesNotMatch(round2, /giwaforge 1124/, 'the one already sent is gone from the list');
+    assert.match(round2, /giwaforge 1136/);
+
+    await say('1');
+    const done = await say('confirm');
+    assert.equal(claimHoldCalls.length, 2);
+    assert.equal(claimHoldCalls[1].nftTokenId, '1120');
+    assert.match(lastText(done), /Both sent/);
+  });
+
+  it('refuses the whole batch when the wallet holds fewer, and says what is there', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124]) };
+    const sent = await say(`flizy send 3 giwaforge to ${RECIPIENT_EMAIL}`);
+
+    const msg = lastText(sent);
+    assert.match(msg, /only have 2 giwaforge: 1120 and 1124/i);
+    assert.match(msg, /send 2 giwaforge to friend@example\.com/, 'hands back a command that works');
+    assert.equal(claimHoldCalls.length, 0, 'a short batch sends nothing at all');
+  });
+
+  it('walks an explicit id list in the order it was given', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124, 1136]) };
+
+    const first = await say(`flizy send 2 giwaforge 1136 1120 to ${RECIPIENT_EMAIL}`);
+    assert.match(textOf(first).join('\n'), /Sending 2 giwaforge: 1136 and 1120/);
+    assert.match(lastText(first), /Claim plan/i, 'named ids need no pick');
+
+    await say('confirm');
+    await say('confirm');
+    assert.deepEqual(
+      claimHoldCalls.map((c) => c.nftTokenId),
+      ['1136', '1120']
+    );
+  });
+
+  it('refuses an id the wallet does not hold', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124]) };
+    const sent = await say(`flizy send 2 giwaforge 1120 9999 to ${RECIPIENT_EMAIL}`);
+
+    assert.match(lastText(sent), /do not hold giwaforge 9999/i);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('refuses a count that disagrees with the ids named', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124, 1136]) };
+    const sent = await say(`flizy send 3 giwaforge 1120 1124 to ${RECIPIENT_EMAIL}`);
+
+    assert.match(lastText(sent), /asked for 3 giwaforge but named 2 ids/i);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('refuses the same id twice', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124]) };
+    const sent = await say(`flizy send 2 giwaforge 1120 1120 to ${RECIPIENT_EMAIL}`);
+
+    assert.match(lastText(sent), /named giwaforge 1120 twice/i);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('refuses a count of zero', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124]) };
+    const sent = await say(`flizy send 0 giwaforge to ${RECIPIENT_EMAIL}`);
+
+    assert.match(lastText(sent), /at least one giwaforge/i);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('a real command mid-batch drops the batch instead of being eaten by it', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124, 1136, 1140]) };
+    await say(`flizy send 2 giwaforge to ${RECIPIENT_EMAIL}`);
+
+    // help, not balance: balance reads the chain, and the stubbed RPC url is
+    // not a node, so it would sit there retrying rather than answering.
+    const sent = await say('flizy help');
+    assert.doesNotMatch(lastText(sent), /Which giwaforge/i, 'help must not answer the pick');
+
+    // And the abandoned batch must not wake up on the next single NFT send.
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120]) };
+    const single = await say(`flizy send giwaforge to ${RECIPIENT_EMAIL}`);
+    assert.match(lastText(single), /Claim plan/i);
+    const after = await say('confirm');
+    assert.equal(claimHoldCalls.length, 1);
+    assert.doesNotMatch(textOf(after).join('\n'), /left: giwaforge/i, 'no stale batch prompt');
+    assert.doesNotMatch(textOf(after).join('\n'), /Which giwaforge/i, 'and asks nothing further');
+  });
+
+  it('asking for a count of something held only as a token still sends that amount', async () => {
+    // The counted path must not capture an ordinary token send by the back door.
+    holdingsAnswer = {
+      ticker: 'flz',
+      token: { symbol: 'FLZ', balance: '250.0', native: false },
+      nft: null,
+    };
+    const sent = await say(`flizy send 2 flz to ${RECIPIENT_EMAIL}`);
+
+    const preview = lastText(sent);
+    assert.match(preview, /Claim plan/i);
+    assert.doesNotMatch(preview, /How much/i, 'the amount was already given');
+    assert.match(preview, /2 FLZ/);
+  });
+});
+
+describe('the by-id form with several ids', () => {
+  beforeEach(() => {
+    ownedTokenIds = new Set(['1120', '1124', '1136']);
+  });
+
+  it('sends each named id, one confirm apiece', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124, 1136]) };
+
+    const first = await say(`flizy nft send giwaforge 1136 1120 to ${RECIPIENT_EMAIL}`);
+    assert.match(textOf(first).join('\n'), /Sending 2 giwaforge: 1136 and 1120/);
+    assert.equal(claimHoldCalls.length, 0);
+
+    await say('confirm');
+    await say('confirm');
+    assert.deepEqual(
+      claimHoldCalls.map((c) => c.nftTokenId),
+      ['1136', '1120'],
+      'both ids, in the order named'
+    );
+  });
+
+  it('leaves the single-id form on its original path', async () => {
+    holdingsAnswer = { ticker: 'giwaforge', token: null, nft: nft([1120, 1124]) };
+
+    const sent = await say(`flizy nft send giwaforge 1124 to ${RECIPIENT_EMAIL}`);
+    // Straight to the preview: one id was never a batch and asks no extra question.
+    assert.match(lastText(sent), /Claim plan/i);
+    assert.doesNotMatch(textOf(sent).join('\n'), /Sending 1 of/, 'no batch counter for one');
+
+    await say('confirm');
+    assert.equal(claimHoldCalls.length, 1);
+    assert.equal(claimHoldCalls[0].nftTokenId, '1124');
   });
 });
