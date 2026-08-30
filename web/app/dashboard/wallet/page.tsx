@@ -10,6 +10,7 @@ import {
 } from '../../../components/AppSection';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
+import { isHeld } from '../../../lib/dashboardTypes';
 
 const SLIDES = ['balances', 'fund', 'power'] as const;
 
@@ -17,8 +18,12 @@ export default function WalletPage() {
   const { data, holdings, explorerBase, refreshing, refreshAll } = useDashboard();
   const [slide, setSlide] = useSlide(SLIDES, 'balances');
 
-  const tokens = holdings?.holdings?.tokens || [];
-  const nfts = holdings?.holdings?.nfts || [];
+  // Only what the wallet actually holds. The API returns every tracked token and
+  // listed collection at zero so other callers can read the balance; this list
+  // shows a row only when there is something in it. See isHeld — an unreadable
+  // row stays visible rather than being reported as none.
+  const tokens = (holdings?.holdings?.tokens || []).filter((t) => isHeld(t.balance));
+  const nfts = (holdings?.holdings?.nfts || []).filter((n) => isHeld(n.balance));
 
   if (!data) return null;
 
@@ -94,7 +99,7 @@ export default function WalletPage() {
               </ul>
             ) : (
               <p className="mt-1 text-xs text-muted">
-                {holdings?.holdings?.note || 'FLZ appears after you buy or receive tokens.'}
+                {holdings?.holdings?.note || 'Tokens appear here once you hold some.'}
               </p>
             )}
           </div>

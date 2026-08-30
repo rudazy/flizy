@@ -57,6 +57,12 @@ export async function loadNftHoldings(
       const nft = new ethers.Contract(col.address, ERC721_META_ABI, provider);
       const bal = await nft.balanceOf(wallet);
       const count = Number(bal);
+      // A listed collection you hold none of is not a holding. This mirrors
+      // lib/holdings.js loadNftHoldings, which has always dropped them; this
+      // copy had lost the filter, which is why the wallet showed "giwaforge 0".
+      // A collection that could not be READ is different and is still reported
+      // by the catch below, so "none" is never confused with "do not know".
+      if (!Number.isFinite(count) || count <= 0) continue;
       let ids: string[] = [];
       if (count > 0) {
         try {

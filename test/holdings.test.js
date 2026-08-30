@@ -48,6 +48,61 @@ describe('formatHoldingsMessage', () => {
 });
 
 /**
+ * Same rule for tokens as for NFTs above: `flizy balance` should not print
+ * "FLZ: 0". Tokens are filtered at display rather than in getWalletHoldings,
+ * because the raw list is also what resolves a ticker for sending.
+ */
+describe('formatHoldingsMessage drops tokens the wallet does not hold', () => {
+  function balanceWith(tokens, nfts = []) {
+    return formatHoldingsMessage({
+      credit: '0',
+      agentWallet: '0x' + '11'.repeat(20),
+      holdings: {
+        native: { symbol: 'ETH', balance: '0.031' },
+        tokens,
+        nfts,
+        chain: { explorerBaseUrl: 'https://sepolia-explorer.giwa.io' },
+      },
+      showCredit: false,
+    });
+  }
+
+  it('drops a zero token and the whole Tokens section with it', () => {
+    const text = balanceWith([{ symbol: 'FLZ', balance: '0.0' }]);
+    assert.doesNotMatch(text, /FLZ: 0/, 'never a zero balance');
+    assert.doesNotMatch(text, /^Tokens:/m, 'no Tokens heading when none are held');
+  });
+
+  it('still lists a token that is held', () => {
+    const text = balanceWith([{ symbol: 'FLZ', balance: '10' }]);
+    assert.match(text, /Tokens:/);
+    assert.match(text, /FLZ: 10\.0000/);
+  });
+
+  it('keeps only the held one in a mixed list', () => {
+    const text = balanceWith([
+      { symbol: 'FLZ', balance: '0' },
+      { symbol: 'USDC', balance: '25.5' },
+    ]);
+    // Not /FLZ/ — the static help footer names FLZ ("flizy send 10 FLZ to name").
+    // Only the holdings line is in question here.
+    assert.doesNotMatch(text, /FLZ:/);
+    assert.match(text, /USDC: 25\.5000/);
+  });
+
+  it('still reports a token it could not read, rather than calling it none', () => {
+    const text = balanceWith([{ symbol: 'FLZ', balance: null, error: 'Could not read' }]);
+    assert.match(text, /FLZ: unavailable/, 'unreadable is not the same as none');
+  });
+
+  it('leaves the ETH line and the help footer alone when nothing is held', () => {
+    const text = balanceWith([{ symbol: 'FLZ', balance: '0' }]);
+    assert.match(text, /ETH \(on-chain\): 0\.031000/);
+    assert.match(text, /Sends are from your agent wallet/);
+  });
+});
+
+/**
  * An NFT you sent away must leave no trace in the balance. Listing every
  * listed collection with a zero next to it reads like you still own one, so
  * the count is filtered out at the source and the whole NFTs section drops

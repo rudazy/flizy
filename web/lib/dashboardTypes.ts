@@ -108,3 +108,25 @@ export function shortAddr(addr: string) {
   if (!addr || addr.length < 12) return addr;
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
+
+/**
+ * Should this token / NFT row be listed in the wallet?
+ *
+ * The holdings API deliberately returns every tracked token and listed
+ * collection whether or not the account holds any, because other callers want
+ * the balance either way — /dashboard/swap reads the FLZ row to print "Bal 0"
+ * next to the token picker. The wallet list wants the opposite: a row for
+ * something you do not own is noise that reads like a holding.
+ *
+ * A row we could NOT read is kept, not hidden. Its balance is null with an
+ * `error` beside it, and "we could not reach the contract" must never render as
+ * "you have none" — that is the one wrong answer here, because it is
+ * indistinguishable from the truth and quietly tells someone their NFT is gone.
+ */
+export function isHeld(balance: string | null | undefined): boolean {
+  if (balance == null) return true;
+  if (String(balance).trim() === '') return true;
+  const n = Number(balance);
+  if (!Number.isFinite(n)) return true;
+  return n > 0;
+}
