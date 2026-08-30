@@ -180,7 +180,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/history/route.ts, web/app/api/pay/execute/route.ts, web/app/api/swap/execute/route.ts, web/lib/payCode.ts"
+      "requiredBy": "web/app/api/history/route.ts, web/app/api/pay/execute/route.ts, web/app/api/swap/execute/route.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
     },
     {
       "kind": "table",

@@ -223,7 +223,6 @@ export default function SwapPage() {
           amount: amountIn,
           tokenIn,
           tokenOut,
-          password,
         }),
       });
       const data = await res.json();
@@ -438,17 +437,10 @@ export default function SwapPage() {
             )}
           </div>
 
-          <PasswordField
-            label="Account password"
-            value={password}
-            onChange={setPassword}
-            autoComplete="current-password"
-            required
-          />
           <button
             type="button"
             className="btn btn-primary mt-3 w-full py-3.5 text-base font-semibold"
-            disabled={busy || quoting || !quote || !password}
+            disabled={busy || quoting || !quote}
             onClick={runSwap}
           >
             {ctaLabel}

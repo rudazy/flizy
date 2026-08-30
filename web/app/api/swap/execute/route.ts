@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
-import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { checkSwapRateLimit } from '../../../../lib/swapRateLimit.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import {
   getWebChain,
@@ -30,9 +30,15 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const supabase = getSupabase();
-    const auth = await requirePassword(supabase, accountId, String(body.password || ''), 'swap');
-    if (!auth.ok) {
-      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
+
+    // No password gate here, unlike every other money route. A swap sends its
+    // output to `recipient: signer.address` below and takes no slippage from the
+    // caller, so it cannot move value off this account — only change what the
+    // account holds. What is left to defend against is churn, which is what the
+    // hourly cap is for. See web/lib/swapRateLimit.ts for the full argument.
+    const rate = await checkSwapRateLimit(supabase, accountId);
+    if (!rate.ok) {
+      return NextResponse.json({ error: rate.error, code: rate.code }, { status: rate.status });
     }
     const amount = String(body.amount || '');
     const side = String(body.side || 'swap');
