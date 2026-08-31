@@ -13,7 +13,7 @@ const en = {
   'auth.signup.title': 'Create your Flizy account',
   'auth.signup.blurb':
     'After signup the dashboard opens the Flizy bot on WhatsApp or Telegram with your link code filled in.',
-  'auth.signup.step1': 'Account, @username, agent wallet',
+  'auth.signup.step1': 'Account, @username, Flizy wallet',
   'auth.signup.step2': 'Set unlock PIN (required for lock/unlock)',
   'auth.signup.step3': 'Link chat + platforms (e.g. GitHub), claim holds',
   'auth.signup.displayName': 'Display name (optional)',

@@ -85,7 +85,7 @@ describe('failures before submission return the reservation', () => {
     assert.equal(Number(balanceNow().toFixed(10)), 1, 'reservation must be returned');
   });
 
-  it('gives credit back when the agent wallet cannot cover the send', async () => {
+  it('gives credit back when the Flizy wallet cannot cover the send', async () => {
     const result = await executeNativeSend({
       plan: plan('0.4'),
       provider: makeProvider({ balanceWei: 1n }),
@@ -95,7 +95,7 @@ describe('failures before submission return the reservation', () => {
     });
     assert.equal(result.ok, false);
     assert.equal(result.submitted, false);
-    assert.match(result.error, /Not enough ETH in your agent wallet/);
+    assert.match(result.error, /Not enough ETH in your Flizy wallet/);
     assert.equal(Number(balanceNow().toFixed(10)), 1);
   });
 });

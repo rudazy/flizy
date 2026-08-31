@@ -102,7 +102,7 @@ flowchart TB
   READ --> KIND
 
   KIND -->|"saved name"| TRUST["Trusted list<br/>password-gated on the site"]
-  KIND -->|"@username, pay code, or QR"| ID["Flizy account<br/>their agent wallet"]
+  KIND -->|"@username, pay code, or QR"| ID["Flizy account<br/>their wallet"]
   KIND -->|"phone, email, or platform handle"| HOLD["Escrow hold<br/>they claim later"]
 
   TRUST --> SPINE["Plan → Confirm → Sign → Receipt"]
@@ -117,7 +117,7 @@ flowchart TB
   ON -->|no| LINK["Share flizy.app/claim/..."]
   NOTE --> CLAIM["They prove identity and claim"]
   LINK --> CLAIM
-  CLAIM --> PAY["Escrow → their agent wallet"]
+  CLAIM --> PAY["Escrow → their Flizy wallet"]
   HOLD -.->|before claim| CANCEL["Sender cancels, funds return"]
 ```
 
@@ -149,7 +149,7 @@ flowchart TB
   end
 
   DB[("Supabase<br/>accounts · identities · claims")]
-  CH["GIWA Sepolia<br/>agent wallet · explorer receipt"]
+  CH["GIWA Sepolia<br/>Flizy wallet · explorer receipt"]
 
   WA --> R
   TG --> R
@@ -179,7 +179,7 @@ sequenceDiagram
   E->>E: Policy then Plan
   E-->>U: Amount, destination, network, fees
   U->>Chat: confirm
-  E->>Chain: Sign from the agent wallet
+  E->>Chain: Sign from the Flizy wallet
   E-->>U: Receipt + explorer link
 ```
 
@@ -222,7 +222,7 @@ Being precise about this matters more than sounding finished.
 ## Using it
 
 1. **Sign up on the site.** Email, password, then a one-time code to prove the inbox. Set a
-   Flizy `@username`. You get an account, an agent wallet, and a personal invite link.
+   Flizy `@username`. You get an account, a Flizy wallet, and a personal invite link.
 2. **Approve who you can pay.** Add a name and an address under trusted destinations. This
    step needs your password, and it only happens on the site.
 3. **Link your chat app.** Generate a one-time code, open WhatsApp or Telegram from the

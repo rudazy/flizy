@@ -145,7 +145,7 @@ export async function POST(req: Request) {
         explorerUrl: explorerTxUrl(chain, result.txHash),
         liquidityBurned: ethers.formatEther(liquidityWei),
         pair: dex.pair,
-        note: 'Liquidity removed. ETH and FLZ returned to your agent wallet.',
+        note: 'Liquidity removed. ETH and FLZ returned to your Flizy wallet.',
       });
     }
 
@@ -197,7 +197,7 @@ export async function POST(req: Request) {
       txHash: result.txHash,
       explorerUrl: explorerTxUrl(chain, result.txHash),
       pair: dex.pair,
-      note: 'Liquidity added. LP tokens are in your agent wallet.',
+      note: 'Liquidity added. LP tokens are in your Flizy wallet.',
     });
     } finally {
       await releaseAccountTxLock(supabase, accountId);

@@ -669,13 +669,13 @@ describe('holding a giwaforge in escrow', () => {
       ...over,
     });
 
-  it('refuses when the agent wallet cannot cover gas, and says which to fund', async () => {
+  it('refuses when the Flizy wallet cannot cover gas, and says which to fund', async () => {
     // The live wallet holding giwaforge #2 sits just under this today.
     const stub = chainStub({ balanceEth: '0.00007' });
     const res = await hold(stub);
 
     assert.equal(res.ok, false);
-    assert.match(res.error, /ETH in your agent wallet for gas/i);
+    assert.match(res.error, /ETH in your Flizy wallet for gas/i);
     assert.match(res.error, new RegExp(agentAddress()), 'must name the wallet to fund');
     assert.equal(stub.sent.length, 0, 'nothing should be broadcast');
   });

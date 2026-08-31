@@ -7,6 +7,10 @@ the [README](../README.md). Deployment and configuration: [OPERATIONS.md](OPERAT
 is the product. Product strategy and roadmap notes stay private (local `docs/` / `tasks/`), not
 in the public tree.
 
+**Naming:** the per-account wallet Flizy derives is the `agent wallet` in code and schema
+(`lib/agentWallet.js`, `accounts.agent_wallet_address`). Every user-facing string — chat,
+site, README — calls it **your Flizy wallet**. One EOA, two names, split by audience.
+
 ---
 
 ## Component map

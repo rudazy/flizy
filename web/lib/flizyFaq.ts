@@ -12,7 +12,7 @@ export const FLIZY_FAQ: Array<{ question: string; answer: string }> = [
   {
     question: 'How do I send crypto from WhatsApp or Telegram?',
     answer:
-      'Create a free account on flizy.app, fund your agent wallet, add trusted people on the dashboard, link the chat with a one-time code, then send with flizy send (WhatsApp) or /send (Telegram) and confirm.',
+      'Create a free account on flizy.app, fund your Flizy wallet, add trusted people on the dashboard, link the chat with a one-time code, then send with flizy send (WhatsApp) or /send (Telegram) and confirm.',
   },
   {
     question: 'Why only trusted addresses?',

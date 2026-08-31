@@ -28,7 +28,7 @@ describe('formatRequestPaidNotice', () => {
     });
     assert.match(t, /Payment received/i);
     assert.match(t, /0\.001 ETH from \+2349068893161/);
-    assert.match(t, /agent wallet/i);
+    assert.match(t, /Flizy wallet/i);
     assert.match(t, /explorer\.test/);
   });
 

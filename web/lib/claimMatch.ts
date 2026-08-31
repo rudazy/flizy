@@ -135,7 +135,7 @@ export function formatClaimClaimedNotice(p: {
   const via = String(p.viaLine || '').trim();
   const lines = ['Claim delivered on Flizy.', `${amount} claimed by ${by}.`];
   if (via) lines.push(`You sent this to ${via}.`);
-  lines.push('', 'Funds left escrow for their agent wallet.');
+  lines.push('', 'Funds left escrow for their Flizy wallet.');
   if (p.explorerUrl) lines.push(String(p.explorerUrl));
   return lines.join('\n');
 }

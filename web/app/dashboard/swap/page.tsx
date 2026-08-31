@@ -474,8 +474,8 @@ export default function SwapPage() {
 
           <p className="text-xs leading-relaxed text-muted">
             {lpMode === 'add'
-              ? 'Deposit ETH + FLZ. LP tokens go to your agent wallet. Site only. No protocol fee on add.'
-              : 'Burn LP tokens to withdraw ETH + FLZ to your agent wallet. Site only. No protocol fee on remove.'}
+              ? 'Deposit ETH + FLZ. LP tokens go to your Flizy wallet. Site only. No protocol fee on add.'
+              : 'Burn LP tokens to withdraw ETH + FLZ to your Flizy wallet. Site only. No protocol fee on remove.'}
           </p>
           <PasswordField
             label="Account password"

@@ -108,7 +108,8 @@ describe('FLZ claim plan', () => {
     const preview = formatClaimPlanPreview(plan);
     assert.match(preview, /10 FLZ/);
     assert.doesNotMatch(preview, /Amount:\s+10 ETH/);
-    assert.match(preview, /Hold 10 FLZ/);
+    // Steps live on the plan record; the preview stopped printing them.
+    assert.match(plan.steps.join(' '), /Hold 10 FLZ/);
 
     const funded = assertPlanFunded(plan, '1', '0.0001', { tokenBalance: '20' });
     assert.equal(funded.ok, true);
@@ -143,7 +144,8 @@ describe('NFT claim plan', () => {
     const preview = formatClaimPlanPreview(plan);
     assert.match(preview, /giwaforge #1842/);
     assert.doesNotMatch(preview, /Amount:\s+1 ETH/);
-    assert.match(preview, /Hold giwaforge #1842/);
+    // The plan record still carries its steps; the preview no longer prints them.
+    assert.match(plan.steps.join(' '), /Hold giwaforge #1842/);
 
     const funded = assertPlanFunded(plan, '1', '0.0001', { nftOwned: true });
     assert.equal(funded.ok, true);

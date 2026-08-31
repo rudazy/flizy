@@ -134,7 +134,7 @@ export default function HomePage() {
               <p className="text-muted">You</p>
               <p className="mono-box text-paper">flizy send 0.001 to nald</p>
               <p className="text-muted">Bot</p>
-              <p className="mono-box text-lime">Pending. Reply confirm</p>
+              <p className="mono-box text-lime">Pending. Reply CONFIRM</p>
               <p className="mono-box text-paper">confirm</p>
               <p className="mono-box text-lime">https://sepolia-explorer.giwa.io/tx/0x…</p>
             </div>

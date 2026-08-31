@@ -114,7 +114,7 @@ export async function GET() {
         nfts,
         note:
           tokens.length === 0 && !nfts.length
-            ? 'Native balance shown. FLZ appears once the agent wallet is funded and DEX is live.'
+            ? 'Native balance shown. FLZ appears once your Flizy wallet is funded and DEX is live.'
             : null,
       },
     });

@@ -45,7 +45,7 @@ export default function WalletPage() {
       <AppSlideNav items={nav} activeId={slide} onSelect={setSlide} />
 
       {slide === 'balances' ? (
-        <AppSection title="Balances" helper="What this agent wallet holds on GIWA Sepolia.">
+        <AppSection title="Balances" helper="What this Flizy wallet holds on GIWA Sepolia.">
           {holdings?.holdings?.native ? (
             <p className="font-sans text-3xl tracking-wide text-lime">
               {Number(holdings.holdings.native.balance).toFixed(6)}{' '}
@@ -62,7 +62,7 @@ export default function WalletPage() {
           </p>
 
           <div className="mt-5">
-            <p className="label">Agent wallet</p>
+            <p className="label">Flizy wallet</p>
             <p className="mono-box mt-1 break-all text-sm">
               {data.account.agent_wallet_address || 'Generating...'}
             </p>
@@ -199,7 +199,7 @@ export default function WalletPage() {
             >
               <div>
                 <p className="font-sans text-sm text-paper">Swap</p>
-                <p className="mt-0.5 text-xs text-muted">Buy or sell FLZ from the agent wallet</p>
+                <p className="mt-0.5 text-xs text-muted">Buy or sell FLZ from your Flizy wallet</p>
               </div>
               <span className="text-muted" aria-hidden>
                 →

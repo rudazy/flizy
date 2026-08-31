@@ -98,7 +98,7 @@ describe('formatHoldingsMessage drops tokens the wallet does not hold', () => {
   it('leaves the ETH line and the help footer alone when nothing is held', () => {
     const text = balanceWith([{ symbol: 'FLZ', balance: '0' }]);
     assert.match(text, /ETH \(on-chain\): 0\.031000/);
-    assert.match(text, /Sends are from your agent wallet/);
+    assert.match(text, /Sends are from your Flizy wallet/);
   });
 });
 

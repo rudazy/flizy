@@ -342,7 +342,7 @@ export async function removeLiquidityEth(args: {
   const pair = new ethers.Contract(d.pair, PAIR_ABI, args.signer);
   const bal: bigint = await pair.balanceOf(await args.signer.getAddress());
   if (bal < args.liquidityWei) {
-    throw new Error('Not enough LP tokens in your agent wallet');
+    throw new Error('Not enough LP tokens in your Flizy wallet');
   }
 
   await ensureAllowance(pair, args.signer, d.dexRouter, args.liquidityWei);
