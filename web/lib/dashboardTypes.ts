@@ -41,12 +41,18 @@ export type DashboardData = {
   } | null;
   /** Claims this account can receive after proving phone / platform identity */
   pendingClaims?: PendingClaimItem[];
-  /** Personal invite link. attributed = signed up via link; counted = verified credit. */
+  /**
+   * Personal invite link. attributed = signed up via the link; counted = reached a
+   * first qualifying transaction; credits = what those counted invites are worth.
+   * This is NOT the spendable balance, though the dashboard labels both "Credit"
+   * -- see web/lib/inviteCredits.ts.
+   */
   invite?: {
     code: string;
     url: string;
     attributed: number;
     counted: number;
+    credits: number;
     attachOnClaims: boolean;
   } | null;
   /** Short pay code + /pay/{code} URL. Present after username is set. */

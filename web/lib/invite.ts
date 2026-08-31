@@ -6,6 +6,7 @@
  */
 
 import { isUsernameReserved, reservedKey, normalizeUsername } from './username.ts';
+import { creditsForCounted } from './inviteCredits.ts';
 
 export const INVITE_CODE_FORMAT = /^[a-z][a-z0-9]{2,23}$/;
 export const INVITE_ISSUE_TRIES = 2;
@@ -608,6 +609,7 @@ export async function getInviteSummary(
   url: string;
   attributed: number;
   counted: number;
+  credits: number;
   attachOnClaims: boolean;
 } | null> {
   const issued = await ensureInviteCode(supabase, accountId);
@@ -630,6 +632,8 @@ export async function getInviteSummary(
     url: base ? `${base}/i/${issued.code}` : `/i/${issued.code}`,
     attributed: stats.attributed,
     counted: stats.counted,
+    // Derived, never stored: counted_at is the record. See web/lib/inviteCredits.ts.
+    credits: creditsForCounted(stats.counted),
     attachOnClaims,
   };
 }

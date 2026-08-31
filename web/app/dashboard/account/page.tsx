@@ -663,7 +663,7 @@ export default function AccountPage() {
             <div className="flex items-center justify-between gap-3">
               <span className="font-sans text-sm tracking-wide text-paper">Credit</span>
               <span className="font-sans text-sm tracking-wide text-paper">
-                {data.invite?.counted ?? 0}
+                {data.invite?.credits ?? 0}
               </span>
             </div>
           </div>

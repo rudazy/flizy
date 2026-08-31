@@ -95,7 +95,7 @@ export default function DashboardHomePage() {
   if (!data) return null;
 
   const nativeBal = holdings?.holdings?.native;
-  const inviteCredit = data.invite?.counted ?? 0;
+  const inviteCredit = data.invite?.credits ?? 0;
   const openSetup = checklist.filter((c) => !c.done);
   const recent = (activity || []).slice(0, 5);
 

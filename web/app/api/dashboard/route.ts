@@ -97,13 +97,9 @@ export async function GET() {
       console.warn('[dashboard] pendingClaims failed', err);
     }
 
-    let invite: {
-      code: string;
-      url: string;
-      attributed: number;
-      counted: number;
-      attachOnClaims: boolean;
-    } | null = null;
+    // Taken from the function rather than re-typed: this was a third hand-written
+    // copy of the invite shape, and it had already fallen behind by one field.
+    let invite: Awaited<ReturnType<typeof getInviteSummary>> = null;
     if (account.username) {
       try {
         invite = await getInviteSummary(supabase, accountId, getSiteConfig().siteUrl);

@@ -275,8 +275,8 @@ export default function DocsPage() {
         </ul>
         <p className="text-base leading-relaxed text-muted">
           Only a failed on-chain receipt is ignored. One phone can only produce one credit,
-          even if they unlink and join again. Credit is a recorded number. It is not spendable
-          yet.
+          even if they unlink and join again. Credit is a recorded number. It is not money,
+          it is separate from your wallet balance, and it is not spendable yet.
         </p>
         <p className="text-base leading-relaxed text-muted">
           Account → Pay me is a QR with your @username under it. A scan or that name
