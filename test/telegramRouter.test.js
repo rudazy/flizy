@@ -119,6 +119,37 @@ describe('Telegram input normalization', () => {
 });
 
 /**
+ * "Save them as a trusted contact?" is asked right after a first payment, and the
+ * answer is one bare word: no slash on Telegram, no "flizy" on WhatsApp. Two gates
+ * decide whether that word survives -- isFlizyCommand (does the bot wake at all) and
+ * normalizeInput (does the text reach a handler). They used to disagree, so the bot
+ * woke for "save" and then answered "Not a Flizy command". One predicate feeds both.
+ */
+describe('answers to the save-contact question', () => {
+  it('accepts every word the prompt offers, in any case', () => {
+    for (const t of ['save', 'Save', ' SKIP ', 'yes', 'no', 'later', 'save mum']) {
+      assert.equal(router.isMerchantSaveReply(t), true, `${t} should answer the prompt`);
+    }
+  });
+
+  it('does not claim ordinary chatter', () => {
+    for (const t of ['saved', 'yes please', 'skipper', 'no thanks', 'send 0.01 to john', '', null]) {
+      assert.equal(router.isMerchantSaveReply(t), false, `${JSON.stringify(t)} is not an answer`);
+    }
+  });
+
+  it('stays out of the way when no save is pending', () => {
+    // The fix must not widen what a bare word means the rest of the time. On
+    // WhatsApp that would turn ordinary chat into commands.
+    const fresh = telegramCtx();
+    router.discardPendingFlows(fresh.key);
+    assert.equal(router.normalizeInput(fresh, 'save'), null);
+    assert.equal(router.normalizeInput(fresh, 'skip'), null);
+    assert.equal(router.normalizeInput(fresh, 'later'), null);
+  });
+});
+
+/**
  * Telegram is slash native. Every command the bot advertises in its menu has to
  * work when typed or tapped as "/command", with no "flizy" in front of it. If a
  * command is added to the menu without a parser behind it, this fails.
