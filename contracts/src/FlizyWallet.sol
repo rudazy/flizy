@@ -2,7 +2,24 @@
 pragma solidity ^0.8.24;
 
 /**
- * Flizy smart wallet (Phase 2/3).
+ * STATUS: SCAFFOLD. NOT DEPLOYED. NOT THE CUSTODY PATH. DO NOT EXTEND.
+ *
+ * This contract is kept for reference only. Custody is not going here: the
+ * direction is a delegation-framework account where the user's passkey is the
+ * on-chain root and Flizy holds a bounded, revocable delegation. Nothing in
+ * this file is on that path, so hardening it -- reentrancy guards, ERC-20
+ * return-value handling, transfer events -- is work on a contract that will
+ * never see a network.
+ *
+ * Users today are on server-derived EOAs. See README.md, contracts/README.md
+ * and docs/PASSKEY-P256-GIWA.md.
+ *
+ * If you are about to deploy, audit, or build on this: stop and check the
+ * current custody decision first. It is not this.
+ */
+
+/**
+ * Flizy smart wallet (early scaffold, superseded).
  * - Owner controls rules (allowlist, session key, routers).
  * - Session key may swap via approved routers and transfer only to allowlisted addresses.
  * - Enforcement is on-chain so a bot/server compromise cannot drain to strangers.
