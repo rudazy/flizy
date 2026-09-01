@@ -108,12 +108,9 @@ export async function GET() {
       }
     }
 
-    let pay: {
-      code: string;
-      url: string;
-      username: string | null;
-      displayName: string | null;
-    } | null = null;
+    // Taken from the function rather than re-typed, so a new field cannot leave
+    // this declaration behind.
+    let pay: Awaited<ReturnType<typeof getPaySummary>> = null;
     if (account.username) {
       try {
         pay = await getPaySummary(supabase, accountId, getSiteConfig().siteUrl);

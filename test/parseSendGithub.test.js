@@ -124,9 +124,11 @@ describe('parseSendCommand platforms', () => {
     const u = parseSendCommand('send 0.01 to @ludarep');
     assert.equal(u.toRaw, 'ludarep');
     assert.equal(u.platform, null);
-    const c = parseSendCommand('send 0.01 to 2K3M9Q');
+    // Nine digits: a pay code, and deliberately too short to be a phone.
+    const c = parseSendCommand('send 0.01 to 012345678');
     assert.ok(c);
-    assert.equal(c.toRaw.toUpperCase(), '2K3M9Q');
+    assert.equal(c.toRaw, '012345678');
+    assert.equal(c.isPhone, false, 'a pay code must never route into the phone flow');
   });
 
   it('does not treat github alone as platform', () => {

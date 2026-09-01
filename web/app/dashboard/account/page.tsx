@@ -737,6 +737,8 @@ export default function AccountPage() {
           {data.pay ? (
             <PayIdentity
               url={data.pay.url}
+              qrUrl={data.pay.qrUrl}
+              code={data.pay.code}
               username={data.pay.username}
               displayName={data.pay.displayName || data.account.display_name}
             />

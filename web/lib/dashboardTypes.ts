@@ -55,14 +55,30 @@ export type DashboardData = {
     credits: number;
     attachOnClaims: boolean;
   } | null;
-  /** Short pay code + /pay/{code} URL. Present after username is set. */
+  /**
+   * Present after a username is set. url is the shareable /pay/{username} form. qrUrl routes on the permanent
+   * pay code and is what gets printed -- see web/lib/payCode.ts buildPayUrls.
+   */
   pay?: {
     code: string;
     url: string;
+    qrUrl: string;
     username: string | null;
     displayName?: string | null;
   } | null;
 };
+
+/**
+ * A pay code as people read it: nine digits grouped 3-3-3. Unbroken digits are
+ * hard to copy off a counter, and the grouping also stops it reading as a bank
+ * account number. Anything that is not a well-formed code is returned untouched
+ * rather than mangled.
+ */
+export function formatPayCode(raw: string | null | undefined): string {
+  const c = String(raw || '').replace(/[^0-9]/g, '');
+  if (c.length !== 9) return String(raw || '');
+  return `${c.slice(0, 3)} ${c.slice(3, 6)} ${c.slice(6)}`;
+}
 
 /** Legacy transfer row shape */
 export type TransferRow = {

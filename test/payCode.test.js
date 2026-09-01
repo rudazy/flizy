@@ -7,6 +7,7 @@
 const { describe, it, before } = require('node:test');
 const assert = require('node:assert/strict');
 const { createFakeSupabase } = require('./helpers/fakeSupabase');
+const { PHONE_MIN_DIGITS, isPlausiblePhone } = require('../lib/phone');
 
 const {
   PAY_CODE_LENGTH,
@@ -32,13 +33,47 @@ function seed() {
 }
 
 describe('pay code format', () => {
-  it('normalizes and rejects ambiguous glyphs', () => {
-    assert.equal(normalizePayCode('  ab23cd  '), 'AB23CD');
-    assert.equal(isPayCodeFormat('AB23CD'), true);
-    assert.equal(isPayCodeFormat('AB01CD'), false);
-    assert.equal(isPayCodeFormat('AB23C'), false);
+  it('is nine digits, and reads back the way it is printed', () => {
+    // Printed grouped 3-3-3, so the grouping has to survive being typed back.
+    assert.equal(normalizePayCode('  012 345 678  '), '012345678');
+    assert.equal(normalizePayCode('012-345-678'), '012345678');
+    assert.equal(isPayCodeFormat('012345678'), true);
+    assert.equal(isPayCodeFormat('012 345 678'), true);
     assert.equal(mintPayCode().length, PAY_CODE_LENGTH);
     assert.equal(isPayCodeFormat(mintPayCode()), true);
+  });
+
+  it('keeps a leading zero, because the code is text and not a number', () => {
+    assert.equal(normalizePayCode('012345678'), '012345678');
+    assert.equal(isPayCodeFormat('12345678'), false, 'eight digits is not a code');
+  });
+
+  it('rejects the old alphanumeric codes', () => {
+    // Every code was re-minted when the format changed. An old one is gone, not
+    // renamed: it must not resolve to anybody.
+    assert.equal(isPayCodeFormat('AB23CD'), false);
+    assert.equal(isPayCodeFormat('K7M2QX'), false);
+  });
+});
+
+/**
+ * The pay code length is chosen to sit BELOW the shortest thing Flizy will read
+ * as a phone number. That is what makes a bare code unambiguous in every
+ * country without a rule for anyone to remember: ten digits would have collided
+ * with bare mobile numbers in the US, India, Kenya, Ghana and South Africa.
+ *
+ * If either number moves, this fails. That is the point of it.
+ */
+describe('a pay code can never be read as a phone number', () => {
+  it('is shorter than the shortest phone Flizy accepts', () => {
+    assert.equal(PAY_CODE_LENGTH < PHONE_MIN_DIGITS, true);
+  });
+
+  it('no minted code is a plausible phone', () => {
+    for (let i = 0; i < 50; i += 1) {
+      const code = mintPayCode();
+      assert.equal(isPlausiblePhone(code), false, `${code} read as a phone`);
+    }
   });
 });
 
@@ -135,8 +170,10 @@ describe('web mirror agrees', () => {
   });
 
   it('shares format', () => {
-    assert.equal(web.isPayCodeFormat('AB23CD'), isPayCodeFormat('AB23CD'));
-    assert.equal(web.normalizePayCode('ab23cd'), normalizePayCode('ab23cd'));
+    for (const v of ['012345678', '012 345 678', 'AB23CD', '', '12345678', '0123456789']) {
+      assert.equal(web.isPayCodeFormat(v), isPayCodeFormat(v), `format drift on ${v}`);
+      assert.equal(web.normalizePayCode(v), normalizePayCode(v), `normalize drift on ${v}`);
+    }
     assert.deepEqual(
       { length: web.PAY_CODE_LENGTH, alphabet: web.PAY_CODE_ALPHABET },
       { length: PAY_CODE_LENGTH, alphabet: require('../lib/payCode').PAY_CODE_ALPHABET }

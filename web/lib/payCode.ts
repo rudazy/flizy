@@ -6,9 +6,9 @@
 import { randomInt } from 'crypto';
 import { normalizeUsername } from './username.ts';
 
-export const PAY_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-export const PAY_CODE_LENGTH = 6;
-export const PAY_CODE_FORMAT = /^[2-9A-HJ-NP-Z]{6}$/;
+export const PAY_CODE_ALPHABET = '0123456789';
+export const PAY_CODE_LENGTH = 9;
+export const PAY_CODE_FORMAT = /^[0-9]{9}$/;
 export const PAY_CODE_ISSUE_TRIES = 8;
 
 type PayClient = {
@@ -21,11 +21,15 @@ function isMissingRelation(error: { code?: string; message?: string } | null | u
   return code === '42P01' || code === 'PGRST205' || /does not exist/i.test(message);
 }
 
+/**
+ * Anything a human might type or paste, reduced to the stored form. Strips the
+ * grouping this is displayed with ("012 345 678") and any stray punctuation,
+ * so a code read off a counter still matches.
+ */
 export function normalizePayCode(raw: unknown): string {
   return String(raw || '')
     .trim()
-    .toUpperCase()
-    .replace(/[^2-9A-HJ-NP-Z]/g, '');
+    .replace(/[^0-9]/g, '');
 }
 
 export function isPayCodeFormat(raw: unknown): boolean {
@@ -186,6 +190,47 @@ export async function resolvePayRef(
   return resolvePayCode(supabase, raw);
 }
 
+/**
+ * The two URLs a pay identity needs. Deliberate mirror of buildPayUrls in
+ * lib/payCode.js -- see that header for why the printed QR must route on the
+ * pay code and not the username. test/payUrls.test.js pins both sides.
+ */
+export function buildPayUrls(
+  siteUrl: string,
+  code: string,
+  username: string | null
+): { shareUrl: string; qrUrl: string } {
+  const base = String(siteUrl || '').replace(/\/$/, '');
+  const name = normalizeUsername(username || '') || null;
+  const routeCode = String(code || '').trim() || name;
+  const slug = name || routeCode;
+  // /pay/c/{code} resolves the pay code ONLY. /pay/{ref} accepts a username
+  // too, and the namespaces overlap, so pointing printed paper there would let
+  // anyone read a shop's code off its QR, register it as a username, and
+  // quietly collect payments meant for the shop.
+  //
+  // No name is carried in the URL: the printed sheet shows the code alone, so
+  // there is no printed name for a scan to disagree with. The payer reads whose
+  // account it is off the confirm screen, live -- the bank-account model.
+  const qrPath = routeCode ? `/pay/c/${routeCode}` : '';
+  // An account mid-issue has no code yet, so the QR falls back to the name
+  // route. A link that resolves beats none, and it is replaced the moment a
+  // code exists -- nothing has been printed from it.
+  const qrFallback = !routeCode || routeCode === name;
+  return {
+    shareUrl: slug ? (base ? `${base}/pay/${slug}` : `/pay/${slug}`) : '',
+    qrUrl: qrFallback
+      ? slug
+        ? base
+          ? `${base}/pay/${slug}`
+          : `/pay/${slug}`
+        : ''
+      : base
+        ? `${base}${qrPath}`
+        : qrPath,
+  };
+}
+
 export async function getPaySummary(
   supabase: PayClient,
   accountId: string,
@@ -193,21 +238,23 @@ export async function getPaySummary(
 ): Promise<{
   code: string;
   url: string;
+  qrUrl: string;
   username: string | null;
   displayName: string | null;
 } | null> {
   const issued = await ensurePayCode(supabase, accountId);
   if (!issued.ok) return null;
-  const base = String(siteUrl || '').replace(/\/$/, '');
   const { data: acc } = await supabase
     .from('accounts')
     .select('username, display_name')
     .eq('id', accountId)
     .maybeSingle();
-  const slug = acc?.username || issued.code;
+  const urls = buildPayUrls(siteUrl, issued.code, acc?.username || null);
   return {
     code: issued.code,
-    url: base ? `${base}/pay/${slug}` : `/pay/${slug}`,
+    // url stays the shareable username form. qrUrl is what gets printed.
+    url: urls.shareUrl,
+    qrUrl: urls.qrUrl,
     username: acc?.username || null,
     displayName: acc?.display_name || null,
   };
