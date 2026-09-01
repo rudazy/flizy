@@ -343,3 +343,63 @@ describe('end to end: what a user actually types becomes a parsed command', () =
     }
   });
 });
+
+/**
+ * Paying a merchant by the code printed under their QR.
+ *
+ * This is the shortest path to moving money in the product: read nine digits off
+ * a counter, type them, confirm. It leans on one alias rule, so the rule is
+ * pinned here rather than left to be rediscovered.
+ *
+ * A pay code is the only recipient shaped like an amount, which is why the
+ * general "pay <recipient> <amount>" rule excludes it and this one exists.
+ */
+describe('pay a merchant by pay code', () => {
+  const { mintPayCode } = require('../lib/payCode');
+
+  it('reads recipient-first, with or without an asset', () => {
+    assert.equal(canonicalizeCommand('pay 123456789 0.01 ETH'), 'send 0.01 ETH to 123456789');
+    assert.equal(canonicalizeCommand('pay 123456789 0.01 FLZ'), 'send 0.01 FLZ to 123456789');
+    assert.equal(canonicalizeCommand('pay 123456789 0.01'), 'send 0.01 to 123456789');
+  });
+
+  it('accepts the code the way it is printed', () => {
+    // The sheet shows "123 456 789", so that is what someone types.
+    assert.equal(canonicalizeCommand('pay 123 456 789 0.01 FLZ'), 'send 0.01 FLZ to 123 456 789');
+    assert.equal(canonicalizeCommand('pay 123-456-789 0.5'), 'send 0.5 to 123-456-789');
+  });
+
+  it('leaves the amount and the asset exactly as typed', () => {
+    // The module's safety rule: a rule may reorder, never rewrite a value.
+    const out = canonicalizeCommand('pay 123456789 0.0001 FLZ');
+    assert.equal(out.includes('0.0001'), true);
+    assert.equal(out.includes('FLZ'), true);
+  });
+
+  it('does not touch the other things "pay" means', () => {
+    // In-person ask, and the ordinary amount-first send.
+    assert.equal(canonicalizeCommand('pay 0.01 for coffee'), 'pay 0.01 for coffee');
+    assert.equal(canonicalizeCommand('pay 5 to john'), 'send 5 to john');
+    assert.equal(canonicalizeCommand('pay ludarep 0.01 FLZ'), 'send 0.01 FLZ to ludarep');
+  });
+
+  it('ignores digit runs that are not a code', () => {
+    for (const t of ['pay 12345678 0.01', 'pay 1234567890 0.01', 'pay 1234 5678 0.01']) {
+      assert.equal(canonicalizeCommand(t), t, `${t} should be left alone`);
+    }
+  });
+
+  it('stays in step with real minted codes', () => {
+    // Minted, not a same-length stand-in: this catches a change to the alphabet
+    // as well as to the length. Either would stop the shortest way to pay a
+    // merchant working, and it should fail here rather than in someone's shop.
+    for (let i = 0; i < 20; i += 1) {
+      const code = mintPayCode();
+      assert.equal(
+        canonicalizeCommand(`pay ${code} 0.01 FLZ`),
+        `send 0.01 FLZ to ${code}`,
+        `the pay-by-code rule no longer matches a minted code (${code})`
+      );
+    }
+  });
+});
