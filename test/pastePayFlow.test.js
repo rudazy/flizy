@@ -180,6 +180,37 @@ describe('the open question', () => {
     assert.equal(router.pendingFlowFor(KEY).payCode, false, 'cancel must actually close it');
   });
 
+  it('takes an amount with an asset, not just a bare number', async () => {
+    // "0.01 ETH" and "10 flz" have to reach the send as much as "0.01" does.
+    // The parser accepts them; what could silently drop them is the gate in
+    // normalizeInput, which is the only thing letting a bare reply count as
+    // input at all. So the gate is what this asserts.
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, MERCHANT_CODE);
+    assert.equal(router.pendingFlowFor(KEY).payCode, true);
+
+    for (const reply of ['0.01', '0.01 ETH', '0.01 eth', '10 flz', '10 FLZ']) {
+      const normalized = router.normalizeInput(ctx, reply);
+      assert.notEqual(normalized, null, `"${reply}" must reach the handler`);
+      assert.equal(normalized.text, reply, `"${reply}" must arrive unrewritten`);
+    }
+  });
+
+  it('still ignores chatter while the question is open', async () => {
+    // The gate is deliberately narrow: an open question must not turn an
+    // ordinary WhatsApp message into a command.
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, MERCHANT_CODE);
+
+    // Not 'how much is that': an existing alias rewrites 'how much is X' into
+    // 'price X', so that phrase is a command before this flow ever sees it.
+    for (const noise of ['ok thanks', 'send it now', 'thank you', 'i will pay later']) {
+      assert.equal(router.normalizeInput(ctx, noise), null, `"${noise}" must be ignored`);
+    }
+  });
+
   it('re-targets when a second code is pasted, rather than reading it as an amount', async () => {
     // Nobody sends 622,412,799 ETH. Reading a pasted code as an amount would be
     // a baffling refusal, so the code is checked first.
