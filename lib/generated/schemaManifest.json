@@ -204,7 +204,7 @@
       "kind": "table",
       "name": "users",
       "providedBy": "20260721000000_create_users.sql",
-      "requiredBy": "lib/engine/executeTransfer.js, lib/identity.js, lib/router.js"
+      "requiredBy": "lib/engine/executeTransfer.js, lib/handlers/admin.js, lib/identity.js, lib/router.js"
     },
     {
       "kind": "trigger",
