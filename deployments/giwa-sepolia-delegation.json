@@ -1,0 +1,260 @@
+{
+  "chainId": 91342,
+  "chainName": "GIWA Sepolia",
+  "explorer": "https://sepolia-explorer.giwa.io",
+  "rpc": "https://sepolia-rpc.giwa.io",
+  "deployedAt": "2026-09-03",
+  "note": "RESEARCH ONLY. HybridDeleGator v1.3.0 experiment on GIWA Sepolia. Not production custody. Do not give testers this account address. Production still signs derived EOAs.",
+  "pin": {
+    "repo": "https://github.com/MetaMask/delegation-framework",
+    "tag": "v1.3.0",
+    "commit": "bfbdf9795a976833ed2fa000baf42fbb83958b03",
+    "published": "2025-07-24",
+    "neverMain": true
+  },
+  "entryPointV07": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+  "deployer": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+  "canonicalCreate2": {
+    "note": "v1.3.0 salt GATOR addresses. All empty on this chain as of 2026-09-03.",
+    "simpleFactory": "0x69Aa2f9fe1572F1B640E1bbc512f5c3a734fc77c",
+    "delegationManager": "0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3",
+    "hybridDeleGatorImpl": "0x48dBe696A4D990079e039489bA2053B36E8FFEC4",
+    "codeBytes": {
+      "simpleFactory": 0,
+      "delegationManager": 0,
+      "hybridDeleGatorImpl": 0,
+      "allowedTargetsEnforcer": 0,
+      "allowedCalldataEnforcer": 0,
+      "allowedMethodsEnforcer": 0
+    }
+  },
+  "contracts": {
+    "simpleFactory": "0x78F5d9AC0aB718dE8AEA78F2E7E8864688F9c051",
+    "delegationManager": "0xB04c9b180d5C0F9854B3f9da5e702d10f0030d4B",
+    "hybridDeleGatorImpl": "0xC12F82BBbD43aA77371D9121acDF088224D4cC0c",
+    "sclRip7212": "0x2E5d71461951B459aE837714a9EB143c0f2548F9",
+    "nativeTokenTransferAmountEnforcer": "0x163bD4BDcb68c4913deeFFa265ec54007d6C03CF",
+    "timestampEnforcer": "0x24DD7326ae2275fD9D505526f62a3843d174C2eF",
+    "allowedTargetsEnforcer": "0x6b50AD84c6Ba42d227bD8f88bCdC4B53d3fdA405"
+  },
+  "experimentAccount": {
+    "address": "0x71055FF6aD1a792FD1b213BD00ac50ba4B40bda1",
+    "predicted": "0x71055FF6aD1a792FD1b213BD00ac50ba4B40bda1",
+    "owner": "0x0000000000000000000000000000000000000000",
+    "salt": "1",
+    "codeBytes": 170,
+    "codeKeccak": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+    "note": "One test HybridDeleGator. Owner was renounced to address(0). P-256 is the on-chain root. Not a user wallet. Not production custody."
+  },
+  "deployTxs": {
+    "simpleFactory": "0x4c39e81c331e14c2ac4e4259867bf8f631ce54e0031c0b3039e407204c59fb27",
+    "delegationManager": "0xb0180838ede1174550a45add91cf3ac449a8afe8da132b68c850b00939846c31",
+    "sclRip7212": "0xdebad914684f9c7b688a900768f7e43e92cdd1ff56646204323255588412e24f",
+    "hybridDeleGatorImpl": "0x681a104c5fa4a78464dc44b3acd4916958724d653b38d62eb389ccdf4b807cef",
+    "nativeTokenTransferAmountEnforcer": "0x77a619f4a78b623ff9802a8d3c176bad8673cbbe6c1a5c0904a0f8bca45c7d08",
+    "timestampEnforcer": "0x540e9f8f8176a9529966c9cc8c8550e4b6008b34bf207d04aaca82f1c080560e",
+    "allowedTargetsEnforcer": "0x2a16a8ce44df870f65132bf4d9441446974d3ee72526e0c0562680e1230931fc",
+    "account": "0x104ee25c8c85b3873f42d5583b579001405c0de6a7c98876ae10941998f08161"
+  },
+  "bytecode": {
+    "SimpleFactory": {
+      "deployedBytes": 751,
+      "exactRuntimeMatch": true,
+      "metadataStrippedMatch": true,
+      "note": "keccak identical to v1.3.0 artifact runtime."
+    },
+    "DelegationManager": {
+      "deployedBytes": 11503,
+      "exactRuntimeMatch": false,
+      "metadataStrippedMatch": false,
+      "note": "Constructor writes owner as immutable. Length matches artifact. Expected mismatch."
+    },
+    "SCL_RIP7212": {
+      "deployedBytes": 3223,
+      "exactRuntimeMatch": false,
+      "metadataStrippedMatch": false,
+      "note": "Solidity library. 20 bytes at offset 1 are the PUSH20 self-address (artifact zeros, deployed self). Remainder including solc 0.8.23 metadata tail is identical."
+    },
+    "HybridDeleGator": {
+      "deployedBytes": 20203,
+      "exactRuntimeMatch": false,
+      "metadataStrippedMatch": false,
+      "note": "Linked against SCL_RIP7212. Runtime contains SCL, DelegationManager, and EntryPoint addresses. Artifact deployedBytecode is unlinked until that splice. Remaining mismatch is constructor immutables."
+    },
+    "NativeTokenTransferAmountEnforcer": {
+      "deployedBytes": 1485,
+      "exactRuntimeMatch": true,
+      "metadataStrippedMatch": true,
+      "note": "keccak identical to v1.3.0 artifact runtime."
+    },
+    "TimestampEnforcer": {
+      "deployedBytes": 1255,
+      "exactRuntimeMatch": true,
+      "metadataStrippedMatch": true,
+      "note": "keccak identical to v1.3.0 artifact runtime. Live re-read 2026-09-03."
+    },
+    "AllowedTargetsEnforcer": {
+      "deployedBytes": 1846,
+      "exactRuntimeMatch": true,
+      "metadataStrippedMatch": true,
+      "note": "keccak identical to v1.3.0 artifact runtime."
+    }
+  },
+  "txs": {
+    "accountDeploy": "0x104ee25c8c85b3873f42d5583b579001405c0de6a7c98876ae10941998f08161",
+    "addP256Key": "0x157e75ce595f7d8fd3eeb4ab3699a75fac26ea263ce72fa7688a7d605a87bbb7",
+    "caseA": "0x045681b8ac3a61552da8f33a6968bcf08760dfed404008c333618cbe99722b96",
+    "caseB": null,
+    "disable": "0xe27f9b771cb273250d744dfd57857846d1f1a62a300240d4bbf6b3c63b0bdbed",
+    "caseAAfterDisable": null,
+    "ownerBypass": "0x99852c2d0f26145dcc07dba7332294aa3266cd068bcd314d94a7c219f1de9cf0"
+  },
+  "measured": {
+    "addressBeforeAddKey": "0x71055FF6aD1a792FD1b213BD00ac50ba4B40bda1",
+    "codeKeccakBeforeAddKey": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+    "addKeyTx": "0x157e75ce595f7d8fd3eeb4ab3699a75fac26ea263ce72fa7688a7d605a87bbb7",
+    "addKeyBlock": 35118178,
+    "addressAfterAddKey": "0x71055FF6aD1a792FD1b213BD00ac50ba4B40bda1",
+    "codeKeccakAfterAddKey": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+    "addressUnchanged": true,
+    "codeUnchanged": true,
+    "keyCountAfter": "1",
+    "ownerAfterAddKey": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+    "delegate": "0x8Eb361De0403Debc77D53D1a18502a48a142A18c",
+    "sink": "0x78592B6147b2B8E7bb9Bb477AE10040cf01867D7",
+    "capWei": "5000000000000000",
+    "inBoundsWei": "1000000000000000",
+    "outOfBoundsWei": "10000000000000000",
+    "delegationHashTyped": "0xf8389ba68e3a126f0cf0d8af8eabb1ef35753b402b9abc794123ad1f22414fcb",
+    "caseA": {
+      "label": "caseA_inBounds",
+      "ok": true,
+      "tx": "0x045681b8ac3a61552da8f33a6968bcf08760dfed404008c333618cbe99722b96",
+      "block": 35118317,
+      "from": "0x8Eb361De0403Debc77D53D1a18502a48a142A18c",
+      "to": "0xB04c9b180d5C0F9854B3f9da5e702d10f0030d4B",
+      "gasUsed": "193227",
+      "sinkDelta": "1000000000000000",
+      "accountDelta": "-1000000000000000",
+      "revert": null
+    },
+    "caseB": {
+      "label": "caseB_outOfBounds",
+      "ok": false,
+      "tx": null,
+      "gasUsed": null,
+      "sinkDelta": "0",
+      "accountDelta": "0",
+      "note": "RPC rejected at estimateGas / eth_call. No mined receipt. Revert data captured from the error.",
+      "revert": {
+        "short": "execution reverted: \"NativeTokenTransferAmountEnforcer:allowance-exceeded\"",
+        "selector": "0x08c379a0",
+        "string": "NativeTokenTransferAmountEnforcer:allowance-exceeded",
+        "custom": null,
+        "raw": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000344e6174697665546f6b656e5472616e73666572416d6f756e74456e666f726365723a616c6c6f77616e63652d6578636565646564000000000000000000000000"
+      }
+    },
+    "disableTx": "0xe27f9b771cb273250d744dfd57857846d1f1a62a300240d4bbf6b3c63b0bdbed",
+    "disableBlock": 35118334,
+    "caseAAfterDisable": {
+      "label": "caseA_afterDisable",
+      "ok": false,
+      "tx": null,
+      "gasUsed": null,
+      "sinkDelta": "0",
+      "accountDelta": "0",
+      "note": "RPC rejected at estimateGas / eth_call. No mined receipt. Revert data captured from the error.",
+      "revert": {
+        "short": "execution reverted (unknown custom error)",
+        "selector": "0x05baa052",
+        "string": null,
+        "custom": "CannotUseADisabledDelegation()",
+        "raw": "0x05baa052"
+      }
+    },
+    "delegateAfterDisable": {
+      "ok": false,
+      "revert": {
+        "short": "execution reverted (unknown custom error)",
+        "selector": "0x05baa052",
+        "string": null,
+        "custom": "CannotUseADisabledDelegation()",
+        "raw": "0x05baa052"
+      }
+    },
+    "ownerBypassTx": "0x99852c2d0f26145dcc07dba7332294aa3266cd068bcd314d94a7c219f1de9cf0",
+    "ownerBypassBlock": 35118351,
+    "ownerBypassOk": true,
+    "disabledSelectorKeccak": "0x05baa052"
+  },
+  "renounce": {
+    "measuredAt": "2026-09-03",
+    "keyId": "root-p256",
+    "addKeyTx": "0x35d24c1945acbcd0dad9a8e75ac289e3b06759f9c8540916c2c8cfdb67b6c168",
+    "addKeyBlock": 35120355,
+    "renounceTx": "0x8c83363d6b9c28a3acb3a564c6e2b95763aa388a4f2de2720a0a1efdd6521a9a",
+    "renounceBlock": 35120460,
+    "addressBefore": "0x71055FF6aD1a792FD1b213BD00ac50ba4B40bda1",
+    "addressAfter": "0x71055FF6aD1a792FD1b213BD00ac50ba4B40bda1",
+    "addressUnchanged": true,
+    "codeKeccakBefore": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+    "codeKeccakAfter": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+    "ownerBefore": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+    "ownerAfter": "0x0000000000000000000000000000000000000000",
+    "keyCountBefore": "2",
+    "keyCountAfter": "2",
+    "preflightP256Magic": "0x1626ba7e",
+    "preflightDelegationMagic": "0x1626ba7e",
+    "preflightOwnerEcdsaMagic": "0x1626ba7e",
+    "p256MagicAfterRenounce": "0x1626ba7e",
+    "ownerEcdsaMagicAfterRenounce": "0xffffffff",
+    "delegate": "0x0F5E4B95c6A8C1320516cA41f13db15FC96a178B",
+    "sink": "0x8Ef6583594e658105a648855f4c690627Ab535c9",
+    "inBounds": {
+      "label": "inBounds_afterRenounce",
+      "ok": true,
+      "tx": "0x45347786e5c729f5c5e36ce0108cc9c2549d976a7665fb152389f21808bd743f",
+      "block": 35120470,
+      "from": "0x0F5E4B95c6A8C1320516cA41f13db15FC96a178B",
+      "to": "0xB04c9b180d5C0F9854B3f9da5e702d10f0030d4B",
+      "gasUsed": "201497",
+      "sinkDelta": "1000000000000000",
+      "accountDelta": "-1000000000000000",
+      "revert": null
+    },
+    "outOfBounds": {
+      "label": "outOfBounds_afterRenounce",
+      "ok": false,
+      "tx": null,
+      "gasUsed": null,
+      "sinkDelta": "0",
+      "accountDelta": "0",
+      "revert": {
+        "short": "execution reverted: \"NativeTokenTransferAmountEnforcer:allowance-exceeded\"",
+        "selector": "0x08c379a0",
+        "string": "NativeTokenTransferAmountEnforcer:allowance-exceeded",
+        "custom": null,
+        "raw": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000344e6174697665546f6b656e5472616e73666572416d6f756e74456e666f726365723a616c6c6f77616e63652d6578636565646564000000000000000000000000"
+      }
+    },
+    "formerOwnerExecute": {
+      "ok": false,
+      "tx": "0x05bc107c3bf3037f8bde9920fd7dda83f22e3d6392ae87ab85ab3db63c9ad0cb",
+      "status": 0,
+      "block": 35120483,
+      "from": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+      "to": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+      "gasUsed": "76113",
+      "sinkDelta": "0",
+      "accountDelta": "0",
+      "note": "Mined status 0. eth_call of the same tx returns FailedOp(0, AA24 signature error).",
+      "revert": {
+        "short": "transaction execution reverted",
+        "selector": "0x220266b6",
+        "string": "AA24 signature error",
+        "custom": "FailedOp(0, \"AA24 signature error\")",
+        "raw": "0x220266b6"
+      }
+    }
+  }
+}
