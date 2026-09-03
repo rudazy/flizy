@@ -380,6 +380,14 @@ describe('end to end through the shared router', () => {
     assert.match(sent.map((s) => s.text).join('\n'), /Link your site account first/);
   });
 
+  it('tells an unlinked user to link before it will show their invite', async () => {
+    const sent = [];
+    await router.handle(telegramCtx(sent), '/invite');
+    const text = sent.map((s) => s.text).join('\n');
+    assert.ok(!/Something went wrong/.test(text));
+    assert.match(text, /Link your site account to get your invite link/);
+  });
+
   it('says nothing useful is happening for chatter, without echoing it back', async () => {
     const sent = [];
     await router.handle(telegramCtx(sent), 'my password is hunter2');
