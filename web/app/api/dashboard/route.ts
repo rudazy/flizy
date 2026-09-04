@@ -3,6 +3,7 @@ import { getSupabase, getSiteConfig } from '../../../lib/supabase';
 import { listTrusted } from '../../../lib/trusted';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { deriveAgentAddress, deriveLegacyAddressV1 } from '../../../lib/agentWallet';
+import { predictGatorAddress } from '../../../lib/gatorAccount.ts';
 import { toPublicAccount } from '../../../lib/publicAccount';
 import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
 import { apiErrorBody } from '../../../lib/apiError';
@@ -32,12 +33,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Set the agent wallet once. An address our own v1 code wrote is moved
-    // forward to the v2 address the signer actually controls; anything else is
-    // left alone because funds may be sitting on it.
-    const expected = deriveAgentAddress(accountId);
+    // Set the agent wallet once. An empty pointer gets the HybridDeleGator.
+    // An address our own v1 code wrote is moved forward to the v2 HMAC EOA,
+    // which the migration script later sweeps onto the gator. Anything else
+    // is left alone because funds may be sitting on it.
     const stored = account.agent_wallet_address;
     const isLegacyPointer = Boolean(stored) && stored === deriveLegacyAddressV1(accountId);
+    const expected = isLegacyPointer
+      ? deriveAgentAddress(accountId)
+      : predictGatorAddress(accountId);
 
     if (!stored || isLegacyPointer) {
       let write = supabase.from('accounts').update({ agent_wallet_address: expected });

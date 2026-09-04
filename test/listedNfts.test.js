@@ -14,6 +14,7 @@ const {
   resolveListedNft,
   normalizeNftTokenId,
   nftEnvKey,
+  chooseNftMintPath,
 } = require('../lib/listedNfts');
 
 const ADDR = '0x' + '11'.repeat(20);
@@ -105,5 +106,55 @@ describe('resolveListedNft empty registry', () => {
     assert.equal(list[0].ticker, 'giwaforge');
     const a = resolveListedNft('giwaforge', 'giwa_sepolia');
     assert.equal(a.ticker, 'giwaforge');
+  });
+});
+
+describe('chooseNftMintPath', () => {
+  const gator = '0x' + 'aa'.repeat(20);
+  const eoa = '0x' + 'bb'.repeat(20);
+  const gasBuf = 1n;
+
+  it('mints from the gator when the wallet is a gator with ETH', () => {
+    const p = chooseNftMintPath({
+      toAddress: gator,
+      agentSignerAddress: eoa,
+      gatorAddress: gator,
+      toEth: 2n,
+      gasBuf,
+    });
+    assert.deepEqual(p, { via: 'gator', method: 'claim' });
+  });
+
+  it('uses ops claimTo when the gator has no ETH, so the NFT still lands on the gator', () => {
+    const p = chooseNftMintPath({
+      toAddress: gator,
+      agentSignerAddress: eoa,
+      gatorAddress: gator,
+      toEth: 0n,
+      gasBuf,
+    });
+    assert.deepEqual(p, { via: 'ops', method: 'claimTo' });
+  });
+
+  it('does not let the HMAC EOA claim() when the Flizy wallet is a gator', () => {
+    const p = chooseNftMintPath({
+      toAddress: gator,
+      agentSignerAddress: eoa,
+      gatorAddress: gator,
+      toEth: 100n,
+      gasBuf,
+    });
+    assert.notEqual(p.via, 'eoa');
+  });
+
+  it('lets an EOA wallet claim() to itself when it has gas', () => {
+    const p = chooseNftMintPath({
+      toAddress: eoa,
+      agentSignerAddress: eoa,
+      gatorAddress: gator,
+      toEth: 2n,
+      gasBuf,
+    });
+    assert.deepEqual(p, { via: 'eoa', method: 'claim' });
   });
 });

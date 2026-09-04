@@ -3,7 +3,7 @@ import { getSupabase } from '../../../../lib/supabase';
 import { hashPassword } from '../../../../lib/cryptoPin';
 import { createSession } from '../../../../lib/cookies';
 import { validatePassword } from '../../../../lib/passwordPolicy';
-import { deriveAgentAddress } from '../../../../lib/agentWallet';
+import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 import { toPublicAccount } from '../../../../lib/publicAccount';
 import { normalizeLocale } from '../../../../lib/locale';
 import { apiErrorBody } from '../../../../lib/apiError';
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
 
     const { data: withWallet, error: wErr } = await supabase
       .from('accounts')
-      .update({ agent_wallet_address: deriveAgentAddress(data.id) })
+      .update({ agent_wallet_address: predictGatorAddress(data.id) })
       .eq('id', data.id)
       .select(
         'email, email_verified_at, display_name, username, username_changed_at, locale, agent_wallet_address, balance_eth'

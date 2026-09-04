@@ -21,9 +21,13 @@ const VECTOR_V2_ADDRESS = '0x7178120b8cD4546191809c61b7ee31111b97b353';
 /** v1 legacy: keccak256(utf8("flizy:agent:v1:" + id)), no secret */
 const VECTOR_V1_ADDRESS = '0x906Fa8a04e28cC00cc2344c5598f0b1c1807fF84';
 
+/** CREATE2 HybridDeleGator for the vector account on GIWA Sepolia v1.3.0 */
+const VECTOR_GATOR_ADDRESS = '0x79F74e580792c466d04beC3594Ee4b586a9Be8c8';
+
 module.exports = {
   VECTOR_ACCOUNT_ID,
   VECTOR_SECRET,
   VECTOR_V2_ADDRESS,
   VECTOR_V1_ADDRESS,
+  VECTOR_GATOR_ADDRESS,
 };

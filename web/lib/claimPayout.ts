@@ -13,7 +13,8 @@
 
 import { ethers } from 'ethers';
 import { getSupabase } from './supabase.ts';
-import { deriveAgentAddress, deriveAgentPrivateKey } from './agentWallet.ts';
+import { deriveAgentPrivateKey } from './agentWallet.ts';
+import { predictGatorAddress } from './gatorAccount.ts';
 import { getWebChain } from './dexServer.ts';
 import { formatUsernameLabel } from './username.ts';
 import {
@@ -203,19 +204,18 @@ async function notifySenderClaimed(
 }
 
 async function ensureAgentAddress(accountId: string): Promise<string> {
-  const address = deriveAgentAddress(accountId);
   const supabase = getSupabase();
   const { data } = await supabase
     .from('accounts')
     .select('agent_wallet_address')
     .eq('id', accountId)
     .maybeSingle();
-  if (!data?.agent_wallet_address) {
-    await supabase
-      .from('accounts')
-      .update({ agent_wallet_address: address })
-      .eq('id', accountId);
-  }
+  if (data?.agent_wallet_address) return data.agent_wallet_address;
+  const address = predictGatorAddress(accountId);
+  await supabase
+    .from('accounts')
+    .update({ agent_wallet_address: address })
+    .eq('id', accountId);
   return address;
 }
 
