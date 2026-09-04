@@ -12,6 +12,8 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
+const { ethers } = require('ethers');
+
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
 
 const bot = require('../lib/gatorExecute');
@@ -99,5 +101,59 @@ describe('pointerIsGator agrees on both sides', () => {
     assert.equal(web.pointerIsGator(id, gator), true);
     assert.equal(bot.pointerIsGator(id, hmac), false);
     assert.equal(web.pointerIsGator(id, hmac), false);
+  });
+});
+
+const EP_EVENT = new ethers.Interface([
+  'event UserOperationEvent(bytes32 indexed userOpHash, address indexed sender, address indexed paymaster, uint256 nonce, bool success, uint256 actualGasCost, uint256 actualGasUsed)',
+]);
+
+/** Receipt shaped like one handleOps produced, carrying a single UserOp result. */
+function receiptWith(sender, success, emitter = ENTRY_POINT) {
+  const enc = EP_EVENT.encodeEventLog('UserOperationEvent', [
+    ethers.id('op'),
+    sender,
+    ethers.ZeroAddress,
+    1n,
+    success,
+    0n,
+    0n,
+  ]);
+  return { status: 1, logs: [{ address: emitter, topics: enc.topics, data: enc.data }] };
+}
+
+describe('userOpSucceeded reads the inner result, not the outer status', () => {
+  it('a reverted UserOp is a failure even though handleOps returned status 1', () => {
+    const r = receiptWith(SENDER, false);
+    assert.equal(r.status, 1, 'the outer tx did succeed');
+    assert.equal(bot.userOpSucceeded(r, ENTRY_POINT, SENDER), false);
+    assert.equal(web.userOpSucceeded(r, ENTRY_POINT, SENDER), false);
+  });
+
+  it('a successful UserOp is a success', () => {
+    const r = receiptWith(SENDER, true);
+    assert.equal(bot.userOpSucceeded(r, ENTRY_POINT, SENDER), true);
+    assert.equal(web.userOpSucceeded(r, ENTRY_POINT, SENDER), true);
+  });
+
+  it('no event for our sender is a failure, not a pass', () => {
+    for (const r of [null, { status: 1 }, { status: 1, logs: [] }]) {
+      assert.equal(bot.userOpSucceeded(r, ENTRY_POINT, SENDER), false);
+      assert.equal(web.userOpSucceeded(r, ENTRY_POINT, SENDER), false);
+    }
+  });
+
+  it('ignores a UserOperationEvent belonging to somebody else', () => {
+    const other = '0x00000000000000000000000000000000000000cc';
+    const r = receiptWith(other, true);
+    assert.equal(bot.userOpSucceeded(r, ENTRY_POINT, SENDER), false);
+    assert.equal(web.userOpSucceeded(r, ENTRY_POINT, SENDER), false);
+  });
+
+  it('ignores an event emitted by something other than the EntryPoint', () => {
+    const impostor = '0x00000000000000000000000000000000000000dd';
+    const r = receiptWith(SENDER, true, impostor);
+    assert.equal(bot.userOpSucceeded(r, ENTRY_POINT, SENDER), false);
+    assert.equal(web.userOpSucceeded(r, ENTRY_POINT, SENDER), false);
   });
 });

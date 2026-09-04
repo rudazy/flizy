@@ -27,6 +27,7 @@ const FACTORY_IFACE = new ethers.Interface([
 const EP_IFACE = new ethers.Interface([
   'function getNonce(address sender, uint192 key) view returns (uint256)',
   'function handleOps((address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData,bytes signature)[] ops, address payable beneficiary)',
+  'event UserOperationEvent(bytes32 indexed userOpHash, address indexed sender, address indexed paymaster, uint256 nonce, bool success, uint256 actualGasCost, uint256 actualGasUsed)',
 ]);
 
 export const PACKED_USER_OP_TYPEHASH = ethers.keccak256(
@@ -46,6 +47,39 @@ type UserOp = {
   paymasterAndData: string;
   signature: string;
 };
+
+/**
+ * Did the UserOp itself succeed?
+ *
+ * handleOps only reverts when validation fails. When the inner call reverts,
+ * EntryPoint catches it and emits UserOperationEvent with success=false while
+ * the outer transaction still returns status 1. Reading receipt.status alone
+ * reports a reverted send as a completed one.
+ *
+ * No event for our sender means the op never ran, which is also a failure.
+ */
+export function userOpSucceeded(
+  receipt: { logs?: ReadonlyArray<{ address?: string; topics: ReadonlyArray<string>; data: string }> } | null,
+  entryPoint: string,
+  sender: string
+): boolean {
+  if (!receipt || !Array.isArray(receipt.logs)) return false;
+  const ep = ethers.getAddress(entryPoint);
+  const who = ethers.getAddress(sender);
+  for (const log of receipt.logs) {
+    if (!log || !log.address || ethers.getAddress(log.address) !== ep) continue;
+    let parsed;
+    try {
+      parsed = EP_IFACE.parseLog({ topics: Array.from(log.topics), data: log.data });
+    } catch {
+      continue;
+    }
+    if (!parsed || parsed.name !== 'UserOperationEvent') continue;
+    if (ethers.getAddress(parsed.args.sender) !== who) continue;
+    return Boolean(parsed.args.success);
+  }
+  return false;
+}
 
 export function packU128(hi: bigint | number, lo: bigint | number): string {
   return ethers.toBeHex((BigInt(hi) << 128n) | BigInt(lo), 32);
@@ -213,6 +247,9 @@ export async function executeGatorCall(args: {
   const receipt = await tx.wait();
   if (!receipt || receipt.status !== 1) {
     throw new Error('HybridDeleGator UserOp failed on-chain');
+  }
+  if (!userOpSucceeded(receipt, addrs.entryPointV07, gator)) {
+    throw new Error('HybridDeleGator UserOp reverted inside handleOps');
   }
   return { txHash: tx.hash, receipt, gator };
 }
