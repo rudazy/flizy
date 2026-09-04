@@ -8,7 +8,9 @@ import {
   getDexAddresses,
   resolveToken,
   addLiquidityEth,
+  addLiquidityEthViaGator,
   removeLiquidityEth,
+  removeLiquidityEthViaGator,
   getLpPosition,
   deriveAgentWallet,
   explorerTxUrl,
@@ -17,6 +19,8 @@ import { apiErrorBody } from '../../../../lib/apiError';
 import { getSupabase } from '../../../../lib/supabase';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
+import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
+import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 
 const ROUTE_GET = 'GET /api/swap/liquidity';
 const ROUTE_POST = 'POST /api/swap/liquidity';
@@ -29,12 +33,20 @@ export async function GET() {
 
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
-    const wallet = deriveAgentWallet(accountId);
-    const position = await getLpPosition(provider, wallet.address);
+    const { data: acct } = await getSupabase()
+      .from('accounts')
+      .select('agent_wallet_address')
+      .eq('id', accountId)
+      .maybeSingle();
+    // LP tokens follow the pointer, so read the position off the gator.
+    const walletAddr = pointerIsGator(accountId, acct?.agent_wallet_address)
+      ? predictGatorAddress(accountId)
+      : deriveAgentWallet(accountId).address;
+    const position = await getLpPosition(provider, walletAddr);
     const dex = getDexAddresses();
 
     return NextResponse.json({
-      agentWallet: wallet.address,
+      agentWallet: walletAddr,
       pair: dex.pair,
       flz: dex.flz,
       lpBalanceFormatted: position.lpBalanceFormatted,
@@ -85,9 +97,16 @@ export async function POST(req: Request) {
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
     const dex = getDexAddresses();
     const signer = deriveAgentWallet(accountId).connect(provider);
+    const { data: acct } = await supabase
+      .from('accounts')
+      .select('agent_wallet_address')
+      .eq('id', accountId)
+      .maybeSingle();
+    const viaGator = pointerIsGator(accountId, acct?.agent_wallet_address);
+    const walletAddr = viaGator ? predictGatorAddress(accountId) : signer.address;
 
     if (action === 'remove') {
-      const position = await getLpPosition(provider, signer.address);
+      const position = await getLpPosition(provider, walletAddr);
       if (position.lpBalance <= 0n) {
         return NextResponse.json({ error: 'No LP tokens to remove' }, { status: 400 });
       }
@@ -116,13 +135,23 @@ export async function POST(req: Request) {
         tokenMin = (position.flzShareWei * liquidityWei * 98n) / (position.lpBalance * 100n);
       }
 
-      const result = await removeLiquidityEth({
-        signer,
-        liquidityWei,
-        amountTokenMin: tokenMin,
-        amountEthMin: ethMin,
-        recipient: signer.address,
-      });
+      const result = viaGator
+        ? await removeLiquidityEthViaGator({
+            accountId,
+            provider,
+            chainId: chain.chainId,
+            liquidityWei,
+            amountTokenMin: tokenMin,
+            amountEthMin: ethMin,
+            recipient: walletAddr,
+          })
+        : await removeLiquidityEth({
+            signer,
+            liquidityWei,
+            amountTokenMin: tokenMin,
+            amountEthMin: ethMin,
+            recipient: signer.address,
+          });
 
       try {
         await maybeMarkFirstTx(getSupabase(), {
@@ -167,15 +196,27 @@ export async function POST(req: Request) {
     const amountTokenMin = tokenWei - tokenWei / 50n;
     const amountEthMin = ethWei - ethWei / 50n;
 
-    const result = await addLiquidityEth({
-      signer,
-      tokenAddress,
-      amountToken: tokenWei,
-      amountEth: ethWei,
-      amountTokenMin,
-      amountEthMin,
-      recipient: signer.address,
-    });
+    const result = viaGator
+      ? await addLiquidityEthViaGator({
+          accountId,
+          provider,
+          chainId: chain.chainId,
+          tokenAddress,
+          amountToken: tokenWei,
+          amountEth: ethWei,
+          amountTokenMin,
+          amountEthMin,
+          recipient: walletAddr,
+        })
+      : await addLiquidityEth({
+          signer,
+          tokenAddress,
+          amountToken: tokenWei,
+          amountEth: ethWei,
+          amountTokenMin,
+          amountEthMin,
+          recipient: signer.address,
+        });
 
     try {
       await maybeMarkFirstTx(getSupabase(), {

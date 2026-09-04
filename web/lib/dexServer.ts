@@ -5,6 +5,7 @@
  */
 
 import { ethers } from 'ethers';
+import { executeGatorCall } from './gatorExecute.ts';
 
 const FEE_ROUTER_ABI = [
   'function feeBps() view returns (uint16)',
@@ -255,6 +256,118 @@ export async function executeSwap(args: {
   return { txHash: tx.hash, receipt };
 }
 
+/**
+ * Swap whose msg.sender must be the HybridDeleGator (UserOp execute).
+ * Same shape as executeSwap, but every call is wrapped in a UserOp that ops
+ * pays for. Mirrors executeSwapViaGator in lib/dex.js.
+ */
+export async function executeSwapViaGator(args: {
+  accountId: string;
+  provider: ethers.JsonRpcProvider;
+  chainId?: number;
+  amountIn: bigint;
+  tokenIn: string | null;
+  tokenOut: string | null;
+  amountOutMinWei: bigint;
+  recipient: string;
+}) {
+  const d = getDexAddresses();
+  const to = ethers.getAddress(args.recipient);
+  const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+  const feeRouter = new ethers.Interface(FEE_ROUTER_ABI);
+  const inIsNative = args.tokenIn === null;
+  const outIsNative = args.tokenOut === null;
+  const path: string[] = [];
+  path.push(inIsNative ? d.wrappedNative : ethers.getAddress(args.tokenIn!));
+  path.push(outIsNative ? d.wrappedNative : ethers.getAddress(args.tokenOut!));
+
+  if (!inIsNative && !outIsNative) {
+    throw new Error('Token-to-token swaps are not exposed on the site yet. Use buy or sell.');
+  }
+
+  if (!inIsNative) {
+    const token = new ethers.Interface(ERC20_ABI);
+    await executeGatorCall({
+      accountId: args.accountId,
+      provider: args.provider,
+      chainId: args.chainId,
+      target: ethers.getAddress(args.tokenIn!),
+      value: 0n,
+      data: token.encodeFunctionData('approve', [d.feeRouter, args.amountIn]),
+    });
+  }
+
+  let data: string;
+  let value = 0n;
+  if (inIsNative) {
+    data = feeRouter.encodeFunctionData('swapExactETHForTokens', [
+      args.amountOutMinWei,
+      path,
+      to,
+      deadline,
+    ]);
+    value = args.amountIn;
+  } else {
+    data = feeRouter.encodeFunctionData('swapExactTokensForETH', [
+      args.amountIn,
+      args.amountOutMinWei,
+      path,
+      to,
+      deadline,
+    ]);
+  }
+  return executeGatorCall({
+    accountId: args.accountId,
+    provider: args.provider,
+    chainId: args.chainId,
+    target: d.feeRouter,
+    value,
+    data,
+  });
+}
+
+/** Add liquidity where msg.sender must be the HybridDeleGator. */
+export async function addLiquidityEthViaGator(args: {
+  accountId: string;
+  provider: ethers.JsonRpcProvider;
+  chainId?: number;
+  tokenAddress: string;
+  amountToken: bigint;
+  amountEth: bigint;
+  amountTokenMin: bigint;
+  amountEthMin: bigint;
+  recipient: string;
+}) {
+  const d = getDexAddresses();
+  const to = ethers.getAddress(args.recipient);
+  const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+  const token = new ethers.Interface(ERC20_ABI);
+  await executeGatorCall({
+    accountId: args.accountId,
+    provider: args.provider,
+    chainId: args.chainId,
+    target: ethers.getAddress(args.tokenAddress),
+    value: 0n,
+    data: token.encodeFunctionData('approve', [d.feeRouter, args.amountToken]),
+  });
+  const feeRouter = new ethers.Interface(FEE_ROUTER_ABI);
+  return executeGatorCall({
+    accountId: args.accountId,
+    provider: args.provider,
+    chainId: args.chainId,
+    target: d.feeRouter,
+    value: args.amountEth,
+    data: feeRouter.encodeFunctionData('addLiquidityETH', [
+      ethers.getAddress(args.tokenAddress),
+      args.amountToken,
+      args.amountTokenMin,
+      args.amountEthMin,
+      to,
+      deadline,
+    ]),
+  });
+}
+
 export async function addLiquidityEth(args: {
   signer: ethers.Wallet;
   tokenAddress: string;
@@ -359,6 +472,52 @@ export async function removeLiquidityEth(args: {
   const receipt = await tx.wait(1);
   if (!receipt || receipt.status !== 1) throw new Error('Remove liquidity failed');
   return { txHash: tx.hash, receipt };
+}
+
+/** Remove liquidity where msg.sender must be the HybridDeleGator. */
+export async function removeLiquidityEthViaGator(args: {
+  accountId: string;
+  provider: ethers.JsonRpcProvider;
+  chainId?: number;
+  liquidityWei: bigint;
+  amountTokenMin?: bigint;
+  amountEthMin?: bigint;
+  recipient: string;
+}) {
+  const d = getDexAddresses();
+  if (args.liquidityWei <= 0n) throw new Error('Liquidity amount must be greater than 0');
+  const to = ethers.getAddress(args.recipient);
+  const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+  const pairRead = new ethers.Contract(d.pair, PAIR_ABI, args.provider);
+  const bal: bigint = await pairRead.balanceOf(to);
+  if (bal < args.liquidityWei) {
+    throw new Error('Not enough LP tokens in your Flizy wallet');
+  }
+  const pairIface = new ethers.Interface(PAIR_ABI);
+  await executeGatorCall({
+    accountId: args.accountId,
+    provider: args.provider,
+    chainId: args.chainId,
+    target: d.pair,
+    value: 0n,
+    data: pairIface.encodeFunctionData('approve', [d.dexRouter, args.liquidityWei]),
+  });
+  const router = new ethers.Interface(V2_ROUTER_ABI);
+  return executeGatorCall({
+    accountId: args.accountId,
+    provider: args.provider,
+    chainId: args.chainId,
+    target: d.dexRouter,
+    value: 0n,
+    data: router.encodeFunctionData('removeLiquidityETH', [
+      d.flz,
+      args.liquidityWei,
+      args.amountTokenMin ?? 0n,
+      args.amountEthMin ?? 0n,
+      to,
+      deadline,
+    ]),
+  });
 }
 
 /**

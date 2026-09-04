@@ -10,6 +10,8 @@ import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { normalizePayAsset } from '../../../../lib/payAsset.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
+import { executeGatorCall, pointerIsGator } from '../../../../lib/gatorExecute.ts';
+import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -77,13 +79,22 @@ export async function POST(req: Request) {
     try {
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
+    // Funds sit on the gator once the pointer is flipped; the HMAC EOA only
+    // signs the UserOp. Ops pays the outer tx, so the gator needs no gas buffer.
+    const { data: payer } = await supabase
+      .from('accounts')
+      .select('agent_wallet_address')
+      .eq('id', payerId)
+      .maybeSingle();
+    const viaGator = pointerIsGator(payerId, payer?.agent_wallet_address);
     const signer = deriveAgentWallet(payerId).connect(provider);
-    const ethBal = await provider.getBalance(signer.address);
-    const gasBuf = gasBufferWei();
+    const walletAddr = viaGator ? predictGatorAddress(payerId) : signer.address;
+    const ethBal = await provider.getBalance(walletAddr);
+    const gasBuf = viaGator ? 0n : gasBufferWei();
 
     let amountHuman: string;
     let tokenAddress: string | null = null;
-    let tx: ethers.TransactionResponse;
+    let txHash: string;
 
     if (asset === 'ETH') {
       let amountWei: bigint;
@@ -119,8 +130,23 @@ export async function POST(req: Request) {
         .select('id')
         .maybeSingle();
 
-      tx = await signer.sendTransaction({ to, value: amountWei });
-      const receipt = await tx.wait(1);
+      let receipt: ethers.TransactionReceipt | null;
+      if (viaGator) {
+        const sent = await executeGatorCall({
+          accountId: payerId,
+          provider,
+          chainId: chain.chainId,
+          target: to,
+          value: amountWei,
+          data: '0x',
+        });
+        txHash = sent.txHash;
+        receipt = sent.receipt;
+      } else {
+        const tx = await signer.sendTransaction({ to, value: amountWei });
+        txHash = tx.hash;
+        receipt = await tx.wait(1);
+      }
       const ok = Boolean(receipt && receipt.status === 1);
 
       if (logRow?.id) {
@@ -128,7 +154,7 @@ export async function POST(req: Request) {
           .from('transfers')
           .update({
             status: ok ? 'confirmed' : 'failed',
-            tx_hash: tx.hash,
+            tx_hash: txHash,
             error: ok ? null : 'receipt status not successful',
           })
           .eq('id', logRow.id);
@@ -148,7 +174,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'FLZ is not configured on this chain.' }, { status: 400 });
       }
       tokenAddress = ethers.getAddress(flzAddr);
-      const erc20 = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+      const erc20 = new ethers.Contract(tokenAddress, ERC20_ABI, viaGator ? provider : signer);
       const decimals = Number(await erc20.decimals());
       let amountTok: bigint;
       try {
@@ -165,7 +191,7 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
-      const tokBal = await erc20.balanceOf(signer.address);
+      const tokBal = await erc20.balanceOf(walletAddr);
       if (tokBal < amountTok) {
         return NextResponse.json(
           { error: 'Not enough FLZ in your Flizy wallet.' },
@@ -191,8 +217,23 @@ export async function POST(req: Request) {
         .select('id')
         .maybeSingle();
 
-      tx = await erc20.transfer(to, amountTok);
-      const receipt = await tx.wait(1);
+      let receipt: ethers.TransactionReceipt | null;
+      if (viaGator) {
+        const sent = await executeGatorCall({
+          accountId: payerId,
+          provider,
+          chainId: chain.chainId,
+          target: tokenAddress,
+          value: 0n,
+          data: erc20.interface.encodeFunctionData('transfer', [to, amountTok]),
+        });
+        txHash = sent.txHash;
+        receipt = sent.receipt;
+      } else {
+        const tx = await erc20.transfer(to, amountTok);
+        txHash = tx.hash;
+        receipt = await tx.wait(1);
+      }
       const ok = Boolean(receipt && receipt.status === 1);
 
       if (logRow?.id) {
@@ -200,7 +241,7 @@ export async function POST(req: Request) {
           .from('transfers')
           .update({
             status: ok ? 'confirmed' : 'failed',
-            tx_hash: tx.hash,
+            tx_hash: txHash,
             error: ok ? null : 'receipt status not successful',
           })
           .eq('id', logRow.id);
@@ -235,8 +276,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      txHash: tx.hash,
-      explorerUrl: explorerTxUrl(chain, tx.hash),
+      txHash,
+      explorerUrl: explorerTxUrl(chain, txHash),
       to: merchant.username ? `@${merchant.username}` : 'account',
       alreadySaved,
     });

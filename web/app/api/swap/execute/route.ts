@@ -10,6 +10,7 @@ import {
   resolveToken,
   quoteSwap,
   executeSwap,
+  executeSwapViaGator,
   deriveAgentWallet,
   explorerTxUrl,
   assertSwapAllowed,
@@ -17,6 +18,8 @@ import {
 import { apiErrorBody } from '../../../../lib/apiError';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
+import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
+import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 
 const ROUTE = 'POST /api/swap/execute';
 
@@ -74,7 +77,7 @@ export async function POST(req: Request) {
 
     const { data: account } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, agent_wallet_address')
       .eq('id', accountId)
       .single();
     if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
@@ -130,15 +133,30 @@ export async function POST(req: Request) {
     }
 
     try {
+      // Funds sit on the gator once the pointer is flipped; the HMAC EOA is
+      // only the owner that signs the UserOp. Mirrors lib/engine/executeSwap.js.
+      const viaGator = pointerIsGator(accountId, account.agent_wallet_address);
       const signer = deriveAgentWallet(accountId).connect(provider);
-      const result = await executeSwap({
-        signer,
-        amountIn,
-        tokenIn,
-        tokenOut,
-        amountOutMinWei: quote.amountOutMin,
-        recipient: signer.address,
-      });
+      const walletAddr = viaGator ? predictGatorAddress(accountId) : signer.address;
+      const result = viaGator
+        ? await executeSwapViaGator({
+            accountId,
+            provider,
+            chainId: chain.chainId,
+            amountIn,
+            tokenIn,
+            tokenOut,
+            amountOutMinWei: quote.amountOutMin,
+            recipient: walletAddr,
+          })
+        : await executeSwap({
+            signer,
+            amountIn,
+            tokenIn,
+            tokenOut,
+            amountOutMinWei: quote.amountOutMin,
+            recipient: signer.address,
+          });
 
       if (logRow?.id) {
         await supabase
