@@ -10,7 +10,11 @@ import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { normalizePayAsset } from '../../../../lib/payAsset.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
-import { executeGatorCall, pointerIsGator } from '../../../../lib/gatorExecute.ts';
+import {
+  executeGatorCall,
+  pointerIsGator,
+  gatorGasReserveWei,
+} from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 
 const ERC20_ABI = [
@@ -80,7 +84,8 @@ export async function POST(req: Request) {
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
     // Funds sit on the gator once the pointer is flipped; the HMAC EOA only
-    // signs the UserOp. Ops pays the outer tx, so the gator needs no gas buffer.
+    // signs the UserOp. Ops submits the outer tx but there is no paymaster, so
+    // EntryPoint still takes its prefund from the gator: it needs a reserve.
     const { data: payer } = await supabase
       .from('accounts')
       .select('agent_wallet_address')
@@ -90,7 +95,7 @@ export async function POST(req: Request) {
     const signer = deriveAgentWallet(payerId).connect(provider);
     const walletAddr = viaGator ? predictGatorAddress(payerId) : signer.address;
     const ethBal = await provider.getBalance(walletAddr);
-    const gasBuf = viaGator ? 0n : gasBufferWei();
+    const gasBuf = viaGator ? await gatorGasReserveWei(provider, walletAddr) : gasBufferWei();
 
     let amountHuman: string;
     let tokenAddress: string | null = null;

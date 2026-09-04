@@ -157,3 +157,49 @@ describe('userOpSucceeded reads the inner result, not the outer status', () => {
     assert.equal(web.userOpSucceeded(r, ENTRY_POINT, SENDER), false);
   });
 });
+
+describe('prefund reserve: the gator pays its own validation', () => {
+  const GWEI = 1_000_000_000n;
+
+  it('reserves a non-zero amount, which is the whole point', () => {
+    // The cutover shipped with a flat 0n here. A max-balance send then passed
+    // the balance check and died in EntryPoint validation with nothing left to
+    // pay the prefund.
+    const r = bot.prefundShortfallWei(GWEI, 0n);
+    assert.ok(r > 0n, 'a gator with no deposit must hold something back');
+    assert.equal(web.prefundShortfallWei(GWEI, 0n), r);
+  });
+
+  it('matches gas x fee x margin', () => {
+    const expected = (bot.GATOR_USEROP_GAS * GWEI * 12_500n) / 10_000n;
+    assert.equal(bot.prefundShortfallWei(GWEI, 0n), expected);
+    assert.equal(web.prefundShortfallWei(GWEI, 0n), expected);
+  });
+
+  it('subtracts an existing EntryPoint deposit', () => {
+    const full = bot.prefundShortfallWei(GWEI, 0n);
+    const half = full / 2n;
+    assert.equal(bot.prefundShortfallWei(GWEI, half), full - half);
+    assert.equal(web.prefundShortfallWei(GWEI, half), full - half);
+  });
+
+  it('reserves nothing once the deposit already covers the op', () => {
+    const full = bot.prefundShortfallWei(GWEI, 0n);
+    for (const deposit of [full, full * 2n]) {
+      assert.equal(bot.prefundShortfallWei(GWEI, deposit), 0n);
+      assert.equal(web.prefundShortfallWei(GWEI, deposit), 0n);
+    }
+  });
+
+  it('scales with the fee, so a fee spike widens the reserve', () => {
+    const low = bot.prefundShortfallWei(GWEI, 0n);
+    const high = bot.prefundShortfallWei(GWEI * 10n, 0n);
+    assert.equal(high, low * 10n);
+    assert.equal(web.prefundShortfallWei(GWEI * 10n, 0n), high);
+  });
+
+  it('bot and site agree on the declared UserOp gas', () => {
+    assert.equal(web.GATOR_USEROP_GAS, bot.GATOR_USEROP_GAS);
+    assert.equal(bot.GATOR_USEROP_GAS, 1_580_000n);
+  });
+});

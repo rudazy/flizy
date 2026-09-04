@@ -26,6 +26,7 @@ const FACTORY_IFACE = new ethers.Interface([
 ]);
 const EP_IFACE = new ethers.Interface([
   'function getNonce(address sender, uint192 key) view returns (uint256)',
+  'function balanceOf(address account) view returns (uint256)',
   'function handleOps((address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData,bytes signature)[] ops, address payable beneficiary)',
   'event UserOperationEvent(bytes32 indexed userOpHash, address indexed sender, address indexed paymaster, uint256 nonce, bool success, uint256 actualGasCost, uint256 actualGasUsed)',
 ]);
@@ -42,7 +43,7 @@ type UserOp = {
   initCode: string;
   callData: string;
   accountGasLimits: string;
-  preVerificationGas: number;
+  preVerificationGas: bigint;
   gasFees: string;
   paymasterAndData: string;
   signature: string;
@@ -79,6 +80,70 @@ export function userOpSucceeded(
     return Boolean(parsed.args.success);
   }
   return false;
+}
+
+/**
+ * Gas the UserOp declares. EntryPoint's required prefund is the sum of these
+ * times maxFeePerGas, so the same numbers must drive both the op we submit and
+ * the ETH we hold back. Keeping the two apart is exactly how a max-balance send
+ * passes the local balance check and then fails validation.
+ */
+const GATOR_VERIFICATION_GAS = 1_000_000n;
+const GATOR_CALL_GAS = 500_000n;
+const GATOR_PREVERIFICATION_GAS = 80_000n;
+export const GATOR_USEROP_GAS =
+  GATOR_VERIFICATION_GAS + GATOR_CALL_GAS + GATOR_PREVERIFICATION_GAS;
+
+/** Headroom for fee movement between the balance check and the submit. */
+const PREFUND_MARGIN_BPS = 12_500n;
+
+/**
+ * ETH the account must still hold so EntryPoint can take its prefund.
+ *
+ * There is no paymaster: ops submits handleOps and is the beneficiary, but the
+ * account itself pays. EntryPoint refunds the unused part into the account's
+ * deposit, so a gator that has transacted before already covers some of the
+ * next op; that is why the deposit is subtracted here.
+ *
+ * Returns 0 when the existing deposit already covers it.
+ */
+export function prefundShortfallWei(
+  maxFeePerGas: bigint | number,
+  depositWei: bigint | number
+): bigint {
+  const required = (GATOR_USEROP_GAS * BigInt(maxFeePerGas) * PREFUND_MARGIN_BPS) / 10_000n;
+  const have = BigInt(depositWei || 0n);
+  return required > have ? required - have : 0n;
+}
+
+/**
+ * Live gas reserve for one gator. This replaces the flat config.gasBufferEth
+ * on the gator path, where that constant is the wrong shape.
+ *
+ * Never throws. A reserve this cannot read must not turn a plain "not enough
+ * ETH" into a generic failure, and if the fee read is really broken the send
+ * itself is about to fail anyway.
+ */
+export async function gatorGasReserveWei(
+  provider: ethers.JsonRpcProvider,
+  gator: string
+): Promise<bigint> {
+  let maxFee: bigint;
+  try {
+    const fee = await provider.getFeeData();
+    const maxPrio = fee.maxPriorityFeePerGas || ethers.parseUnits('1', 'gwei');
+    maxFee = fee.maxFeePerGas || maxPrio * 2n;
+  } catch {
+    maxFee = ethers.parseUnits('1', 'gwei');
+  }
+  let deposit = 0n;
+  try {
+    const ep = new ethers.Contract(gatorAddresses().entryPointV07, EP_IFACE, provider);
+    deposit = await ep.balanceOf(ethers.getAddress(gator));
+  } catch {
+    deposit = 0n;
+  }
+  return prefundShortfallWei(maxFee, deposit);
 }
 
 export function packU128(hi: bigint | number, lo: bigint | number): string {
@@ -231,8 +296,8 @@ export async function executeGatorCall(args: {
     nonce,
     initCode: '0x',
     callData: encodeExecuteCall(target, value, data || '0x'),
-    accountGasLimits: packU128(1_000_000, 500_000),
-    preVerificationGas: 80_000,
+    accountGasLimits: packU128(GATOR_VERIFICATION_GAS, GATOR_CALL_GAS),
+    preVerificationGas: GATOR_PREVERIFICATION_GAS,
     gasFees: packU128(maxPrio, maxFee),
     paymasterAndData: '0x',
     signature: '0x',
