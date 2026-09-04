@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getSupabase, getSiteConfig } from '../../../lib/supabase';
 import { listTrusted } from '../../../lib/trusted';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
-import { deriveAgentAddress, deriveLegacyAddressV1 } from '../../../lib/agentWallet';
 import { predictGatorAddress } from '../../../lib/gatorAccount.ts';
 import { toPublicAccount } from '../../../lib/publicAccount';
 import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
@@ -33,23 +32,19 @@ export async function GET() {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Set the agent wallet once. An empty pointer gets the HybridDeleGator.
-    // An address our own v1 code wrote is moved forward to the v2 HMAC EOA,
-    // which the migration script later sweeps onto the gator. Anything else
-    // is left alone because funds may be sitting on it.
+    // Set the agent wallet once and never replace it. An empty pointer gets the
+    // HybridDeleGator. Anything already stored is left alone because funds may
+    // be sitting on it and it is the account's on-chain identity.
     const stored = account.agent_wallet_address;
-    const isLegacyPointer = Boolean(stored) && stored === deriveLegacyAddressV1(accountId);
-    const expected = isLegacyPointer
-      ? deriveAgentAddress(accountId)
-      : predictGatorAddress(accountId);
 
-    if (!stored || isLegacyPointer) {
-      let write = supabase.from('accounts').update({ agent_wallet_address: expected });
-      write = stored
-        ? write.eq('id', accountId).eq('agent_wallet_address', stored)
-        : write.eq('id', accountId).is('agent_wallet_address', null);
-
-      const { data: updated, error: uErr } = await write.select(ACCOUNT_COLS).single();
+    if (!stored) {
+      const { data: updated, error: uErr } = await supabase
+        .from('accounts')
+        .update({ agent_wallet_address: predictGatorAddress(accountId) })
+        .eq('id', accountId)
+        .is('agent_wallet_address', null)
+        .select(ACCOUNT_COLS)
+        .single();
       if (!uErr && updated) {
         account = updated;
       } else {

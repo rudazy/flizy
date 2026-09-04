@@ -26,6 +26,14 @@ This is a chain measurement. It is not a product cutover. Production
 still signs derived EOAs. The experiment account is not a user or tester
 wallet. No production account address was written.
 
+**Superseded in part, 2026-09-04.** The sentence above about production was
+true on the measurement date. The engine cut over the next day: production
+pointers are HybridDeleGators and both the bot and the site spend from them,
+still owned by the server-derived EOA. The custody transition recorded below
+— add passkey, sign the bounded delegation with it, renounce the EOA owner —
+remains unbuilt in the product. Every present-tense statement about
+production in this document describes 2026-09-03.
+
 Companion to `docs/PASSKEY-P256-GIWA.md` (P-256 / WebAuthn on this chain).
 Addresses: `deployments/giwa-sepolia-delegation.json`.
 Script for the custody loop: `scripts/delegation-giwa-renounce.js`.

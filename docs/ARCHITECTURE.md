@@ -9,7 +9,7 @@ in the public tree.
 
 **Naming:** the per-account wallet Flizy derives is the `agent wallet` in code and schema
 (`lib/agentWallet.js`, `accounts.agent_wallet_address`). Every user-facing string — chat,
-site, README — calls it **your Flizy wallet**. One EOA, two names, split by audience.
+site, README — calls it **your Flizy wallet**. One address, two names, split by audience.
 
 ---
 
@@ -138,9 +138,11 @@ Two rules do the heavy lifting:
   additionally store `null` unless the value passes `isPlausiblePhone`.
 - Sessions are keyed `(account_id, channel, external_id)`. Locking one chat app leaves the
   other untouched.
-- Agent wallets are derived once per account (v2: HMAC-SHA256 of the account id under
-  `WALLET_DERIVATION_SECRET`, then keccak256). They are never rotated, so the site and every
-  chat client always show the same address.
+- Agent wallets are HybridDeleGator smart accounts at a CREATE2 address derived from a
+  per-account owner key (v2: HMAC-SHA256 of the account id under `WALLET_DERIVATION_SECRET`,
+  then keccak256). `ensureAgentWallet` writes the pointer once and never replaces it, so the
+  site and every chat client always show the same address. Aliases and ownership may change;
+  the account address does not.
 - Invites: the public ref is the Flizy `@username` (`/i/ludarep`, and
   `/claim/{token}/ludarep` when attach is on). Attribution is set once on signup from
   an httpOnly cookie or a typed username. A count is written by `try_count_invite` only
@@ -321,7 +323,7 @@ Caller does not choose ERC-20 vs bank vs Uniswap. Route does.
 
 | Wallet | Role |
 |--------|------|
-| **Agent wallet** | Per-account funds for normal sends; derived once per account, never rotated for address stability |
+| **Agent wallet** | Per-account funds for normal sends; a HybridDeleGator owned by a derived per-account key, written once and never replaced |
 | **Ops** (`PRIVATE_KEY`) | Infra / gas only — not user escrow |
 | **Escrow** (`ESCROW_PRIVATE_KEY` or derived) | Pending claim liability only |
 
@@ -333,9 +335,14 @@ escrow_on_chain_balance >= sum(pending claims amount)  (+ gas for next payout)
 
 Hold: agent → escrow. Cancel: escrow → sender agent. Claim: escrow → recipient agent.
 
-Live custody is per-account derived EOAs. `contracts/src/FlizyWallet.sol` is
-scaffold, not deployed, and not the upgrade path. Do not extend it.
-`lib/smartAccount.js` is a Kernel research smoke, not wired into the engine.
+Live custody is a HybridDeleGator per account, owned by that account's derived
+EOA. That is a smart account, not a non-custodial one: the owner key is
+server-held, so Flizy can still move the funds. Moving the root to a user
+passkey and reducing Flizy to a bounded delegate is measured in
+[DELEGATION-GIWA.md](DELEGATION-GIWA.md) and not built in the product.
+`contracts/src/FlizyWallet.sol` is scaffold, not deployed, and not the upgrade
+path. Do not extend it. `lib/smartAccount.js` is a Kernel research smoke, not
+wired into the engine.
 P-256 / WebAuthn verification on GIWA Sepolia is measured in
 [PASSKEY-P256-GIWA.md](PASSKEY-P256-GIWA.md).
 
