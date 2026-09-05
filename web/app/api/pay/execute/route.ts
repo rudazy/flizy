@@ -16,6 +16,7 @@ import {
   gatorGasReserveWei,
 } from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
+import { fundingWallText } from '../../../../lib/fundingWall.ts';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -113,7 +114,7 @@ export async function POST(req: Request) {
       }
       if (ethBal < amountWei + gasBuf) {
         return NextResponse.json(
-          { error: 'Not enough ETH in your Flizy wallet (amount + gas).' },
+          { error: fundingWallText({ kind: 'native', address: walletAddr }) },
           { status: 400 }
         );
       }
@@ -192,14 +193,14 @@ export async function POST(req: Request) {
       }
       if (ethBal < gasBuf) {
         return NextResponse.json(
-          { error: 'Need a little ETH in your Flizy wallet for gas.' },
+          { error: fundingWallText({ kind: 'gas', address: walletAddr }) },
           { status: 400 }
         );
       }
       const tokBal = await erc20.balanceOf(walletAddr);
       if (tokBal < amountTok) {
         return NextResponse.json(
-          { error: 'Not enough FLZ in your Flizy wallet.' },
+          { error: fundingWallText({ kind: 'token', asset, address: walletAddr }) },
           { status: 400 }
         );
       }
