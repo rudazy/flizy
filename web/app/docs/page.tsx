@@ -181,6 +181,22 @@ const CMD_GROUPS: Array<{
   },
 ];
 
+/**
+ * Telegram commands read as root-relative paths, so Googlebot lifts them out of the
+ * page text and crawls flizy.app/phone, /me, /balance and the rest, none of which
+ * exist. Emitting the slash as its own node leaves the line identical on screen and
+ * no bare path in the HTML. Row keys use `wa` alone for the same reason.
+ */
+function TgCommand({ command }: { command: string }) {
+  if (!command.startsWith('/')) return <>{command}</>;
+  return (
+    <>
+      <span>/</span>
+      {command.slice(1)}
+    </>
+  );
+}
+
 export default function DocsPage() {
   const origin = siteOrigin();
 
@@ -299,7 +315,9 @@ export default function DocsPage() {
           <p className="mt-2 text-sm text-muted">
             WhatsApp: prefix with <span className="text-paper">flizy</span>. Telegram: use a slash
             or the same words. Type <span className="text-paper">flizy help</span> or{' '}
-            <span className="text-paper">/help</span> in chat for a short everyday guide.
+            <span className="text-paper">
+              <TgCommand command="/help" />
+            </span> in chat for a short everyday guide.
           </p>
         </div>
 
@@ -320,9 +338,11 @@ export default function DocsPage() {
                 </thead>
                 <tbody>
                   {group.rows.map((row) => (
-                    <tr key={row.wa + row.tg} className="border-b border-border last:border-0">
+                    <tr key={row.wa} className="border-b border-border last:border-0">
                       <td className="px-3 py-2.5 font-mono text-xs text-paper">{row.wa}</td>
-                      <td className="px-3 py-2.5 font-mono text-xs text-paper">{row.tg}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-paper">
+                        <TgCommand command={row.tg} />
+                      </td>
                       <td className="px-3 py-2.5 text-muted">{row.meaning}</td>
                     </tr>
                   ))}
