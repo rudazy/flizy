@@ -6,6 +6,7 @@ import { AppPage, AppSection } from '../../../components/AppSection';
 import { useDashboard } from '../../../components/DashboardProvider';
 import type { ActivityItem } from '../../../lib/dashboardTypes';
 import { shortAddr } from '../../../lib/dashboardTypes';
+import { formatAmount } from '../../../lib/amountDisplay';
 
 function typeBadge(type: ActivityItem['type']) {
   const map: Record<ActivityItem['type'], string> = {
@@ -34,14 +35,8 @@ function amountLine(row: ActivityItem) {
   return `${sign}${fmtAmt(row.amount)} ${row.asset}`;
 }
 
-function fmtAmt(n: string | number) {
-  const x = Number(n);
-  if (!Number.isFinite(x)) return String(n);
-  if (x === 0) return '0';
-  if (x >= 1000) return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  if (x < 0.000001) return x.toExponential(3);
-  return x.toLocaleString(undefined, { maximumFractionDigits: 6 });
-}
+/** One rule, shared with chat via lib/amountDisplay.js. */
+const fmtAmt = formatAmount;
 
 function relativeTime(iso: string) {
   const t = new Date(iso).getTime();
@@ -76,7 +71,7 @@ function secondaryLine(row: ActivityItem) {
 }
 
 export default function HistoryPage() {
-  const { activity, history, explorerBase, refreshing, refreshAll } = useDashboard();
+  const { activity, waiting, history, explorerBase, refreshing, refreshAll } = useDashboard();
 
   const rows: ActivityItem[] =
     activity.length > 0
@@ -102,6 +97,40 @@ export default function HistoryPage() {
         onAction={refreshAll}
         actionBusy={refreshing}
       />
+
+      {waiting.length > 0 ? (
+        <AppSection
+          title="Waiting for you"
+          helper="Money already sent to you that has not been collected yet."
+          badge={String(waiting.length)}
+        >
+          <ul className="space-y-2">
+            {waiting.map((c) => (
+              <li
+                key={c.id}
+                className="flex items-center justify-between gap-3 border-b border-border pb-2 last:border-0 last:pb-0"
+              >
+                <div className="min-w-0">
+                  <p className="font-sans text-sm tracking-wide text-paper">{c.label}</p>
+                  {c.counterparty ? (
+                    <p className="mt-0.5 text-xs text-muted">{c.counterparty}</p>
+                  ) : null}
+                </div>
+                {c.canClaimOnWeb && c.claimToken ? (
+                  <Link
+                    href={`/claim/${c.claimToken}`}
+                    className="shrink-0 text-xs text-lime no-underline hover:text-gold"
+                  >
+                    Claim →
+                  </Link>
+                ) : (
+                  <span className="shrink-0 text-xs text-muted">Claim in chat</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </AppSection>
+      ) : null}
 
       <AppSection
         title="Activity"

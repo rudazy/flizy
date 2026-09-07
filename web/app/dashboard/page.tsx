@@ -19,6 +19,7 @@ import { useLocale } from '../../components/LocaleProvider';
 import { shortAddr } from '../../lib/dashboardTypes';
 import { CopyButton } from '../../components/CopyButton';
 import { formatClaimAmount } from '../../lib/claimAmount.ts';
+import { formatAmount } from '../../../lib/amountDisplay';
 
 const SLIDES = ['overview', 'claims', 'go', 'recent'] as const;
 
@@ -387,9 +388,7 @@ export default function DashboardHomePage() {
                                 asset: c.asset,
                                 nft_token_id: c.nftTokenId,
                               })
-                            : `+${Number(c.amountEth).toLocaleString(undefined, {
-                                maximumFractionDigits: 6,
-                              })} ${c.asset || 'ETH'}`}
+                            : `+${formatAmount(c.amountEth)} ${c.asset || 'ETH'}`}
                         </p>
                       </div>
                       {phoneOnly ? (
@@ -497,9 +496,7 @@ export default function DashboardHomePage() {
                     }`}
                   >
                     {row.direction === 'in' ? '+' : '−'}
-                    {Number(row.amount).toLocaleString(undefined, {
-                      maximumFractionDigits: 4,
-                    })}{' '}
+                    {formatAmount(row.amount)}{' '}
                     {row.asset}
                   </p>
                 </li>

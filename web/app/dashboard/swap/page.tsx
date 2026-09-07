@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AppTopBar } from '../../../components/AppTopBar';
 import { AppDesktopTabs } from '../../../components/AppBottomNav';
 import { PasswordField } from '../../../components/PasswordField';
+import { formatAmount } from '../../../lib/amountDisplay';
 
 type Token = 'ETH' | 'FLZ';
 
@@ -31,12 +32,22 @@ type PriceInfo = {
   reserveWeth: string;
 };
 
-function fmt(n: string | number, max = 6) {
+/**
+ * With no cap this is the shared money rule (lib/amountDisplay.js), so a swap
+ * amount reads the same here as it does in chat.
+ *
+ * With a cap it is a swap-specific quantity — a rate, a price impact, a
+ * percentage — where fewer digits is the point. Those keep their own cap but
+ * lose the old `>= 1000 rounds to 2dp` override, which silently contradicted
+ * the cap the caller asked for, and the locale is pinned so grouping does not
+ * depend on who is reading.
+ */
+function fmt(n: string | number, max?: number) {
+  if (max === undefined) return formatAmount(n);
   const x = Number(n);
   if (!Number.isFinite(x)) return String(n);
   if (x === 0) return '0';
-  if (x >= 1000) return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  return x.toLocaleString(undefined, { maximumFractionDigits: max });
+  return x.toLocaleString('en-US', { maximumFractionDigits: max });
 }
 
 type Balances = { eth: string; flz: string };
