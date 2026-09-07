@@ -7,7 +7,17 @@ describe('formatRequestsMenu', () => {
   it('incoming empty', () => {
     const t = formatRequestsMenu([], 'incoming');
     assert.match(t, /No payment requests/);
-    assert.match(t, /\/phone/);
+    // This used to assert the literal "/phone", which is the Telegram form, in
+    // a message both channels are shown -- so it pinned copy that was wrong on
+    // WhatsApp. The command is now a marker the delivery layer renders.
+    assert.match(t, /\{\{cmd:phone\}\}/);
+  });
+
+  it('names the share-number command the way each channel types it', () => {
+    const { renderCommands } = require('../lib/commands/render');
+    const t = formatRequestsMenu([], 'incoming');
+    assert.match(renderCommands(t, 'telegram'), /\/phone/);
+    assert.match(renderCommands(t, 'whatsapp'), /flizy phone/);
   });
   it('lists pay menu', () => {
     const t = formatRequestsMenu(
