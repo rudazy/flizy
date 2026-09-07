@@ -72,6 +72,9 @@ docs/README.md
 docs/PROJECT.md
 docs/NFT-COLLECTIONS.md
 docs/SMART-ACCOUNTS-ASSESSMENT.md
+# Security architecture (private). Unbuilt design, not the shipped model.
+docs/SECURITY-RECOVERY.md
+docs/SECURITY-MODEL.md
 # Dev staging runbook (private). Maps two remotes, two DBs, env layout.
 docs/DEV-ENVIRONMENT.md
 # Staged build plans (private). Glob covers future stages, not just this one.
