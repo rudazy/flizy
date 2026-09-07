@@ -2,18 +2,26 @@ import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 import { apiErrorBody } from '../../../lib/apiError';
+import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
 // Shared with chat history — platform claims must show GitHub pay / Phone / X pay
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
   formatClaimHistoryLabel,
   claimHistoryCounterparty,
 } = require('../../../../lib/claimHistoryLabel');
+// Same query the bot runs, for the same reason the label formatter is shared:
+// two implementations of "what happened on this account" disagreed.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { loadSettledHistory } = require('../../../../lib/history');
 
 const ROUTE = 'GET /api/history';
 
-/** Claim columns needed for rail labels (phone vs GitHub vs X). */
-const CLAIM_SELECT =
-  'id, from_account_id, to_account_id, to_wa_hint, to_channel, to_external_id, to_display_handle, amount_eth, asset, token_address, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at';
+/** One row from lib/history.js, before the site decides how to draw it. */
+type HistoryEntry = {
+  source: 'transfer' | 'claim';
+  row: Record<string, unknown>;
+  createdAt: string;
+};
 
 export type ActivityItem = {
   id: string;
@@ -141,103 +149,36 @@ export async function GET() {
     }
 
     const supabase = getSupabase();
-    const selectFull =
-      'id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id, kind, asset, token_address, counterparty_label, direction, amount_secondary, asset_secondary';
-    const selectCore =
-      'id, amount_eth, to_address, status, tx_hash, created_at, phone, chain_id, kind';
 
-    // Prefer account_id (swaps / site rows use this). Merge legacy phone-only rows.
-    // transfers.phone holds the identity transfer key: bare id for WhatsApp,
-    // namespaced (telegram:<id>) for every other channel.
-    const { data: identities } = await supabase
-      .from('channel_identities')
-      .select('channel, external_id')
-      .eq('account_id', accountId);
-    const phones = (identities || [])
-      .filter((i) => i.external_id)
-      .map((i) => (i.channel === 'whatsapp' ? i.external_id : `${i.channel}:${i.external_id}`));
+    // Row selection, ordering and limits all live in lib/history.js. What stays
+    // here is how the site renders them, which is not the same job as the chat
+    // line and should not be forced into the same shape.
+    const settled = await loadSettledHistory(supabase, accountId);
 
-    async function loadTransfers(select: string): Promise<{
-      rows: Record<string, unknown>[];
-      error: { message: string } | null;
-    }> {
-      const byAccount = await supabase
-        .from('transfers')
-        .select(select)
-        .eq('account_id', accountId)
-        .order('created_at', { ascending: false })
-        .limit(40);
+    const items: ActivityItem[] = settled.items.map((entry: HistoryEntry) =>
+      entry.source === 'claim'
+        ? mapClaimRow(entry.row, accountId)
+        : mapTransferRow(entry.row)
+    );
 
-      if (byAccount.error) {
-        return { rows: [], error: byAccount.error };
-      }
+    const transferRows = settled.items
+      .filter((e: HistoryEntry) => e.source === 'transfer')
+      .map((e: HistoryEntry) => e.row);
 
-      const map = new Map<string, Record<string, unknown>>();
-      for (const r of (byAccount.data || []) as unknown as Record<string, unknown>[]) {
-        map.set(String(r.id), r);
-      }
-
-      if (phones.length > 0) {
-        // Query each phone separately — avoids fragile .in() with LID special chars
-        for (const phone of phones.slice(0, 8)) {
-          const byPhone = await supabase
-            .from('transfers')
-            .select(select)
-            .eq('phone', phone)
-            .order('created_at', { ascending: false })
-            .limit(20);
-          if (byPhone.error) continue;
-          for (const r of (byPhone.data || []) as unknown as Record<string, unknown>[]) {
-            map.set(String(r.id), r);
-          }
-        }
-      }
-
-      const rows = Array.from(map.values()).sort(
-        (a, b) =>
-          new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime()
-      );
-      return { rows: rows.slice(0, 40), error: null };
+    // Money already sent to this user and not yet collected. Kept out of the
+    // settled list on purpose: it is not something that happened, it is
+    // something still to do.
+    let waiting: Awaited<ReturnType<typeof listPendingClaimSummaries>> = [];
+    try {
+      waiting = await listPendingClaimSummaries(accountId);
+    } catch {
+      // Settled activity is still worth returning without it.
     }
-
-    let loaded = await loadTransfers(selectFull);
-    if (loaded.error) {
-      loaded = await loadTransfers(selectCore);
-    }
-    const transferRows = loaded.rows;
-
-    const { data: claimsOut } = await supabase
-      .from('claims')
-      .select(CLAIM_SELECT)
-      .eq('from_account_id', accountId)
-      .order('created_at', { ascending: false })
-      .limit(30);
-
-    // Claimed rows (to_account_id set on payout). Also pending platform claims
-    // for this account are not listed here until claimed — matching is chat-side.
-    const { data: claimsIn } = await supabase
-      .from('claims')
-      .select(CLAIM_SELECT)
-      .eq('to_account_id', accountId)
-      .order('created_at', { ascending: false })
-      .limit(30);
-
-    const claimMap = new Map<string, Record<string, unknown>>();
-    for (const c of [...(claimsOut || []), ...(claimsIn || [])]) {
-      claimMap.set(String(c.id), c as Record<string, unknown>);
-    }
-
-    const items: ActivityItem[] = [
-      ...transferRows.map((r) => mapTransferRow(r as Record<string, unknown>)),
-      ...Array.from(claimMap.values()).map((c) => mapClaimRow(c, accountId)),
-    ];
-
-    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    const activity = items.slice(0, 30);
 
     // Backward-compatible transfers key for older clients
     return NextResponse.json({
-      activity,
+      activity: items,
+      waiting,
       transfers: transferRows.slice(0, 30),
       limit: 30,
     });

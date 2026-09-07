@@ -96,13 +96,13 @@
       "kind": "table",
       "name": "channel_identities",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/channelBind.js, lib/discordLookup.js, lib/identity.js, lib/invite.js, lib/router.js, lib/telegramLookup.js"
+      "requiredBy": "lib/channelBind.js, lib/discordLookup.js, lib/history.js, lib/identity.js, lib/invite.js, lib/router.js, lib/telegramLookup.js"
     },
     {
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "lib/claims.js, lib/dailyLimits.js, lib/escrowWallet.js, lib/router.js"
+      "requiredBy": "lib/claims.js, lib/dailyLimits.js, lib/escrowWallet.js, lib/history.js"
     },
     {
       "kind": "table",
@@ -192,7 +192,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/dailyLimits.js, lib/payCode.js, lib/router.js, lib/transferLog.js"
+      "requiredBy": "lib/dailyLimits.js, lib/history.js, lib/payCode.js, lib/transferLog.js"
     },
     {
       "kind": "table",

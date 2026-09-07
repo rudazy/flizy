@@ -84,13 +84,13 @@
       "kind": "table",
       "name": "channel_identities",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/history/route.ts, web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/invite.ts, web/lib/pendingClaims.ts"
+      "requiredBy": "web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/invite.ts, web/lib/pendingClaims.ts"
     },
     {
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "web/app/api/history/route.ts, web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts"
+      "requiredBy": "web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts"
     },
     {
       "kind": "table",
@@ -180,7 +180,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/history/route.ts, web/app/api/pay/execute/route.ts, web/app/api/swap/execute/route.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
+      "requiredBy": "web/app/api/pay/execute/route.ts, web/app/api/swap/execute/route.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
     },
     {
       "kind": "table",

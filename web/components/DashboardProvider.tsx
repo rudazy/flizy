@@ -15,6 +15,7 @@ import type {
   DashboardData,
   HoldingsData,
   TransferRow,
+  PendingClaimItem,
 } from '../lib/dashboardTypes';
 import { useLocale } from './LocaleProvider';
 import { normalizeLocale, type LocaleCode } from '../lib/locale';
@@ -23,6 +24,8 @@ type DashboardContextValue = {
   data: DashboardData | null;
   history: TransferRow[];
   activity: ActivityItem[];
+  /** Unclaimed money addressed to this account. Never mixed into activity. */
+  waiting: PendingClaimItem[];
   holdings: HoldingsData | null;
   error: string;
   msg: string;
@@ -60,6 +63,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [history, setHistory] = useState<TransferRow[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [waiting, setWaiting] = useState<PendingClaimItem[]>([]);
   const [holdings, setHoldings] = useState<HoldingsData | null>(null);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -98,6 +102,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     if (!accountPayload.account?.email_verified || !hasUser) {
       setHistory([]);
       setActivity([]);
+      setWaiting([]);
       setHoldings(null);
       return;
     }
@@ -110,6 +115,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const h = await histRes.json();
       setHistory(h.transfers || []);
       setActivity(h.activity || []);
+      setWaiting(h.waiting || []);
     }
     if (holdRes.ok) {
       const ho = await holdRes.json();
@@ -378,6 +384,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       data,
       history,
       activity,
+      waiting,
       holdings,
       error,
       msg,
@@ -401,6 +408,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       data,
       history,
       activity,
+      waiting,
       holdings,
       error,
       msg,
