@@ -20,8 +20,14 @@ const assert = require('node:assert/strict');
 
 const { resolveDevTarget, describeTarget } = require('../scripts/devDbTarget');
 
-const DEV_REF = 'tkkxcmrmtzpplydbksfe';
-const PROD_REF = 'wbqhvmtiocoozjgwdsiq';
+/**
+ * Fake refs, deliberately. The guard only cares that two refs disagree, so the
+ * real project ids buy nothing here and a project ref is reconnaissance: it is
+ * the API subdomain, so publishing one tells an attacker exactly which project
+ * to aim at. Do not "improve" these by pasting the real ones back.
+ */
+const DEV_REF = 'devrefdevrefdevrefaa';
+const PROD_REF = 'prodrefprodrefprodaa';
 
 /** A valid, minimal dev env. */
 function env(overrides = {}) {
