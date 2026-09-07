@@ -178,6 +178,12 @@
     },
     {
       "kind": "table",
+      "name": "pots",
+      "providedBy": "20260908000000_pots.sql",
+      "requiredBy": "lib/pots.js"
+    },
+    {
+      "kind": "table",
       "name": "reserved_usernames",
       "providedBy": "20260811000000_reserved_usernames.sql",
       "requiredBy": "lib/username.js"
@@ -192,7 +198,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/dailyLimits.js, lib/history.js, lib/payCode.js, lib/transferLog.js"
+      "requiredBy": "lib/dailyLimits.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/transferLog.js"
     },
     {
       "kind": "table",
