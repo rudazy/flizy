@@ -166,6 +166,40 @@ describe('a request made by @username reaches the person it names', () => {
   });
 });
 
+/**
+ * The sibling bug, found in production by replying "1" to a real split rather
+ * than by any test here.
+ *
+ * startPayRequest authorized by comparing from_wa_hint against the account's
+ * phones, which was right while phone was the only way to address a request.
+ * Since 20260907000000 it is one of four, and the other three leave that column
+ * null -- so an account-addressed request was listed, notified, and then
+ * refused at the till as "This request is for a different phone number".
+ *
+ * The property: what the menu lists and what pay accepts cannot disagree.
+ */
+describe('a listed request is a payable request', () => {
+  it('does not refuse an account-addressed request as a phone mismatch', async () => {
+    await say(ORG_WA, 'flizy split 0.05 with ludarep for dinner');
+    await say(PAYER_WA, 'flizy pay');
+    const said = await say(PAYER_WA, 'confirm');
+
+    assert.doesNotMatch(said, /different phone number/);
+    assert.doesNotMatch(said, /not addressed to you/);
+    assert.doesNotMatch(said, /Could not verify your phone/);
+    // It gets as far as reading the wallet, which is the step after
+    // authorization. The stub provider has no getBalance, so that is where it
+    // stops here -- past the gate, which is what this pins.
+    assert.match(said, /Could not check your Flizy wallet/);
+  });
+
+  // The other half -- that somebody else cannot pay it -- is covered upstream by
+  // "does not show up for somebody else": the menu is the only way to reach
+  // startPayRequest, and it is filtered by the same listIncomingRequests this
+  // now authorizes against. A test here would have to export an internal to say
+  // anything the menu test does not already prove.
+});
+
 describe('declining', () => {
   it('ends the request and tells the person who asked', async () => {
     await say(ORG_WA, 'flizy split 0.05 with ludarep for dinner');
