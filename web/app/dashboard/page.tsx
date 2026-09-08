@@ -185,17 +185,29 @@ export default function DashboardHomePage() {
 
       {/* Status always visible — summary, not a buried section */}
       <AppStatusStrip>
+        {/*
+          "Balance", not "On-chain": the label is what the person can spend, not
+          where it is kept. formatAmount rather than toFixed(4) so this figure
+          reads the same here as in chat, in history and on a receipt -- it was
+          the third rendering of one number.
+        */}
         <AppStatusCell
-          label="On-chain"
+          label="Balance"
           value={
             nativeBal
-              ? `${Number(nativeBal.balance).toFixed(4)} ${nativeBal.symbol}`
+              ? `${formatAmount(nativeBal.balance)} ${nativeBal.symbol}`
               : '— ETH'
           }
           href="/dashboard/wallet?s=balances"
         />
+        {/*
+          "Invites", not "Credit". This is data.invite.credits -- earned invite
+          credits, which CREDITS_SPENDABLE deliberately keeps unspendable. Sat
+          next to a balance in ETH under a label that reads like money, which is
+          the ambiguity this whole item exists to remove.
+        */}
         <AppStatusCell
-          label="Credit"
+          label="Invites"
           value={String(inviteCredit)}
           href="/dashboard/account?s=profile"
         />

@@ -76,7 +76,18 @@ describe('formatHoldingsMessage drops tokens the wallet does not hold', () => {
   it('still lists a token that is held', () => {
     const text = balanceWith([{ symbol: 'FLZ', balance: '10' }]);
     assert.match(text, /Tokens:/);
-    assert.match(text, /FLZ: 10\.0000/);
+    // Was /FLZ: 10\.0000/, which is toPrecision(6). This screen now uses the
+    // one shared rule, so a balance reads the same here as in history, on a
+    // receipt, in a pot and on the dashboard.
+    assert.match(text, /FLZ: 10\b/);
+  });
+
+  it('does not round a token balance into a different number', () => {
+    // toPrecision(6) rendered 12345.6789 as "12345.7". Not a formatting
+    // preference: a money screen was showing an amount the wallet did not hold.
+    const text = balanceWith([{ symbol: 'FLZ', balance: '12345.6789' }]);
+    assert.match(text, /FLZ: 12,345\.6789/);
+    assert.doesNotMatch(text, /12345\.7\b/);
   });
 
   it('keeps only the held one in a mixed list', () => {
@@ -87,7 +98,7 @@ describe('formatHoldingsMessage drops tokens the wallet does not hold', () => {
     // Not /FLZ/ — the static help footer names FLZ ("flizy send 10 FLZ to name").
     // Only the holdings line is in question here.
     assert.doesNotMatch(text, /FLZ:/);
-    assert.match(text, /USDC: 25\.5000/);
+    assert.match(text, /USDC: 25\.5\b/);
   });
 
   it('still reports a token it could not read, rather than calling it none', () => {
@@ -95,10 +106,22 @@ describe('formatHoldingsMessage drops tokens the wallet does not hold', () => {
     assert.match(text, /FLZ: unavailable/, 'unreadable is not the same as none');
   });
 
-  it('leaves the ETH line and the help footer alone when nothing is held', () => {
+  it('leads with one spendable figure, and names no chain', () => {
     const text = balanceWith([{ symbol: 'FLZ', balance: '0' }]);
-    assert.match(text, /ETH \(on-chain\): 0\.031000/);
-    assert.match(text, /Sends are from your Flizy wallet/);
+    // Was 'ETH (on-chain): 0.031000'. The parenthetical was chain vocabulary on
+    // the screen everybody reads, and the figure disagreed with every other
+    // surface. One number, in the units the person spends.
+    assert.match(text, /0\.031 ETH/);
+    assert.doesNotMatch(text, /on-chain/);
+    assert.doesNotMatch(text, /GIWA|Sepolia/, 'the chain named itself in default copy');
+  });
+
+  it('speaks each channel dialect in the footer', () => {
+    const { renderCommands } = require('../lib/commands/render');
+    const text = balanceWith([{ symbol: 'FLZ', balance: '0' }]);
+    // These three lines hardcoded the WhatsApp form, so Telegram read them wrong.
+    assert.match(renderCommands(text, 'telegram'), /\/deposit/);
+    assert.match(renderCommands(text, 'whatsapp'), /flizy deposit/);
   });
 });
 
