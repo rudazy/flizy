@@ -162,6 +162,11 @@ describe('every advertised Telegram command works as a bare slash command', () =
     link: 'A7K2QX99',
     send: '0.01 to john',
     request: '0.01 from 2348012345678',
+    // Both need a subject: a bill with nobody in it and a pot with no name are
+    // refused by the parser on purpose, so the menu entry is a starting point
+    // the user completes, exactly like /send.
+    split: '30 with @ada @kemi',
+    collect: '5 for rent',
     buy: '0.01 FLZ',
     sell: '10 FLZ',
     swap: '0.01 ETH for FLZ',

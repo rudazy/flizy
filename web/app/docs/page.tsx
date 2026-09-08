@@ -129,6 +129,57 @@ const CMD_GROUPS: Array<{
     ],
   },
   {
+    title: 'Split & collect',
+    blurb:
+      'A split turns one bill into one request per person, and you are counted in the division ' +
+      'without being asked for your own share. A pot is named first and paid into later, so it ' +
+      'suits money with no fixed list of people. Money from either lands in your wallet as it ' +
+      'arrives; nothing is held.',
+    rows: [
+      {
+        wa: 'flizy split 30 with @ada @kemi for dinner',
+        tg: '/split 30 with @ada @kemi for dinner',
+        meaning:
+          'Three ways including you: two requests go out at 10 each, and your 10 is simply yours to cover',
+      },
+      {
+        wa: 'flizy requests',
+        tg: '/requests',
+        meaning: 'How the bill stands — who has paid, who declined, who is still open',
+      },
+      {
+        wa: 'flizy remind',
+        tg: '/remind',
+        meaning: 'Nudge whoever still owes. Once every few hours per person, not more',
+      },
+      {
+        wa: 'flizy decline',
+        tg: '/decline',
+        meaning: 'Refuse a request addressed to you. The person who asked is told; no money moves',
+      },
+      {
+        wa: '0.01',
+        tg: '0.01',
+        meaning: 'Reply with an amount instead of confirm to pay part of a request now',
+      },
+      {
+        wa: 'flizy collect 5 for rent',
+        tg: '/collect 5 for rent',
+        meaning: 'Open a pot with a goal and share the code. Leave the amount out for no goal',
+      },
+      {
+        wa: 'flizy pay pot k7m2q4 1.5',
+        tg: '/pay pot k7m2q4 1.5',
+        meaning: "Pay into someone else's pot using the code they shared",
+      },
+      {
+        wa: 'flizy pots',
+        tg: '/pots',
+        meaning: 'Your pots and what has landed in each. Close one with: close pot CODE',
+      },
+    ],
+  },
+  {
     title: 'Account & safety',
     blurb: 'Link once. Lock freezes this chat only — your other apps stay as they are.',
     rows: [

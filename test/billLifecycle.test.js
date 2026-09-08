@@ -170,6 +170,51 @@ describe('what is left to pay is exact', () => {
   });
 });
 
+/**
+ * Partial pay is answered with a bare amount, and a bare amount is not a
+ * command. It routed and was tested here for a whole slice while no user could
+ * reach it, because the WhatsApp gate is a separate list from the router and
+ * these tests call the router directly. Same gap as the currency work; this is
+ * the assertion that would have caught it.
+ */
+describe('a bare amount wakes the bot only while a pay prompt is open', () => {
+  const { pendingClaimMenus } = require('../lib/commands/pending');
+  const wa = { channel: 'whatsapp', key: 'whatsapp:gate' };
+  const open = (mode) =>
+    pendingClaimMenus.set(wa.key, {
+      mode,
+      awaitConfirmId: 'req-1',
+      requests: [{ id: 'req-1' }],
+      createdAt: Date.now(),
+    });
+
+  it('ignores an amount when nothing is being asked', () => {
+    pendingClaimMenus.delete(wa.key);
+    assert.equal(router.isFlizyCommand(wa, '0.01'), false, 'chatter became a command');
+  });
+
+  it('takes one while a request is waiting to be paid', () => {
+    open('pay_request');
+    assert.equal(router.isFlizyCommand(wa, '0.01'), true);
+    assert.equal(router.isFlizyCommand(wa, 'flizy 0.01'), true);
+    pendingClaimMenus.delete(wa.key);
+  });
+
+  it('still ignores ordinary words while that prompt is open', () => {
+    open('pay_request');
+    assert.equal(router.isFlizyCommand(wa, 'hello'), false);
+    pendingClaimMenus.delete(wa.key);
+  });
+
+  it('does not take one for a menu an amount cannot answer', () => {
+    // Cancelling is a numbered choice, not an amount, so waking here would only
+    // turn chatter into commands.
+    open('cancel_request');
+    assert.equal(router.isFlizyCommand(wa, '0.01'), false);
+    pendingClaimMenus.delete(wa.key);
+  });
+});
+
 describe('the reminder', () => {
   it('says who is waiting and how much is left', () => {
     const t = formatRequestReminderNotice({ byLabel: '@whuffi', amountEth: '0.02', billNote: 'dinner' });
