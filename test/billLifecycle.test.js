@@ -215,6 +215,64 @@ describe('a bare amount wakes the bot only while a pay prompt is open', () => {
   });
 });
 
+/**
+ * Paying into a pot without naming an amount.
+ *
+ * Reported from real use: the bot asked "how much do you want to put in?" and
+ * registered nothing to catch the answer, so replying with an amount got
+ * silence. It also suggested `pay pot CODE 1` -- and 1 ETH is ten times
+ * maxSendEth, so following the bot's own instruction always failed.
+ */
+describe('the pot pay question', () => {
+  const { pendingPotPays } = require('../lib/commands/pending');
+  // lib/config exports { config, requireEnv }, not the settings directly.
+  const { config } = require('../lib/config');
+
+  async function openPot() {
+    await org('flizy collect 0.02 for rent');
+    return (fake.db.tables.pots || [])[0];
+  }
+
+  it('never suggests more than a single send is allowed to be', async () => {
+    const pot = await openPot();
+    const said = await org(`flizy pay pot ${pot.code}`);
+    const amounts = [...said.matchAll(/([0-9]*\.?[0-9]+) ETH|like: ([0-9]*\.?[0-9]+)/g)]
+      .flatMap((m) => [m[1], m[2]])
+      .filter(Boolean)
+      .map(Number);
+    assert.ok(amounts.length, 'no amount was suggested at all');
+    for (const a of amounts) {
+      assert.ok(a <= Number(config.maxSendEth), `suggested ${a}, over the ${config.maxSendEth} cap`);
+    }
+  });
+
+  it('registers the question, so an answer has somewhere to land', async () => {
+    const pot = await openPot();
+    pendingPotPays.delete(`whatsapp:${ORG_WA}`);
+    await org(`flizy pay pot ${pot.code}`);
+    assert.equal(
+      pendingPotPays.has(`whatsapp:${ORG_WA}`),
+      true,
+      'the bot asked a question with nothing listening'
+    );
+    pendingPotPays.delete(`whatsapp:${ORG_WA}`);
+  });
+
+  it('wakes WhatsApp for a bare amount while that question is open', async () => {
+    const pot = await openPot();
+    const key = `whatsapp:${ORG_WA}`;
+    pendingPotPays.delete(key);
+    assert.equal(
+      router.isFlizyCommand({ channel: 'whatsapp', key }, '0.02'),
+      false,
+      'an amount woke the bot with no question open'
+    );
+    pendingPotPays.set(key, { code: pot.code, createdAt: Date.now() });
+    assert.equal(router.isFlizyCommand({ channel: 'whatsapp', key }, '0.02'), true);
+    pendingPotPays.delete(key);
+  });
+});
+
 describe('the reminder', () => {
   it('says who is waiting and how much is left', () => {
     const t = formatRequestReminderNotice({ byLabel: '@whuffi', amountEth: '0.02', billNote: 'dinner' });

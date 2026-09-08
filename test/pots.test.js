@@ -267,7 +267,15 @@ describe('what the organiser and a contributor see', () => {
 
   it('renders the pay-in command in each channel dialect', () => {
     const t = formatPotDetail(pot, { totalEth: 0, count: 0, contributors: 0 }, []);
-    assert.match(renderCommands(t, 'telegram'), /\/pay pot k7m2q4 1/);
-    assert.match(renderCommands(t, 'whatsapp'), /flizy pay pot k7m2q4 1/);
+    assert.match(renderCommands(t, 'telegram'), /\/pay pot k7m2q4/);
+    assert.match(renderCommands(t, 'whatsapp'), /flizy pay pot k7m2q4/);
+  });
+
+  it('suggests no amount here, because it cannot know a sendable one', () => {
+    // This used to end "... k7m2q4 1", and 1 ETH is ten times maxSendEth, so
+    // anyone following it was refused. The amount is asked for instead, where
+    // the pot's goal and the cap are both in hand.
+    const t = formatPotDetail(pot, { totalEth: 0, count: 0, contributors: 0 }, []);
+    assert.doesNotMatch(t, /pay pot k7m2q4 1\}/);
   });
 });
