@@ -10,6 +10,12 @@
 
 require('dotenv').config();
 
+// Installed before the requires below, so a throw while loading them is
+// reported rather than silent. lib/sentry loads dotenv itself, because the
+// env is otherwise not read until lib/runtime, further down.
+const { initSentry, installProcessHandlers } = require('./lib/sentry');
+initSentry('flizy-telegram');
+installProcessHandlers('flizy-telegram');
 // Fails fast on shared env (Supabase, RPC, keys) before anything else starts
 const { chain, opsWallet, escrowWallet, addressUrl, assertSchema } = require('./lib/runtime');
 const { config } = require('./lib/config');

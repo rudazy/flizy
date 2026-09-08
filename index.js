@@ -9,6 +9,12 @@
 
 const fs = require('fs');
 const path = require('path');
+// Installed before the requires below, so a throw while loading them is
+// reported rather than silent. lib/sentry loads dotenv itself, because the
+// env is otherwise not read until lib/runtime, further down.
+const { initSentry, installProcessHandlers } = require('./lib/sentry');
+initSentry('flizy-whatsapp');
+installProcessHandlers('flizy-whatsapp');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 
