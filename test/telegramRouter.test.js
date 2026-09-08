@@ -330,10 +330,16 @@ describe('end to end through the shared router', () => {
     await router.handle(telegramCtx(first), '/help');
     const welcome = first.map((s) => s.text).join('\n');
     assert.match(welcome, /Welcome to Flizy/);
-    // Slash style, and a destination that needs no setup. The greeting used to
-    // lead with a saved name, which taught a brand new user with nothing saved
-    // that they had to go store an address before they could send anything.
-    assert.match(welcome, /\/send 0\.001 to @friend on telegram/);
+    // The greeting opens with whatever this user can actually do next. This
+    // fixture has no linked account, so that is linking -- the same rule this
+    // file already asserts for money commands ("tells an unlinked user to link
+    // before it will run a money command"). It previously led with a send,
+    // which is the third version of one recurring bug: teaching a brand new
+    // user an action they are not yet able to perform. First it was a saved
+    // name they had not saved, then a send they had no funds for.
+    assert.match(welcome, /Connect your Flizy account/);
+    assert.match(welcome, /\/link CODE/);
+    assert.doesNotMatch(welcome.split('Then')[0], /\/send /);
     // A first message of /help must still answer the question it asked: the
     // greeting on its own left a new user with no command list.
     assert.match(welcome, /\/send 0\.01 to john/, 'first /help must include the command list');
