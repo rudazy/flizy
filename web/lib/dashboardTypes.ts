@@ -105,6 +105,8 @@ export type ActivityItem = {
   status: string;
   txHash?: string | null;
   createdAt: string;
+  /** What the payment was for, as the sender typed it. Null when unsaid. */
+  note?: string | null;
   label: string;
 };
 

@@ -20,6 +20,14 @@ const ROUTE = 'GET /api/history';
 type HistoryEntry = {
   source: 'transfer' | 'claim';
   row: Record<string, unknown>;
+  /**
+   * Whether this payment came in, decided by lib/history.js from the wallet it
+   * was sent to. Not on the row: every transfers row is written by the sender,
+   * so `direction` there is always 'out' no matter who is reading it.
+   */
+  received?: boolean;
+  /** Who paid, for a received row. Resolved from the sender's account. */
+  fromLabel?: string | null;
   createdAt: string;
 };
 
@@ -35,6 +43,8 @@ export type ActivityItem = {
   status: string;
   txHash?: string | null;
   createdAt: string;
+  /** What the payment was for, as the sender typed it. Null when unsaid. */
+  note?: string | null;
   label: string;
 };
 
@@ -43,9 +53,16 @@ function shortAddr(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-function mapTransferRow(row: Record<string, unknown>): ActivityItem {
+function mapTransferRow(
+  row: Record<string, unknown>,
+  received = false,
+  fromLabel: string | null = null
+): ActivityItem {
   const kind = String(row.kind || 'transfer').toLowerCase();
-  const direction = String(row.direction || 'out') === 'in' ? 'in' : 'out';
+  // lib/history.js decides this once, from the wallet the payment was sent to.
+  // Reading row.direction here would call every payment "sent", because the row
+  // belongs to whoever made it.
+  const direction = received ? 'in' : 'out';
   const asset = String(row.asset || 'ETH').toUpperCase();
   const amount = row.amount_eth as string | number;
   const to = row.to_address ? String(row.to_address) : '';
@@ -63,7 +80,11 @@ function mapTransferRow(row: Record<string, unknown>): ActivityItem {
     const outAsset = row.asset_secondary ? String(row.asset_secondary) : null;
     label = outAmt && outAsset ? `${amount} ${asset} → ${outAmt} ${outAsset}` : `Swap ${amount} ${asset}`;
   } else if (type === 'receive') {
-    label = `Received ${amount} ${asset}`;
+    // Not labelExtra: on a received row that names the reader, not the payer.
+    // And never row.phone, which is the sender's own number.
+    label = fromLabel
+      ? `Received ${amount} ${asset} from ${fromLabel}`
+      : `Received ${amount} ${asset}`;
   } else {
     const dest = labelExtra || (to ? shortAddr(to) : '—');
     label = `Sent ${amount} ${asset} → ${dest}`;
@@ -81,6 +102,7 @@ function mapTransferRow(row: Record<string, unknown>): ActivityItem {
     status: String(row.status || 'unknown'),
     txHash: row.tx_hash ? String(row.tx_hash) : null,
     createdAt: String(row.created_at),
+    note: row.note ? String(row.note) : null,
     label,
   };
 }
@@ -153,12 +175,21 @@ export async function GET() {
     // Row selection, ordering and limits all live in lib/history.js. What stays
     // here is how the site renders them, which is not the same job as the chat
     // line and should not be forced into the same shape.
-    const settled = await loadSettledHistory(supabase, accountId);
+    // The wallet is the only way to find money somebody else sent: transfers
+    // are written by the sender and keyed to the sender.
+    const { data: me } = await supabase
+      .from('accounts')
+      .select('agent_wallet_address')
+      .eq('id', accountId)
+      .maybeSingle();
+    const settled = await loadSettledHistory(supabase, accountId, {
+      walletAddress: me?.agent_wallet_address || null,
+    });
 
     const items: ActivityItem[] = settled.items.map((entry: HistoryEntry) =>
       entry.source === 'claim'
         ? mapClaimRow(entry.row, accountId)
-        : mapTransferRow(entry.row)
+        : mapTransferRow(entry.row, Boolean(entry.received), entry.fromLabel ?? null)
     );
 
     const transferRows = settled.items
