@@ -27,6 +27,7 @@ const {
   parseBareAmount,
   parseBarePayCode,
   parsePayAskCommand,
+  parsePayRequestAmount,
   parseSwapCommand,
   parseRequestCommand,
 } = require('../lib/commands/parse');
@@ -114,6 +115,8 @@ describe('send parses the shapes people type', () => {
     assert.equal(parseSendCommand('send 10000 to john').assetExplicit, false);
     assert.equal(parseSendCommand('send 1 eth to john').assetExplicit, true);
     assert.equal(parseSendCommand('send 10 flz to john').assetExplicit, true);
+    assert.equal(parseBareAmount('0.01').assetExplicit, false);
+    assert.equal(parseBareAmount('10 FLZ').assetExplicit, true);
   });
 });
 
@@ -129,6 +132,32 @@ describe('the other amount parsers got the same treatment', () => {
   it('and reject malformed grouping the same way', () => {
     assert.equal(parseBareAmount('1,23'), null);
     assert.equal(parseSwapCommand('buy 1,23 flz'), null);
+  });
+});
+
+/**
+ * The prompt says "0.01 pay part of it". People also retry with the verb that
+ * opened it still attached: `pay 0.03`, `pay 0.03 eth`. Those have to parse as
+ * the same answer, or the menu handler never sees an amount.
+ */
+describe('the amount that answers a pay-request prompt', () => {
+  it('takes a bare amount, with or without ETH', () => {
+    assert.equal(parsePayRequestAmount('0.03').amountEth, '0.03');
+    assert.equal(parsePayRequestAmount('0.03 eth').amountEth, '0.03');
+    assert.equal(parsePayRequestAmount('0.03 ETH').asset, 'ETH');
+  });
+
+  it('takes the same amount with pay still in front', () => {
+    assert.equal(parsePayRequestAmount('pay 0.03').amountEth, '0.03');
+    assert.equal(parsePayRequestAmount('pay 0.03 eth').amountEth, '0.03');
+    assert.equal(parsePayRequestAmount('pay 0.01').amountEth, '0.01');
+  });
+
+  it('leaves pay-for and pay-pot alone', () => {
+    assert.equal(parsePayRequestAmount('pay 0.01 for coffee'), null);
+    assert.equal(parsePayRequestAmount('pay pot k7m2q4 1'), null);
+    assert.equal(parsePayRequestAmount('pay'), null);
+    assert.equal(parsePayRequestAmount('confirm'), null);
   });
 });
 

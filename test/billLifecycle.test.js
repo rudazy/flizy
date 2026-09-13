@@ -197,6 +197,9 @@ describe('a bare amount wakes the bot only while a pay prompt is open', () => {
     open('pay_request');
     assert.equal(router.isFlizyCommand(wa, '0.01'), true);
     assert.equal(router.isFlizyCommand(wa, 'flizy 0.01'), true);
+    assert.equal(router.isFlizyCommand(wa, '0.03 eth'), true);
+    assert.equal(router.isFlizyCommand(wa, 'pay 0.03'), true);
+    assert.equal(router.isFlizyCommand(wa, 'flizy pay 0.03 eth'), true);
     pendingClaimMenus.delete(wa.key);
   });
 

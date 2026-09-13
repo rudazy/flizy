@@ -72,13 +72,25 @@ describe('a pay code pasted on its own', () => {
 
 describe('the amount reply', () => {
   it('reads a bare amount, defaulting to ETH', () => {
-    assert.deepEqual(parseBareAmount('0.01'), { amountEth: '0.01', asset: 'ETH' });
-    assert.deepEqual(parseBareAmount('10'), { amountEth: '10', asset: 'ETH' });
+    assert.deepEqual(parseBareAmount('0.01'), {
+      amountEth: '0.01',
+      asset: 'ETH',
+      assetExplicit: false,
+    });
+    assert.deepEqual(parseBareAmount('10'), { amountEth: '10', asset: 'ETH', assetExplicit: false });
   });
 
   it('reads an asset when one is given', () => {
-    assert.deepEqual(parseBareAmount('10 FLZ'), { amountEth: '10', asset: 'FLZ' });
-    assert.deepEqual(parseBareAmount('0.5 flz'), { amountEth: '0.5', asset: 'FLZ' });
+    assert.deepEqual(parseBareAmount('10 FLZ'), {
+      amountEth: '10',
+      asset: 'FLZ',
+      assetExplicit: true,
+    });
+    assert.deepEqual(parseBareAmount('0.5 flz'), {
+      amountEth: '0.5',
+      asset: 'FLZ',
+      assetExplicit: true,
+    });
   });
 
   it('is not a command on its own', () => {
