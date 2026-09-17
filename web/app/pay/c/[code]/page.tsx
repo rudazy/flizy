@@ -46,7 +46,7 @@ export default async function PayByCodePage({ params }: Props) {
     return (
       <div className="fade-up mx-auto max-w-md space-y-4">
         <h1 className="font-sans text-3xl tracking-wide text-paper">Not found</h1>
-        <p className="text-sm text-muted">No Flizy account matches that pay code.</p>
+        <p className="text-sm text-muted">No Flizy account matches that Flizy number.</p>
         <Link href="/" className="text-sm text-lime no-underline hover:text-gold">
           Home
         </Link>

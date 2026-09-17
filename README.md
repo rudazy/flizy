@@ -102,7 +102,7 @@ flowchart TB
   READ --> KIND
 
   KIND -->|"saved name"| TRUST["Trusted list<br/>password-gated on the site"]
-  KIND -->|"@username, pay code, or QR"| ID["Flizy account<br/>their wallet"]
+  KIND -->|"@username, Flizy number, or QR"| ID["Flizy account<br/>their wallet"]
   KIND -->|"phone, email, or platform handle"| HOLD["Escrow hold<br/>they claim later"]
 
   TRUST --> SPINE["Plan → Confirm → Sign → Receipt"]
@@ -194,7 +194,7 @@ send within those rules. Implementation detail lives in
 | Control | What it does |
 | --- | --- |
 | **Approved destinations** | Named address sends reach your trusted list only. The list is managed on the site behind your password, never from chat |
-| **Pay by identity** | A Flizy `@username`, pay code, or scanned QR can be paid with confirm. First payment is flagged. After success you can save them |
+| **Pay by identity** | A Flizy `@username`, Flizy number, or scanned QR can be paid with confirm. First payment is flagged. After success you can save them |
 | **Plan then confirm** | Every money action shows amount, destination, network, and fees first. Nothing executes without confirm |
 | **Fees disclosed up front** | Swap plans show the protocol fee percentage, the fee amount, and slippage before you confirm |
 | **Per-channel lock** | Lock a chat app instantly. Unlocking needs your PIN or account password. Wrong attempts back off. A new PIN on the site, behind password, clears the block |

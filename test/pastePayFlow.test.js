@@ -51,6 +51,7 @@ require.cache[runtimePath] = {
 };
 
 const router = require('../lib/router');
+const { pendingPayAsks } = require('../lib/commands/pending');
 
 const PAYER_TG = '778899124';
 const KEY = `telegram:${PAYER_TG}`;
@@ -146,7 +147,7 @@ describe('pasting a pay code', () => {
   it('says so plainly when no account has that code', async () => {
     const sent = [];
     await router.handle(ctxFor(sent), '111222333');
-    assert.match(sent.join('\n'), /No Flizy account has that pay code/i);
+    assert.match(sent.join('\n'), /No Flizy account has that number/i);
     assert.equal(router.pendingFlowFor(KEY).payCode, false, 'nothing should be left open');
   });
 
@@ -154,7 +155,7 @@ describe('pasting a pay code', () => {
     fake.db.tables.pay_codes.push({ account_id: 'acc-payer', code: '999888777' });
     const sent = [];
     await router.handle(ctxFor(sent), '999888777');
-    assert.match(sent.join('\n'), /your own pay code/i);
+    assert.match(sent.join('\n'), /your own Flizy number/i);
     assert.equal(router.pendingFlowFor(KEY).payCode, false);
   });
 });
@@ -260,5 +261,77 @@ describe('the open question', () => {
     sent.length = 0;
     await router.handle(ctx, 'cancel');
     assert.equal(router.pendingFlowFor(KEY).payCode, false);
+  });
+});
+
+describe('pay amount first, then who', () => {
+  beforeEach(() => {
+    seed();
+    router.discardPendingFlows(KEY);
+  });
+
+  it('opens with the amount and the reason, and waits for who', async () => {
+    const sent = [];
+    await router.handle(ctxFor(sent), 'pay 0.001 for coffee');
+    const out = sent.join('\n');
+    assert.match(out, /0\.001 ETH for coffee/);
+    assert.match(out, /Who\?/i);
+    assert.equal(router.pendingFlowFor(KEY).payAsk, true);
+    assert.equal(router.pendingFlowFor(KEY).payCode, false);
+  });
+
+  it('takes a pay code as the identity, not as a new "how much?" paste', async () => {
+    // Production bug: the bare-code branch ran first and asked for an amount
+    // the payer had already given. The code is who, the amount is already set.
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, 'pay 0.001 for coffee');
+    sent.length = 0;
+    await router.handle(ctx, MERCHANT_CODE);
+    const out = sent.join('\n');
+    assert.doesNotMatch(out, /How much/i);
+    // Harness has no chain provider, so handleSend stops at the balance read.
+    // That reply is the proof we entered send with the stored amount, not a no-op.
+    assert.match(out, /Could not check your Flizy wallet/);
+    assert.equal(router.pendingFlowFor(KEY).payAsk, false, 'the who-question is spent');
+    assert.equal(router.pendingFlowFor(KEY).payCode, false, 'must not open a second amount prompt');
+  });
+
+  it('takes a grouped code the same way', async () => {
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, 'pay 0.001 for coffee');
+    sent.length = 0;
+    await router.handle(ctx, '622 412 799');
+    assert.doesNotMatch(sent.join('\n'), /How much/i);
+    assert.match(sent.join('\n'), /Could not check your Flizy wallet/);
+    assert.equal(router.pendingFlowFor(KEY).payCode, false);
+  });
+
+  it('takes @username as who the same way', async () => {
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, 'pay 0.001 for coffee');
+    sent.length = 0;
+    await router.handle(ctx, '@ludarep');
+    assert.doesNotMatch(sent.join('\n'), /How much/i);
+    assert.match(sent.join('\n'), /Could not check your Flizy wallet/);
+    assert.equal(router.pendingFlowFor(KEY).payAsk, false);
+  });
+
+  it('wakes WhatsApp on a bare number or @name while Who? is open, not on chatter', () => {
+    const wa = {
+      channel: 'whatsapp',
+      externalId: '2348011111111',
+      key: 'whatsapp:2348011111111',
+    };
+    router.discardPendingFlows(wa.key);
+    pendingPayAsks.set(wa.key, { amountEth: '0.001', note: 'coffee', createdAt: Date.now() });
+    assert.equal(router.isFlizyCommand(wa, MERCHANT_CODE), true);
+    assert.equal(router.isFlizyCommand(wa, '@ludarep'), true);
+    assert.equal(router.isFlizyCommand(wa, 'ludarep'), false, 'prompt asks for @username');
+    assert.equal(router.isFlizyCommand(wa, 'yes'), false);
+    assert.equal(router.isFlizyCommand(wa, 'thanks'), false);
+    router.discardPendingFlows(wa.key);
   });
 });

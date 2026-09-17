@@ -113,30 +113,31 @@ export function PayIdentity({
       </div>
 
       {/*
-        Printed sheet carries the pay code alone -- the bank-account model. You
-        give out the number; the payer sees whose account it is on the confirm
-        screen, read live. A name on paper is the only thing here that could go
-        stale, so it is not on the paper.
+        Printed sheet carries the Flizy number alone -- the bank-account model.
+        You give out the number; the payer sees whose account it is on the
+        confirm screen, read live. A name on paper is the only thing here that
+        could go stale, so it is not on the paper. Spoken name is "Flizy
+        number", not "pay code" (OTP) and not "account number" (NUBAN).
       */}
       <div className="text-center">
         {code ? (
           <>
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
-              Pay code
+              Flizy number
             </p>
             <p className="mt-1 font-mono text-2xl tracking-[0.2em] text-paper">
               {formatPayCode(code)}
             </p>
           </>
         ) : (
-          <p className="font-mono text-sm text-muted">Pay code is issued shortly.</p>
+          <p className="font-mono text-sm text-muted">Your Flizy number is issued shortly.</p>
         )}
       </div>
 
       <div className="flex flex-wrap justify-center gap-2 print:hidden">
         {username ? <CopyButton value={`@${username}`} label="Copy @username" /> : null}
         {/* Copy gives the bare digits; the grouping is for eyes only. */}
-        {code ? <CopyButton value={code} label="Copy pay code" /> : null}
+        {code ? <CopyButton value={code} label="Copy Flizy number" /> : null}
         <CopyButton value={url} label="Copy link" />
         <button type="button" className="btn btn-ghost text-sm" onClick={onDownload} disabled={!qrReady}>
           Download QR

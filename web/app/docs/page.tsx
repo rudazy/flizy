@@ -40,7 +40,7 @@ const CMD_GROUPS: Array<{
       {
         wa: 'flizy pay 0.01 for coffee',
         tg: '/pay 0.01 for coffee',
-        meaning: 'Then send their @username or the code under their QR, then confirm',
+        meaning: 'Then send their @username or the number under their QR, then confirm',
       },
       {
         wa: 'save',

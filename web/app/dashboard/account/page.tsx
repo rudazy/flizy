@@ -744,7 +744,7 @@ export default function AccountPage() {
             />
           ) : (
             <p className="text-sm text-muted">
-              Set a username on Profile first. Your pay code is issued then.
+              Set a username on Profile first. Your Flizy number is issued then.
             </p>
           )}
         </AppSection>
