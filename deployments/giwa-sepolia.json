@@ -3,7 +3,7 @@
   "chainName": "GIWA Sepolia",
   "explorer": "https://sepolia-explorer.giwa.io",
   "deployedAt": "2026-07-23",
-  "treasury": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+  "treasury": "0x042D82b3EaC96d9f5CddC52Fb80FE9d30f11A2a0",
   "feeBpsDefault": 30,
   "feeBpsMax": 100,
   "seed": {
@@ -64,6 +64,8 @@
   "notes": [
     "FLZ is a testnet demo token: 100000 supply, symbol FLZ, 18 decimals.",
     "Protocol fee default 30 bps (0.30%), hard max 100 bps, paid to treasury.",
+    "treasury moved off the deploy-time address on 2026-09-18 via feeRouter.setTreasury, so swap fee income is separable from the ops wallet that pays gas. verification.constructorArgs records the deploy-time value and does not change.",
+    "The factory feeTo (Uniswap V2 LP cut) is a separate sink. setTreasury does not affect it.",
     "Swaps go through feeRouter. Liquidity can use feeRouter.addLiquidityETH or V2 router.",
     "Uniswap V2 style 0.30% pool fee remains on the pair (standard V2).",
     "All six contracts are source verified on the explorer (full match).",

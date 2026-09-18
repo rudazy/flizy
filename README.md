@@ -323,7 +323,7 @@ All six are source verified as a full match, built with `v0.8.24+commit.e11b9ed9
 on at 200 runs, EVM version cancun. This is a Solidity 0.8 port of Uniswap V2, so factory,
 pair and router build on one compiler rather than the canonical 0.5.16 / 0.6.6 split.
 
-**Treasury / fee destination:** [`0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B`](https://sepolia-explorer.giwa.io/address/0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B)
+**Treasury / fee destination:** [`0x042D82b3EaC96d9f5CddC52Fb80FE9d30f11A2a0`](https://sepolia-explorer.giwa.io/address/0x042D82b3EaC96d9f5CddC52Fb80FE9d30f11A2a0)
 **Seed liquidity:** 1.2 ETH and 60,000 FLZ, starting near 50,000 FLZ per ETH.
 
 Also in the repository, not live custody:

@@ -168,7 +168,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `SUPABASE_DB_PASSWORD` | Direct Postgres connection for migration scripts |
 | `GIWA_RPC` | GIWA Sepolia RPC endpoint |
 | `WALLET_DERIVATION_SECRET` | Required, min 32 chars. Keys every agent wallet. Same value on the VPS and on Vercel. See below |
-| `PRIVATE_KEY` | Ops / treasury hot wallet |
+| `PRIVATE_KEY` | Ops hot wallet. Pays gas, and owns the fee router. Not the fee destination |
 | `ESCROW_PRIVATE_KEY` | Optional dedicated claim escrow key |
 | `BOT_WHATSAPP_NUMBER` | Digits for `wa.me` deep links |
 | `TELEGRAM_BOT_TOKEN` | Telegram client. Never commit it, never log it |
@@ -185,7 +185,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `PENDING_TTL_MS` / `SESSION_TTL_MS` / `LINK_CODE_TTL_MS` | Plan, session and link code lifetimes |
 | `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes |
 | `CHAIN_GIWA_SEPOLIA_*` | Optional overrides for WETH, routers, FLZ, pair |
-| `FLIZY_TREASURY` | Fee destination (defaults to ops) |
+| `FLIZY_TREASURY` | Treasury passed at DEX deploy time (defaults to ops). The live fee destination is `feeRouter.treasury` on chain, changed with `setTreasury`, not with this variable |
 | `GAS_BUFFER_ETH` | Reserve kept for gas when checking funding |
 
 Treat `PRIVATE_KEY`, escrow keys and Supabase service keys as production secrets. Rotate
