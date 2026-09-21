@@ -1113,6 +1113,18 @@ export default function AccountPage() {
             <a href="/docs" className="btn btn-ghost text-sm no-underline">
               Security docs
             </a>
+            {/*
+              The signed-in app has no footer (AppChrome returns early for
+              /dashboard), so without these two the only copy of the agreement a
+              user accepted is unreachable from inside the product. This slide
+              already links out, so it is where they belong.
+            */}
+            <a href="/terms" className="btn btn-ghost text-sm no-underline">
+              Terms
+            </a>
+            <a href="/privacy" className="btn btn-ghost text-sm no-underline">
+              Privacy
+            </a>
             <button
               type="button"
               className="btn btn-ghost text-sm"

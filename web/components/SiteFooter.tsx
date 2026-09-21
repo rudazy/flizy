@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { GIWA_FAUCET_URL } from '../lib/botPublic';
+import { ENTITY_LINE } from '../lib/entity';
 
 export function SiteFooter({ signedIn = false }: { signedIn?: boolean }) {
   return (
@@ -10,6 +11,12 @@ export function SiteFooter({ signedIn = false }: { signedIn?: boolean }) {
           <p className="mt-2 max-w-sm text-sm text-muted">
             Chat wallet for WhatsApp and Telegram. Trusted sends. Built for GIWA and EVM.
           </p>
+          {/*
+            Plain text, not a link. A link is something nobody clicks; the line
+            itself is what signals there is a real company behind the site, and
+            it has to be readable without any further action.
+          */}
+          <p className="mt-4 text-xs text-muted">{ENTITY_LINE}</p>
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-muted">
           <Link href="/how-it-works" className="text-muted no-underline hover:text-lime">

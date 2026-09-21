@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ConsentReset } from '../../components/ConsentReset';
 import { LegalArticle, LegalH } from '../../components/LegalArticle';
+import { ENTITY_SENTENCE } from '../../lib/entity';
 import { StructuredData, breadcrumbJsonLd } from '../../components/StructuredData';
 import { pageMetadata } from '../../lib/seo';
 import { siteOrigin } from '../../lib/siteOrigin';
@@ -40,7 +41,12 @@ export default function PrivacyPage() {
             <Link href="/" className="text-paper no-underline hover:text-lime">
               flizy.app
             </Link>
-            . You create an account on the site, then send and receive crypto from WhatsApp or
+            , operated by <span className="text-paper">{ENTITY_SENTENCE}</span>. That company is
+            the data controller for the personal data described here, and &quot;we&quot; in this
+            policy means that company.
+          </p>
+          <p>
+            You create an account on the site, then send and receive crypto from WhatsApp or
             Telegram to people you already trust. This policy describes personal data we hold
             when you use the site, the bots, and linked platforms.
           </p>

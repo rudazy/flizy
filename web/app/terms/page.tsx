@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { LegalArticle, LegalH } from '../../components/LegalArticle';
 import { StructuredData, breadcrumbJsonLd } from '../../components/StructuredData';
+import { ENTITY_SENTENCE } from '../../lib/entity';
 import { pageMetadata } from '../../lib/seo';
 import { siteOrigin } from '../../lib/siteOrigin';
 
@@ -34,6 +35,11 @@ export default function TermsPage() {
       >
         <section className="space-y-3">
           <LegalH id="what">What Flizy is</LegalH>
+          <p>
+            These terms are an agreement between you and{' '}
+            <span className="text-paper">{ENTITY_SENTENCE}</span>, which operates Flizy.
+            &quot;We&quot; and &quot;us&quot; below mean that company.
+          </p>
           <p>
             Flizy is a chat wallet. You create an account at{' '}
             <Link href="/" className="text-paper no-underline hover:text-lime">

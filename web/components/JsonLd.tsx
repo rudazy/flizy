@@ -3,6 +3,8 @@
  * Keep sameAs to real public profiles only.
  */
 
+import { ENTITY } from '../lib/entity';
+import { serializeJsonLd } from '../lib/jsonLd';
 import { siteOrigin } from '../lib/siteOrigin';
 
 export function JsonLd() {
@@ -25,6 +27,21 @@ export function JsonLd() {
         '@type': 'Organization',
         '@id': `${origin}/#organization`,
         name: 'Flizy',
+        // The trading name is Flizy; the legal person is the registered
+        // company. Both are stated so the entity behind the site is machine
+        // readable, matching the footer and the legal pages.
+        legalName: ENTITY.legalName,
+        // A PropertyValue, not the prefixed free-text form. schema.org has no
+        // dedicated company-registration property (leiCode, vatID and duns are
+        // all something else), and this is the documented way to publish an
+        // identifier together with the scheme it belongs to. As bare text a
+        // parser gets a string it cannot act on, which defeats the point of
+        // stating it at all.
+        identifier: {
+          '@type': 'PropertyValue',
+          propertyID: 'Corporate Affairs Commission registration number',
+          value: ENTITY.rcNumber,
+        },
         url: origin,
         logo: {
           '@type': 'ImageObject',
@@ -69,7 +86,7 @@ export function JsonLd() {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(graph) }}
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(graph) }}
     />
   );
 }
