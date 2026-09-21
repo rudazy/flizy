@@ -1,10 +1,18 @@
-import Script from 'next/script';
+import { cookies } from 'next/headers';
+import { analyticsAllowed, CONSENT_COOKIE } from '../lib/consent';
+import { AnalyticsScripts } from './AnalyticsScripts';
 
 /**
  * Optional GA4 + Microsoft Clarity + Umami Cloud.
- * Only load when public env ids are set (production Vercel).
- * Never load without an id — keeps local/dev clean.
- * Preview deploys must not pollute production properties.
+ *
+ * Three gates, and a tag has to pass all of them:
+ *  1. Production only, never preview or development (isMeasurableEnv).
+ *  2. A real id for that service, checked by shape.
+ *  3. The visitor accepted, read from the cookie on the server so a refused
+ *     tag is never in the document rather than shipped and suppressed.
+ *
+ * The fourth gate is WHERE, and it lives in AnalyticsScripts because only the
+ * client knows the path after a soft navigation. See lib/analyticsRoutes.ts.
  */
 
 const GA_ID = (process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || '').trim();
@@ -39,54 +47,40 @@ function looksLikeUmamiId(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
 
+/**
+ * The ids that pass their shape check.
+ *
+ * One source of truth for two questions: what to render, and whether there is
+ * anything worth asking consent for. Answering those separately would let the
+ * banner appear where nothing would ever load, or — the direction that matters
+ * — be skipped on a page that loads a tracker anyway.
+ */
+function configuredIds() {
+  return {
+    ga: looksLikeGaId(GA_ID) ? GA_ID : '',
+    clarity: looksLikeClarityId(CLARITY_ID) ? CLARITY_ID : '',
+    umami: looksLikeUmamiId(UMAMI_ID) ? UMAMI_ID : '',
+  };
+}
+
+/** Would a yes actually load something? The layout asks before it asks the visitor. */
+export function analyticsConfigured(): boolean {
+  if (!isMeasurableEnv()) return false;
+  const { ga, clarity, umami } = configuredIds();
+  return Boolean(ga || clarity || umami);
+}
+
 export function Analytics() {
   if (!isMeasurableEnv()) return null;
 
-  const ga = looksLikeGaId(GA_ID) ? GA_ID : '';
-  const clarity = looksLikeClarityId(CLARITY_ID) ? CLARITY_ID : '';
-  const umami = looksLikeUmamiId(UMAMI_ID) ? UMAMI_ID : '';
+  // Read on the server so a tracker is never in the document before it is
+  // allowed. A client-side suppression would still have shipped the script.
+  // Undecided is not consent: readConsent returns null and this refuses.
+  if (!analyticsAllowed(cookies().get(CONSENT_COOKIE)?.value)) return null;
+
+  const { ga, clarity, umami } = configuredIds();
 
   if (!ga && !clarity && !umami) return null;
 
-  return (
-    <>
-      {ga ? (
-        <>
-          <Script
-            src={`https://www.googletagmanager.com/gtag/js?id=${ga}`}
-            strategy="afterInteractive"
-          />
-          <Script id="ga4-init" strategy="afterInteractive">
-            {`
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', '${ga}', { anonymize_ip: true });
-`}
-          </Script>
-        </>
-      ) : null}
-
-      {clarity ? (
-        <Script id="ms-clarity" strategy="afterInteractive">
-          {`
-(function(c,l,a,r,i,t,y){
-  c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-  t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-  y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-})(window, document, "clarity", "script", "${clarity}");
-`}
-        </Script>
-      ) : null}
-
-      {umami ? (
-        <Script
-          src={UMAMI_SRC}
-          data-website-id={umami}
-          strategy="afterInteractive"
-          defer
-        />
-      ) : null}
-    </>
-  );
+  return <AnalyticsScripts ga={ga} clarity={clarity} umami={umami} umamiSrc={UMAMI_SRC} />;
 }

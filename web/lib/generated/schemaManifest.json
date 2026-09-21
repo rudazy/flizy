@@ -10,6 +10,12 @@
     },
     {
       "kind": "function",
+      "name": "bump_signup_attempts",
+      "providedBy": "20260919000000_signup_attempts.sql",
+      "requiredBy": "web/lib/signupLimit.ts"
+    },
+    {
+      "kind": "function",
       "name": "channel_identities_enforce_one_phone",
       "providedBy": "20260725100000_channel_identities.sql",
       "requiredBy": "executed by trigger channel_identities_one_phone"

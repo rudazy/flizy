@@ -10,6 +10,7 @@ import { track } from '../../lib/analytics';
 import { validatePassword } from '../../lib/passwordPolicy';
 import type { LocaleCode } from '../../lib/locale';
 import { safeNext } from '../../lib/safeNext.ts';
+import { HONEYPOT_FIELD } from '../../lib/honeypot.ts';
 
 /**
  * Stage 1 only: email + password.
@@ -23,6 +24,8 @@ export function SignupForm() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  // Honeypot. Stays empty for anyone using the form; see lib/honeypot.ts.
+  const [honeypot, setHoneypot] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -74,6 +77,7 @@ export function SignupForm() {
           password,
           locale,
           inviteCode,
+          [HONEYPOT_FIELD]: honeypot,
         }),
       });
       const data = await res.json();
@@ -133,6 +137,25 @@ export function SignupForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
+          />
+        </div>
+        {/*
+          Honeypot. Positioned off-screen rather than display:none, because a
+          bot that skips hidden inputs would also skip this one. aria-hidden and
+          tabIndex keep it away from screen readers and the tab order, so nobody
+          using the form can reach it by any route. See lib/honeypot.ts for why
+          the field is named the way it is.
+        */}
+        <div className="absolute left-[-9999px] h-px w-px overflow-hidden" aria-hidden="true">
+          <label htmlFor={HONEYPOT_FIELD}>Note</label>
+          <input
+            id={HONEYPOT_FIELD}
+            name={HONEYPOT_FIELD}
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
           />
         </div>
         <PasswordField

@@ -1,10 +1,14 @@
 import type { Metadata, Viewport } from 'next';
 import { GeistMono } from 'geist/font/mono';
 import { GeistSans } from 'geist/font/sans';
-import { Analytics } from '../components/Analytics';
+import { cookies } from 'next/headers';
+import { Suspense } from 'react';
+import { Analytics, analyticsConfigured } from '../components/Analytics';
 import { AppChrome } from '../components/AppChrome';
+import { CookieConsent } from '../components/CookieConsent';
 import { JsonLd } from '../components/JsonLd';
 import { LocaleProvider } from '../components/LocaleProvider';
+import { CONSENT_COOKIE, readConsent } from '../lib/consent';
 import { hasSessionCookie } from '../lib/cookies';
 import { OG_IMAGE } from '../lib/seo';
 import './globals.css';
@@ -99,14 +103,29 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const signedIn = hasSessionCookie();
+
+  // Ask only when there is something to ask about, and only once. Deciding this
+  // on the server means a visitor who already answered never sees the banner
+  // render and dismiss itself.
+  const askConsent =
+    analyticsConfigured() && readConsent(cookies().get(CONSENT_COOKIE)?.value) === null;
+
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="page-shell font-mono antialiased">
         <JsonLd />
-        <Analytics />
+        {/*
+          The tags read useSearchParams, because a claim token can ride in the
+          query of an allowlisted page. Next requires that behind a Suspense
+          boundary or it opts the whole route out of static rendering.
+        */}
+        <Suspense fallback={null}>
+          <Analytics />
+        </Suspense>
         <LocaleProvider>
           <AppChrome signedIn={signedIn}>{children}</AppChrome>
         </LocaleProvider>
+        {askConsent ? <CookieConsent /> : null}
       </body>
     </html>
   );

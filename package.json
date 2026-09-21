@@ -10,8 +10,6 @@
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
     "web:start": "npm --prefix web run start",
-    "db:push": "npx supabase db push",
-    "db:link": "npx supabase link",
     "link:create": "node scripts/create-link.js"
   },
   "private": true,

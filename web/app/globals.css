@@ -288,6 +288,22 @@ textarea {
   min-height: var(--app-nav-row);
 }
 
+/*
+ * Consent bar. Sits above the mobile tab bar rather than across it, derived
+ * from the same --app-nav-h the bar itself is pinned to, so the two cannot
+ * drift apart. The tab bar is md:hidden, so from that breakpoint up the banner
+ * belongs on the floor.
+ */
+.consent-bar {
+  bottom: var(--app-nav-h);
+}
+
+@media (min-width: 768px) {
+  .consent-bar {
+    bottom: 0;
+  }
+}
+
 /* Mobile tap targets */
 @media (max-width: 640px) {
   .btn {
@@ -327,6 +343,7 @@ textarea {
   nav,
   footer,
   .app-bottom-nav,
+  .consent-bar,
   .alert {
     display: none !important;
   }

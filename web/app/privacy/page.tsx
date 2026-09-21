@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ConsentReset } from '../../components/ConsentReset';
 import { LegalArticle, LegalH } from '../../components/LegalArticle';
 import { StructuredData, breadcrumbJsonLd } from '../../components/StructuredData';
 import { pageMetadata } from '../../lib/seo';
@@ -12,7 +13,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '14 August 2026';
+const UPDATED = '19 September 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -75,7 +76,8 @@ export default function PrivacyPage() {
             <li>
               <span className="text-paper">Session cookies.</span> A logged-in session cookie
               on the site. If you open an invite or a claim that carries an invite, a short
-              invite cookie so signup can attribute you once.
+              invite cookie so signup can attribute you once. One cookie recording your
+              analytics answer, set whichever way you answer.
             </li>
             <li>
               <span className="text-paper">Chat link.</span> One-time link codes and the
@@ -115,11 +117,50 @@ export default function PrivacyPage() {
         </section>
 
         <section className="space-y-3">
+          <LegalH id="analytics">Analytics, and your choice</LegalH>
+          <p>
+            Nothing that measures your visit runs until you accept it. On your first visit we
+            ask, with Accept and Reject offered equally. Reject is remembered and the site
+            works exactly the same. If you never answer, nothing loads.
+          </p>
+          <p>
+            If you accept, these run on the public pages only: the home page, how it works,
+            docs, terms, privacy, and the sign-in and sign-up pages. They do not run on your
+            dashboard, on a payment link, or on a claim link, so what they see never includes
+            your balance, your wallet address, your saved destinations or your history. They
+            never run in WhatsApp or Telegram.
+          </p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <span className="text-paper">Google Analytics 4.</span> Pages visited, rough
+              location from your IP, browser and device type. We switch on IP anonymization.
+            </li>
+            <li>
+              <span className="text-paper">Microsoft Clarity.</span> How the public pages are
+              used: clicks, scrolling, and a replay of the page session.
+            </li>
+            <li>
+              <span className="text-paper">Umami.</span> Page view counts, no cookies.
+            </li>
+          </ul>
+          <p>
+            These never see your password, your unlock PIN, or a verification code. They are
+            not on the bots, and we do not use advertising pixels or sell anything to
+            advertisers. Your answer is stored in one cookie for six months, and you can change
+            it whenever you like.
+          </p>
+          <div className="pt-1">
+            <ConsentReset />
+          </div>
+        </section>
+
+        <section className="space-y-3">
           <LegalH id="share">Who it is shared with</LegalH>
           <p>
             We pass account data only to the services that run Flizy: Supabase (database) and
-            our email sender for verification codes. We do not sell it. We do not use
-            advertising pixels.
+            our email sender for verification codes. If you accepted analytics, the measurement
+            services named above also receive the site usage described there, and nothing else.
+            We do not sell it. We do not use advertising pixels.
           </p>
         </section>
 
@@ -129,6 +170,7 @@ export default function PrivacyPage() {
             <li>Verification codes expire in minutes and are then useless.</li>
             <li>Session cookies last until you sign out or they expire.</li>
             <li>Invite cookies last up to 14 days, or until they are used at signup.</li>
+            <li>The analytics answer lasts six months, or until you change it.</li>
             <li>Account, username, trusted addresses, and history stay while the account exists.</li>
             <li>
               A phone that has already produced an invite credit is remembered so the same
