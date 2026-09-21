@@ -33,6 +33,10 @@ const CASES = [
   'no user with ada@example.com',
   'send to 0x1111111111111111111111111111111111111111 failed',
   `key 0x${'a'.repeat(64)} leaked`,
+  // Claim token: randomBytes(16).toString('hex'). No dashes and no 0x, so it
+  // slips past both the UUID and the 0x patterns unless it is matched itself.
+  'no hold for 9f3a1c2b4d5e60718293a4b5c6d7e8f0',
+  `raw key ${'b'.repeat(64)} in a message`,
   'insufficient balance: 0.025 ETH on chain 91342',
   'nothing identifying here at all',
 ];
@@ -85,6 +89,30 @@ describe('the two scrubbers agree', () => {
     };
     assert.deepEqual(web.scrubEvent(event), bot.scrubEvent(event));
   });
+
+  it('keeps the SDK own ids, in both copies', () => {
+    // event_id is a UUID with the dashes removed: 32 hex, the same shape as a
+    // claim token. Redacting it corrupts the envelope and the event can be
+    // refused at ingest, which switches reporting off without saying so.
+    const event = {
+      event_id: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
+      contexts: { trace: { trace_id: '0123456789abcdef0123456789abcdef' } },
+    };
+    const fromWeb = web.scrubEvent(event);
+    const fromBot = bot.scrubEvent(event);
+    assert.deepEqual(fromWeb, fromBot);
+    assert.equal(fromBot.event_id, 'a1b2c3d4e5f60718293a4b5c6d7e8f90');
+    assert.equal(fromBot.contexts.trace.trace_id, '0123456789abcdef0123456789abcdef');
+  });
+
+  it('does not let a preserved key smuggle something out, in either copy', () => {
+    const event = { event_id: 'reach me at ada@example.com', trace_id: '234-801-234-5678' };
+    const fromWeb = web.scrubEvent(event);
+    const fromBot = bot.scrubEvent(event);
+    assert.deepEqual(fromWeb, fromBot);
+    assert.equal(fromBot.event_id, 'reach me at [email]');
+    assert.equal(fromBot.trace_id, '[phone]');
+  });
 });
 
 describe('neither copy can quietly lose a rule', () => {
@@ -99,6 +127,12 @@ describe('neither copy can quietly lose a rule', () => {
   it('both drop the same key list', () => {
     for (const key of bot.DROP_KEYS) {
       assert.ok(WEB_SRC.includes(`'${key}'`), `web copy does not drop ${key}`);
+    }
+  });
+
+  it('both preserve the same key list', () => {
+    for (const key of bot.PRESERVE_KEYS) {
+      assert.ok(WEB_SRC.includes(`'${key}'`), `web copy does not preserve ${key}`);
     }
   });
 });

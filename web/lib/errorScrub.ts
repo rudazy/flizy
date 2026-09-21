@@ -29,6 +29,12 @@ const PII_PATTERNS: Array<[RegExp, string]> = [
   [/\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g, '[id]'],
   [/0x[a-fA-F0-9]{64}\b/g, '[redacted]'],
   [/0x[a-fA-F0-9]{40}\b/g, '[address]'],
+  // Bare hex, no 0x. A claim token is randomBytes(16).toString('hex'): 32
+  // characters, no dashes, so the UUID and 0x patterns both miss it. It is the
+  // credential for the claim, and the client half is where it lives, in the
+  // URL of the page an error is thrown on. Runs to 64 to take an unprefixed
+  // key or hash with it.
+  [/\b[0-9a-fA-F]{32,64}\b/g, '[redacted]'],
   // Separators included: an error can echo back what a user typed, so
   // "234-801-234-5678" has to go as well as the bare digits this app stores.
   // Known limit: a short numeric id is not caught, because the threshold that
@@ -58,6 +64,21 @@ const DROP_KEYS = new Set([
   'agent_wallet_address',
 ]);
 
+/**
+ * Keys holding an identifier the SDK generated for itself, which must survive
+ * verbatim.
+ *
+ * `event_id` is a UUID with the dashes taken out: 32 hex characters, the exact
+ * shape of the claim-token rule above. Redacting it corrupts the envelope and
+ * risks the event being refused at ingest, which would turn error reporting off
+ * in the least visible way possible. `trace_id` is the same shape.
+ *
+ * Preserved only when the value still looks like one of those ids, so a field
+ * of the right name holding anything else is scrubbed as usual.
+ */
+const PRESERVE_KEYS = new Set(['event_id', 'trace_id', 'span_id', 'parent_span_id']);
+const SDK_ID = /^[0-9a-f]{1,64}$/i;
+
 const MAX_DEPTH = 8;
 
 export function scrubText(text: unknown): string {
@@ -78,6 +99,10 @@ export function scrubValue(value: unknown, depth = 0): unknown {
   const out: Record<string, unknown> = {};
   for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
     if (DROP_KEYS.has(key)) continue;
+    if (PRESERVE_KEYS.has(key) && typeof v === 'string' && SDK_ID.test(v)) {
+      out[key] = v;
+      continue;
+    }
     const scrubbed = scrubValue(v, depth + 1);
     if (scrubbed !== undefined) out[key] = scrubbed;
   }

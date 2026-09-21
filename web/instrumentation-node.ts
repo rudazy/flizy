@@ -24,10 +24,21 @@ import { scrubEvent } from './lib/errorScrub';
  * Tracing is off: sampling real requests is more data leaving for less benefit
  * than a money app should accept by default.
  */
+/**
+ * Same reasoning as instrumentation-client.ts: a Vercel preview builds with
+ * NODE_ENV=production and inherits the production variables, so without this
+ * a preview error arrives tagged `production`. An explicit override wins.
+ */
+function sentryEnvironment(): string {
+  const explicit = (process.env.SENTRY_ENVIRONMENT || '').trim();
+  if (explicit) return explicit;
+  return (process.env.VERCEL_ENV || '').trim() || 'production';
+}
+
 if (process.env.SENTRY_DSN && process.env.NODE_ENV === 'production') {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
-    environment: process.env.SENTRY_ENVIRONMENT || 'production',
+    environment: sentryEnvironment(),
     sendDefaultPii: false,
     tracesSampleRate: 0,
     beforeSend: (event) => scrubEvent(event) as never,
