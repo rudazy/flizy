@@ -62,6 +62,7 @@
     "pairFlzWeth": "https://sepolia-explorer.giwa.io/address/0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227"
   },
   "notes": [
+    "feeRouter source diverged from the deployed bytecode on 2026-09-22: addLiquidityETH now refunds this call's unused amounts instead of the contract's whole balance. The live address still runs the earlier build, so the verified source on the explorer matches the deployment and not the repo. Redeploy and reverify before relying on addLiquidityETH refunds. Swap paths are unaffected.",
     "FLZ is a testnet demo token: 100000 supply, symbol FLZ, 18 decimals.",
     "Protocol fee default 30 bps (0.30%), hard max 100 bps, paid to treasury.",
     "treasury moved off the deploy-time address on 2026-09-18 via feeRouter.setTreasury, so swap fee income is separable from the ops wallet that pays gas. verification.constructorArgs records the deploy-time value and does not change.",

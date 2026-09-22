@@ -34,7 +34,23 @@ interface IUniswapV2RouterMinimal {
     ) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity);
 }
 
-/// @notice Thin fee-taking router over Uniswap V2. Protocol fee accrues to treasury.
+/**
+ * @notice Thin fee-taking router over Uniswap V2. Protocol fee accrues to treasury.
+ *
+ * @dev Assumes plain ERC20s. A fee-on-transfer or rebasing token would deliver
+ * less than `amountIn` into this contract while the fee and the approval are
+ * still computed from the requested figure, so the swap would revert rather
+ * than silently shortchange anyone. Listed assets are standard tokens; do not
+ * list a fee-on-transfer token against this router without reworking the pull.
+ *
+ * @dev The contract is not meant to hold a balance between calls. It accepts
+ * ETH because the V2 router returns the unused part of an `addLiquidityETH`
+ * offer, and refunds are computed from the amounts the pair reports rather than
+ * from this contract's balance. Anything that ends up stranded here stays
+ * stranded: there is deliberately no sweep, because a sweep is either a
+ * privilege worth arguing about or, as it was before, a gift to whoever calls
+ * next.
+ */
 contract FlizyFeeRouter {
     IUniswapV2RouterMinimal public immutable v2Router;
     address public owner;
@@ -97,10 +113,9 @@ contract FlizyFeeRouter {
         amountAfterFee = amountIn - feeAmount;
     }
 
+    /// @notice Quote for the amount that will actually reach the pair, fee removed.
     function getAmountsOut(uint256 amountIn, address[] memory path) external view returns (uint256[] memory amounts) {
-        (uint256 feeAmount, uint256 afterFee) = quoteFee(amountIn);
-        // silence unused when feeBps is 0
-        feeAmount;
+        (, uint256 afterFee) = quoteFee(amountIn);
         return v2Router.getAmountsOut(afterFee, path);
     }
 
@@ -179,14 +194,35 @@ contract FlizyFeeRouter {
         (amountToken, amountETH, liquidity) = v2Router.addLiquidityETH{value: msg.value}(
             token, amountTokenDesired, amountTokenMin, amountETHMin, to, deadline
         );
-        // refund unused token
-        uint256 leftover = IERC20(token).balanceOf(address(this));
-        if (leftover > 0) {
-            require(IERC20(token).transfer(msg.sender, leftover), "REFUND");
+        // Refund what THIS call did not use, computed from the amounts the pair
+        // reported, never from the contract's balance.
+        //
+        // Reading `balanceOf(address(this))` and `address(this).balance` here
+        // refunded everything the router was holding, not just this caller's
+        // remainder. With a bare `receive()` that made any stray ETH or token
+        // sitting in the contract the property of whoever called this next, for
+        // the price of one wei. The test that pins this has the caller walking
+        // away 5 ETH richer than he arrived.
+        //
+        // The pair cannot take more than it was offered, so neither subtraction
+        // can underflow.
+        uint256 tokenRefund = amountTokenDesired - amountToken;
+        if (tokenRefund > 0) {
+            require(IERC20(token).transfer(msg.sender, tokenRefund), "REFUND");
         }
-        uint256 ethLeft = address(this).balance;
-        if (ethLeft > 0) {
-            (bool ok, ) = msg.sender.call{value: ethLeft}("");
+        // Drop the unspent allowance before handing control to the caller. The
+        // router is not meant to hold this token between calls, and leaving an
+        // open claim on a balance it might later hold is the same mistake in a
+        // smaller form. Done here, not after the ETH refund, so the contract is
+        // fully settled before the one call in this function that reaches an
+        // address the caller chooses.
+        if (tokenRefund > 0) {
+            require(IERC20(token).approve(address(v2Router), 0), "APPROVE_RESET");
+        }
+
+        uint256 ethRefund = msg.value - amountETH;
+        if (ethRefund > 0) {
+            (bool ok, ) = msg.sender.call{value: ethRefund}("");
             require(ok, "ETH_REFUND");
         }
     }
