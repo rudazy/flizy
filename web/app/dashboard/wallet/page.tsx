@@ -8,11 +8,17 @@ import {
   AppSlideNav,
   useSlide,
 } from '../../../components/AppSection';
+import { ActivityPanels } from '../../../components/ActivityPanels';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
 import { isHeld } from '../../../lib/dashboardTypes';
 
-const SLIDES = ['balances', 'fund', 'power'] as const;
+/**
+ * Order is the product lock of 2026-09-17: Balances | History | Fund | Power.
+ * History sits second because it is the thing people check after a balance,
+ * not an afterthought behind the funding instructions.
+ */
+const SLIDES = ['balances', 'history', 'fund', 'power'] as const;
 
 export default function WalletPage() {
   const { data, holdings, explorerBase, refreshing, refreshAll } = useDashboard();
@@ -29,6 +35,7 @@ export default function WalletPage() {
 
   const nav = [
     { id: 'balances', label: 'Balances' },
+    { id: 'history', label: 'History' },
     { id: 'fund', label: 'Fund' },
     { id: 'power', label: 'Power' },
   ];
@@ -126,6 +133,13 @@ export default function WalletPage() {
           </div>
         </AppSection>
       ) : null}
+
+      {/*
+        The same panels the History tab renders, from one component, so the two
+        surfaces cannot drift. No Wallet link in the empty state here: it would
+        point at the page already on screen.
+      */}
+      {slide === 'history' ? <ActivityPanels showWalletLink={false} /> : null}
 
       {slide === 'fund' ? (
         <AppSection
