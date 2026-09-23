@@ -40,6 +40,31 @@ describe('the entity is stated once and reused', () => {
     assert.match(entity.ENTITY.jurisdiction, /\S/);
   });
 
+  it('states the country in the legal documents and only there', () => {
+    // Owner decision 2026-09-23. The footer shows the company and its number;
+    // where it is incorporated is a term of the agreement, so it belongs in
+    // the documents. These two assertions are the whole rule.
+    assert.ok(
+      entity.ENTITY_SENTENCE.includes(entity.ENTITY.jurisdiction),
+      'the legal sentence must name the country'
+    );
+    assert.ok(
+      !entity.ENTITY_LINE.includes(entity.ENTITY.jurisdiction),
+      'the footer line must not name the country'
+    );
+  });
+
+  it('the legal sentence reads exactly as agreed', () => {
+    assert.equal(
+      entity.ENTITY_SENTENCE,
+      'Flizy Tek Ltd (RC 9864520), a company incorporated in Nigeria'
+    );
+  });
+
+  it('the footer line reads exactly as agreed', () => {
+    assert.equal(entity.ENTITY_LINE, 'Flizy Tek Ltd · RC 9864520');
+  });
+
   it('keeps the prose and data forms of the number in step', () => {
     // Two spellings of one number is exactly the drift this file guards, so
     // the data form has to be derivable from the prose one.
@@ -50,7 +75,6 @@ describe('the entity is stated once and reused', () => {
   it('builds the footer line and the document sentence from those parts', () => {
     assert.ok(entity.ENTITY_LINE.includes(entity.ENTITY.legalName));
     assert.ok(entity.ENTITY_LINE.includes(entity.ENTITY.rc));
-    assert.ok(entity.ENTITY_LINE.includes(entity.ENTITY.jurisdiction));
     assert.ok(entity.ENTITY_SENTENCE.includes(entity.ENTITY.legalName));
     assert.ok(entity.ENTITY_SENTENCE.includes(entity.ENTITY.rc));
   });

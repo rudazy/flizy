@@ -25,15 +25,29 @@ export const ENTITY = {
    * repeating "RC" in the value would be saying it twice.
    */
   rcNumber: '9864520',
-  /** Country of incorporation. */
+  /**
+   * Country of incorporation. Owner decision 2026-09-23: this belongs in the
+   * legal documents and nowhere else, so it is deliberately absent from
+   * ENTITY_LINE below. Read that as a rule, not an oversight.
+   */
   jurisdiction: 'Nigeria',
 } as const;
 
-/** One line for the footer: `Flizy Tek Ltd · RC 9864520 · Nigeria`. */
-export const ENTITY_LINE = `${ENTITY.legalName} · ${ENTITY.rc} · ${ENTITY.jurisdiction}`;
+/**
+ * One line for the footer: `Flizy Tek Ltd · RC 9864520`.
+ *
+ * No country, on purpose. The footer exists to show there is a real company
+ * and to give the number someone would search; the place of incorporation is
+ * a term of the agreement, not a credential, so it lives in the documents.
+ */
+export const ENTITY_LINE = `${ENTITY.legalName} · ${ENTITY.rc}`;
 
 /**
  * How the entity is introduced inside a legal document, where `we` has to
  * resolve to a named person for the document to bind anyone.
+ *
+ * This is the one place the jurisdiction is stated, and it is stated in full:
+ * a document that names a counterparty and a data controller should say which
+ * company, under which number, incorporated where.
  */
 export const ENTITY_SENTENCE = `${ENTITY.legalName} (${ENTITY.rc}), a company incorporated in ${ENTITY.jurisdiction}`;
