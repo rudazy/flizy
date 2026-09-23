@@ -74,10 +74,24 @@ export function EmailVerifyGate() {
         </p>
       </div>
 
-      {localError ? <div className="alert alert-error text-sm">{localError}</div> : null}
-      {localOk ? <div className="alert alert-ok text-sm">{localOk}</div> : null}
-
       <div className="rounded-md border border-border bg-ink/40 px-4 py-4 space-y-4">
+        {/*
+          Inside the card with the buttons, not above the heading. On a phone
+          with the keyboard up, an alert at the top of the page is off-screen
+          from the button that produced it, and pressing Continue reads as
+          pressing something broken.
+        */}
+        {localError ? (
+          <div className="alert alert-error text-sm" role="alert">
+            {localError}
+          </div>
+        ) : null}
+        {localOk ? (
+          <div className="alert alert-ok text-sm" role="status">
+            {localOk}
+          </div>
+        ) : null}
+
         <button
           type="button"
           className="btn btn-ghost w-full py-3 text-sm font-semibold"
@@ -102,8 +116,21 @@ export function EmailVerifyGate() {
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              aria-describedby="gate-code-hint"
               required
             />
+            {/*
+              The button below is disabled until the code is exactly six digits.
+              Without this line that is a dead control with no explanation,
+              which is the same complaint as a button that does nothing.
+            */}
+            <p id="gate-code-hint" className="mt-1.5 text-xs text-muted">
+              {code.length === 0
+                ? 'Six digits from the email.'
+                : code.length < 6
+                  ? `${6 - code.length} more digit${6 - code.length === 1 ? '' : 's'} to go.`
+                  : 'Ready to verify.'}
+            </p>
           </div>
           <button
             type="submit"

@@ -121,8 +121,18 @@ describe('isReservedAgainst (entry-point stand-in)', () => {
   });
 
   it('unified unavailable copy never explains why', () => {
-    assert.equal(bot.USERNAME_UNAVAILABLE, 'That username is unavailable.');
+    assert.equal(
+      bot.USERNAME_UNAVAILABLE,
+      'That username is not available. Please choose another.'
+    );
     assert.doesNotMatch(bot.USERNAME_UNAVAILABLE, /reserved|list|admin|support/i);
+    // Not "already taken" either: most of the refusals are reserved names that
+    // nobody holds, and the copy has to stay true for both cases.
+    assert.doesNotMatch(bot.USERNAME_UNAVAILABLE, /taken/i);
+  });
+
+  it('unavailable copy tells the person what to do next', () => {
+    assert.match(bot.USERNAME_UNAVAILABLE, /choose another/i);
   });
 });
 
