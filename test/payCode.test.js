@@ -145,11 +145,50 @@ describe('merchant history', () => {
     const fake = createFakeSupabase({
       accounts: [{ id: ACC, email: 'p@x.com', username: 'payer' }],
       transfers: [],
-      trusted_addresses: [{ id: 'tr1', account_id: ACC, address: dest, label: 'shop' }],
+      // status is carried because the column is not null with a default, so a
+      // row without one cannot exist. A fixture missing it would be testing a
+      // shape the database does not allow.
+      trusted_addresses: [
+        { id: 'tr1', account_id: ACC, address: dest, label: 'shop', status: 'active' },
+      ],
     });
     assert.equal(await isSavedMerchant(fake.client, ACC, dest), true);
     assert.equal(await isSavedMerchant(fake.client, ACC, '0x2222222222222222222222222222222222222222'), false);
     assert.equal(await hasPaidMerchantBefore(fake.client, ACC, dest), false);
+  });
+
+  it('a cancelled destination is not a saved merchant, so the offer returns', async () => {
+    // Cancelling does not delete the row. Reading it as still saved would mean
+    // the payer is never offered the save again and cannot get the merchant
+    // back from this flow at all.
+    const fake = createFakeSupabase({
+      accounts: [{ id: ACC, email: 'p@x.com', username: 'payer' }],
+      transfers: [],
+      trusted_addresses: [
+        { id: 'tr1', account_id: ACC, address: dest, label: 'shop', status: 'cancelled' },
+      ],
+    });
+    assert.equal(await isSavedMerchant(fake.client, ACC, dest), false);
+  });
+
+  it('a destination still inside its hold is already saved', async () => {
+    // It is on the list, so offering to save it again would be wrong. The hold
+    // is about whether it can receive, not whether it exists.
+    const fake = createFakeSupabase({
+      accounts: [{ id: ACC, email: 'p@x.com', username: 'payer' }],
+      transfers: [],
+      trusted_addresses: [
+        {
+          id: 'tr1',
+          account_id: ACC,
+          address: dest,
+          label: 'shop',
+          status: 'active',
+          active_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        },
+      ],
+    });
+    assert.equal(await isSavedMerchant(fake.client, ACC, dest), true);
   });
 });
 

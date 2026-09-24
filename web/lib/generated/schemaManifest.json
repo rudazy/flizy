@@ -58,6 +58,12 @@
     },
     {
       "kind": "function",
+      "name": "trusted_addresses_apply_hold",
+      "providedBy": "20260923000000_trusted_destination_hold.sql",
+      "requiredBy": "executed by trigger trusted_addresses_hold"
+    },
+    {
+      "kind": "function",
       "name": "try_account_tx_lock",
       "providedBy": "20260827000000_account_tx_locks.sql",
       "requiredBy": "web/lib/accountTxLock.ts"
@@ -90,7 +96,7 @@
       "kind": "table",
       "name": "channel_identities",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/invite.ts, web/lib/pendingClaims.ts"
+      "requiredBy": "web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/invite.ts, web/lib/notifyChannels.ts, web/lib/pendingClaims.ts"
     },
     {
       "kind": "table",
@@ -156,7 +162,7 @@
       "kind": "table",
       "name": "notifications",
       "providedBy": "20260725110000_notifications_outbox.sql",
-      "requiredBy": "web/lib/claimPayout.ts"
+      "requiredBy": "web/lib/notifyChannels.ts"
     },
     {
       "kind": "table",
@@ -187,6 +193,12 @@
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
       "requiredBy": "web/app/api/pay/execute/route.ts, web/app/api/swap/execute/route.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
+    },
+    {
+      "kind": "table",
+      "name": "trusted_add_tickets",
+      "providedBy": "20260923000000_trusted_destination_hold.sql",
+      "requiredBy": "web/lib/trustedTicket.ts"
     },
     {
       "kind": "table",
@@ -241,6 +253,12 @@
       "name": "invite_phone_claims_no_update",
       "providedBy": "20260813000000_invite_attribution.sql",
       "requiredBy": "trigger on invite_phone_claims"
+    },
+    {
+      "kind": "trigger",
+      "name": "trusted_addresses_hold",
+      "providedBy": "20260923000000_trusted_destination_hold.sql",
+      "requiredBy": "trigger on trusted_addresses"
     },
     {
       "kind": "trigger",

@@ -6,6 +6,13 @@ import { addTrusted } from '../../../../lib/trusted';
 import { requirePassword } from '../../../../lib/passwordGate.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
+import { notifyAllChannels } from '../../../../lib/notifyChannels';
+
+/** Short form for a notification, where the full 0x is noise. */
+function shortAddress(address: string): string {
+  const a = String(address || '');
+  return a.length > 12 ? a.slice(0, 6) + '...' + a.slice(-4) : a;
+}
 
 const ROUTE = 'POST /api/pay/save';
 
@@ -47,6 +54,22 @@ export async function POST(req: Request) {
     }
     const label = merchant.username || merchant.displayName || 'merchant';
     const row = await addTrusted(payerId, to, label);
+
+    // This route is the third writer to the trusted list, and the caller sweep
+    // for the hold work found it announcing nothing. A destination the owner is
+    // never told about can sit out its 24 hours unnoticed, which is most of the
+    // value of having a hold at all. Same outbox as everywhere else.
+    await notifyAllChannels(
+      payerId,
+      [
+        'New payout destination saved from a payment.',
+        `${label}  ${shortAddress(to)}`,
+        '',
+        'It cannot receive anything for 24 hours.',
+        `Not you? Reply: cancel wallet ${label}`,
+      ].join('\n')
+    );
+
     return NextResponse.json({ ok: true, trusted: row });
   } catch (err) {
     return NextResponse.json(apiErrorBodyAllowingClientError(ROUTE, err), { status: 400 });

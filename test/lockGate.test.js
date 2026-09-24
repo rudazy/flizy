@@ -102,68 +102,36 @@ function trustedRows() {
   return fake.db.tables.trusted_addresses || fake.db.tables.trusted_wallets || [];
 }
 
-describe('a pending wallet add cannot be finished while the session is locked', () => {
+describe('chat cannot add a payout destination, locked or open', () => {
   beforeEach(() => {
     seed();
     // Pending flows are module state, so one test must not inherit another's.
     router.discardPendingFlows(`telegram:${TG_ID}`);
   });
 
-  it('refuses the name step after a lock, and adds nothing', async () => {
+  it('there is no wallet-add flow left to race the lock', async () => {
+    // This block used to prove the gate sat above the pending name step, so a
+    // flow opened before a lock could not be finished after it. That race is
+    // gone because the flow is gone: chat cannot add a payout destination at
+    // all now, locked or open. The weaker guarantee is replaced by a stronger
+    // one, so the old assertions are not merely deleted.
     const sent = [];
     const ctx = ctxFor(sent);
 
     await router.handle(ctx, `/add wallet ${WALLET}`);
-    assert.match(sent.join('\n'), /What should we call this wallet\?/);
-    assert.equal(router.pendingFlowFor(ctx.key).walletAdd, true, 'flow should be open');
+    assert.match(sent.join('\n'), /dashboard\/account\?add=/, 'it offers the site instead');
+    assert.equal(trustedRows().length, 0, 'unlocked chat must not add a destination');
 
     sent.length = 0;
+    await router.handle(ctx, 'john');
+    assert.equal(trustedRows().length, 0, 'the old name step must write nothing');
+
     await router.handle(ctx, '/lock');
-    assert.match(sent.join('\n'), /Session locked/);
-    assert.equal(fake.db.tables.sessions[0].is_locked, true);
-
-    // Locking throws the half-finished flow away, so there is nothing to resume.
-    assert.equal(router.pendingFlowFor(ctx.key).walletAdd, false, 'lock should discard the flow');
-
     sent.length = 0;
-    await router.handle(ctx, 'john');
-    assert.equal(trustedRows().length, 0, 'no trusted wallet may be added while locked');
-    assert.ok(!/Added john/.test(sent.join('\n')));
-  });
-
-  it('refuses it even if the flow somehow survives the lock', async () => {
-    // Belt and braces: the gate, not the discard, is what has to hold. Lock the
-    // session first, then open a flow behind its back and try to finish it.
-    const sent = [];
-    const ctx = ctxFor(sent);
-
     await router.handle(ctx, `/add wallet ${WALLET}`);
-    assert.equal(router.pendingFlowFor(ctx.key).walletAdd, true);
-
-    const { lockSession } = require('../lib/session');
-    await lockSession('acc-a', 'telegram', TG_ID);
-    assert.equal(router.pendingFlowFor(ctx.key).walletAdd, true, 'flow is still open on purpose');
-
-    sent.length = 0;
-    await router.handle(ctx, 'john');
-
-    assert.match(sent.join('\n'), /Session locked/);
-    assert.equal(trustedRows().length, 0);
+    assert.equal(trustedRows().length, 0, 'locked chat must not add a destination either');
   });
 
-  it('completes normally when the session is not locked', async () => {
-    const sent = [];
-    const ctx = ctxFor(sent);
-
-    await router.handle(ctx, `/add wallet ${WALLET}`);
-    sent.length = 0;
-    await router.handle(ctx, 'john');
-
-    assert.match(sent.join('\n'), /Added john/);
-    const rows = trustedRows();
-    assert.equal(rows.length, 1);
-    assert.equal(String(rows[0].label || '').toLowerCase(), 'john');
-  });
 
   it('still lets a locked user unlock, and the name step no longer eats the word', async () => {
     const sent = [];

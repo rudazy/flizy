@@ -13,15 +13,34 @@ function checksumLike(address: string): string {
   );
 }
 
+/**
+ * The destinations to show, and whether each one can actually be used yet.
+ *
+ * `pending` is derived rather than stored: a row is held until `active_at`
+ * passes, and nothing flips it, so there is no job to fail. Cancelled rows are
+ * left out entirely; they exist only so the attempt stays on record.
+ *
+ * This is display. The rule that a held destination cannot receive funds is
+ * enforced in lib/trusted.js `isTrustedAddress`, which is what the send policy
+ * calls. Filtering here would not stop a send.
+ */
 export async function listTrusted(accountId: string) {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('trusted_addresses')
-    .select('address, label')
+    .select('address, label, status, active_at')
     .eq('account_id', accountId)
+    .eq('status', 'active')
     .order('label', { ascending: true });
   if (error) throw new Error(error.message);
-  return data || [];
+
+  const now = Date.now();
+  return (data || []).map((row) => ({
+    address: row.address,
+    label: row.label,
+    pending: new Date(row.active_at).getTime() > now,
+    activeAt: row.active_at,
+  }));
 }
 
 export async function addTrusted(accountId: string, address: string, label: string) {
@@ -37,6 +56,12 @@ export async function addTrusted(accountId: string, address: string, label: stri
         account_id: accountId,
         address: normalized,
         label: label || '',
+        // Stated, not implied. Adding a destination that was previously
+        // cancelled lands on the existing row as an update, and without this it
+        // would stay cancelled and unusable while the add reported success. The
+        // database sees the cancelled -> active transition and re-applies the
+        // 24 hour hold, so re-adding is never a way to skip one.
+        status: 'active',
       },
       { onConflict: 'account_id,address' }
     )

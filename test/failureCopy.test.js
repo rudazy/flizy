@@ -94,6 +94,76 @@ describe('no refusal writes the dialect by hand', () => {
   });
 });
 
+/**
+ * The sweep above catches a hardcoded dialect. It does not catch the other way
+ * to get this wrong, which is calling cmd(ctx, ...) inside a body that is about
+ * to be fanned out: that renders correctly, for the wrong channel.
+ *
+ * It happened in handleLink. A Telegram user linking sent the account's
+ * WhatsApp an instruction reading "/lock", which does nothing there, in a
+ * message whose entire purpose was to let the owner react quickly. The existing
+ * sweep missed it twice over: it does not read router.js, and the text it looks
+ * for is a literal, not a call.
+ */
+describe('no fan-out body picks a channel at composition time', () => {
+  const FILES = ['lib/router.js', 'lib/notify.js', 'lib/paymentRequests.js', 'lib/holdings.js'];
+
+  /** Source of one call's arguments, by balancing parens from the call site. */
+  function callArgs(src, index) {
+    let depth = 0;
+    for (let i = index; i < src.length && i < index + 4000; i += 1) {
+      if (src[i] === '(') depth += 1;
+      else if (src[i] === ')') {
+        depth -= 1;
+        if (depth === 0) return src.slice(index, i + 1);
+      }
+    }
+    return src.slice(index, index + 4000);
+  }
+
+  /**
+   * Comments are not code. The first run of this guard failed on the comment
+   * explaining why the marker is used, which named the very call it was warning
+   * against. A check that fires on prose about itself is one somebody deletes
+   * instead of reading.
+   */
+  function withoutComments(src) {
+    return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  }
+
+  it('every notifyAccount body uses the marker, never cmd(ctx, ...)', () => {
+    for (const rel of FILES) {
+      const full = path.join(__dirname, '..', rel);
+      if (!fs.existsSync(full)) continue;
+      const src = fs.readFileSync(full, 'utf8');
+
+      let from = 0;
+      for (;;) {
+        const at = src.indexOf('notifyAccount(', from);
+        if (at === -1) break;
+        from = at + 1;
+        const args = withoutComments(callArgs(src, at + 'notifyAccount'.length));
+        assert.equal(
+          /\bcmd\(\s*ctx\b/.test(args),
+          false,
+          `${rel}: a notifyAccount body renders a command for the sender's channel. ` +
+            'Use {{cmd:...}} so renderCommands can resolve it per recipient.'
+        );
+      }
+    }
+  });
+
+  it('the guard can actually see a violation', () => {
+    // Without this the test above passes just as well when callArgs returns
+    // nothing useful, which is how a structural sweep quietly stops working.
+    const sample = "await notifyAccount(id, ['x', `go: ${cmd(ctx, 'lock')}`].join('\\n'), {});";
+    const args = withoutComments(
+      callArgs(sample, sample.indexOf('notifyAccount(') + 'notifyAccount'.length)
+    );
+    assert.match(args, /cmd\(\s*ctx/, 'the slicer must reach into the body it is checking');
+  });
+});
+
 describe('a refusal names a way forward', () => {
   it('the not-trusted copy carries a route, not just a rule', () => {
     const said = rejectUntrustedMessage();

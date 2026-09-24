@@ -59,6 +59,8 @@ export default function AccountPage() {
   const [addr, setAddr] = useState('');
   const [label, setLabel] = useState('');
   const [password, setPassword] = useState('');
+  /** Ticket code from a chat-started add, passed back so the add can spend it. */
+  const [ticket, setTicket] = useState('');
   const [removePassword, setRemovePassword] = useState('');
   const [removing, setRemoving] = useState<string | null>(null);
   const [pin, setPin] = useState('');
@@ -248,13 +250,50 @@ export default function AccountPage() {
     }
   }
 
+  /**
+   * An add begun in chat arrives as ?add=CODE.
+   *
+   * The ticket carries the address across so it does not have to be retyped,
+   * which matters most for "save this merchant": the payer has never seen that
+   * 0x. It fills the form and nothing more. The password below is still what
+   * authorises the add.
+   */
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('add');
+    if (!code) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/trusted/ticket?code=${encodeURIComponent(code)}`);
+        const body = await res.json();
+        if (cancelled) return;
+        if (body?.ok) {
+          setTicket(code);
+          setAddr(String(body.address || ''));
+          if (body.label) setLabel(String(body.label));
+          setSlide('trusted');
+        } else if (body?.error) {
+          setMsg(String(body.error));
+        }
+      } catch {
+        /* a dead link is not worth an error banner; the form still works */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Once, on mount. The code is consumed by the add, not by reading it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function onAddTrusted(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await addTrusted({ address: addr, label, password });
+    const ok = await addTrusted({ address: addr, label, password, ticket });
     if (ok) {
       setAddr('');
       setLabel('');
       setPassword('');
+      setTicket('');
     }
   }
 
@@ -939,6 +978,21 @@ export default function AccountPage() {
           badge={`${data.trusted.length}`}
         >
           <form onSubmit={onAddTrusted} className="grid gap-3">
+            {ticket ? (
+              /*
+               * Provenance, because the whole design rests on this moment.
+               * Chat cannot add a destination, so the password below is the
+               * defence. A prefilled address with no explanation defeats that:
+               * it reads as something the site chose, and the one plausible
+               * attack left is getting somebody to authorise an address a chat
+               * message put there. Name where it came from and ask them to
+               * check it.
+               */
+              <p className="text-xs text-muted">
+                This address came from a request in your chat app. Check it
+                matches who you meant to pay before saving.
+              </p>
+            ) : null}
             <div>
               <label className="label">Name</label>
               <input

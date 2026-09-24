@@ -13,6 +13,7 @@
 
 import { ethers } from 'ethers';
 import { getSupabase } from './supabase.ts';
+import { notifyAllChannels } from './notifyChannels.ts';
 import { deriveAgentPrivateKey } from './agentWallet.ts';
 import { predictGatorAddress } from './gatorAccount.ts';
 import { getWebChain } from './dexServer.ts';
@@ -178,29 +179,17 @@ async function claimerLabel(accountId: string): Promise<string> {
   return n || 'another Flizy user';
 }
 
-/** Queue notify on every linked channel of the sender (bots drain the outbox). */
+/**
+ * Queue notify on every linked channel of the sender (bots drain the outbox).
+ *
+ * The body of this lives in lib/notifyChannels.ts now, shared with the trusted
+ * destination notice. One outbox writer, so a fix to either reaches both.
+ */
 async function notifySenderClaimed(
   senderAccountId: string,
   body: string
 ): Promise<void> {
-  const supabase = getSupabase();
-  const { data: identities } = await supabase
-    .from('channel_identities')
-    .select('channel, external_id')
-    .eq('account_id', senderAccountId);
-  for (const row of identities || []) {
-    if (!row.channel || !row.external_id) continue;
-    try {
-      await supabase.from('notifications').insert({
-        account_id: senderAccountId,
-        channel: row.channel,
-        external_id: String(row.external_id),
-        body,
-      });
-    } catch (err) {
-      console.warn('[claimPayout] notify enqueue failed:', err);
-    }
-  }
+  await notifyAllChannels(senderAccountId, body);
 }
 
 async function ensureAgentAddress(accountId: string): Promise<string> {

@@ -40,6 +40,8 @@ type DashboardContextValue = {
     address: string;
     label: string;
     password: string;
+    /** Code from a chat-started add. Carries the address only; the password authorises. */
+    ticket?: string;
   }) => Promise<boolean>;
   removeTrusted: (address: string, password: string) => Promise<boolean>;
   setUnlockPin: (pin: string, password: string) => Promise<boolean>;
@@ -185,7 +187,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [loadAccount]);
 
   const addTrusted = useCallback(
-    async (input: { address: string; label: string; password: string }) => {
+    async (input: { address: string; label: string; password: string; ticket?: string }) => {
       setBusy('trusted');
       setMsg('');
       try {
@@ -196,6 +198,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             address: input.address.trim(),
             label: input.label.trim(),
             password: input.password,
+            // Spent by the route only after the add succeeds.
+            ticket: input.ticket || '',
           }),
         });
         const json = await res.json();

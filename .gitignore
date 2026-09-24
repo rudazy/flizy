@@ -75,6 +75,10 @@ docs/SMART-ACCOUNTS-ASSESSMENT.md
 # Security architecture (private). Unbuilt design, not the shipped model.
 docs/SECURITY-RECOVERY.md
 docs/SECURITY-MODEL.md
+# Audit output (private). Names unfixed weaknesses with file and line numbers,
+# which is a map for anyone who reads it before the fixes land. Glob rather
+# than a list, so a future audit is covered without naming it here.
+docs/*-AUDIT.md
 # Dev staging runbook (private). Maps two remotes, two DBs, env layout.
 docs/DEV-ENVIRONMENT.md
 # Staged build plans (private). Glob covers future stages, not just this one.

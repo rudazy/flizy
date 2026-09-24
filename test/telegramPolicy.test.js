@@ -20,9 +20,6 @@ require.cache[trustedPath] = {
       accountId === 'acc-ok' &&
       String(address).toLowerCase() === '0x1111111111111111111111111111111111111111',
     rejectUntrustedMessage: () => 'That destination is not allowed.',
-    addTrusted: async () => ({}),
-    removeTrusted: async () => {},
-    listTrusted: async () => [],
   },
 };
 

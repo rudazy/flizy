@@ -32,9 +32,6 @@ require.cache[trustedPath] = {
     isTrustedAddress: async (_accountId, address) =>
       String(address).toLowerCase() === TRUSTED.toLowerCase(),
     rejectUntrustedMessage: () => 'That destination is not allowed.',
-    addTrusted: async () => ({}),
-    removeTrusted: async () => {},
-    listTrusted: async () => [],
   },
 };
 

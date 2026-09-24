@@ -64,6 +64,12 @@
     },
     {
       "kind": "function",
+      "name": "trusted_addresses_apply_hold",
+      "providedBy": "20260923000000_trusted_destination_hold.sql",
+      "requiredBy": "executed by trigger trusted_addresses_hold"
+    },
+    {
+      "kind": "function",
       "name": "try_account_tx_lock",
       "providedBy": "20260827000000_account_tx_locks.sql",
       "requiredBy": "lib/accountTxLock.js"
@@ -202,6 +208,12 @@
     },
     {
       "kind": "table",
+      "name": "trusted_add_tickets",
+      "providedBy": "20260923000000_trusted_destination_hold.sql",
+      "requiredBy": "lib/trustedTicket.js"
+    },
+    {
+      "kind": "table",
       "name": "trusted_addresses",
       "providedBy": "20260721120000_phase_full_features.sql",
       "requiredBy": "lib/payCode.js, lib/router.js, lib/trusted.js"
@@ -259,6 +271,12 @@
       "name": "invite_phone_claims_no_update",
       "providedBy": "20260813000000_invite_attribution.sql",
       "requiredBy": "trigger on invite_phone_claims"
+    },
+    {
+      "kind": "trigger",
+      "name": "trusted_addresses_hold",
+      "providedBy": "20260923000000_trusted_destination_hold.sql",
+      "requiredBy": "trigger on trusted_addresses"
     },
     {
       "kind": "trigger",

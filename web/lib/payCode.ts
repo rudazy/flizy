@@ -141,11 +141,15 @@ export async function isSavedMerchant(
   toAddress: string
 ): Promise<boolean> {
   if (!payerAccountId || !toAddress) return false;
+  // Mirror of lib/payCode.js: status only, since a held destination is on the
+  // list, and limit(1) because two casings of one address are two rows.
   const { data, error } = await supabase
     .from('trusted_addresses')
     .select('id')
     .eq('account_id', payerAccountId)
     .ilike('address', toAddress)
+    .eq('status', 'active')
+    .limit(1)
     .maybeSingle();
   if (error) {
     if (isMissingRelation(error)) return false;

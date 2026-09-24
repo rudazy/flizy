@@ -20,9 +20,6 @@ require.cache[trustedPath] = {
       return false;
     },
     rejectUntrustedMessage: () => 'That destination is not allowed.',
-    addTrusted: async () => ({}),
-    removeTrusted: async () => {},
-    listTrusted: async () => [],
   },
 };
 
