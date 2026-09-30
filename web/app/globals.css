@@ -22,7 +22,7 @@
    * the token is true by construction rather than by estimate.
    */
   --app-nav-row: 4rem;
-  /* The Swap pill uses -mt-4 to ride above the bar and overflows it by that much. */
+  /* The Swap button rides 15px above the bar (-mt-[15px]); this rounds that up. */
   --app-nav-overhang: 1rem;
   /* Home indicator / gesture bar. Declared once, consumed everywhere. */
   --app-nav-h: calc(var(--app-nav-row) + env(safe-area-inset-bottom, 0px));
@@ -117,6 +117,70 @@ textarea {
 .btn-primary:hover {
   color: var(--accent-ink);
   border-color: #f0d078;
+}
+
+/*
+ * A tap area of at least 44px around a control drawn smaller than that, without
+ * changing how it looks. hit-y-44 grows the height only, for controls set closer
+ * than 44px side by side, so neighbouring tap areas never overlap.
+ */
+.hit-44,
+.hit-y-44 {
+  position: relative;
+}
+
+.hit-44::after,
+.hit-y-44::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.hit-44::after {
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+}
+
+.hit-y-44::after {
+  width: 100%;
+  height: max(100%, 44px);
+}
+
+/* Explore gold: the sun fill used by Create, Explore Campaigns and Notify me. */
+.btn-sun {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #f9d95d 0%, #f7d043 100%);
+  color: #1a1405;
+  border: 1px solid #f7d047;
+  font-weight: 600;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 6px 18px rgba(247, 208, 71, 0.16);
+  transition: filter 150ms ease;
+}
+
+.btn-sun:hover {
+  filter: brightness(1.05);
+  color: #1a1405;
+}
+
+/* Explore outline button: View ended campaigns. */
+.btn-chrome {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #141416;
+  color: #f5f5f5;
+  border: 1px solid #28292e;
+  font-weight: 500;
+  transition: border-color 150ms ease;
+}
+
+.btn-chrome:hover {
+  border-color: #3a3b41;
+  color: #f5f5f5;
 }
 
 .btn-ghost {

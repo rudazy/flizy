@@ -68,13 +68,19 @@ function CompactTab({
   return (
     <Link
       href={href}
-      className={`flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 no-underline transition-colors ${
-        active ? 'text-lime' : 'text-muted hover:text-paper'
+      className={`flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-start gap-[3px] px-0.5 pt-[10px] no-underline transition-colors ${
+        active ? 'text-sun' : 'text-[#cfcfcf] hover:text-white'
       }`}
       aria-current={active ? 'page' : undefined}
     >
       <Icon active={active} />
-      <span className="font-sans text-[10px] font-medium tracking-wide">{label}</span>
+      <span className={`font-sans text-[9.5px] tracking-wide ${active ? 'font-semibold' : 'font-medium'}`}>
+        {label}
+      </span>
+      <span
+        className={`mt-px h-[2px] w-[19px] rounded-full ${active ? 'bg-sun' : 'bg-transparent'}`}
+        aria-hidden
+      />
     </Link>
   );
 }
@@ -102,20 +108,24 @@ function SwapPill({ compact }: { compact?: boolean }) {
   return (
     <Link
       href="/dashboard/swap"
-      className="relative -mt-4 flex min-w-[72px] flex-col items-center justify-end no-underline"
+      className="relative -mt-[15px] flex min-w-[72px] flex-col items-center justify-start self-start no-underline"
       aria-current={active ? 'page' : undefined}
       aria-label={label}
     >
       <span
-        className={`flex h-14 w-14 items-center justify-center rounded-full border-2 shadow-glow transition-transform duration-150 active:scale-95 ${
-          active ? 'border-lime bg-lime text-ink' : 'border-[#3a322a] bg-lime text-ink'
+        className={`flex h-[47px] w-[47px] items-center justify-center rounded-full border-2 text-sun-ink transition-transform duration-150 active:scale-95 ${
+          active ? 'border-sun' : 'border-[#3d381f]'
         }`}
+        style={{
+          background: 'linear-gradient(180deg, #f9d95d 0%, #f7d043 100%)',
+          boxShadow: '0 6px 18px rgba(247, 208, 71, 0.22)',
+        }}
       >
         <SwapIcon />
       </span>
       <span
-        className={`mt-1 font-sans text-[11px] font-semibold tracking-wide ${
-          active ? 'text-lime' : 'text-muted'
+        className={`mt-[2px] font-sans text-[9.5px] font-medium tracking-wide ${
+          active ? 'text-sun' : 'text-[#cfcfcf]'
         }`}
       >
         {label}
@@ -150,20 +160,20 @@ export function AppDesktopTabs() {
   );
 }
 
-/** Mobile fixed bottom bar: Home | Wallet | large Swap | History | Account */
+/** Mobile fixed bottom bar: Home | Wallet | large Swap | Explore | Account */
 export function AppBottomNav() {
   const pathname = usePathname() || '';
   const { t } = useLocale();
   return (
     <nav
-      className="app-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-border bg-ink/95 backdrop-blur-md md:hidden"
+      className="app-bottom-nav fixed inset-x-0 bottom-0 z-50 border-t border-[#1c1e22] bg-[#0b0c0d]/95 backdrop-blur-md md:hidden"
       aria-label="App"
     >
       {/*
         Row height comes from --app-nav-row so the clearance token stays true.
         The safe-area inset lives on .app-bottom-nav only -- do not add it here.
       */}
-      <div className="app-bottom-nav-row mx-auto flex max-w-lg items-end justify-between px-1">
+      <div className="app-bottom-nav-row mx-auto flex max-w-lg items-start justify-between px-1">
         {LEFT_TABS.map((tab) => (
           <CompactTab
             key={tab.href}
@@ -194,7 +204,7 @@ function HomeIcon({ active }: { active: boolean }) {
       <path
         d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5z"
         stroke="currentColor"
-        strokeWidth={active ? 2 : 1.5}
+        strokeWidth={active ? 2 : 1.7}
         strokeLinejoin="round"
       />
     </svg>
@@ -211,9 +221,9 @@ function WalletIcon({ active }: { active: boolean }) {
         height="13"
         rx="2"
         stroke="currentColor"
-        strokeWidth={active ? 2 : 1.5}
+        strokeWidth={active ? 2 : 1.7}
       />
-      <path d="M3 10h18" stroke="currentColor" strokeWidth={active ? 2 : 1.5} />
+      <path d="M3 10h18" stroke="currentColor" strokeWidth={active ? 2 : 1.7} />
       <circle cx="16.5" cy="14.5" r="1.25" fill="currentColor" />
     </svg>
   );
@@ -221,15 +231,23 @@ function WalletIcon({ active }: { active: boolean }) {
 
 function ExploreIcon({ active }: { active: boolean }) {
   // A compass: discovery rather than a magnifier, which would read as search.
+  // Active is a solid disc with the needle cut out in the bar colour.
+  if (active) {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="9.5" fill="currentColor" />
+        <path d="M15.6 8.4l-2.2 5-5 2.2 2.2-5 5-2.2z" fill="#0b0c0d" />
+      </svg>
+    );
+  }
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth={active ? 2 : 1.5} />
+      <circle cx="12" cy="12" r="8.8" stroke="currentColor" strokeWidth={1.7} />
       <path
-        d="M14.8 9.2l-1.9 4.1-4.1 1.9 1.9-4.1 4.1-1.9z"
+        d="M15.2 8.8l-2 4.4-4.4 2 2-4.4 4.4-2z"
         stroke="currentColor"
-        strokeWidth={active ? 2 : 1.5}
+        strokeWidth={1.7}
         strokeLinejoin="round"
-        fill={active ? 'currentColor' : 'none'}
       />
     </svg>
   );
@@ -238,11 +256,11 @@ function ExploreIcon({ active }: { active: boolean }) {
 function AccountIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="9" r="3.5" stroke="currentColor" strokeWidth={active ? 2 : 1.5} />
+      <circle cx="12" cy="9" r="3.5" stroke="currentColor" strokeWidth={active ? 2 : 1.7} />
       <path
         d="M5 19.5c1.5-3 4-4.5 7-4.5s5.5 1.5 7 4.5"
         stroke="currentColor"
-        strokeWidth={active ? 2 : 1.5}
+        strokeWidth={active ? 2 : 1.7}
         strokeLinecap="round"
       />
     </svg>
@@ -251,7 +269,7 @@ function AccountIcon({ active }: { active: boolean }) {
 
 function SwapIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M7 7h11l-2.5-2.5M17 17H6l2.5 2.5"
         stroke="currentColor"

@@ -20,6 +20,19 @@ const config: Config = {
         gold: '#c4893f',
         // Optional deeper copper for rare emphasis
         copper: '#a86b3c',
+        // App chrome and Explore gold: the bottom nav, top bar and Explore
+        // controls. Brighter than the lime token the rest of the app uses.
+        sun: {
+          DEFAULT: '#f7d047',
+          ink: '#1a1405',
+          wash: '#1b190e',
+        },
+        // Neutral chrome surfaces and hairlines for the same screens.
+        chrome: {
+          fill: '#111113',
+          line: '#23242a',
+          'card-line': '#1c1c1f',
+        },
       },
       fontFamily: {
         // Variables come from the `geist` package, applied on <html> in app/layout.tsx.

@@ -23,21 +23,59 @@ export function AppPage({ children }: { children: ReactNode }) {
   return <div className="flex flex-1 flex-col space-y-4">{children}</div>;
 }
 
-export type SlideNavItem = { id: string; label: string; badge?: string };
+export type SlideNavItem = { id: string; label: string; badge?: string; icon?: ReactNode };
 
 /**
  * Secondary mode chips: switch which slide is on screen.
  * Not hash links — do not jump down a long page.
+ *
+ * `tabs` is the Explore form: a few equal-width tabs with icons, the active one
+ * outlined in gold. The default is the small scrolling chips the other pages
+ * use, where the count of slides varies.
  */
 export function AppSlideNav({
   items,
   activeId,
   onSelect,
+  variant = 'chips',
 }: {
   items: SlideNavItem[];
   activeId: string;
   onSelect: (id: string) => void;
+  variant?: 'chips' | 'tabs';
 }) {
+  if (variant === 'tabs') {
+    return (
+      <nav
+        className="grid gap-[7px]"
+        style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
+        aria-label="Sections"
+        role="tablist"
+      >
+        {items.map((item) => {
+          const active = item.id === activeId;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onSelect(item.id)}
+              className={`hit-y-44 flex h-[35px] items-center justify-center gap-[9px] rounded-[6px] border font-sans text-[10px] font-medium transition-colors ${
+                active
+                  ? 'border-[1.5px] border-sun bg-sun-wash text-sun'
+                  : 'border-chrome-line bg-[#0e0f11] text-[#e6e6e6] hover:border-[#34353b]'
+              }`}
+            >
+              {item.icon ? <span className={active ? 'text-sun' : 'text-[#d2d2d2]'}>{item.icon}</span> : null}
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+    );
+  }
+
   return (
     <nav
       className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
