@@ -9,6 +9,7 @@ import {
   getDexAddresses,
   resolveToken,
   quoteSwap,
+  readErc20Decimals,
   executeSwap,
   executeSwapViaGator,
   deriveAgentWallet,
@@ -20,6 +21,8 @@ import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
 import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
+import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { bindAmountOutMin, swapNeedsPassword } from '../../../../lib/swapGate.ts';
 
 const ROUTE = 'POST /api/swap/execute';
 
@@ -34,11 +37,10 @@ export async function POST(req: Request) {
     const body = await req.json();
     const supabase = getSupabase();
 
-    // No password gate here, unlike every other money route. A swap sends its
-    // output to `recipient: signer.address` below and takes no slippage from the
-    // caller, so it cannot move value off this account — only change what the
-    // account holds. What is left to defend against is churn, which is what the
-    // hourly cap is for. See web/lib/swapRateLimit.ts for the full argument.
+    // ETH/FLZ swaps take no password: the only pool on that pair is the one
+    // Flizy controls, so the worst a stolen session can do is churn, which the
+    // hourly cap is for. Any other token needs the password, checked below once
+    // the sides are resolved. web/lib/swapGate.ts has the reason.
     const rate = await checkSwapRateLimit(supabase, accountId);
     if (!rate.ok) {
       return NextResponse.json({ error: rate.error, code: rate.code }, { status: rate.status });
@@ -69,10 +71,45 @@ export async function POST(req: Request) {
       tokenIn = tokenInRaw.toUpperCase() === 'ETH' ? null : resolveToken(tokenInRaw);
       tokenOut = tokenOutRaw.toUpperCase() === 'ETH' ? null : resolveToken(tokenOutRaw);
     }
+    if (tokenIn !== null && tokenOut !== null) {
+      return NextResponse.json(
+        { error: 'Token-to-token swaps are not available. Use buy or sell.' },
+        { status: 400 }
+      );
+    }
 
-    const amountIn = ethers.parseEther(amount);
+    if (swapNeedsPassword([tokenIn, tokenOut], dex)) {
+      const auth = await requirePassword(
+        supabase,
+        accountId,
+        String(body.password || ''),
+        'trade a token Flizy has not verified'
+      );
+      if (!auth.ok) {
+        return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
+      }
+    }
+
+    const inDecimals = await readErc20Decimals(provider, tokenIn);
+    const outDecimals = await readErc20Decimals(provider, tokenOut);
+    let amountIn: bigint;
+    try {
+      amountIn = ethers.parseUnits(amount, inDecimals);
+    } catch {
+      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
+    }
     if (amountIn <= 0n) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
+    }
+    // The minimum shown on the review step. Optional so an older open tab still
+    // works, in which case the server's own quote sets the floor.
+    let confirmedMin: bigint | null = null;
+    if (body.minOut != null && String(body.minOut).trim() !== '') {
+      try {
+        confirmedMin = ethers.parseUnits(String(body.minOut), outDecimals);
+      } catch {
+        return NextResponse.json({ error: 'Invalid minimum' }, { status: 400 });
+      }
     }
 
     const { data: account } = await supabase
@@ -94,10 +131,17 @@ export async function POST(req: Request) {
       tokenIn,
       tokenOut,
     });
+    if (confirmedMin != null && quote.amountOut < confirmedMin) {
+      return NextResponse.json(
+        { error: 'The price moved since you reviewed it. Review the trade again.' },
+        { status: 409 }
+      );
+    }
+    const floor = bindAmountOutMin(quote.amountOutMin, confirmedMin);
 
     const inLabel = tokenInRaw.toUpperCase() === 'ETH' ? 'ETH' : tokenInRaw.toUpperCase();
     const outLabel = tokenOutRaw.toUpperCase() === 'ETH' ? 'ETH' : tokenOutRaw.toUpperCase();
-    const amountOutStr = ethers.formatEther(quote.amountOut);
+    const amountOutStr = ethers.formatUnits(quote.amountOut, outDecimals);
 
     // phone required on older schemas; 'site' marks dashboard-originated swaps
     const logPayload: Record<string, unknown> = {
@@ -146,7 +190,7 @@ export async function POST(req: Request) {
             amountIn,
             tokenIn,
             tokenOut,
-            amountOutMinWei: quote.amountOutMin,
+            amountOutMinWei: floor,
             recipient: walletAddr,
           })
         : await executeSwap({
@@ -154,7 +198,7 @@ export async function POST(req: Request) {
             amountIn,
             tokenIn,
             tokenOut,
-            amountOutMinWei: quote.amountOutMin,
+            amountOutMinWei: floor,
             recipient: signer.address,
           });
 
@@ -187,7 +231,7 @@ export async function POST(req: Request) {
         ok: true,
         txHash: result.txHash,
         explorerUrl: explorerTxUrl(chain, result.txHash),
-        fee: ethers.formatEther(quote.feeAmount),
+        fee: ethers.formatUnits(quote.feeAmount, inDecimals),
         feeBps: quote.feeBps,
         feePct,
         allInPct,

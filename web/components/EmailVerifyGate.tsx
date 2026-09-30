@@ -4,8 +4,15 @@
  * Full-screen gate: no dashboard features until registration email is verified.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDashboard } from './DashboardProvider';
+
+/**
+ * True only in a development build. Next inlines NODE_ENV at build time, so the
+ * branch below this guard is removed from the production bundle entirely rather
+ * than merely not taken.
+ */
+const IS_DEV_BUILD = process.env.NODE_ENV !== 'production';
 
 export function EmailVerifyGate() {
   const { data, load, setMsg } = useDashboard();
@@ -38,6 +45,33 @@ export function EmailVerifyGate() {
       setBusy('');
     }
   }
+
+  /*
+   * On a development build, fetch the code straight away.
+   *
+   * Nothing on a local machine can send mail: with no SMTP or Resend key
+   * configured, sendMail logs the body and reports success, and
+   * issueEmailVerificationCode hands the code back as `devCode` instead. But
+   * the screen says to wait for an email, so somebody signing up locally sits
+   * watching an inbox that will never receive anything. The code was always one
+   * button press away and nothing said so.
+   *
+   * Production is unaffected: the guard is a build-time constant, so this whole
+   * branch is removed from that bundle rather than merely skipped, and no extra
+   * email is ever sent on a real deploy.
+   */
+  const devCodeRequested = useRef(false);
+  useEffect(() => {
+    if (!IS_DEV_BUILD) return;
+    // React runs effects twice in development. Without this the code is issued
+    // twice and the first one is invalidated before it can be used.
+    if (devCodeRequested.current) return;
+    devCodeRequested.current = true;
+    void sendCode();
+    // Once on mount. sendCode is stable enough for this and re-running it on
+    // every render would mint codes in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function verify(e: React.FormEvent) {
     e.preventDefault();
@@ -72,6 +106,12 @@ export function EmailVerifyGate() {
           Flizy. This proves you control the inbox so only you can receive payments sent to that
           address.
         </p>
+        {IS_DEV_BUILD ? (
+          <p className="mt-2 text-xs text-muted">
+            Local build: no mail is configured, so the code appears below and in
+            the server terminal instead of arriving by email.
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-md border border-border bg-ink/40 px-4 py-4 space-y-4">

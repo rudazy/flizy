@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AppTopBar } from '../../components/AppTopBar';
 import {
   AppListRow,
@@ -12,12 +12,14 @@ import {
   AppSlideNav,
   AppStatusCell,
   AppStatusStrip,
+  AppStatusTap,
   useSlide,
 } from '../../components/AppSection';
 import { useDashboard } from '../../components/DashboardProvider';
 import { useLocale } from '../../components/LocaleProvider';
 import { shortAddr } from '../../lib/dashboardTypes';
 import { CopyButton } from '../../components/CopyButton';
+import { EyeMark } from '../../components/BalanceEye';
 import { formatClaimAmount } from '../../lib/claimAmount.ts';
 import { formatAmount } from '../../../lib/amountDisplay';
 
@@ -45,6 +47,16 @@ export default function DashboardHomePage() {
   const [githubLinkedNotice, setGithubLinkedNotice] = useState(false);
   const [claimBusyId, setClaimBusyId] = useState('');
   const [claimMsg, setClaimMsg] = useState('');
+  const [balanceOpen, setBalanceOpen] = useState(false);
+  const [walletFlash, setWalletFlash] = useState('');
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    return () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    };
+  }, []);
 
   const pendingClaims = data?.pendingClaims || [];
   const needsPin = data ? !data.account.has_pin : false;
@@ -99,6 +111,33 @@ export default function DashboardHomePage() {
   const inviteCredit = data.invite?.credits ?? 0;
   const openSetup = checklist.filter((c) => !c.done);
   const recent = (activity || []).slice(0, 5);
+  const balanceText = nativeBal
+    ? `${formatAmount(nativeBal.balance)} ${nativeBal.symbol}`
+    : '… ETH';
+  const walletAddress = data.account.agent_wallet_address || '';
+  const walletValue = walletFlash === 'copied'
+    ? 'Copied'
+    : walletFlash === 'failed'
+      ? 'Not copied'
+      : walletAddress
+        ? shortAddr(walletAddress)
+        : '…';
+
+  function openWallet() {
+    router.push('/dashboard/wallet?s=balances');
+  }
+
+  async function copyWallet() {
+    if (!walletAddress) return;
+    try {
+      await navigator.clipboard.writeText(walletAddress);
+      setWalletFlash('copied');
+    } catch {
+      setWalletFlash('failed');
+    }
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setWalletFlash(''), 1600);
+  }
 
   async function onQuickPin(e: React.FormEvent) {
     e.preventDefault();
@@ -190,16 +229,32 @@ export default function DashboardHomePage() {
           where it is kept. formatAmount rather than toFixed(4) so this figure
           reads the same here as in chat, in history and on a receipt -- it was
           the third rendering of one number.
+          Starts covered. Each tap switches between the figure and the mask.
         */}
-        <AppStatusCell
-          label="Balance"
-          value={
-            nativeBal
-              ? `${formatAmount(nativeBal.balance)} ${nativeBal.symbol}`
-              : '— ETH'
-          }
-          href="/dashboard/wallet?s=balances"
-        />
+        <button
+          type="button"
+          onClick={() => setBalanceOpen((open) => !open)}
+          aria-pressed={balanceOpen}
+          aria-label={balanceOpen ? 'Hide balance' : 'Show balance'}
+          className="group w-full touch-manipulation select-none border-b border-r border-border bg-transparent px-3 py-3 text-left font-[inherit] last:border-r-0 hover:bg-white/[0.02] focus-visible:outline focus-visible:outline-1 focus-visible:outline-lime sm:border-b-0"
+        >
+          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">Balance</p>
+          <span className="mt-1 flex h-5 items-center gap-2">
+            <span
+              className={
+                balanceOpen
+                  ? 'truncate font-sans text-sm leading-5 tracking-wide text-paper'
+                  : 'font-sans text-sm leading-5 tracking-[0.22em] text-paper'
+              }
+            >
+              {balanceOpen ? balanceText : '••••'}
+            </span>
+            <EyeMark
+              hidden={!balanceOpen}
+              className="h-4 w-4 shrink-0 text-paper transition-colors group-hover:text-lime"
+            />
+          </span>
+        </button>
         {/*
           "Invites", not "Credit". This is data.invite.credits -- earned invite
           credits, which CREDITS_SPENDABLE deliberately keeps unspendable. Sat
@@ -216,14 +271,19 @@ export default function DashboardHomePage() {
           value={String(data.trusted.length)}
           href="/dashboard/account?s=trusted"
         />
-        <AppStatusCell
+        {/* One tap copies the full address. Two taps open the wallet. */}
+        <AppStatusTap
           label="Wallet"
-          value={
-            data.account.agent_wallet_address
-              ? shortAddr(data.account.agent_wallet_address)
-              : '…'
+          value={walletValue}
+          hint={
+            walletFlash === 'copied'
+              ? 'Wallet address copied.'
+              : 'Wallet address. Tap to copy it. Double tap opens the wallet.'
           }
-          href="/dashboard/wallet?s=balances"
+          onSingle={() => {
+            void copyWallet();
+          }}
+          onDouble={openWallet}
         />
       </AppStatusStrip>
 

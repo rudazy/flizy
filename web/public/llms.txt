@@ -1,10 +1,10 @@
 # Flizy
 
-> Send crypto from WhatsApp or Telegram, only to destinations approved in advance. GIWA-first, testnet.
+> Send money by phone number, email or username, from WhatsApp, Telegram or the web. GIWA-first, testnet.
 
 Money commands run in the chat app the user already has, and the same account can be linked
-on WhatsApp and Telegram at once. Transfers only reach destinations the user approved on the
-site, so a stolen phone cannot add a new payout address. Swaps only go through allowlisted
+on WhatsApp and Telegram at once. Raw wallet addresses only work once saved on the site with
+the account password, and a new one waits 24 hours before it can receive. Swaps only go through allowlisted
 DEX routers, with fees disclosed before confirmation. Currently running on GIWA Sepolia
 testnet with source-verified contracts.
 
@@ -33,12 +33,11 @@ testnet with source-verified contracts.
 - Listed NFT identity send uses the same escrow: `nft send giwaforge 1842 to @bob on telegram`. Collections studio is a separate site and is not this command.
 - One site link code binds either channel. Identity is proven by that code, because only a
   logged-in account holder can generate one.
-- Claims are addressed to a phone number, so they can be redeemed from either channel by
-  whoever owns that number. One phone belongs to exactly one account.
+- Claims can be addressed to a phone number, an email, or a platform account. One phone
+  belongs to exactly one account.
 - Sending to a phone number always reserves the funds, whether or not that number is
   already on Flizy. If it is, the owner is notified in their chat app immediately and
-  claims it there. Money never arrives in a wallet unannounced, and a number that is not
-  on Flizy is never messaged out of the blue. The sender can cancel until it is claimed.
+  claims it there. The sender can cancel until it is claimed.
 
 ## When to read
 

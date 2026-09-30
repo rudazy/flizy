@@ -10,6 +10,12 @@
     },
     {
       "kind": "function",
+      "name": "accounts_username_not_project_handle",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "executed by trigger accounts_username_not_project_handle"
+    },
+    {
+      "kind": "function",
       "name": "channel_identities_enforce_one_phone",
       "providedBy": "20260725100000_channel_identities.sql",
       "requiredBy": "executed by trigger channel_identities_one_phone"
@@ -228,6 +234,12 @@
       "kind": "trigger",
       "name": "accounts_set_updated_at",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "trigger on accounts"
+    },
+    {
+      "kind": "trigger",
+      "name": "accounts_username_not_project_handle",
+      "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "trigger on accounts"
     },
     {

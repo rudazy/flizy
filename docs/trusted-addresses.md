@@ -1,6 +1,7 @@
 # Trusted addresses
 
-Flizy only allows transfers to destinations you already trust.
+Raw wallet addresses only work once you have saved them on the site with your
+password, and a new one waits 24 hours before it can receive.
 
 Trusted destinations are added on the Flizy site, under Account, and your
 account password is required at the moment you add one. A linked chat app cannot

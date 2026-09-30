@@ -47,14 +47,28 @@ supabase/.temp/
 supabase/.branches/
 
 # Agent session notes / local task logs (never public)
-tasks/
-tasks/**
+#
+# Anchored with a leading slash, and that slash is load bearing. A bare `tasks/`
+# matches a directory of that name at ANY depth, so it silently swallowed
+# web/app/api/tasks/ and web/app/tasks/ the moment a Tasks feature existed: the
+# files sat on disk, every local build passed, and the deploy would have gone
+# out with no task routes at all. Only the root notes directory is private.
+/tasks/
+/tasks/**
 **/todo.md
 # Standing agent rules. Local-only: read from the folder, never pushed to any
 # remote, so it stays out of both the private and the public repo.
 CLAUDE.md
 
 # Private / non-public materials (never ship to the public repo)
+# Anchored for the same reason as /tasks/ above: a bare `notes/` would also
+# swallow any app route or module of that name.
+/private/
+/internal/
+/notes/
+/docs/private/
+/docs/internal/
+/docs/notes/
 .video-analysis/
 .video-analysis/**
 docs/INVESTOR-MAP.md

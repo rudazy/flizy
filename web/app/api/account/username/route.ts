@@ -18,6 +18,7 @@ import {
 import { apiErrorBody } from '../../../../lib/apiError';
 import { ensureInviteCode } from '../../../../lib/invite.ts';
 import { ensurePayCode } from '../../../../lib/payCode.ts';
+import { isHandleTakenByProject } from '../../../../lib/tasks';
 
 const ROUTE = 'POST /api/account/username';
 
@@ -68,6 +69,10 @@ export async function POST(req: Request) {
     if (await isUsernameReserved(supabase, check.username)) {
       return NextResponse.json({ error: USERNAME_UNAVAILABLE }, { status: 409 });
     }
+    // Usernames and project handles share one namespace.
+    if (await isHandleTakenByProject(check.username, supabase)) {
+      return NextResponse.json({ error: USERNAME_UNAVAILABLE }, { status: 409 });
+    }
 
     const nowIso = new Date().toISOString();
     const { data: updated, error } = await supabase
@@ -78,12 +83,13 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
-      // Unique index, or FZ002 reserved trigger.
+      // Unique index, FZ002 reserved trigger, or FZ101 project-handle trigger.
       const code = String(error.code || '');
       const msg = String(error.message || '').toLowerCase();
       if (
         code === '23505' ||
         code === 'FZ002' ||
+        code === 'FZ101' ||
         msg.includes('duplicate') ||
         msg.includes('username is reserved')
       ) {

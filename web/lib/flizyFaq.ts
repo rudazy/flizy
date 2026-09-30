@@ -15,9 +15,9 @@ export const FLIZY_FAQ: Array<{ question: string; answer: string }> = [
       'Create a free account on flizy.app, fund your Flizy wallet, add trusted people on the dashboard, link the chat with a one-time code, then send with flizy send (WhatsApp) or /send (Telegram) and confirm.',
   },
   {
-    question: 'Why only trusted addresses?',
+    question: 'Who can I pay?',
     answer:
-      'Flizy only pays destinations you already saved on the site. That way a stolen phone cannot invent a new recipient. Manage the list under Account → Trusted.',
+      'A Flizy username or pay code, or a phone number, email, GitHub or X handle, even before the person joins. Unclaimed money waits, and you can cancel it from chat. A raw wallet address only works once you have saved it on the site with your password, and a new one waits 24 hours before it can receive.',
   },
   {
     question: 'How do phone claims work?',

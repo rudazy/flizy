@@ -7,7 +7,7 @@ import { siteOrigin } from '../../lib/siteOrigin';
 export const metadata: Metadata = pageMetadata({
   title: 'WhatsApp & Telegram crypto commands | Flizy',
   description:
-    'Full Flizy WhatsApp and Telegram command list. Why sends only go to people you already trust, and how unlock PIN and chat unlink work.',
+    'Send money by phone number, email or username, from WhatsApp, Telegram or the web.',
   path: '/docs',
 });
 
@@ -289,9 +289,9 @@ export default function DocsPage() {
       <section className="space-y-4">
         <h2 className="font-sans text-xl tracking-wide text-paper">Why trusted people</h2>
         <p className="text-base leading-relaxed text-muted">
-          Flizy only allows transfers to destinations you already approved on the site — never by
-          adding a new payout address from WhatsApp or Telegram alone. If someone steals your phone
-          or hijacks a chat, they still cannot rewrite who you can pay.
+          Raw wallet addresses only work once you&apos;ve saved them on the site with your password,
+          and a new one waits 24 hours before it can receive. In chat, flizy add wallet gives you a
+          link, and you finish on the site with your password.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="card p-5">

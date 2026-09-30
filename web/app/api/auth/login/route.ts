@@ -76,6 +76,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
+    /*
+     * An unrecognised browser needs the emailed code on every runtime. A local
+     * build has no mail transport, so issueEmailVerificationCode returns the
+     * code as `devCode` there and LoginForm shows it; the step itself is never
+     * skipped, so development exercises the same path production does.
+     */
     const remembered = hasTrustedLoginDevice(data.id);
     if (!remembered && !code) {
       const issued = await issueEmailVerificationCode({

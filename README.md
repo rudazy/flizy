@@ -7,7 +7,7 @@
 <p align="center">
   <strong>Send crypto the way you send a message.</strong><br />
   WhatsApp or Telegram. Only to people you already approved.<br />
-  A stolen phone cannot add a payout address, so it cannot drain you.
+  Raw wallet addresses only work once saved on the site with your password, and a new one waits 24 hours before it can receive.
 </p>
 
 <p align="center">

@@ -8,8 +8,10 @@ import {
   tokenLabel,
   quoteSwap,
   getFlzPrice,
+  readErc20Decimals,
 } from '../../../../lib/dexServer';
-import { apiErrorBody } from '../../../../lib/apiError';
+import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
+import { asSwapQuoteError } from '../../../../lib/swapQuoteError';
 
 const ROUTE = 'GET /api/swap/quote';
 
@@ -53,7 +55,14 @@ export async function GET(req: Request) {
       tokenOut = outU === 'ETH' ? null : resolveToken(tokenOutRaw);
     }
 
-    const amountIn = ethers.parseEther(String(amount));
+    const inDecimals = await readErc20Decimals(provider, tokenIn);
+    const outDecimals = await readErc20Decimals(provider, tokenOut);
+    let amountIn: bigint;
+    try {
+      amountIn = ethers.parseUnits(String(amount), inDecimals);
+    } catch {
+      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
+    }
     if (amountIn <= 0n) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
     }
@@ -74,10 +83,10 @@ export async function GET(req: Request) {
     const outLabel = tokenLabel(tokenOut);
 
     return NextResponse.json({
-      amountIn: ethers.formatEther(amountIn),
-      amountOut: ethers.formatEther(quote.amountOut),
-      amountOutMin: ethers.formatEther(quote.amountOutMin),
-      fee: ethers.formatEther(quote.feeAmount),
+      amountIn: ethers.formatUnits(amountIn, inDecimals),
+      amountOut: ethers.formatUnits(quote.amountOut, outDecimals),
+      amountOutMin: ethers.formatUnits(quote.amountOutMin, outDecimals),
+      fee: ethers.formatUnits(quote.feeAmount, inDecimals),
       feeBps: quote.feeBps,
       feePct,
       poolFeeBps,
@@ -90,9 +99,13 @@ export async function GET(req: Request) {
       tokenOut: outLabel,
       feeRouter: quote.feeRouter,
       chain: { id: chain.chainId, name: chain.name },
-      disclosure: `All-in ~${allInPct}: protocol ${feePct} + pool 0.30%. Protocol takes ~${ethers.formatEther(quote.feeAmount)} ${inLabel} before the swap. Network gas is extra.`,
+      disclosure: `All-in ~${allInPct}: protocol ${feePct} + pool 0.30%. Protocol takes ~${ethers.formatUnits(quote.feeAmount, inDecimals)} ${inLabel} before the swap. Network gas is extra.`,
     });
   } catch (err) {
+    const client = asSwapQuoteError(err);
+    if (client) {
+      return NextResponse.json(apiErrorBodyAllowingClientError(ROUTE, client), { status: 400 });
+    }
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

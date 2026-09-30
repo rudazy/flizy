@@ -7,7 +7,8 @@
  *   platform  → account must hold (channel, external_id)
  * Race: status pending → processing → claimed (or back to pending if pre-chain fail).
  *
- * Escrow signs with ESCROW_PRIVATE_KEY (or same derived key as the bot).
+ * Escrow signs with ESCROW_PRIVATE_KEY, or on a testnet only with the same
+ * derived key as the bot (see getEscrowWallet).
  * Agent receive address uses the same derivation as chat (web/lib/agentWallet).
  */
 
@@ -16,7 +17,7 @@ import { getSupabase } from './supabase.ts';
 import { notifyAllChannels } from './notifyChannels.ts';
 import { deriveAgentPrivateKey } from './agentWallet.ts';
 import { predictGatorAddress } from './gatorAccount.ts';
-import { getWebChain } from './dexServer.ts';
+import { getWebChain, type WebChain } from './dexServer.ts';
 import { formatUsernameLabel } from './username.ts';
 import {
   claimMatchesAccountKeys,
@@ -69,7 +70,26 @@ export {
   matchErrorForClaim,
 } from './claimMatch.ts';
 
-function getEscrowWallet(provider: ethers.Provider): ethers.Wallet {
+/**
+ * Chains on which deriving the escrow key from the ops key is acceptable, by
+ * name and chain id. Mirror of DERIVED_ESCROW_OK_CHAINS in lib/escrowWallet.js.
+ *
+ * The derived key has its own address but not its own custody: whoever holds
+ * PRIVATE_KEY can recompute it. That is tolerable on a testnet only, so on any
+ * other chain ESCROW_PRIVATE_KEY is required. The chain id is checked as well as
+ * the name because getWebChain() always names giwa_sepolia while GIWA_CHAIN_ID
+ * can point the site at a different network.
+ */
+const DERIVED_ESCROW_OK_CHAINS = new Map<string, number>([['giwa_sepolia', 91342]]);
+
+/** Said once per process, not per call. */
+let warnedAboutDerivedEscrow = false;
+
+/** Escrow signer. Prefer ESCROW_PRIVATE_KEY (dedicated key). */
+export function getEscrowWallet(
+  chain: Pick<WebChain, 'id' | 'chainId'>,
+  provider?: ethers.Provider
+): ethers.Wallet {
   const explicit = process.env.ESCROW_PRIVATE_KEY || '';
   let wallet: ethers.Wallet;
   if (explicit && !/^your_/i.test(explicit) && !explicit.includes('placeholder')) {
@@ -79,10 +99,31 @@ function getEscrowWallet(provider: ethers.Provider): ethers.Wallet {
     if (!ops) {
       throw new Error('ESCROW_PRIVATE_KEY or PRIVATE_KEY required for claim payout');
     }
+
+    // DEFAULT_CHAIN is the bot's chain selector. When the site carries it too,
+    // it must name the same allowed chain the site is paying on.
+    const chainKey = String(process.env.DEFAULT_CHAIN || chain.id || '');
+    const allowedChainId = DERIVED_ESCROW_OK_CHAINS.get(chainKey);
+    if (chainKey !== chain.id || allowedChainId === undefined || allowedChainId !== chain.chainId) {
+      throw new Error(
+        `ESCROW_PRIVATE_KEY is required on ${chainKey || 'this chain'} (chain id ${chain.chainId}). ` +
+          'Escrow may only be derived from the ops key on a testnet, because deriving it means ' +
+          'one stolen key empties both gas and every pending claim.'
+      );
+    }
+
+    if (!warnedAboutDerivedEscrow) {
+      warnedAboutDerivedEscrow = true;
+      console.warn(
+        `[escrow] ESCROW_PRIVATE_KEY is not set; the escrow key is derived from the ops key on ${chainKey}. ` +
+          'One stolen key empties both. Set a dedicated ESCROW_PRIVATE_KEY.'
+      );
+    }
+
     const material = ethers.keccak256(ethers.toUtf8Bytes(`flizy:escrow:v1:${ops}`));
     wallet = new ethers.Wallet(material);
   }
-  return wallet.connect(provider);
+  return provider ? wallet.connect(provider) : wallet;
 }
 
 function gasBufferWei(): bigint {
@@ -271,7 +312,7 @@ export async function executeWebClaimPayout(p: {
     // Touch derivation so secret is validated even if we only send TO the address
     void deriveAgentPrivateKey(accountId);
 
-    const escrow = getEscrowWallet(provider);
+    const escrow = getEscrowWallet(chain, provider);
     const gasBuffer = gasBufferWei();
     const escEth = await provider.getBalance(escrow.address);
     const tokenAddr = held.token_address && ethers.isAddress(String(held.token_address))

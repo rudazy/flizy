@@ -1,12 +1,16 @@
 /**
  * In-memory stand-in for the supabase-js query builder.
  *
- * Covers only what lib/identity.js uses: select/insert/update with eq/is/in,
- * limit, order, maybeSingle, single, and awaiting the builder directly.
+ * Covers what the app actually calls: select, insert, update, upsert and delete;
+ * the filters eq, is, in, ilike, gt, gte, lt, lte and not; limit, order (a
+ * no-op), maybeSingle, single, `select(cols, { count, head })`, and awaiting the
+ * builder directly.
  *
- * Database-side rules (the one-phone-one-account trigger, unique indexes) are
- * NOT simulated here. Tests against this fake prove the application guard; the
- * trigger in 20260725100000_channel_identities.sql is the second layer.
+ * Database-side rules are NOT simulated: no triggers, no CHECK constraints, no
+ * unique indexes, and therefore no unique-violation races. Tests against this
+ * fake prove the application guard only. The second layer is the schema itself
+ * (triggers, indexes, constraints), and that has to be proven against a real
+ * development database, not here.
  */
 
 let seq = 1;
@@ -38,6 +42,8 @@ class Query {
     this.op = 'select';
     this.payload = null;
     this.limitN = null;
+    this.countMode = null;
+    this.headOnly = false;
   }
 
   get rows() {
@@ -45,8 +51,19 @@ class Query {
     return this.db.tables[this.table];
   }
 
-  select() {
+  /**
+   * `select(cols, { count, head })`.
+   *
+   * Columns are ignored, as they always were: this fake returns whole rows and
+   * the code under test reads the fields it asked for. The options are not
+   * ignored, because `{ count: 'exact', head: true }` is how the real client is
+   * asked "how many", and code that numbers a row from that count would other-
+   * wise see undefined here and take a branch production never takes.
+   */
+  select(_cols, opts) {
     if (this.op === 'select') this.op = 'select';
+    if (opts && opts.count) this.countMode = String(opts.count);
+    if (opts && opts.head) this.headOnly = true;
     return this;
   }
 
@@ -180,7 +197,17 @@ class Query {
   run() {
     if (this.op === 'insert') {
       const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
-      const created = rows.map((row) => ({ id: newId(this.table), ...row }));
+      const created = rows.map((row) => {
+        const made = { id: newId(this.table), ...row };
+        // Fill a sequence column the database would have filled.
+        const col = this.db.sequences[this.table];
+        if (col && made[col] == null) {
+          const next = (this.db.nextSeq[this.table] || 99) + 1;
+          this.db.nextSeq[this.table] = next;
+          made[col] = next;
+        }
+        return made;
+      });
       this.rows.push(...created);
       return { data: created, error: null };
     }
@@ -218,6 +245,11 @@ class Query {
 
     let hits = this.matching().map((r) => this.decorate(r));
     if (this.limitN != null) hits = hits.slice(0, this.limitN);
+    // head:true means the caller wants the count and no rows, which is what the
+    // real client returns: data is null, not an empty array.
+    if (this.countMode) {
+      return { data: this.headOnly ? null : hits, error: null, count: this.matching().length };
+    }
     return { data: hits, error: null };
   }
 
@@ -247,8 +279,20 @@ class Query {
 /**
  * @param {Record<string, object[]>} [seed]
  */
-function createFakeSupabase(seed = {}) {
-  const db = { tables: { accounts: [], channel_identities: [], link_codes: [], users: [], ...seed } };
+/**
+ * @param {object} [seed] starting rows, keyed by table
+ * @param {{ sequences?: Record<string, string> }} [opts]
+ *   sequences maps a table to a column filled by a Postgres sequence, e.g.
+ *   { tasks: 'ref' }. Opt-in and explicit: a default the database supplies is
+ *   invisible to this fake, and a test whose ids all come back undefined fails
+ *   for a reason that has nothing to do with what it was checking.
+ */
+function createFakeSupabase(seed = {}, opts = {}) {
+  const db = {
+    tables: { accounts: [], channel_identities: [], link_codes: [], users: [], ...seed },
+    sequences: { ...(opts.sequences || {}) },
+    nextSeq: {},
+  };
 
   /**
    * Stand-ins for the Postgres functions in
@@ -318,6 +362,20 @@ function createFakeSupabase(seed = {}) {
 
       row.balance_eth = Number(row.balance_eth || 0) + amount;
       return { data: [{ success: true, new_balance: row.balance_eth }], error: null };
+    },
+
+    /** 20260925010000_tasks.sql: entries per task, tasks with none absent. */
+    task_participant_counts({ p_task_ids }) {
+      const wanted = new Set((p_task_ids || []).map(String));
+      const counts = new Map();
+      for (const s of db.tables.task_submissions || []) {
+        const id = String(s.task_id);
+        if (wanted.has(id)) counts.set(id, (counts.get(id) || 0) + 1);
+      }
+      return {
+        data: [...counts].map(([task_id, participants]) => ({ task_id, participants })),
+        error: null,
+      };
     },
   };
 

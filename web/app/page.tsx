@@ -18,12 +18,12 @@ const AUDIENCE = [
   {
     mark: 'F',
     t: 'For the people you pay',
-    d: 'They receive only if you already saved their address. Nothing to install on their side.',
+    d: 'Pay their Flizy username, or, even before they join, their phone number, email, GitHub or X handle. Nothing to install on their side.',
   },
   {
     mark: 'W',
     t: 'One wallet, everywhere',
-    d: 'The same Flizy wallet on the site and in chat. Permanent, never rotated.',
+    d: 'The same Flizy wallet on the site and in chat. Your Flizy address stays the same when your keys change.',
   },
 ];
 
@@ -34,7 +34,7 @@ const WHY = [
   },
   {
     t: 'Trusted list',
-    d: 'Only names you save can receive funds. Managed on the site or via flizy add wallet.',
+    d: "Raw wallet addresses only work once you've saved them on the site with your password, and a new one waits 24 hours before it can receive. In chat, flizy add wallet gives you a link, and you finish on the site with your password.",
   },
   {
     t: 'Your wallet sends',
@@ -75,17 +75,17 @@ export default function HomePage() {
             Send crypto on WhatsApp and Telegram.
             <br />
             <span className="bg-gradient-to-r from-[#e8c45a] to-[#c4893f] bg-clip-text text-transparent">
-              Only to people you trust.
+              By phone number, email or username.
             </span>
           </h1>
 
           <p className="mt-6 max-w-xl font-sans text-base leading-relaxed text-paper md:mt-8 md:text-xl">
-            A stolen phone cannot add a new destination.
+            New wallet addresses are saved on the site with your password, and wait 24 hours
+            before they can receive.
           </p>
 
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted md:text-lg">
-            You approve who you are allowed to pay here on the site. In chat, you just send. One
-            account works on both apps.
+            In chat, you just send. One account works on both apps.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3 md:mt-10">
@@ -147,8 +147,9 @@ export default function HomePage() {
               you confirm with a button.
             </p>
             <p className="mt-4 text-sm leading-relaxed text-muted">
-              <span className="text-paper">nald</span> is a name you saved on the site. If it is not
-              on your list, the send does not happen — from any device, on any chat.
+              Pay a Flizy @username, or pay anyone by phone number, email, GitHub or X handle. If
+              they&apos;re not on Flizy yet, the money waits for them, and you can cancel it from chat
+              any time before they claim.
             </p>
           </div>
         </div>

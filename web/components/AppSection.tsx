@@ -8,8 +8,9 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { classifyTap } from '../lib/tapGesture.ts';
 
 /**
  * Page column rhythm, and the link in the height chain.
@@ -227,6 +228,53 @@ export function AppStatusCell({
     <div className="border-b border-r border-border px-3 py-3 last:border-r-0 sm:border-b-0">
       {inner}
     </div>
+  );
+}
+
+/**
+ * Same cell as AppStatusCell, but one tap and two taps do different things.
+ *
+ * The single-tap action runs inside the tap itself, not after the double-tap
+ * window: a clipboard write outside the user gesture can be refused (iOS Safari
+ * does). So the first tap of a double tap also runs it, which suits an action
+ * like a copy that is harmless to repeat before the second tap navigates.
+ */
+export function AppStatusTap({
+  label,
+  value,
+  hint,
+  onSingle,
+  onDouble,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  onSingle: () => void;
+  onDouble: () => void;
+}) {
+  const armedAt = useRef<number | null>(null);
+
+  function press() {
+    const now = Date.now();
+    if (armedAt.current != null && classifyTap(now - armedAt.current) === 'double') {
+      armedAt.current = null;
+      onDouble();
+      return;
+    }
+    armedAt.current = now;
+    onSingle();
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={press}
+      aria-label={`${label}: ${value}. ${hint}`}
+      className="w-full touch-manipulation select-none border-b border-r border-border bg-transparent px-3 py-3 text-left font-[inherit] last:border-r-0 hover:bg-white/[0.02] focus-visible:outline focus-visible:outline-1 focus-visible:outline-lime sm:border-b-0"
+    >
+      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">{label}</p>
+      <p className="mt-1 truncate font-sans text-sm tracking-wide text-paper">{value}</p>
+    </button>
   );
 }
 

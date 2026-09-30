@@ -1,20 +1,21 @@
 /**
  * Rolling-window cap on site swaps.
  *
- * This replaces the account-password prompt that used to sit on
- * POST /api/swap/execute. The password came off because a swap cannot move
- * value to a third party: the route hardcodes `recipient: signer.address` and
- * never takes slippage from the caller (quoteSwap falls back to
- * SWAP_SLIPPAGE_BPS), so the worst a stolen session can do here is churn the
+ * This stands in for the account-password prompt on ETH/FLZ swaps only. On
+ * that pair the route hardcodes `recipient: signer.address`, and the only pool
+ * is the one Flizy controls, so the worst a stolen session can do is churn the
  * account's own balance at ~0.60% + gas a round trip. That is griefing, not
  * theft, and this cap is sized against griefing.
  *
+ * A fixed recipient is not enough on its own. Any other token trades against a
+ * pool someone else can seed and drain, which moves value off the account, so
+ * those swaps need the password as well (web/lib/swapGate.ts).
+ *
  * The password stays on every route that CAN move value or widen authority:
  * trusted (the only route that adds a payout address), pay/execute, pin,
- * limits, identity, and swap/liquidity. Do not copy this file's reasoning onto
- * any of those — it holds only because the destination is fixed to the caller's
- * own wallet. If a recipient argument is ever added to the swap route, the
- * password has to come back with it.
+ * limits, identity, swap/liquidity, and swaps of unverified tokens. Do not copy
+ * this file's reasoning onto any of those. If a recipient argument is ever
+ * added to the swap route, the password has to come back with it.
  *
  * Database-backed, like web/lib/callbackLimiter.ts and for the same reason: a
  * Map in module scope enforces nothing on Vercel, where every serverless

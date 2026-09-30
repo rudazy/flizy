@@ -25,6 +25,7 @@ import {
   validateUsername,
 } from '../../../../../lib/username';
 import { apiErrorBody } from '../../../../../lib/apiError';
+import { isHandleTakenByProject } from '../../../../../lib/tasks';
 
 const ROUTE = 'GET /api/account/username/check';
 
@@ -46,7 +47,12 @@ export async function GET(req: Request) {
 
     const supabase = getSupabase();
 
-    if (await isUsernameReserved(supabase, check.username)) {
+    // A project handle shares the namespace, and the set route refuses it, so
+    // the picker must not call it available.
+    if (
+      (await isUsernameReserved(supabase, check.username)) ||
+      (await isHandleTakenByProject(check.username, supabase))
+    ) {
       return NextResponse.json({ available: false, reason: USERNAME_UNAVAILABLE });
     }
 

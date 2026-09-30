@@ -4,8 +4,20 @@ import { getSupabase } from '../../../lib/supabase';
 import { getDexAddresses } from '../../../lib/dexServer';
 import { apiErrorBody } from '../../../lib/apiError';
 import { loadNftHoldings } from '../../../lib/listedNfts.ts';
+import { listAccountTokens } from '../../../lib/accountTokens';
 
 const ROUTE = 'GET /api/holdings';
+
+const TOKEN_READ_BATCH = 8;
+const TOKEN_READ_MS = 8000;
+
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('token read timed out')), ms);
+  });
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
+}
 
 export async function GET() {
   try {
@@ -40,6 +52,8 @@ export async function GET() {
       address: string | null;
       balance: string | null;
       error?: string;
+      verified?: boolean;
+      added?: boolean;
     }> = [];
     let nfts: Awaited<ReturnType<typeof loadNftHoldings>> = [];
 
@@ -54,9 +68,13 @@ export async function GET() {
       };
 
       // Always include FLZ from deployed DEX addresses (not env-only)
-      const tracked: Array<{ address: string; symbol: string; decimals: number | null }> = [
-        { address: dex.flz, symbol: 'FLZ', decimals: 18 },
-      ];
+      const tracked: Array<{
+        address: string;
+        symbol: string;
+        decimals: number | null;
+        verified?: boolean;
+        added?: boolean;
+      }> = [{ address: dex.flz, symbol: 'FLZ', decimals: 18, verified: true }];
       const raw = process.env.TRACKED_TOKENS || '';
       for (const part of raw
         .split(',')
@@ -73,32 +91,65 @@ export async function GET() {
         });
       }
 
+      // Added tokens are extra rows, not the balance. If they cannot be read,
+      // the wallet still shows ETH, FLZ and NFTs instead of failing whole.
+      let saved: Awaited<ReturnType<typeof listAccountTokens>> = [];
+      try {
+        saved = await listAccountTokens(accountId);
+      } catch {
+        // listAccountTokens throws one fixed message, so there is nothing more to log.
+        console.warn(`[${ROUTE}] added tokens unavailable`);
+      }
+      for (const row of saved) {
+        if (tracked.some((t) => t.address.toLowerCase() === row.address.toLowerCase())) continue;
+        tracked.push({
+          address: row.address,
+          symbol: row.symbol,
+          decimals: row.decimals,
+          verified: false,
+          added: true,
+        });
+      }
+
       const erc20Abi = [
         'function balanceOf(address) view returns (uint256)',
         'function decimals() view returns (uint8)',
         'function symbol() view returns (string)',
       ];
-      for (const t of tracked) {
+      // Up to 50 added tokens plus the tracked ones. Read in small parallel
+      // batches, each with its own deadline, so one slow or hostile contract
+      // cannot hold the whole response until the platform timeout.
+      const readToken = async (t: (typeof tracked)[number]) => {
         try {
           const c = new ethers.Contract(t.address, erc20Abi, provider);
-          const [b, d, s] = await Promise.all([
-            c.balanceOf(wallet),
-            t.decimals != null ? Promise.resolve(t.decimals) : c.decimals(),
-            t.symbol ? Promise.resolve(t.symbol) : c.symbol(),
-          ]);
-          tokens.push({
+          const [b, d, s] = await withDeadline(
+            Promise.all([
+              c.balanceOf(wallet),
+              t.decimals != null ? Promise.resolve(t.decimals) : c.decimals(),
+              t.symbol ? Promise.resolve(t.symbol) : c.symbol(),
+            ]),
+            TOKEN_READ_MS
+          );
+          return {
             symbol: String(s),
             address: t.address,
             balance: ethers.formatUnits(b, Number(d)),
-          });
+            verified: t.verified === true,
+            added: t.added === true,
+          };
         } catch {
-          tokens.push({
+          return {
             symbol: t.symbol || 'TOKEN',
             address: t.address,
             balance: null,
             error: 'Could not read',
-          });
+            verified: t.verified === true,
+            added: t.added === true,
+          };
         }
+      };
+      for (let i = 0; i < tracked.length; i += TOKEN_READ_BATCH) {
+        tokens.push(...(await Promise.all(tracked.slice(i, i + TOKEN_READ_BATCH).map(readToken))));
       }
 
       nfts = await loadNftHoldings(provider, wallet);
@@ -114,7 +165,7 @@ export async function GET() {
         nfts,
         note:
           tokens.length === 0 && !nfts.length
-            ? 'Native balance shown. FLZ appears once your Flizy wallet is funded and DEX is live.'
+            ? 'Native balance shown. Add a token contract on Balances to see a deposit other than ETH.'
             : null,
       },
     });

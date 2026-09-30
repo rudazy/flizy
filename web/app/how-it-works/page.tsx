@@ -11,9 +11,9 @@ import { pageMetadata } from '../../lib/seo';
 import { siteOrigin } from '../../lib/siteOrigin';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'How Flizy works — send crypto on WhatsApp & Telegram',
+  title: 'How Flizy works: send crypto on WhatsApp & Telegram',
   description:
-    'Set up Flizy once on the web, then send crypto from WhatsApp or Telegram to people you trust. Account, funding, link code, and everyday chat sends.',
+    'Set up Flizy once on the web, then send crypto from WhatsApp or Telegram. Account, funding, link code, and everyday chat sends.',
   path: '/how-it-works',
 });
 

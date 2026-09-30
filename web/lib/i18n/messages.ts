@@ -47,6 +47,7 @@ const en = {
   'nav.home': 'Home',
   'nav.wallet': 'Wallet',
   'nav.history': 'History',
+  'nav.explore': 'Explore',
   'nav.account': 'Account',
   'nav.swap': 'Swap',
 
@@ -113,6 +114,7 @@ const ko: Record<MessageKey, string> = {
   'nav.home': '홈',
   'nav.wallet': '지갑',
   'nav.history': '기록',
+  'nav.explore': '탐색',
   'nav.account': '계정',
   'nav.swap': '스왑',
 
@@ -176,6 +178,7 @@ const zh: Record<MessageKey, string> = {
   'nav.home': '首页',
   'nav.wallet': '钱包',
   'nav.history': '记录',
+  'nav.explore': '探索',
   'nav.account': '账户',
   'nav.swap': '兑换',
 

@@ -89,6 +89,25 @@ export function isAllowedSwapRouter(address: string): boolean {
   return a === d.feeRouter.toLowerCase() || a === d.dexRouter.toLowerCase();
 }
 
+/** Native ETH is 18. FLZ and WETH are 18. Anything else is read from the contract. */
+export async function readErc20Decimals(
+  provider: ethers.Provider,
+  address: string | null
+): Promise<number> {
+  if (address == null) return 18;
+  const known = getDexAddresses();
+  const lower = address.toLowerCase();
+  if (lower === known.flz.toLowerCase() || lower === known.wrappedNative.toLowerCase()) return 18;
+  const contract = new ethers.Contract(address, ['function decimals() view returns (uint8)'], provider);
+  try {
+    const n = Number(await contract.decimals());
+    if (!Number.isInteger(n) || n < 0 || n > 36) throw new Error('bad');
+    return n;
+  } catch {
+    throw new Error('Token decimals could not be read');
+  }
+}
+
 /** null = native ETH */
 export function resolveToken(symbolOrAddress: string): string | null {
   const raw = String(symbolOrAddress || '').trim();
@@ -247,8 +266,6 @@ export async function executeSwap(args: {
     await ensureAllowance(token, args.signer, d.feeRouter, args.amountIn);
     tx = await feeRouter.swapExactTokensForETH(args.amountIn, args.amountOutMinWei, path, to, deadline);
   } else {
-    const token = new ethers.Contract(args.tokenIn!, ERC20_ABI, args.signer);
-    await ensureAllowance(token, args.signer, d.feeRouter, args.amountIn);
     throw new Error('Token-to-token swaps are not exposed on the site yet. Use buy or sell.');
   }
   const receipt = await tx.wait(1);

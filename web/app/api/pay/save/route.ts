@@ -7,6 +7,7 @@ import { requirePassword } from '../../../../lib/passwordGate.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
 import { notifyAllChannels } from '../../../../lib/notifyChannels';
+import { displaySafeLabel } from '../../../../lib/sanitize.ts';
 
 /** Short form for a notification, where the full 0x is noise. */
 function shortAddress(address: string): string {
@@ -52,13 +53,17 @@ export async function POST(req: Request) {
     if (!to) {
       return NextResponse.json({ error: 'That account has no wallet yet.' }, { status: 400 });
     }
-    const label = merchant.username || merchant.displayName || 'merchant';
+    // The label is another user's text and ends up in a notification body.
+    // displaySafeLabel flattens control characters and newlines, and braces are
+    // dropped so it can never carry a {{cmd:}} marker into the outbox.
+    const label =
+      displaySafeLabel(String(merchant.username || merchant.displayName || '').replace(/[{}]/g, '')) ||
+      'merchant';
     const row = await addTrusted(payerId, to, label);
 
-    // This route is the third writer to the trusted list, and the caller sweep
-    // for the hold work found it announcing nothing. A destination the owner is
-    // never told about can sit out its 24 hours unnoticed, which is most of the
-    // value of having a hold at all. Same outbox as everywhere else.
+    // Every writer to the trusted list announces the new destination. One the
+    // owner is never told about can sit out its 24 hours unnoticed, which is
+    // most of the value of having a hold at all. Same outbox as everywhere else.
     await notifyAllChannels(
       payerId,
       [

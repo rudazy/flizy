@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { track } from '../../lib/analytics';
@@ -16,12 +16,30 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [needsCode, setNeedsCode] = useState(false);
+  const [devCode, setDevCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setNext(safeNext(new URLSearchParams(window.location.search).get('next')));
   }, []);
+
+  /**
+   * Put the cursor in the code box the moment it appears.
+   *
+   * Logging in can be two steps. The second inserts a field between the
+   * password and the button, relabels the button and disables it until six
+   * digits are typed. Somebody who does not notice the new field presses the
+   * button again, nothing happens, and login looks broken.
+   *
+   * Moving the cursor there says what changed without a word of copy.
+   */
+  const codeRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!needsCode) return;
+    codeRef.current?.focus();
+    codeRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [needsCode]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,6 +60,10 @@ export function LoginForm() {
       if (data.needsCode) {
         setNeedsCode(true);
         setCode('');
+        // Only ever present on a development build: with no mail transport the
+        // server returns the code instead of sending it. Without it the code
+        // box would have nothing that could fill it.
+        setDevCode(typeof data.devCode === 'string' ? data.devCode : '');
         return;
       }
       track('login_completed');
@@ -100,10 +122,18 @@ export function LoginForm() {
         </div>
         {needsCode ? (
           <div>
+            {/*
+              Stated as a step, in the same place errors appear, so the change of
+              state is visible rather than implied by a relabelled button.
+            */}
+            <div className="alert mb-3 text-sm" role="status">
+              One more step. Enter the code below to finish signing in.
+            </div>
             <label className="label" htmlFor="login-code">
               Login code
             </label>
             <input
+              ref={codeRef}
               id="login-code"
               className="input font-mono"
               inputMode="numeric"
@@ -114,6 +144,11 @@ export function LoginForm() {
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               required
             />
+            {devCode ? (
+              <p className="mt-1.5 font-mono text-xs text-lime">
+                Local build, no mail configured. Your code is {devCode}
+              </p>
+            ) : null}
             <p className="mt-1.5 text-xs text-muted">
               We emailed a code because this is a new browser or it has been a while. It expires
               in 15 minutes.

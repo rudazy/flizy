@@ -181,21 +181,47 @@ describe('the build is wired for it', () => {
     assert.match(NEXT_CONFIG, /removeDebugLogging: true/);
   });
 
-  it('lets the browser reach the ingest host, or CSP would block every report', () => {
-    assert.match(NEXT_CONFIG, /connect-src 'self'[^`]*\$\{\s*sentryOrigin/);
+  it('lets the browser reach the ingest host, or CSP would block every report', async () => {
+    // The host is built in the policy module. The config's job is to pass the
+    // public DSN through, or a deploy with reporting on would still be blocked.
+    assert.match(
+      NEXT_CONFIG,
+      /contentSecurityPolicy\(\{[\s\S]*dsn: process\.env\.NEXT_PUBLIC_SENTRY_DSN/
+    );
+    const { contentSecurityPolicy } = await import('../web/lib/contentSecurityPolicy.mjs');
+    const header = contentSecurityPolicy({
+      dev: false,
+      dsn: 'https://public@o123.ingest.sentry.io/1',
+    });
+    assert.match(header, /connect-src[^;]*https:\/\/o123\.ingest\.sentry\.io/);
   });
 
-  it('derives that host from the DSN and adds nothing when there is none', () => {
-    assert.match(NEXT_CONFIG, /return url\.origin;/);
-    assert.match(NEXT_CONFIG, /if \(!dsn\) return '';/);
-    assert.match(NEXT_CONFIG, /sentryOrigin \? ` \$\{sentryOrigin\}` : ''/);
+  it('derives that host from the DSN and adds nothing when there is none', async () => {
+    const { contentSecurityPolicy } = await import('../web/lib/contentSecurityPolicy.mjs');
+    const bare = contentSecurityPolicy({ dev: false, dsn: '' });
+    const named = contentSecurityPolicy({
+      dev: false,
+      dsn: 'https://public@o123.ingest.sentry.io/1',
+    });
+    assert.doesNotMatch(bare, /ingest\.sentry\.io/);
+    assert.match(named, /https:\/\/o123\.ingest\.sentry\.io/);
   });
 
-  it('puts only an https origin in the header', () => {
+  it('puts only an https origin in the header', async () => {
     // A javascript: or data: DSN parses and its origin is the string "null",
     // which would land in connect-src as a bare token. An http: one would name
     // a plaintext endpoint in a policy that ends in upgrade-insecure-requests.
-    assert.match(NEXT_CONFIG, /if \(url\.protocol !== 'https:'\) return '';/);
+    const { sentryIngestOrigin, contentSecurityPolicy } = await import(
+      '../web/lib/contentSecurityPolicy.mjs'
+    );
+    assert.equal(sentryIngestOrigin('http://o123.ingest.sentry.io/1'), '');
+    assert.equal(sentryIngestOrigin('javascript:alert(1)'), '');
+    assert.equal(sentryIngestOrigin('data:text/plain,hi'), '');
+    const header = contentSecurityPolicy({
+      dev: false,
+      dsn: 'http://o123.ingest.sentry.io/1',
+    });
+    assert.doesNotMatch(header, /o123\.ingest\.sentry\.io/);
   });
 
   it('cannot inject into the header, whatever the DSN says', () => {

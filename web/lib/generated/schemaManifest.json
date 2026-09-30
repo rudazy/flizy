@@ -4,9 +4,21 @@
   "objects": [
     {
       "kind": "function",
+      "name": "account_tokens_before_insert",
+      "providedBy": "20260929140000_account_tokens.sql",
+      "requiredBy": "executed by trigger account_tokens_before_insert"
+    },
+    {
+      "kind": "function",
       "name": "accounts_enforce_username_not_reserved",
       "providedBy": "20260811000000_reserved_usernames.sql",
       "requiredBy": "executed by trigger accounts_username_not_reserved"
+    },
+    {
+      "kind": "function",
+      "name": "accounts_username_not_project_handle",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "executed by trigger accounts_username_not_project_handle"
     },
     {
       "kind": "function",
@@ -40,6 +52,12 @@
     },
     {
       "kind": "function",
+      "name": "projects_handle_not_username",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "executed by trigger projects_handle_not_username"
+    },
+    {
+      "kind": "function",
       "name": "release_account_tx_lock",
       "providedBy": "20260827000000_account_tx_locks.sql",
       "requiredBy": "web/lib/accountTxLock.ts"
@@ -55,6 +73,18 @@
       "name": "set_updated_at",
       "providedBy": "20260721000000_create_users.sql",
       "requiredBy": "executed by trigger accounts_set_updated_at"
+    },
+    {
+      "kind": "function",
+      "name": "task_participant_counts",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "web/lib/tasks.ts"
+    },
+    {
+      "kind": "function",
+      "name": "task_submissions_window",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "executed by trigger task_submissions_window_check"
     },
     {
       "kind": "function",
@@ -88,21 +118,39 @@
     },
     {
       "kind": "table",
+      "name": "account_tokens",
+      "providedBy": "20260929140000_account_tokens.sql",
+      "requiredBy": "web/lib/accountTokens.ts"
+    },
+    {
+      "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/claimPayout.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts"
+      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/copySetup.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/tasks.ts"
     },
     {
       "kind": "table",
       "name": "channel_identities",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/invite.ts, web/lib/notifyChannels.ts, web/lib/pendingClaims.ts"
+      "requiredBy": "web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/invite.ts, web/lib/notifyChannels.ts, web/lib/pendingClaims.ts, web/lib/tasks.ts"
     },
     {
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
       "requiredBy": "web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts"
+    },
+    {
+      "kind": "table",
+      "name": "copy_setups",
+      "providedBy": "20260929120000_copy_setups.sql",
+      "requiredBy": "web/lib/copySetup.ts"
+    },
+    {
+      "kind": "table",
+      "name": "copy_wallets",
+      "providedBy": "20260929120000_copy_setups.sql",
+      "requiredBy": "web/lib/copySetup.ts"
     },
     {
       "kind": "table",
@@ -178,6 +226,12 @@
     },
     {
       "kind": "table",
+      "name": "projects",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "web/lib/tasks.ts"
+    },
+    {
+      "kind": "table",
       "name": "reserved_usernames",
       "providedBy": "20260811000000_reserved_usernames.sql",
       "requiredBy": "web/lib/username.ts"
@@ -187,6 +241,36 @@
       "name": "sessions",
       "providedBy": "20260721120000_phase_full_features.sql",
       "requiredBy": "web/lib/passwordGate.ts"
+    },
+    {
+      "kind": "table",
+      "name": "task_links",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "web/lib/tasks.ts"
+    },
+    {
+      "kind": "table",
+      "name": "task_requirements",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "web/lib/tasks.ts"
+    },
+    {
+      "kind": "table",
+      "name": "task_submissions",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "web/lib/tasks.ts"
+    },
+    {
+      "kind": "table",
+      "name": "task_winners",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "web/lib/tasks.ts"
+    },
+    {
+      "kind": "table",
+      "name": "tasks",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "web/lib/tasks.ts"
     },
     {
       "kind": "table",
@@ -214,8 +298,20 @@
     },
     {
       "kind": "trigger",
+      "name": "account_tokens_before_insert",
+      "providedBy": "20260929140000_account_tokens.sql",
+      "requiredBy": "trigger on account_tokens"
+    },
+    {
+      "kind": "trigger",
       "name": "accounts_set_updated_at",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "trigger on accounts"
+    },
+    {
+      "kind": "trigger",
+      "name": "accounts_username_not_project_handle",
+      "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "trigger on accounts"
     },
     {
@@ -253,6 +349,18 @@
       "name": "invite_phone_claims_no_update",
       "providedBy": "20260813000000_invite_attribution.sql",
       "requiredBy": "trigger on invite_phone_claims"
+    },
+    {
+      "kind": "trigger",
+      "name": "projects_handle_not_username",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "trigger on projects"
+    },
+    {
+      "kind": "trigger",
+      "name": "task_submissions_window_check",
+      "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "trigger on task_submissions"
     },
     {
       "kind": "trigger",

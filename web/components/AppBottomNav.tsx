@@ -25,6 +25,15 @@ const LEFT_TABS: Array<{
   },
 ];
 
+/*
+ * History is not in the bar: it is a Wallet slide rendering the same
+ * ActivityPanels, so a tab for it would occupy a slot twice. /dashboard/history
+ * stays a live route because links to it are already out there.
+ *
+ * Explore takes the slot rather than becoming a sixth tab. At 360px a sixth item
+ * leaves about 52px per tab around the Swap pill, under the 44px tap target once
+ * padding is counted, and the bar is the one piece of chrome on every screen.
+ */
 const RIGHT_TABS: Array<{
   href: string;
   labelKey: MessageKey;
@@ -32,10 +41,10 @@ const RIGHT_TABS: Array<{
   icon: (p: { active: boolean }) => JSX.Element;
 }> = [
   {
-    href: '/dashboard/history',
-    labelKey: 'nav.history',
-    match: (p: string) => p.startsWith('/dashboard/history'),
-    icon: HistoryIcon,
+    href: '/dashboard/explore',
+    labelKey: 'nav.explore',
+    match: (p: string) => p.startsWith('/dashboard/explore'),
+    icon: ExploreIcon,
   },
   {
     href: '/dashboard/account',
@@ -210,16 +219,17 @@ function WalletIcon({ active }: { active: boolean }) {
   );
 }
 
-function HistoryIcon({ active }: { active: boolean }) {
+function ExploreIcon({ active }: { active: boolean }) {
+  // A compass: discovery rather than a magnifier, which would read as search.
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth={active ? 2 : 1.5} />
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth={active ? 2 : 1.5} />
       <path
-        d="M12 8v4.5l3 1.5"
+        d="M14.8 9.2l-1.9 4.1-4.1 1.9 1.9-4.1 4.1-1.9z"
         stroke="currentColor"
         strokeWidth={active ? 2 : 1.5}
-        strokeLinecap="round"
         strokeLinejoin="round"
+        fill={active ? 'currentColor' : 'none'}
       />
     </svg>
   );

@@ -15,6 +15,7 @@ import { LanguageSelect, useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { shortAddr } from '../../../lib/dashboardTypes';
 import { PayIdentity } from '../../../components/PayIdentity';
+import { AccountProjects } from '../../../components/AccountProjects';
 import type { LocaleCode } from '../../../lib/locale';
 import {
   clearAwaitingChatLink,
@@ -25,6 +26,7 @@ import {
 
 const SLIDES = [
   'profile',
+  'projects',
   'pay',
   'language',
   'chat',
@@ -361,6 +363,10 @@ export default function AccountPage() {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error || 'Could not send code');
+    // A development build has no mail transport, so the server hands the code
+    // back instead of sending it. Every other caller of this pattern dropped it
+    // and left a code box nothing could fill; say it out loud here instead.
+    if (body.devCode) setMsg(`Local build, no mail configured. Your code is ${body.devCode}`);
     return body;
   }
 
@@ -436,6 +442,7 @@ export default function AccountPage() {
       label: t('account.profile'),
       badge: data.account.username ? `@${data.account.username}` : undefined,
     },
+    { id: 'projects', label: 'Projects' },
     { id: 'pay', label: 'Pay me', badge: data.pay?.username ? `@${data.pay.username}` : undefined },
     { id: 'language', label: t('account.language') },
     { id: 'chat', label: 'Chat', badge: data.link ? undefined : '!' },
@@ -626,6 +633,11 @@ export default function AccountPage() {
                     setVerifyTarget(String(extraEmail || '').trim().toLowerCase());
                     setAddEmailStep('code');
                     setVerifyCode('');
+                    // Same reason as requestEmailCode: on a local build the code
+                    // comes back here rather than by email.
+                    if (body.devCode) {
+                      setMsg(`Local build, no mail configured. Your code is ${body.devCode}`);
+                    }
                   } catch (err) {
                     setMsg(err instanceof Error ? err.message : 'Could not add email');
                   } finally {
@@ -767,6 +779,8 @@ export default function AccountPage() {
           </div>
         </AppSection>
       ) : null}
+
+      {slide === 'projects' ? <AccountProjects /> : null}
 
       {slide === 'pay' ? (
         <AppSection

@@ -2,12 +2,12 @@
  * History as a Wallet slide.
  *
  * The product lock of 2026-09-17 moves History out of the bottom bar and into
- * Wallet as a slide, freeing the bar slot that Explore is meant to take. This
- * is the first half of that: the slide exists, the tab still works, and both
- * render one component so they cannot drift apart.
+ * Wallet as a slide, freeing the bar slot that Explore is meant to take. The
+ * first half is the slide: it exists, the tab still works, and both render one
+ * component so they cannot drift apart.
  *
- * The second half, retargeting AppBottomNav, is deliberately NOT done, and one
- * test here asserts that so nobody assumes it shipped with this.
+ * The second half is the bar: Explore holds the slot History had. The tests
+ * below pin the bar as it is, and prove History is still reachable without it.
  *
  * Run: node --test test/walletHistorySlide.test.js
  */
@@ -67,7 +67,7 @@ describe('one implementation, two surfaces', () => {
   });
 });
 
-describe('what this change deliberately does not do', () => {
+describe('History survived leaving the bottom bar', () => {
   it('leaves /dashboard/history working, because links to it are already out there', () => {
     assert.ok(
       fs.existsSync(path.join(WEB, 'app', 'dashboard', 'history', 'page.tsx')),
@@ -75,10 +75,24 @@ describe('what this change deliberately does not do', () => {
     );
   });
 
-  it('does not retarget the bottom bar', () => {
-    // tasks/todo.md: "Do not retarget AppBottomNav or start Explore." Swapping
-    // the bar is the next step and needs its own decision, not a side effect.
-    assert.match(NAV, /nav\.history/);
-    assert.ok(!/explore/i.test(NAV), 'Explore appeared in the bar without that being the task');
+  it('the bar now carries Explore where History was', () => {
+    // Pins the bar, so a change to it is always a deliberate one.
+    assert.match(NAV, /nav\.explore/);
+    assert.match(NAV, /\/dashboard\/explore/);
+    assert.ok(
+      !/nav\.history/.test(NAV),
+      'History is still in the bar, so it occupies a slot twice'
+    );
+  });
+
+  it('History is still reachable, which is what made the swap safe', () => {
+    // Removing it from the bar is only acceptable because Wallet renders the
+    // same panels. If that slide ever goes, the bar change has to be revisited.
+    assert.match(WALLET, /slide === 'history' \? <ActivityPanels/);
+  });
+
+  it('no dead icon was left behind in the bar', () => {
+    // The History icon lost its only caller when the tab was swapped.
+    assert.ok(!/function HistoryIcon/.test(NAV), 'HistoryIcon is unused, so it should be gone');
   });
 });
