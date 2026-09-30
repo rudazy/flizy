@@ -319,7 +319,7 @@ export default function AccountPage() {
       setPin('');
       setPinPassword('');
       setMsg(
-        'Unlock PIN saved. In chat: flizy lock or /lock · flizy unlock or /unlock with PIN or password.'
+        'Unlock PIN saved. In chat: flizy lock or /lock, then flizy unlock or /unlock with your PIN.'
       );
     }
   }
@@ -1095,7 +1095,7 @@ export default function AccountPage() {
       {slide === 'pin' ? (
         <AppSection
           title="Unlock PIN"
-          helper="For flizy lock / unlock in chat. Password also works."
+          helper="For flizy lock / unlock in chat. Chat takes this PIN, never your password."
           badge={data.account.has_pin ? 'Set' : 'Required'}
           badgeTone={data.account.has_pin ? 'lime' : 'gold'}
         >
@@ -1136,7 +1136,7 @@ export default function AccountPage() {
 
       {slide === 'limits' ? (
         <AppSection
-          title="Daily send limit"
+          title="Daily ETH send limit"
           helper={`Current: ${currentLimit}`}
           badge="Policy"
         >
@@ -1146,10 +1146,11 @@ export default function AccountPage() {
               <input
                 className="input"
                 inputMode="decimal"
-                placeholder="e.g. 0.05 — empty clears"
+                placeholder="e.g. 0.05, leave empty for no limit"
                 value={dailyLimit}
                 onChange={(e) => setDailyLimitInput(e.target.value)}
               />
+              <p className="mt-1 text-xs text-muted">0 blocks every ETH send.</p>
             </div>
             <div>
               <label className="label">Account password</label>

@@ -4,6 +4,15 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
+// Policy reads the unlock state itself (lib/session.js sessionGate). The
+// database it reads is a fake, so no test here can reach a real one.
+const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+const fake = createFakeSupabase({
+  accounts: [{ id: 'acc1', unlock_pin_hash: null }],
+  sessions: [],
+});
+mockSupabaseModule({ from: (table) => fake.client.from(table) });
+
 const { createSwapIntent, createSendIntent } = require('../lib/engine/intent');
 const { evaluateSwapPolicy, evaluateSendPolicy } = require('../lib/engine/policy');
 const { buildSwapPlan, formatSwapPlanPreview } = require('../lib/engine/plan');
@@ -77,7 +86,7 @@ describe('evaluateSwapPolicy', () => {
 
   it('denies non-allowlisted router', async () => {
     const intent = createSwapIntent({
-      actor: { accountId: 'acc1', waSenderId: '1', sessionUnlocked: true },
+      actor: { accountId: 'acc1', waSenderId: '1', channel: 'whatsapp', externalId: '2348012345678' },
       amountIn: '0.01',
       routerAddress: '0x0000000000000000000000000000000000000001',
     });
@@ -91,8 +100,8 @@ describe('evaluateSwapPolicy', () => {
       actor: {
         accountId: 'acc1',
         waSenderId: '1',
-        sessionUnlocked: true,
-        hasPin: false,
+        channel: 'whatsapp',
+        externalId: '2348012345678',
       },
       amountIn: '0.01',
       tokenInLabel: 'ETH',

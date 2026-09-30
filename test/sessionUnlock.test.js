@@ -77,7 +77,7 @@ describe('unlockWithPin with mocked supabase', () => {
     if (originalCache) require.cache[sessionPath] = originalCache;
   });
 
-  it('accepts site password after re-fetch', async () => {
+  it('refuses the site password from chat, even when it is right', async () => {
     const { fake, session } = loadSession({
       accounts: [
         {
@@ -86,7 +86,15 @@ describe('unlockWithPin with mocked supabase', () => {
           unlock_pin_hash: hashPin('9999'),
         },
       ],
-      sessions: [],
+      sessions: [
+        {
+          account_id: 'acc-1',
+          channel: 'whatsapp',
+          external_id: '2348012345678',
+          is_locked: true,
+          expires_at: new Date(0).toISOString(),
+        },
+      ],
     });
 
     const res = await session.unlockWithPin(
@@ -95,8 +103,11 @@ describe('unlockWithPin with mocked supabase', () => {
       '2348012345678',
       'Secret1!'
     );
-    assert.equal(res.ok, true);
-    assert.equal(fake.db.tables.sessions[0].is_locked, false);
+    assert.equal(res.ok, false);
+    assert.equal(res.reason, 'bad_pin');
+    // Counted like any wrong PIN, and the locked session stays locked.
+    assert.equal(fake.db.tables.sessions[0].failed_pin_attempts, 1);
+    assert.equal(fake.db.tables.sessions[0].is_locked, true);
   });
 
   it('accepts unlock PIN', async () => {
@@ -115,7 +126,7 @@ describe('unlockWithPin with mocked supabase', () => {
     assert.equal(res.ok, true);
   });
 
-  it('rejects wrong secret', async () => {
+  it('tells an account with no PIN to set one, without counting a guess', async () => {
     const { session } = loadSession({
       accounts: [
         {
@@ -131,10 +142,10 @@ describe('unlockWithPin with mocked supabase', () => {
       { id: 'acc-1' },
       'whatsapp',
       '2348012345678',
-      'WrongPass1!'
+      'Secret1!'
     );
     assert.equal(res.ok, false);
-    assert.equal(res.reason, 'bad_pin');
+    assert.equal(res.reason, 'no_pin');
   });
 });
 

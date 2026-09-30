@@ -205,7 +205,7 @@ const CMD_GROUPS: Array<{
       {
         wa: 'flizy unlock',
         tg: '/unlock',
-        meaning: 'Unlock with your PIN or account password',
+        meaning: 'Unlock with your PIN (set it on the site)',
       },
       { wa: 'flizy help', tg: '/help', meaning: 'Short guide in chat' },
     ],

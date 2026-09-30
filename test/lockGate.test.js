@@ -144,7 +144,7 @@ describe('chat cannot add a payout destination, locked or open', () => {
     await router.handle(ctx, '/unlock');
     const joined = sent.join('\n');
     assert.ok(!/Added unlock/.test(joined), 'unlock must never become a trusted label');
-    assert.match(joined, /Reply with your site login password or unlock PIN|Unlock Flizy/i);
+    assert.match(joined, /Reply with your unlock PIN\./);
   });
 
   it('lock is never swallowed as the secret the bot is waiting for', async () => {

@@ -6,6 +6,26 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
+// Policy reads the unlock state itself (lib/session.js sessionGate). The
+// database it reads is a fake, so no test here can reach a real one.
+const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+const fake = createFakeSupabase({
+  accounts: [
+    { id: 'acc-ok', unlock_pin_hash: null },
+    { id: 'acc-locked', unlock_pin_hash: 'pin-hash-present' },
+  ],
+  sessions: [
+    {
+      account_id: 'acc-locked',
+      channel: 'whatsapp',
+      external_id: '2348012345678',
+      is_locked: true,
+      expires_at: new Date(0).toISOString(),
+    },
+  ],
+});
+mockSupabaseModule({ from: (table) => fake.client.from(table) });
+
 // Mock trusted before loading policy
 const trustedPath = require.resolve('../lib/trusted');
 require.cache[trustedPath] = {
@@ -38,8 +58,8 @@ function baseActor(over = {}) {
     waSenderId: '2348012345678',
     isAdmin: false,
     creditEth: 1,
-    sessionUnlocked: true,
-    hasPin: false,
+    channel: 'whatsapp',
+    externalId: '2348012345678',
     ...over,
   };
 }
@@ -105,7 +125,7 @@ describe('evaluateSendPolicy', () => {
 
   it('denies locked session when PIN set', async () => {
     const intent = createSendIntent({
-      actor: baseActor({ hasPin: true, sessionUnlocked: false }),
+      actor: baseActor({ accountId: 'acc-locked' }),
       amountEth: '0.01',
       toAddress: TRUSTED,
     });

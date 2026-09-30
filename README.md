@@ -197,7 +197,7 @@ send within those rules. Implementation detail lives in
 | **Pay by identity** | A Flizy `@username`, Flizy number, or scanned QR can be paid with confirm. First payment is flagged. After success you can save them |
 | **Plan then confirm** | Every money action shows amount, destination, network, and fees first. Nothing executes without confirm |
 | **Fees disclosed up front** | Swap plans show the protocol fee percentage, the fee amount, and slippage before you confirm |
-| **Per-channel lock** | Lock a chat app instantly. Unlocking needs your PIN or account password. Wrong attempts back off. A new PIN on the site, behind password, clears the block |
+| **Per-channel lock** | Lock a chat app instantly. Unlocking needs your PIN; chat never takes the account password. Wrong attempts back off. A new PIN on the site, behind password, clears the block |
 | **Limits** | Per-transaction maximum and a daily cap, enforced centrally |
 | **Separated keys** | User funds, operational gas, and claim escrow use different keys |
 | **Verified contracts** | Every deployed contract is source verified on the public explorer |

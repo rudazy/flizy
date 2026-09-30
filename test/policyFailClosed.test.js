@@ -45,8 +45,8 @@ function intent(overrides = {}) {
     actor: {
       accountId: 'acct-1',
       isAdmin: false,
-      hasPin: false,
-      sessionUnlocked: true,
+      channel: 'whatsapp',
+      externalId: '2348012345678',
       creditEth: 100,
       ...(overrides.actor || {}),
     },
@@ -84,7 +84,9 @@ describe('daily limit failure denies the send', () => {
 
   it('still lets an admin through', async () => {
     const result = await evaluateSendPolicy(
-      intent({ actor: { accountId: 'acct-1', isAdmin: true, sessionUnlocked: true } }),
+      intent({
+        actor: { accountId: 'acct-1', isAdmin: true, channel: 'whatsapp', externalId: '2348012345678' },
+      }),
       opts
     );
     assert.equal(result.decision, 'ALLOW_WITH_CONFIRM');

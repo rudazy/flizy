@@ -1,5 +1,5 @@
 /**
- * Which site swaps need the account password, and the floor a swap may fill at.
+ * Site swaps: which tokens are unverified, and the floor a swap may fill at.
  *
  * A swap's output always lands in the caller's own wallet, but that alone does
  * not keep value on the account. Flizy controls only the FLZ/WETH pool. Any
@@ -8,16 +8,19 @@
  * and the pool owner removes liquidity and keeps the ETH. Selling a thin token
  * into a pool someone else controls leaks the same way in reverse.
  *
- * So a swap with any side other than ETH, WETH or FLZ needs the password, like
- * every other route that can move value off the account.
+ * Every site swap takes the account password. This decides whether the prompt
+ * warns that the token is one Flizy has not verified. Mirror of isUnverifiedSwap
+ * in lib/dex.js, which gates the same trades in chat; test/swapGateDrift.test.js
+ * keeps the two verified sets identical.
  */
 
 export type VerifiedSwapTokens = { wrappedNative: string; flz: string };
 
 /**
+ * True when either side is a token other than native, WETH or FLZ.
  * @param sides resolved token addresses; null is native ETH
  */
-export function swapNeedsPassword(
+export function isUnverifiedSwap(
   sides: Array<string | null>,
   verified: VerifiedSwapTokens
 ): boolean {

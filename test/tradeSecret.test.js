@@ -15,7 +15,7 @@ const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
-const { hashPin } = require('../lib/cryptoPin');
+const { hashPin, hashPassword } = require('../lib/cryptoPin');
 
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
 
@@ -96,6 +96,8 @@ const TG = '778899126';
 const KEY = `telegram:${TG}`;
 const UNVERIFIED = '0x2222222222222222222222222222222222222222';
 const PIN = '482915';
+// The account's real site password. Chat must refuse it even though it matches.
+const PASSWORD = 'Secret1!';
 
 function ctxFor(sent) {
   return {
@@ -124,7 +126,7 @@ function seed({ pin = true } = {}) {
         is_admin: false,
         agent_wallet_address: '0x9999999999999999999999999999999999999999',
         unlock_pin_hash: pin ? hashPin(PIN) : null,
-        password_hash: null,
+        password_hash: hashPassword(PASSWORD),
       },
     ],
     channel_identities: [
@@ -158,7 +160,7 @@ describe('chat trade of an unverified token', () => {
 
     sent.length = 0;
     await router.handle(ctx, 'confirm');
-    assert.match(sent.join('\n'), /Reply with your PIN or account password/);
+    assert.match(sent.join('\n'), /Reply with your unlock PIN to send this trade/);
     assert.equal(executed, 0);
     assert.equal(router.pendingFlowFor(KEY).tradeSecret, true);
   });
@@ -221,17 +223,29 @@ describe('chat trade of an unverified token', () => {
     assert.equal(router.pendingFlowFor(KEY).send, false);
   });
 
-  it('with no PIN or password on the account, nothing is sent', async () => {
+  it('with no PIN on the account, the trade is refused before a plan exists', async () => {
     seed({ pin: false });
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, `/buy 0.01 eth of ${UNVERIFIED}`);
+    const text = sent.join('\n');
+    assert.doesNotMatch(text, /Swap plan/);
+    assert.match(text, /Set an unlock PIN on the site first: \S+\/dashboard\/account/);
+    assert.equal(router.pendingFlowFor(KEY).send, false);
+    assert.equal(executed, 0);
+  });
+
+  it('the account password sent as the secret is refused, even when it is right', async () => {
+    seed();
     const sent = [];
     const ctx = ctxFor(sent);
     await planUnverifiedBuy(ctx, sent);
     await router.handle(ctx, 'confirm');
 
     sent.length = 0;
-    await router.handle(ctx, '123456');
+    await router.handle(ctx, PASSWORD);
     assert.equal(executed, 0);
-    assert.match(sent.join('\n'), /Set a PIN on the site first/);
+    assert.match(sent.join('\n'), /Trade cancelled\. Nothing was sent\./);
   });
 });
 

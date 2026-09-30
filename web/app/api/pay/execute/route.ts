@@ -17,6 +17,10 @@ import {
 } from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 import { fundingWallText } from '../../../../lib/fundingWall.ts';
+import { checkDailyNativeLimit } from '../../../../lib/dailyLimits.ts';
+import { notifyAllChannels } from '../../../../lib/notifyChannels';
+import { formatPaymentReceived, payerLabel } from '../../../../lib/payNotice.ts';
+import { siteOrigin } from '../../../../lib/siteOrigin';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -117,6 +121,13 @@ export async function POST(req: Request) {
           { error: fundingWallText({ kind: 'native', address: walletAddr }) },
           { status: 400 }
         );
+      }
+      // Inside the account lock, which chat confirm also takes, so a chat send
+      // and a site pay cannot both pass against the same allowance. A limit that
+      // cannot be read throws, and the pay is not made.
+      const daily = await checkDailyNativeLimit(supabase, payerId, amountWei);
+      if (!daily.ok) {
+        return NextResponse.json({ error: daily.message }, { status: 400 });
       }
       amountHuman = ethers.formatEther(amountWei);
       const { data: logRow } = await supabase
@@ -271,6 +282,28 @@ export async function POST(req: Request) {
         '[invite] first tx hook:',
         hookErr instanceof Error ? hookErr.message : hookErr
       );
+    }
+
+    // The payee hears about it on every chat they linked, as they would from a
+    // chat send. The money has arrived; a notice that fails to queue must not
+    // read as a failed payment.
+    try {
+      const { data: payerRow } = await supabase
+        .from('accounts')
+        .select('username, display_name')
+        .eq('id', payerId)
+        .maybeSingle();
+      await notifyAllChannels(
+        merchant.accountId,
+        formatPaymentReceived({
+          amount: amountHuman,
+          asset,
+          fromLabel: payerLabel(payerRow),
+          walletUrl: `${siteOrigin()}/dashboard/wallet`,
+        })
+      );
+    } catch {
+      console.warn(`[${ROUTE}] payee notice was not queued`);
     }
 
     let alreadySaved = false;

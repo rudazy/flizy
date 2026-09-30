@@ -9,6 +9,28 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
+// Policy reads the unlock state itself (lib/session.js sessionGate), so the
+// database it reads is a fake: acc-ok has no PIN, acc-locked has a PIN and a
+// locked session on both channels.
+const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+
+const WA_ID = '2348012345678';
+const TG_ID = '778899123';
+const fake = createFakeSupabase({
+  accounts: [
+    { id: 'acc-ok', unlock_pin_hash: null, password_hash: 'x' },
+    { id: 'acc-locked', unlock_pin_hash: 'pin-hash-present', password_hash: 'x' },
+  ],
+  sessions: [WA_ID, TG_ID].map((externalId) => ({
+    account_id: 'acc-locked',
+    channel: externalId === TG_ID ? 'telegram' : 'whatsapp',
+    external_id: externalId,
+    is_locked: true,
+    expires_at: new Date(0).toISOString(),
+  })),
+});
+mockSupabaseModule({ from: (table) => fake.client.from(table) });
+
 // Mock trusted before loading policy
 const trustedPath = require.resolve('../lib/trusted');
 require.cache[trustedPath] = {
@@ -33,15 +55,15 @@ const ROUTER = '0x3333333333333333333333333333333333333333';
 
 /** Same person, same account, two channels. */
 function actorFor(channel, over = {}) {
-  const externalId = channel === 'telegram' ? '778899123' : '2348012345678';
+  const externalId = channel === 'telegram' ? TG_ID : WA_ID;
   return {
     accountId: 'acc-ok',
     userId: 'user-1',
     waSenderId: identityTransferKey(channel, externalId),
     isAdmin: false,
     creditEth: 1,
-    sessionUnlocked: true,
-    hasPin: false,
+    channel,
+    externalId,
     ...over,
   };
 }
@@ -88,7 +110,7 @@ describe('send policy is identical on every channel', () => {
       const r = await sendDecisionFor(channel, {
         amountEth: '0.01',
         toAddress: TRUSTED,
-        actorOver: { hasPin: true, sessionUnlocked: false },
+        actorOver: { accountId: 'acc-locked' },
         opts: { enforceTrusted: true, requireUnlock: true },
       });
       assert.equal(r.decision, 'DENY', channel);
@@ -180,7 +202,7 @@ describe('swap policy is identical on every channel', () => {
   it('denies a locked session before it ever looks at the router', async () => {
     for (const channel of CHANNELS_UNDER_TEST) {
       const r = await evaluateSwapPolicy(
-        swapIntentFor(channel, { actorOver: { hasPin: true, sessionUnlocked: false } }),
+        swapIntentFor(channel, { actorOver: { accountId: 'acc-locked' } }),
         { requireUnlock: true }
       );
       assert.equal(r.decision, 'DENY', channel);

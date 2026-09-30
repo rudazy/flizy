@@ -285,7 +285,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setMsg(
           limit == null
             ? 'Daily limit cleared (app default).'
-            : `Daily send limit set to ${limit} ETH (UTC day).`
+            : `Daily ETH send limit set to ${limit} ETH (UTC day). It covers ETH sends from chat and the web.`
         );
         await load();
         return true;

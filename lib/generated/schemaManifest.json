@@ -28,6 +28,12 @@
     },
     {
       "kind": "function",
+      "name": "daily_native_sent_eth",
+      "providedBy": "20260930120000_daily_native_sent.sql",
+      "requiredBy": "lib/dailyLimits.js"
+    },
+    {
+      "kind": "function",
       "name": "debit_user_balance",
       "providedBy": "20260729110000_atomic_balance_debit.sql",
       "requiredBy": "lib/credit.js"
@@ -102,7 +108,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/router.js, lib/session.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/router.js, lib/session.js"
     },
     {
       "kind": "table",
@@ -114,7 +120,7 @@
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "lib/claims.js, lib/dailyLimits.js, lib/escrowWallet.js, lib/history.js"
+      "requiredBy": "lib/claims.js, lib/escrowWallet.js, lib/history.js"
     },
     {
       "kind": "table",
@@ -210,7 +216,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/dailyLimits.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/transferLog.js"
+      "requiredBy": "lib/history.js, lib/payCode.js, lib/pots.js, lib/transferLog.js"
     },
     {
       "kind": "table",

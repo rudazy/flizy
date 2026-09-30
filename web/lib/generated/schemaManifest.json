@@ -34,6 +34,12 @@
     },
     {
       "kind": "function",
+      "name": "daily_native_sent_eth",
+      "providedBy": "20260930120000_daily_native_sent.sql",
+      "requiredBy": "web/lib/dailyLimits.ts"
+    },
+    {
+      "kind": "function",
       "name": "identity_events_append_only",
       "providedBy": "20260802160000_identity_events.sql",
       "requiredBy": "executed by trigger identity_events_no_update"
@@ -126,7 +132,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/copySetup.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/tasks.ts"
+      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/tasks.ts"
     },
     {
       "kind": "table",

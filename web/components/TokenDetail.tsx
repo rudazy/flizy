@@ -7,6 +7,7 @@ import { AppTopBar } from './AppTopBar';
 import { useDashboard } from './DashboardProvider';
 import { formatEthDisplay, formatPct, maxSpend } from '../lib/tokenFormat';
 import { VerifiedMark } from './VerifiedMark';
+import { PasswordField } from './PasswordField';
 import type { HolderView } from '../lib/tokenHolders';
 
 type Market = {
@@ -75,6 +76,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const [stage, setStage] = useState<'edit' | 'confirm'>('edit');
   const [busy, setBusy] = useState(false);
   const [tradeError, setTradeError] = useState('');
+  const [password, setPassword] = useState('');
   const [result, setResult] = useState<{ explorerUrl?: string } | null>(null);
 
   const loadMarket = useCallback(async () => {
@@ -164,7 +166,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   ];
 
   async function confirmTrade() {
-    if (!quoteReady || busy) return;
+    if (!quoteReady || busy || !password) return;
     setBusy(true);
     setTradeError('');
     setResult(null);
@@ -178,6 +180,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           tokenIn: side === 'sell' ? 'FLZ' : 'ETH',
           tokenOut: side === 'buy' ? 'FLZ' : 'ETH',
           minOut: quote?.amountOutMin,
+          password,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -187,6 +190,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
       }
       setResult({ explorerUrl: body.explorerUrl });
       setStage('edit');
+      setPassword('');
       setAmount('');
       setQuote(null);
       loadMarket();
@@ -374,7 +378,18 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                 {side === 'buy' ? 'Buy' : 'Sell'} {amount} {side === 'buy' ? 'ETH of FLZ' : 'FLZ for ETH'}. This
                 sends from your Flizy wallet.
               </p>
-              <button type="button" className="btn btn-primary" disabled={busy} onClick={confirmTrade}>
+              <PasswordField
+                label="Account password"
+                value={password}
+                onChange={setPassword}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy || !password}
+                onClick={confirmTrade}
+              >
                 {busy ? 'Sending...' : 'Confirm transaction'}
               </button>
               <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setStage('edit')}>

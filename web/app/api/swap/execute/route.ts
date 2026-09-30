@@ -22,7 +22,7 @@ import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountT
 import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 import { requirePassword } from '../../../../lib/passwordGate.ts';
-import { bindAmountOutMin, swapNeedsPassword } from '../../../../lib/swapGate.ts';
+import { bindAmountOutMin, isUnverifiedSwap } from '../../../../lib/swapGate.ts';
 
 const ROUTE = 'POST /api/swap/execute';
 
@@ -37,10 +37,10 @@ export async function POST(req: Request) {
     const body = await req.json();
     const supabase = getSupabase();
 
-    // ETH/FLZ swaps take no password: the only pool on that pair is the one
-    // Flizy controls, so the worst a stolen session can do is churn, which the
-    // hourly cap is for. Any other token needs the password, checked below once
-    // the sides are resolved. web/lib/swapGate.ts has the reason.
+    // Every swap takes the account password, the same gate and lockout ladder as
+    // pay/execute. It is checked below once the sides are resolved, so the
+    // prompt can say when the token is one Flizy has not verified. The hourly
+    // cap stays as a churn limit behind it.
     const rate = await checkSwapRateLimit(supabase, accountId);
     if (!rate.ok) {
       return NextResponse.json({ error: rate.error, code: rate.code }, { status: rate.status });
@@ -78,16 +78,14 @@ export async function POST(req: Request) {
       );
     }
 
-    if (swapNeedsPassword([tokenIn, tokenOut], dex)) {
-      const auth = await requirePassword(
-        supabase,
-        accountId,
-        String(body.password || ''),
-        'trade a token Flizy has not verified'
-      );
-      if (!auth.ok) {
-        return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
-      }
+    const auth = await requirePassword(
+      supabase,
+      accountId,
+      String(body.password || ''),
+      isUnverifiedSwap([tokenIn, tokenOut], dex) ? 'trade a token Flizy has not verified' : 'swap'
+    );
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
     }
 
     const inDecimals = await readErc20Decimals(provider, tokenIn);

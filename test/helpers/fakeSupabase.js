@@ -364,6 +364,38 @@ function createFakeSupabase(seed = {}, opts = {}) {
       return { data: [{ success: true, new_balance: row.balance_eth }], error: null };
     },
 
+    /**
+     * 20260930120000_daily_native_sent.sql: native ETH sent today (UTC) by one
+     * account. Outgoing non-swap transfers plus claim holds, native rows only.
+     * Summed as 18-decimal fixed point, as the numeric column is, and returned
+     * as text like the function.
+     */
+    daily_native_sent_eth({ p_account_id }) {
+      const now = new Date();
+      const since = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      const native = (asset) => ['ETH', 'NATIVE', 'ETHER'].includes(String(asset || 'ETH').toUpperCase());
+      const today = (row) => new Date(row.created_at || now).getTime() >= since;
+      const toUnits = (value) => {
+        const [whole, frac = ''] = String(value).split('.');
+        return BigInt(whole || '0') * 10n ** 18n + BigInt((frac + '0'.repeat(18)).slice(0, 18));
+      };
+      let total = 0n;
+      for (const t of db.tables.transfers || []) {
+        if (String(t.account_id) !== String(p_account_id) || !today(t)) continue;
+        if (!['pending', 'submitted', 'confirmed'].includes(t.status)) continue;
+        if (!native(t.asset) || (t.kind || 'transfer') === 'swap' || (t.direction || 'out') !== 'out') continue;
+        total += toUnits(t.amount_eth);
+      }
+      for (const c of db.tables.claims || []) {
+        if (String(c.from_account_id) !== String(p_account_id) || !today(c)) continue;
+        if (!['pending', 'processing', 'claimed'].includes(c.status)) continue;
+        if (!native(c.asset)) continue;
+        total += toUnits(c.amount_eth);
+      }
+      const text = `${total / 10n ** 18n}.${String(total % 10n ** 18n).padStart(18, '0')}`;
+      return { data: text, error: null };
+    },
+
     /** 20260925010000_tasks.sql: entries per task, tasks with none absent. */
     task_participant_counts({ p_task_ids }) {
       const wanted = new Set((p_task_ids || []).map(String));

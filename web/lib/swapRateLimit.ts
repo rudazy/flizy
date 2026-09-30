@@ -1,21 +1,14 @@
 /**
  * Rolling-window cap on site swaps.
  *
- * This stands in for the account-password prompt on ETH/FLZ swaps only. On
- * that pair the route hardcodes `recipient: signer.address`, and the only pool
- * is the one Flizy controls, so the worst a stolen session can do is churn the
- * account's own balance at ~0.60% + gas a round trip. That is griefing, not
- * theft, and this cap is sized against griefing.
+ * This is a churn limit, not the authority check. Every swap also takes the
+ * account password (POST /api/swap/execute), the same gate as pay/execute.
  *
- * A fixed recipient is not enough on its own. Any other token trades against a
- * pool someone else can seed and drain, which moves value off the account, so
- * those swaps need the password as well (web/lib/swapGate.ts).
- *
- * The password stays on every route that CAN move value or widen authority:
- * trusted (the only route that adds a payout address), pay/execute, pin,
- * limits, identity, swap/liquidity, and swaps of unverified tokens. Do not copy
- * this file's reasoning onto any of those. If a recipient argument is ever
- * added to the swap route, the password has to come back with it.
+ * A swap cannot name a recipient: the route hardcodes the caller's own wallet.
+ * That alone does not keep value on the account, because any token other than
+ * ETH, WETH or FLZ trades against a pool someone else can seed and drain
+ * (web/lib/swapGate.ts). The password is what stops a stolen session; this cap
+ * bounds how often even the account holder can swap in an hour.
  *
  * Database-backed, like web/lib/callbackLimiter.ts and for the same reason: a
  * Map in module scope enforces nothing on Vercel, where every serverless
