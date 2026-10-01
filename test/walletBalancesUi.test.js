@@ -1,7 +1,8 @@
 /**
  * Wallet, Balances: every figure is real, the eye covers every amount, the
- * address answers one tap and two taps differently, and a token can only be
- * removed from a row that is not also a link.
+ * address answers one tap and two taps differently, a token can only be
+ * removed from a row that is not also a link, and Refresh says nothing when it
+ * works.
  *
  * The screen is a client component that needs a browser to render, so this
  * reads its source, the same way test/exploreTasksUi does.
@@ -66,5 +67,14 @@ describe('the Wallet page', () => {
 
   it('draws Refresh with its icon, spinning while busy', () => {
     assert.match(read('components/AppTopBar.tsx'), /<RefreshIcon size=\{14\} className=\{actionBusy \? 'animate-spin' : undefined\} \/>/);
+  });
+});
+
+describe('Refresh', () => {
+  it('is silent when it works: no banner after a successful refresh', () => {
+    const provider = read('components/DashboardProvider.tsx');
+    const body = provider.match(/const refreshAll = useCallback\(async \(\) => \{([\s\S]*?)\}, \[load\]\);/)[1];
+    assert.doesNotMatch(body, /refreshed/);
+    assert.match(body, /await load\(\);\s*\} catch \{\s*setMsg\('Could not refresh\. Try again\.'\);/);
   });
 });

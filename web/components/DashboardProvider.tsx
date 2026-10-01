@@ -129,8 +129,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setRefreshing(true);
     setMsg('');
     try {
+      // Silent on success: the spinning Refresh icon is the feedback, and the
+      // figures changing on screen are the result.
       await load();
-      setMsg('Balances and history refreshed.');
     } catch {
       setMsg('Could not refresh. Try again.');
     } finally {
