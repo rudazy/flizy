@@ -5,6 +5,9 @@ import { loadFlzMarket } from '../../../lib/tokenMarketServer';
 
 const ROUTE = 'GET /api/tokens';
 
+/** Points in a row's sparkline. */
+const SPARK_POINTS = 24;
+
 /** Listed tokens for discovery. One market today, priced from its pool. */
 export async function GET() {
   try {
@@ -21,6 +24,11 @@ export async function GET() {
           change1hPct: market.change1hPct,
           liquidityEth: market.liquidityEth,
           verified: true,
+          // For the Explore row: the pool's own figures, all in ETH, and the
+          // closing prices of the last hour's candles for its sparkline.
+          flzPerEth: market.flzPerEth,
+          marketCapEth: market.marketCapEth,
+          spark: market.candles.slice(-SPARK_POINTS).map((c) => c.close),
         },
       ],
     });

@@ -38,6 +38,11 @@ export type DiscoveryToken = {
   liquidityEth: string | null;
   /** Flizy attestation. This is what may be sent on socials. */
   verified: boolean;
+  /** Pool figures for the Explore row, all in ETH. Absent from older responses. */
+  flzPerEth?: string | null;
+  marketCapEth?: string | null;
+  /** Closing prices of recent candles, oldest first, for the sparkline. */
+  spark?: number[];
 };
 
 const EMPTY: Record<TokenFilterId, string> = {

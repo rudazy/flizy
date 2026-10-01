@@ -564,3 +564,22 @@ export function MoreVerticalIcon({ size, className }: IconProps) {
     </svg>
   );
 }
+
+/** A filled flame in gold to orange, for the token list heading. */
+export function FlameIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size ?? 18} height={size ?? 18} viewBox="0 0 24 24" className={className} aria-hidden>
+      <defs>
+        <linearGradient id="flame-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffd25a" />
+          <stop offset="1" stopColor="#f2702a" />
+        </linearGradient>
+      </defs>
+      <path
+        fill="url(#flame-fill)"
+        d="M12.6 2.5c.4 2.6-.6 4.4-2 6-1.5 1.6-3.6 3.4-3.6 6.6A5.1 5.1 0 0 0 12 20.5a5.2 5.2 0 0 0 5.3-5.3c0-2.2-1-3.7-1.9-4.9-.2 1.4-.9 2.5-2 3 .4-2.9-.2-6.9-.8-10.8z"
+      />
+      <path fill="#ffe58a" d="M12.2 13.2c.9 1.3 1.8 2.3 1.8 3.7a2 2 0 0 1-4 0c0-1.3.9-2.3 2.2-3.7z" />
+    </svg>
+  );
+}

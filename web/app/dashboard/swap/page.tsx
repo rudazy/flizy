@@ -1,9 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AppTopBar } from '../../../components/AppTopBar';
 import { AppPage } from '../../../components/AppSection';
 import { formatAmount } from '../../../lib/amountDisplay';
+import { pairFromQuery } from '../../../lib/swapPair';
 import {
   ArrowRightIcon,
   ChartLineIcon,
@@ -86,8 +88,12 @@ function plain(n: number, digits = 6): string {
 
 export default function SwapPage() {
   const [mode, setMode] = useState<Mode>('swap');
-  const [tokenIn, setTokenIn] = useState<Token>('ETH');
-  const [tokenOut, setTokenOut] = useState<Token>('FLZ');
+  // A Trade button elsewhere opens this screen on its pair: ?from=FLZ&to=ETH.
+  // Anything that is not the ETH/FLZ pair one way round falls back to buying FLZ.
+  const search = useSearchParams();
+  const linked = pairFromQuery(search.get('from'), search.get('to'));
+  const [tokenIn, setTokenIn] = useState<Token>(linked.tokenIn);
+  const [tokenOut, setTokenOut] = useState<Token>(linked.tokenOut);
   const [amountIn, setAmountIn] = useState('0.01');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [price, setPrice] = useState<PriceInfo | null>(null);
