@@ -188,3 +188,147 @@ export function HistoryIcon({ size, strokeWidth = 1.8, className }: IconProps) {
     </Svg>
   );
 }
+
+export function ArrowLeftIcon({ size, strokeWidth = 2, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M19.5 12H5M10.5 6.5L5 12l5.5 5.5" />
+    </Svg>
+  );
+}
+
+export function HelpIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.8" />
+        <path d="M12 17.2h.01" strokeWidth={2.4} />
+      </g>
+    </Svg>
+  );
+}
+
+export function PersonIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="12" cy="8" r="3.8" />
+        <path d="M4.8 20.2c.9-3.7 3.6-5.6 7.2-5.6s6.3 1.9 7.2 5.6" />
+      </g>
+    </Svg>
+  );
+}
+
+export function PeopleIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="9" cy="8.2" r="3.4" />
+        <path d="M2.8 19.6c.8-3.4 3.1-5.1 6.2-5.1s5.4 1.7 6.2 5.1" />
+        <path d="M15.2 4.9a3.3 3.3 0 0 1 0 6.5" />
+        <path d="M17.6 14.6c1.9.6 3.2 2.3 3.6 5" />
+      </g>
+    </Svg>
+  );
+}
+
+export function ClockIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="12" cy="12" r="8.8" />
+        <path d="M12 7.2V12l3.2 2" />
+      </g>
+    </Svg>
+  );
+}
+
+export function CalendarIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <rect x="3.8" y="5" width="16.4" height="15.5" rx="2" />
+        <path d="M3.8 9.8h16.4M8.2 3v4M15.8 3v4" />
+        <path d="M7.6 13.4h.01M12 13.4h.01M16.4 13.4h.01M7.6 17h.01M12 17h.01" strokeWidth={2.2} />
+      </g>
+    </Svg>
+  );
+}
+
+export function ChevronDownIcon({ size, strokeWidth = 2, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M6.5 9.5L12 15l5.5-5.5" />
+    </Svg>
+  );
+}
+
+export function InfoIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="12" cy="12" r="8.8" />
+        <path d="M12 11v5.4" />
+        <path d="M12 7.8h.01" strokeWidth={2.4} />
+      </g>
+    </Svg>
+  );
+}
+
+/** The X (Twitter) mark, as a requirement type. */
+export function XLogoIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size ?? 18} height={size ?? 18} viewBox="0 0 24 24" className={className} aria-hidden>
+      <path
+        fill="currentColor"
+        d="M17.75 3h3.07l-6.72 7.68L22 21h-6.19l-4.85-6.34L5.4 21H2.33l7.19-8.21L1.94 3h6.35l4.38 5.79L17.75 3zm-1.08 16.17h1.7L7.4 4.73H5.58l11.09 14.44z"
+      />
+    </svg>
+  );
+}
+
+export function ListIcon({ size, strokeWidth = 1.9, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M9 6.5h11M9 12h11M9 17.5h11" />
+        <path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" strokeWidth={2.8} />
+      </g>
+    </Svg>
+  );
+}
+
+export function EyeIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M2.5 12s3.4-6.5 9.5-6.5S21.5 12 21.5 12s-3.4 6.5-9.5 6.5S2.5 12 2.5 12z" />
+        <circle cx="12" cy="12" r="2.8" />
+      </g>
+    </Svg>
+  );
+}
+
+export function TrashIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M4 6.5h16M9.5 6.5V4.2h5v2.3" />
+        <path d="M6.2 6.5l.9 13.3a1 1 0 0 0 1 .9h7.8a1 1 0 0 0 1-.9l.9-13.3" />
+        <path d="M10 10.5v6.5M14 10.5v6.5" />
+      </g>
+    </Svg>
+  );
+}
+
+export function InfinityIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path
+        strokeWidth={strokeWidth}
+        d="M12 12c-1.8-2.4-3.4-3.6-5.2-3.6a3.6 3.6 0 0 0 0 7.2c1.8 0 3.4-1.2 5.2-3.6zm0 0c1.8 2.4 3.4 3.6 5.2 3.6a3.6 3.6 0 0 0 0-7.2c-1.8 0-3.4 1.2-5.2 3.6z"
+      />
+    </Svg>
+  );
+}

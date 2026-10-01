@@ -24,6 +24,10 @@ export type TaskCardData = {
   creator: { kind: 'project' | 'personal'; name: string; handle: string | null };
 };
 
+/**
+ * `preview` is the Create task page's live preview: the same card, not a link,
+ * since the task does not exist until it is published.
+ */
 export function TaskCard({ task, preview = false }: { task: TaskCardData; preview?: boolean }) {
   const body = (
     <>
@@ -40,7 +44,7 @@ export function TaskCard({ task, preview = false }: { task: TaskCardData; previe
           <span className="min-w-0 truncate font-sans text-sm tracking-wide text-paper">
             {task.creator.name}
           </span>
-          <span className="font-mono text-xs text-muted">{task.ref ? `#${task.ref}` : 'Preview'}</span>
+          <span className="font-mono text-xs text-muted">{preview ? 'Preview' : `#${task.ref}`}</span>
         </div>
       </div>
     </>
