@@ -541,3 +541,26 @@ export function SwapVerticalIcon({ size, strokeWidth = 2, className }: IconProps
     </Svg>
   );
 }
+
+export function BookOpenIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M12 6.5C10.3 5.2 7.9 4.6 3.5 4.8v13.4c4.4-.2 6.8.4 8.5 1.7 1.7-1.3 4.1-1.9 8.5-1.7V4.8c-4.4-.2-6.8.4-8.5 1.7z" />
+        <path d="M12 6.5v13.4" />
+      </g>
+    </Svg>
+  );
+}
+
+export function MoreVerticalIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size ?? 18} height={size ?? 18} viewBox="0 0 24 24" className={className} aria-hidden>
+      <g fill="currentColor">
+        <circle cx="12" cy="5.5" r="2" />
+        <circle cx="12" cy="12" r="2" />
+        <circle cx="12" cy="18.5" r="2" />
+      </g>
+    </svg>
+  );
+}

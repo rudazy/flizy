@@ -106,3 +106,96 @@ export function formatNftHoldingLine(n: NftHolding): string {
   if (n.ids.length) return `${n.ticker} ${n.ids.map((id) => `#${id}`).join(', ')}`;
   return `${n.ticker}: ${n.balance}`;
 }
+
+const COLLECTION_ABI = [
+  'function name() view returns (string)',
+  'function totalSupply() view returns (uint256)',
+  'function claimed(address) view returns (bool)',
+  'function ownerOf(uint256) view returns (address)',
+  'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+];
+
+export type CollectionStats = {
+  ticker: string;
+  address: string;
+  name: string;
+  /** Tokens minted so far. */
+  items: number | null;
+  /** Distinct wallets holding at least one, from the Transfer history. */
+  owners: number | null;
+  /** True when the contract has the one-free-claim-per-wallet mint. */
+  freeMint: boolean;
+};
+
+/** Stats are read from the chain; a minute old is fresh enough for a list. */
+const STATS_TTL_MS = 60 * 1000;
+const statsCache = new Map<string, { at: number; stats: CollectionStats }>();
+
+/** The ownerOf fallback reads at most this many tokens, this many at a time. */
+const OWNER_SCAN_MAX = 1000;
+const OWNER_SCAN_BATCH = 50;
+
+/**
+ * What the Explore card shows for one listed collection, all read from the
+ * contract. A figure that could not be read is null and shows as a dash, never
+ * as a zero that would read like an answer.
+ */
+export async function loadCollectionStats(
+  provider: ethers.Provider,
+  col: ListedNft,
+  now = Date.now()
+): Promise<CollectionStats> {
+  const hit = statsCache.get(col.address);
+  if (hit && now - hit.at < STATS_TTL_MS) return hit.stats;
+
+  const nft = new ethers.Contract(col.address, COLLECTION_ABI, provider);
+  const [name, supply, claimProbe, transfers] = await Promise.all([
+    nft.name().catch(() => null),
+    nft.totalSupply().catch(() => null),
+    nft.claimed(ethers.ZeroAddress).then(() => true).catch(() => false),
+    nft.queryFilter(nft.filters.Transfer()).catch(() => null),
+  ]);
+
+  let owners: number | null = null;
+  let minted: number | null = null;
+  if (transfers) {
+    const ownerOf = new Map<string, string>();
+    for (const ev of transfers) {
+      if (!('args' in ev) || ev.args?.tokenId == null) continue;
+      ownerOf.set(ev.args.tokenId.toString(), String(ev.args.to).toLowerCase());
+    }
+    const zero = ethers.ZeroAddress.toLowerCase();
+    owners = new Set([...ownerOf.values()].filter((a) => a !== zero)).size;
+    minted = ownerOf.size;
+  }
+
+  // Some RPCs refuse a log query from genesis. Token ids here are minted in
+  // order from 1, so asking each one who owns it gives the same answer, in
+  // batches, up to a bound that keeps one request from becoming thousands.
+  if (owners == null && supply != null && Number(supply) <= OWNER_SCAN_MAX) {
+    const ids = Array.from({ length: Number(supply) }, (_, i) => i + 1);
+    const holders = new Set<string>();
+    let readAll = true;
+    for (let i = 0; i < ids.length; i += OWNER_SCAN_BATCH) {
+      const batch = await Promise.all(
+        ids.slice(i, i + OWNER_SCAN_BATCH).map((id) => nft.ownerOf(id).catch(() => null))
+      );
+      for (const who of batch) {
+        if (who == null) readAll = false;
+        else holders.add(String(who).toLowerCase());
+      }
+    }
+    owners = readAll ? holders.size : null;
+  }
+
+  const stats: CollectionStats = {
+    ticker: col.ticker,
+    address: col.address,
+    name: typeof name === 'string' && name.trim() ? name.trim().slice(0, 64) : col.ticker,
+    items: supply != null ? Number(supply) : minted,
+    owners,
+    freeMint: claimProbe,
+  };
+  statsCache.set(col.address, { at: now, stats });
+  return stats;
+}

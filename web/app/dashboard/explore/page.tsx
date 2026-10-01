@@ -8,7 +8,7 @@ import { AppPage, AppSlideNav, useSlide } from '../../../components/AppSection';
 import { TaskCard, type TaskCardData } from '../../../components/TaskCard';
 import { ExploreTokens } from '../../../components/ExploreTokens';
 import { ExploreNfts } from '../../../components/ExploreNfts';
-import { useComingSoon } from '../../../components/ComingSoon';
+import { ComingSoonPanel, useComingSoon } from '../../../components/ComingSoon';
 import {
   AirdropIcon,
   ArrowRightIcon,
@@ -331,20 +331,6 @@ function Hero({ onExplore }: { onExplore: () => void }) {
           </button>
         ))}
       </div>
-    </section>
-  );
-}
-
-/** A slide whose feature is not built yet: the same card, "Coming soon" in the middle. */
-function ComingSoonPanel({ what }: { what: string }) {
-  return (
-    <section
-      className="flex min-h-[297px] flex-col items-center justify-center rounded-[9px] border border-chrome-card-line px-4 text-center"
-      style={{ background: 'linear-gradient(180deg, #111111 0%, #0c0c0d 100%)' }}
-      aria-live="polite"
-    >
-      <h3 className="font-sans text-[15.5px] font-bold text-sun">Coming soon</h3>
-      <p className="mt-[7px] font-sans text-[10px] text-[#a9a9a9]">{what}</p>
     </section>
   );
 }
