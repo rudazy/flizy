@@ -332,3 +332,91 @@ export function InfinityIcon({ size, strokeWidth = 1.8, className }: IconProps) 
     </Svg>
   );
 }
+
+export function WalletIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h10A1.5 1.5 0 0 1 18 6.5V8" />
+        <rect x="4" y="8" width="16.5" height="11.5" rx="2.2" />
+        <path d="M15.5 13.75h2" strokeWidth={2.4} />
+      </g>
+    </Svg>
+  );
+}
+
+export function PlusCircleIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="12" cy="12" r="8.8" />
+        <path d="M12 8v8M8 12h8" />
+      </g>
+    </Svg>
+  );
+}
+
+export function RefreshIcon({ size, strokeWidth = 2, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+        <path d="M19.6 4.2v4.3h-4.3" />
+      </g>
+    </Svg>
+  );
+}
+
+export function CopyIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <rect x="8" y="7.5" width="11" height="13" rx="2" />
+        <path d="M5 16.5V5.5a2 2 0 0 1 2-2h8" />
+      </g>
+    </Svg>
+  );
+}
+
+export function ExternalLinkIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M18.5 13.5v5a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 18.5V7a1.5 1.5 0 0 1 1.5-1.5h5" />
+        <path d="M14 4h6v6M20 4l-9 9" />
+      </g>
+    </Svg>
+  );
+}
+
+export function ChevronRightIcon({ size, strokeWidth = 2, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M9.5 6.5L15 12l-5.5 5.5" />
+    </Svg>
+  );
+}
+
+/** Ether's diamond, drawn flat in currentColor. */
+export function EthDiamondIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size ?? 18} height={size ?? 18} viewBox="0 0 24 24" className={className} aria-hidden>
+      <path fill="currentColor" opacity="0.65" d="M12 2.5l-6 9.8 6 3.5 6-3.5z" />
+      <path fill="currentColor" d="M12 2.5v13.3l6-3.5z" />
+      <path fill="currentColor" opacity="0.65" d="M6 13.5l6 8 6-8-6 3.6z" />
+      <path fill="currentColor" d="M12 17.1v4.4l6-8z" />
+    </svg>
+  );
+}
+
+/** The GIWA wave mark: three stacked swells. */
+export function GiwaMarkIcon({ size, className }: IconProps) {
+  return (
+    <svg width={size ?? 24} height={size ?? 24} viewBox="0 0 24 24" className={className} aria-hidden>
+      <path
+        fill="currentColor"
+        d="M3 6.2c3-2.4 6.2-2.4 9 0 2.8 2.3 5.7 2.3 9 0v3c-3.3 2.3-6.2 2.3-9 0-2.8-2.3-6-2.3-9 0zM3 11.2c3-2.4 6.2-2.4 9 0 2.8 2.3 5.7 2.3 9 0v3c-3.3 2.3-6.2 2.3-9 0-2.8-2.3-6-2.3-9 0zM3 16.2c3-2.4 6.2-2.4 9 0 2.8 2.3 5.7 2.3 9 0v3c-3.3 2.3-6.2 2.3-9 0-2.8-2.3-6-2.3-9 0z"
+      />
+    </svg>
+  );
+}

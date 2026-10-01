@@ -23,7 +23,7 @@ export default function HistoryPage() {
     <AppPage>
       <AppTopBar
         title="History"
-        actionLabel={refreshing ? '...' : 'Refresh'}
+        actionLabel="Refresh"
         onAction={refreshAll}
         actionBusy={refreshing}
       />

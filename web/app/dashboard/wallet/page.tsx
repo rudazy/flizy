@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { AppTopBar } from '../../../components/AppTopBar';
 import {
@@ -12,9 +11,8 @@ import {
 import { ActivityPanels } from '../../../components/ActivityPanels';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
-import { isHeld } from '../../../lib/dashboardTypes';
-import { VerifiedMark } from '../../../components/VerifiedMark';
-import { BalanceEye } from '../../../components/BalanceEye';
+import { WalletBalances } from '../../../components/WalletBalances';
+import { BoltIcon, HistoryIcon, PlusCircleIcon, WalletIcon } from '../../../components/ExploreIcons';
 
 /**
  * Order is the product lock of 2026-09-17: Balances | History | Fund | Power.
@@ -23,272 +21,34 @@ import { BalanceEye } from '../../../components/BalanceEye';
  */
 const SLIDES = ['balances', 'history', 'fund', 'power'] as const;
 
-function tokenHref(token: { symbol: string; address: string | null; verified?: boolean }): string | null {
-  if (token.verified && token.symbol.toUpperCase() === 'FLZ') return '/dashboard/explore/tokens/flz';
-  if (token.address) return `/dashboard/explore/tokens/${token.address}`;
-  return null;
-}
-
 export default function WalletPage() {
-  const { data, holdings, explorerBase, refreshing, refreshAll } = useDashboard();
+  const { data, refreshing, refreshAll } = useDashboard();
   const [slide, setSlide] = useSlide(SLIDES, 'balances');
-  const [contract, setContract] = useState('');
-  const [tokenNote, setTokenNote] = useState('');
-  const [tokenError, setTokenError] = useState('');
-  const [tokenBusy, setTokenBusy] = useState(false);
-  const [addingToken, setAddingToken] = useState(false);
-  const [balancesHidden, setBalancesHidden] = useState(false);
-
-  // Only what the wallet actually holds. The API returns every tracked token and
-  // listed collection at zero so other callers can read the balance; this list
-  // shows a row only when there is something in it. See isHeld — an unreadable
-  // row stays visible rather than being reported as none.
-  const tokens = (holdings?.holdings?.tokens || []).filter((t) => isHeld(t.balance));
-  const nfts = (holdings?.holdings?.nfts || []).filter((n) => isHeld(n.balance));
-
-  async function addToken() {
-    if (tokenBusy || !contract.trim()) return;
-    setTokenBusy(true);
-    setTokenError('');
-    setTokenNote('');
-    try {
-      const res = await fetch('/api/wallet/tokens', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: contract }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setTokenError(body.error || 'Could not add that token.');
-        return;
-      }
-      const symbol = body.token?.symbol || 'Token';
-      const balance = body.token?.balance;
-      const holds = balance != null && Number(balance) > 0;
-      setTokenNote(
-        holds ? `${symbol} added.` : `${symbol} added. It shows here once this wallet holds some.`
-      );
-      setContract('');
-      await refreshAll();
-    } catch {
-      setTokenError('Could not add that token.');
-    } finally {
-      setTokenBusy(false);
-    }
-  }
-
-  async function removeToken(address: string) {
-    if (tokenBusy) return;
-    setTokenBusy(true);
-    setTokenError('');
-    setTokenNote('');
-    try {
-      const res = await fetch('/api/wallet/tokens', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setTokenError(body.error || 'Could not remove that token.');
-        return;
-      }
-      setTokenNote('Token removed.');
-      await refreshAll();
-    } catch {
-      setTokenError('Could not remove that token.');
-    } finally {
-      setTokenBusy(false);
-    }
-  }
 
   if (!data) return null;
 
   const nav = [
-    { id: 'balances', label: 'Balances' },
-    { id: 'history', label: 'History' },
-    { id: 'fund', label: 'Fund' },
-    { id: 'power', label: 'Power' },
+    { id: 'balances', label: 'Balances', icon: <WalletIcon size={15} /> },
+    { id: 'history', label: 'History', icon: <HistoryIcon size={15} /> },
+    { id: 'fund', label: 'Fund', icon: <PlusCircleIcon size={15} /> },
+    { id: 'power', label: 'Power', icon: <BoltIcon size={16} /> },
   ];
 
   return (
     <AppPage>
       <AppTopBar
         title="Wallet"
-        actionLabel={refreshing ? '...' : 'Refresh'}
+        actionLabel="Refresh"
         onAction={refreshAll}
         actionBusy={refreshing}
       />
 
-      <AppSlideNav items={nav} activeId={slide} onSelect={setSlide} />
+      {/* The top bar keeps its own bottom margin; the tabs sit closer under it here. */}
+      <div className="!-mt-[15px]">
+        <AppSlideNav items={nav} activeId={slide} onSelect={setSlide} variant="tabs" />
+      </div>
 
-      {slide === 'balances' ? (
-        <AppSection title="Balances" helper="What this Flizy wallet holds on GIWA Sepolia.">
-          <div className="flex items-center">
-            {holdings?.holdings?.native ? (
-              <p className="font-sans text-3xl tracking-wide text-lime">
-                {balancesHidden ? (
-                  <span className="tracking-[0.35em] text-muted">••••</span>
-                ) : (
-                  <>
-                    {Number(holdings.holdings.native.balance).toFixed(6)}{' '}
-                    <span className="text-lg text-paper">{holdings.holdings.native.symbol}</span>
-                  </>
-                )}
-              </p>
-            ) : (
-              <p className="font-sans text-2xl text-muted">No balance yet</p>
-            )}
-            {holdings?.holdings?.native || tokens.length || nfts.length ? (
-              <BalanceEye
-                hidden={balancesHidden}
-                onToggle={() => setBalancesHidden((open) => !open)}
-              />
-            ) : null}
-          </div>
-          <p className="mt-2 text-xs text-muted">
-            {holdings?.holdings?.chain?.name || 'GIWA Sepolia'}
-            {Number(data.account.balance_eth || 0) > 0
-              ? balancesHidden
-                ? ' · Credit ••••'
-                : ` · Credit ${data.account.balance_eth}`
-              : null}
-          </p>
-
-          <div className="mt-5">
-            <p className="label">Flizy wallet</p>
-            <p className="mono-box mt-1 break-all text-sm">
-              {data.account.agent_wallet_address || 'Generating...'}
-            </p>
-            {data.account.agent_wallet_address ? (
-              <div className="mt-2 flex flex-wrap gap-2">
-                <CopyButton value={data.account.agent_wallet_address} label="Copy address" />
-                <a
-                  className="btn btn-ghost text-sm"
-                  href={`${explorerBase}/address/${data.account.agent_wallet_address}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Explorer
-                </a>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-5">
-            <p className="label">Tokens</p>
-            {tokens.length ? (
-              <ul className="mt-2 space-y-0">
-                {tokens.map((t) => {
-                  const href = tokenHref(t);
-                  const label = (
-                    <span className="flex items-center gap-1.5 text-muted">
-                      <span>{t.symbol}</span>
-                      {t.verified ? <VerifiedMark /> : null}
-                    </span>
-                  );
-                  return (
-                    <li
-                      key={t.address || t.symbol}
-                      className="flex items-center justify-between gap-3 border-b border-border py-2.5 text-sm first:pt-0 last:border-0 last:pb-0"
-                    >
-                      {href ? (
-                        <Link href={href} className="no-underline">
-                          {label}
-                        </Link>
-                      ) : (
-                        label
-                      )}
-                      <span className="flex items-center gap-2">
-                        {t.added && t.address ? (
-                          <button
-                            type="button"
-                            className="min-h-11 px-2 text-xs text-muted"
-                            disabled={tokenBusy}
-                            onClick={() => removeToken(t.address as string)}
-                          >
-                            Remove
-                          </button>
-                        ) : null}
-                        <span className="font-mono text-paper">
-                          {balancesHidden
-                            ? '••••'
-                            : t.balance == null
-                              ? t.error || 'n/a'
-                              : Number(t.balance).toPrecision(6)}
-                        </span>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="mt-1 text-xs text-muted">
-                {holdings?.holdings?.note || 'Tokens appear here once you hold some.'}
-              </p>
-            )}
-            {tokenError ? <p className="alert alert-error mt-3">{tokenError}</p> : null}
-            {tokenNote ? <p className="m-0 mt-3 text-xs text-muted">{tokenNote}</p> : null}
-            {addingToken ? (
-              <form
-                className="mt-3 grid gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  addToken();
-                }}
-              >
-                <label className="grid gap-1">
-                  <span className="text-xs leading-relaxed text-muted">
-                    Paste a contract. Any token sent to this address can be added. Only a verified token can be sent
-                    on socials.
-                  </span>
-                  <input
-                    className="input font-mono"
-                    value={contract}
-                    spellCheck={false}
-                    autoComplete="off"
-                    autoFocus
-                    aria-label="Token contract"
-                    onChange={(event) => setContract(event.target.value)}
-                  />
-                </label>
-                <button type="submit" className="btn btn-primary" disabled={tokenBusy || !contract.trim()}>
-                  Add
-                </button>
-              </form>
-            ) : (
-              <button
-                type="button"
-                className="mt-3 inline-flex min-h-11 items-center text-sm text-lime"
-                onClick={() => setAddingToken(true)}
-              >
-                Add a token
-              </button>
-            )}
-          </div>
-
-          <div className="mt-5">
-            <p className="label">NFTs</p>
-            {nfts.length ? (
-              <ul className="mt-2 space-y-0">
-                {nfts.map((n) => (
-                  <li
-                    key={n.address}
-                    className="flex items-center justify-between border-b border-border py-2.5 text-sm first:pt-0 last:border-0 last:pb-0"
-                  >
-                    <span className="text-muted">{n.ticker}</span>
-                    <span className="font-mono text-paper">
-                      {balancesHidden ? '••••' : n.balance == null ? n.error || 'n/a' : n.balance}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1 text-xs text-muted">Listed NFTs appear after you mint or receive them.</p>
-            )}
-          </div>
-        </AppSection>
-      ) : null}
+      {slide === 'balances' ? <WalletBalances /> : null}
 
       {/*
         The same panels the History tab renders, from one component, so the two

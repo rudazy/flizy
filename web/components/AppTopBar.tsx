@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { AppDesktopTabs } from './AppBottomNav';
 import { useDashboard } from './DashboardProvider';
 import { useComingSoon } from './ComingSoon';
-import { BellIcon, SearchIcon } from './ExploreIcons';
+import { BellIcon, RefreshIcon, SearchIcon } from './ExploreIcons';
 
 type AppTopBarProps = {
   title: string;
@@ -65,11 +65,12 @@ export function AppTopBar({
             {actionLabel && onAction ? (
               <button
                 type="button"
-                className="btn btn-primary shrink-0 !px-3 !py-1.5 text-xs"
+                className="btn-sun hit-y-44 h-[34px] shrink-0 gap-[8px] rounded-[5px] px-[10px] font-sans text-[11px] font-semibold"
                 onClick={onAction}
                 disabled={actionBusy}
               >
-                {actionBusy ? '...' : actionLabel}
+                <RefreshIcon size={14} className={actionBusy ? 'animate-spin' : undefined} />
+                {actionLabel}
               </button>
             ) : null}
             <button

@@ -204,7 +204,7 @@ export default function DashboardHomePage() {
     <AppPage>
       <AppTopBar
         title="Home"
-        actionLabel={refreshing ? '...' : 'Refresh'}
+        actionLabel="Refresh"
         onAction={refreshAll}
         actionBusy={refreshing}
       />

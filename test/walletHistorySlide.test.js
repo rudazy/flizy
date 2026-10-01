@@ -31,7 +31,7 @@ describe('the slide exists, in the order the lock specifies', () => {
   });
 
   it('History is second in the visible nav, not appended at the end', () => {
-    const ids = [...WALLET.matchAll(/\{ id: '([a-z]+)', label: '[^']+' \}/g)].map((m) => m[1]);
+    const ids = [...WALLET.matchAll(/\{ id: '([a-z]+)', label: '[^']+'/g)].map((m) => m[1]);
     assert.deepEqual(ids, ['balances', 'history', 'fund', 'power']);
   });
 

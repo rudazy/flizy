@@ -28,27 +28,3 @@ export function EyeMark({
     </svg>
   );
 }
-
-/**
- * One privacy control for a balance figure.
- * The hit area is the button. The icon stays small.
- */
-export function BalanceEye({
-  hidden,
-  onToggle,
-}: {
-  hidden: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={hidden}
-      aria-label={hidden ? 'Show balances' : 'Hide balances'}
-      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded text-paper transition-colors hover:text-lime focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-lime"
-    >
-      <EyeMark hidden={hidden} className="h-[18px] w-[18px]" />
-    </button>
-  );
-}
