@@ -420,3 +420,57 @@ export function GiwaMarkIcon({ size, className }: IconProps) {
     </svg>
   );
 }
+
+export function ArrowDownIcon({ size, strokeWidth = 1.9, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M12 4v13M6.5 11.5L12 17l5.5-5.5" />
+        <path d="M5 20.5h14" />
+      </g>
+    </Svg>
+  );
+}
+
+export function SwapArrowsIcon({ size, strokeWidth = 1.9, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M4.5 8.5h14M15 5l3.5 3.5L15 12" />
+        <path d="M19.5 15.5h-14M9 12l-3.5 3.5L9 19" />
+      </g>
+    </Svg>
+  );
+}
+
+export function UserPlusIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="10" cy="8" r="3.6" />
+        <path d="M3.5 20c.8-3.6 3.3-5.4 6.5-5.4 1.6 0 3 .4 4.1 1.2" />
+        <path d="M18 14v6M15 17h6" />
+      </g>
+    </Svg>
+  );
+}
+
+export function AlertCircleIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="12" cy="12" r="8.8" />
+        <path d="M12 7.6v5.2" />
+        <path d="M12 16.2h.01" strokeWidth={2.6} />
+      </g>
+    </Svg>
+  );
+}
+
+export function CheckIcon({ size, strokeWidth = 2.2, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M5.5 12.5l4.2 4.2L18.5 7.8" />
+    </Svg>
+  );
+}

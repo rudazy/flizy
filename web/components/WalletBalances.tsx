@@ -4,8 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useDashboard } from './DashboardProvider';
 import { useComingSoon } from './ComingSoon';
+import { useTapGesture } from './AppSection';
 import { isHeld } from '../lib/dashboardTypes';
 import { VerifiedMark } from './VerifiedMark';
+import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
 import { EyeMark } from './BalanceEye';
 import {
   ArrowRightIcon,
@@ -59,7 +61,6 @@ export function WalletBalances() {
   const [market, setMarket] = useState<Market | null>(null);
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [contract, setContract] = useState('');
   const [tokenNote, setTokenNote] = useState('');
@@ -96,9 +97,15 @@ export function WalletBalances() {
   useEffect(
     () => () => {
       if (copyTimer.current) clearTimeout(copyTimer.current);
-      if (tapTimer.current) clearTimeout(tapTimer.current);
     },
     []
+  );
+
+  // One tap copies the address; a second tap inside the window opens it on the
+  // explorer. The copy runs inside the tap, see useTapGesture.
+  const onAddressTap = useTapGesture(
+    () => void copyAddress(),
+    () => openExplorer()
   );
 
   if (!data) return null;
@@ -128,20 +135,6 @@ export function WalletBalances() {
 
   function openExplorer() {
     if (address) window.open(`${explorerBase}/address/${address}`, '_blank', 'noopener,noreferrer');
-  }
-
-  /** One tap copies the address. A second tap inside 300ms opens it on the explorer instead. */
-  function onAddressTap() {
-    if (tapTimer.current) {
-      clearTimeout(tapTimer.current);
-      tapTimer.current = null;
-      openExplorer();
-      return;
-    }
-    tapTimer.current = setTimeout(() => {
-      tapTimer.current = null;
-      void copyAddress();
-    }, 300);
   }
 
   async function addToken() {
@@ -486,39 +479,6 @@ function HeroGlow() {
         }}
       />
     </span>
-  );
-}
-
-function Card({ className = '', children }: { className?: string; children: ReactNode }) {
-  return (
-    <section className={`rounded-[6px] border border-[#1f1f22] bg-[#0c0c0d] ${className}`}>{children}</section>
-  );
-}
-
-function CardHeader({
-  icon,
-  title,
-  subtitle,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-  action: ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-[13px]">
-        <span className="flex h-[29.5px] w-[29.5px] shrink-0 items-center justify-center rounded-[5px] border border-[#3a3017] bg-[#1c180c] text-sun">
-          {icon}
-        </span>
-        <div className="min-w-0">
-          <h2 className="m-0 font-sans text-[12.3px] font-semibold leading-[15px] text-white">{title}</h2>
-          <p className="m-0 mt-[1px] truncate font-sans text-[8.6px] text-[#b5b5b5]">{subtitle}</p>
-        </div>
-      </div>
-      <div className="shrink-0">{action}</div>
-    </div>
   );
 }
 

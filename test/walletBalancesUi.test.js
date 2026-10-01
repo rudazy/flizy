@@ -45,9 +45,9 @@ describe('the eye covers every amount', () => {
 });
 
 describe('the address', () => {
-  it('copies on one tap and opens the explorer on a second tap inside 300ms', () => {
-    assert.match(BALANCES, /if \(tapTimer\.current\) \{\s*clearTimeout\(tapTimer\.current\);\s*tapTimer\.current = null;\s*openExplorer\(\);/);
-    assert.match(BALANCES, /void copyAddress\(\);\s*\}, 300\);/);
+  it('copies inside the tap and opens the explorer on a second tap', () => {
+    // Through the shared hook: a copy delayed by a timer can be refused on iOS.
+    assert.match(BALANCES, /useTapGesture\(\s*\(\) => void copyAddress\(\),\s*\(\) => openExplorer\(\)\s*\)/);
     assert.match(BALANCES, /window\.open\(`\$\{explorerBase\}\/address\/\$\{address\}`, '_blank', 'noopener,noreferrer'\)/);
   });
 });

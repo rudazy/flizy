@@ -12,15 +12,23 @@ test('a second press inside the window is a double tap', async () => {
 
 test('the single-tap action runs inside the tap, not on a timer', () => {
   // A clipboard write deferred past the user gesture can be refused (iOS
-  // Safari), so the status tap must call onSingle synchronously.
+  // Safari), so the tap hook must call onSingle synchronously, and every
+  // copy-on-tap control must go through it rather than a timer of its own.
   const fs = require('node:fs');
   const path = require('node:path');
-  const src = fs.readFileSync(path.join(__dirname, '..', 'web', 'components', 'AppSection.tsx'), 'utf8');
-  const start = src.indexOf('export function AppStatusTap(');
-  assert.ok(start > 0, 'AppStatusTap must exist');
+  const web = (...p) => fs.readFileSync(path.join(__dirname, '..', 'web', ...p), 'utf8');
+  const src = web('components', 'AppSection.tsx');
+  const start = src.indexOf('export function useTapGesture(');
+  assert.ok(start > 0, 'useTapGesture must exist');
   const end = src.indexOf('\nexport function', start + 1);
   const body = src.slice(start, end < 0 ? undefined : end);
   assert.doesNotMatch(body, /setTimeout\(/);
   assert.match(body, /onSingle\(\);/);
-  assert.match(body, /aria-label=\{`\$\{label\}: \$\{value\}/, 'screen readers hear the value');
+
+  const home = web('app', 'dashboard', 'page.tsx');
+  assert.match(home, /const onWalletTap = useTapGesture\(/);
+  assert.match(home, /aria-label=\{`Wallet address: \$\{walletValue\}/, 'screen readers hear the value');
+  const wallet = web('components', 'WalletBalances.tsx');
+  assert.match(wallet, /const onAddressTap = useTapGesture\(/);
+  assert.doesNotMatch(wallet, /tapTimer/);
 });

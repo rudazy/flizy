@@ -7,7 +7,6 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import Link from 'next/link';
 import { useCallback, useMemo, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { classifyTap } from '../lib/tapGesture.ts';
@@ -30,8 +29,9 @@ export type SlideNavItem = { id: string; label: string; badge?: string; icon?: R
  * Not hash links — do not jump down a long page.
  *
  * `tabs` is the Explore form: a few equal-width tabs with icons, the active one
- * outlined in gold. The default is the small scrolling chips the other pages
- * use, where the count of slides varies.
+ * outlined in gold. `pills` is Home's: the same gold outline, each tab as wide
+ * as its label, with the count in a round badge. The default is the small
+ * scrolling chips the other pages use, where the count of slides varies.
  */
 export function AppSlideNav({
   items,
@@ -42,8 +42,43 @@ export function AppSlideNav({
   items: SlideNavItem[];
   activeId: string;
   onSelect: (id: string) => void;
-  variant?: 'chips' | 'tabs';
+  variant?: 'chips' | 'tabs' | 'pills';
 }) {
+  if (variant === 'pills') {
+    return (
+      <nav className="flex gap-[6.5px]" aria-label="Sections" role="tablist">
+        {items.map((item) => {
+          const active = item.id === activeId;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onSelect(item.id)}
+              className={`hit-y-44 flex h-[33.5px] shrink-0 items-center gap-[7px] rounded-[5px] border px-[15.5px] font-sans text-[10px] font-medium transition-colors ${
+                active
+                  ? 'border-[1.5px] border-sun bg-sun-wash text-sun'
+                  : 'border-chrome-line bg-[#0e0f11] text-[#e6e6e6] hover:border-[#34353b]'
+              }`}
+            >
+              {item.label}
+              {item.badge ? (
+                <span
+                  className={`flex h-[15px] min-w-[15px] items-center justify-center rounded-full px-[4px] text-[8.4px] font-semibold ${
+                    active ? 'bg-sun text-sun-ink' : 'bg-[#2c2d32] text-[#e6e6e6]'
+                  }`}
+                >
+                  {item.badge}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </nav>
+    );
+  }
+
   if (variant === 'tabs') {
     return (
       <nav
@@ -228,71 +263,17 @@ export function AppSection({
   );
 }
 
-/** Compact status strip (Home top) */
-export function AppStatusStrip({ children }: { children: ReactNode }) {
-  return (
-    <section className="card grid grid-cols-2 gap-0 overflow-hidden sm:grid-cols-4">
-      {children}
-    </section>
-  );
-}
-
-export function AppStatusCell({
-  label,
-  value,
-  href,
-}: {
-  label: string;
-  value: string;
-  href?: string;
-}) {
-  const inner = (
-    <>
-      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">{label}</p>
-      <p className="mt-1 truncate font-sans text-sm tracking-wide text-paper">{value}</p>
-    </>
-  );
-  if (href) {
-    return (
-      <Link
-        href={href}
-        className="border-b border-r border-border px-3 py-3 no-underline last:border-r-0 hover:bg-white/[0.02] sm:border-b-0"
-      >
-        {inner}
-      </Link>
-    );
-  }
-  return (
-    <div className="border-b border-r border-border px-3 py-3 last:border-r-0 sm:border-b-0">
-      {inner}
-    </div>
-  );
-}
-
 /**
- * Same cell as AppStatusCell, but one tap and two taps do different things.
+ * One tap and two taps doing different things, for a control whose single tap
+ * is something harmless to repeat (a copy) and whose double tap navigates.
  *
  * The single-tap action runs inside the tap itself, not after the double-tap
  * window: a clipboard write outside the user gesture can be refused (iOS Safari
- * does). So the first tap of a double tap also runs it, which suits an action
- * like a copy that is harmless to repeat before the second tap navigates.
+ * does). So the first tap of a double tap also runs it.
  */
-export function AppStatusTap({
-  label,
-  value,
-  hint,
-  onSingle,
-  onDouble,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  onSingle: () => void;
-  onDouble: () => void;
-}) {
+export function useTapGesture(onSingle: () => void, onDouble: () => void): () => void {
   const armedAt = useRef<number | null>(null);
-
-  function press() {
+  return function press() {
     const now = Date.now();
     if (armedAt.current != null && classifyTap(now - armedAt.current) === 'double') {
       armedAt.current = null;
@@ -301,76 +282,5 @@ export function AppStatusTap({
     }
     armedAt.current = now;
     onSingle();
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={press}
-      aria-label={`${label}: ${value}. ${hint}`}
-      className="w-full touch-manipulation select-none border-b border-r border-border bg-transparent px-3 py-3 text-left font-[inherit] last:border-r-0 hover:bg-white/[0.02] focus-visible:outline focus-visible:outline-1 focus-visible:outline-lime sm:border-b-0"
-    >
-      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">{label}</p>
-      <p className="mt-1 truncate font-sans text-sm tracking-wide text-paper">{value}</p>
-    </button>
-  );
-}
-
-/** Quick action grid — each item should open a real destination or slide (?s=) */
-export function AppQuickActions({
-  items,
-}: {
-  items: Array<{ href: string; label: string; hint?: string }>;
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {items.map((item) => (
-        <Link
-          key={item.href + item.label}
-          href={item.href}
-          className="card flex flex-col justify-center px-3 py-3 no-underline transition-colors hover:border-[#3a322a]"
-        >
-          <span className="font-sans text-sm tracking-wide text-paper">{item.label}</span>
-          {item.hint ? (
-            <span className="mt-0.5 font-mono text-[10px] text-muted">{item.hint}</span>
-          ) : null}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-/** List row for attention / setup */
-export function AppListRow({
-  title,
-  body,
-  done,
-  href,
-  actionLabel = 'Open',
-}: {
-  title: string;
-  body: string;
-  done?: boolean;
-  href?: string;
-  actionLabel?: string;
-}) {
-  return (
-    <li className="flex items-start gap-3 border-b border-border py-3 first:pt-0 last:border-0 last:pb-0">
-      <span
-        className={`mt-0.5 font-mono text-[11px] ${done ? 'text-lime' : 'text-muted'}`}
-        aria-hidden
-      >
-        {done ? '[x]' : '[ ]'}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="font-sans text-sm tracking-wide text-paper">{title}</p>
-        <p className="mt-0.5 text-xs text-muted">{body}</p>
-      </div>
-      {href && !done ? (
-        <Link href={href} className="shrink-0 text-xs text-lime no-underline hover:text-gold">
-          {actionLabel}
-        </Link>
-      ) : null}
-    </li>
-  );
+  };
 }

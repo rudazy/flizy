@@ -1298,3 +1298,42 @@ export async function canCreateTasks(accountId: string, client?: Db): Promise<bo
   const { data } = await supabase.from('accounts').select('id').eq('id', accountId).maybeSingle();
   return Boolean(data);
 }
+
+export type EnteredTaskCounts = Record<TaskState, number>;
+
+/** Entries counted for Home. More than anyone enters in practice, and a bound on the read. */
+const ENTERED_TASKS_READ_MAX = 500;
+
+/**
+ * How many tasks this account has entered, by where each task stands now.
+ *
+ * Counts only, for the Home summary. Which tasks they are, and what was
+ * entered, stay on the task pages. The state comes from deriveTaskState, so a
+ * task past its deadline reads as in review here exactly as it does on Explore.
+ */
+export async function countEnteredTasks(accountId: string, client?: Db): Promise<EnteredTaskCounts> {
+  const counts: EnteredTaskCounts = { live: 0, review: 0, completed: 0, cancelled: 0 };
+  if (!accountId) return counts;
+  const supabase = db(client);
+
+  const { data: entries, error: entriesError } = await supabase
+    .from('task_submissions')
+    .select('task_id')
+    .eq('account_id', accountId)
+    .limit(ENTERED_TASKS_READ_MAX);
+  if (entriesError) throw new Error(entriesError.message);
+  const taskIds = [...new Set((entries || []).map((e) => String((e as { task_id: string }).task_id)))];
+  if (!taskIds.length) return counts;
+
+  const { data: rows, error: tasksError } = await supabase
+    .from('tasks')
+    .select('id, status, ends_at')
+    .in('id', taskIds);
+  if (tasksError) throw new Error(tasksError.message);
+
+  const now = Date.now();
+  for (const row of (rows || []) as Array<Pick<TaskRow, 'status' | 'ends_at'>>) {
+    counts[deriveTaskState(row, now)] += 1;
+  }
+  return counts;
+}
