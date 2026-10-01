@@ -12,6 +12,7 @@ import {
 } from '../../../../lib/dexServer';
 import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
 import { asSwapQuoteError } from '../../../../lib/swapQuoteError';
+import { parseSlippageBps } from '../../../../lib/swapGate.ts';
 
 const ROUTE = 'GET /api/swap/quote';
 
@@ -67,11 +68,19 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
     }
 
+    let slippageBps: number | undefined;
+    try {
+      slippageBps = parseSlippageBps(url.searchParams.get('slippageBps'));
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    }
+
     const quote = await quoteSwap({
       provider,
       amountIn,
       tokenIn,
       tokenOut,
+      slippageBps,
     });
 
     const feePct = `${(quote.feeBps / 100).toFixed(2)}%`;

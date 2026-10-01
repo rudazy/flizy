@@ -474,3 +474,70 @@ export function CheckIcon({ size, strokeWidth = 2.2, className }: IconProps) {
     </Svg>
   );
 }
+
+export function ChartLineIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M3.5 4v16.5H21" />
+        <path d="M6.5 16l4.2-5 3.3 3 5.5-7" />
+      </g>
+    </Svg>
+  );
+}
+
+export function GearIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2.8l1.6 2.4 2.8-.7.7 2.8 2.4 1.6-1.2 2.6 1.2 2.6-2.4 1.6-.7 2.8-2.8-.7L12 21.2l-1.6-2.4-2.8.7-.7-2.8-2.4-1.6 1.2-2.6-1.2-2.6 2.4-1.6.7-2.8 2.8.7z" />
+      </g>
+    </Svg>
+  );
+}
+
+export function PencilIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M4 20l1-4.2L15.7 5.1a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.2 19 4 20z" />
+        <path d="M13.8 7l3.2 3.2" />
+      </g>
+    </Svg>
+  );
+}
+
+export function ShieldCheckIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M12 3l7.5 2.8v5.6c0 4.6-3.1 8.2-7.5 9.6-4.4-1.4-7.5-5-7.5-9.6V5.8L12 3z" />
+        <path d="M8.6 12.2l2.4 2.4 4.4-4.6" />
+      </g>
+    </Svg>
+  );
+}
+
+export function LockIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <rect x="5" y="10.5" width="14" height="10" rx="2" />
+        <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+        <path d="M12 14.6v2" />
+      </g>
+    </Svg>
+  );
+}
+
+export function SwapVerticalIcon({ size, strokeWidth = 2, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M8 19V5M4.5 8.5L8 5l3.5 3.5" />
+        <path d="M16 5v14M12.5 15.5L16 19l3.5-3.5" />
+      </g>
+    </Svg>
+  );
+}

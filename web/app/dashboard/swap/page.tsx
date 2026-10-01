@@ -1,28 +1,35 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppTopBar } from '../../../components/AppTopBar';
-import { AppDesktopTabs } from '../../../components/AppBottomNav';
-import { PasswordField } from '../../../components/PasswordField';
+import { AppPage } from '../../../components/AppSection';
 import { formatAmount } from '../../../lib/amountDisplay';
+import {
+  ArrowRightIcon,
+  ChartLineIcon,
+  ChevronDownIcon,
+  EthDiamondIcon,
+  GearIcon,
+  InfoIcon,
+  LockIcon,
+  PencilIcon,
+  PlusIcon,
+  RefreshIcon,
+  ShieldCheckIcon,
+  SwapArrowsIcon,
+  SwapVerticalIcon,
+} from '../../../components/ExploreIcons';
 
 type Token = 'ETH' | 'FLZ';
+type Mode = 'swap' | 'limit' | 'liquidity';
 
 type Quote = {
   amountIn: string;
   amountOut: string;
   amountOutMin: string;
-  fee: string;
-  feeBps: number;
-  feePct: string;
-  poolFeePct?: string;
-  allInPct?: string;
   slippagePct: string;
   tokenIn: string;
   tokenOut: string;
-  disclosure: string;
-  chain: { id: number; name: string };
 };
 
 type PriceInfo = {
@@ -32,15 +39,36 @@ type PriceInfo = {
   reserveWeth: string;
 };
 
+type LimitOrder = {
+  id: string;
+  tokenIn: Token;
+  tokenOut: Token;
+  amountIn: string;
+  minOut: string;
+  status: 'open' | 'filling' | 'filled' | 'cancelled' | 'expired' | 'failed';
+  expiresAt: string;
+  txHash: string | null;
+  error: string | null;
+};
+
+type Balances = { eth: string; flz: string };
+
+/** Characters kept out of the source as literals; see the ASCII rule for this repo. */
+const APPROX = String.fromCharCode(0x2248);
+const DOT = String.fromCharCode(0xb7);
+
+/** How often the quote and pool price refresh while the page is open. */
+const QUOTE_REFRESH_MS = 10000;
+
+/** Slippage the screen may set, matching SLIPPAGE_BPS_MIN/MAX in lib/swapGate.ts. */
+const SLIPPAGE_MIN_PCT = 0.1;
+const SLIPPAGE_MAX_PCT = 5;
+
 /**
  * With no cap this is the shared money rule (lib/amountDisplay.js), so a swap
- * amount reads the same here as it does in chat.
- *
- * With a cap it is a swap-specific quantity — a rate, a price impact, a
- * percentage — where fewer digits is the point. Those keep their own cap but
- * lose the old `>= 1000 rounds to 2dp` override, which silently contradicted
- * the cap the caller asked for, and the locale is pinned so grouping does not
- * depend on who is reading.
+ * amount reads the same here as it does in chat. With a cap it is a rate or a
+ * percentage, where fewer digits is the point, and the locale is pinned so
+ * grouping does not depend on who is reading.
  */
 function fmt(n: string | number, max?: number) {
   if (max === undefined) return formatAmount(n);
@@ -50,26 +78,36 @@ function fmt(n: string | number, max?: number) {
   return x.toLocaleString('en-US', { maximumFractionDigits: max });
 }
 
-type Balances = { eth: string; flz: string };
+/** A typed number with no more digits than the token can hold, as a plain string. */
+function plain(n: number, digits = 6): string {
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return (n >= 1 ? n.toFixed(digits) : n.toPrecision(digits)).replace(/\.?0+$/, '');
+}
 
 export default function SwapPage() {
+  const [mode, setMode] = useState<Mode>('swap');
   const [tokenIn, setTokenIn] = useState<Token>('ETH');
   const [tokenOut, setTokenOut] = useState<Token>('FLZ');
   const [amountIn, setAmountIn] = useState('0.01');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [price, setPrice] = useState<PriceInfo | null>(null);
   const [balances, setBalances] = useState<Balances>({ eth: '0', flz: '0' });
+  const [slippagePct, setSlippagePct] = useState('1.00');
+  const [editingSlippage, setEditingSlippage] = useState(false);
+  const [limitPrice, setLimitPrice] = useState('');
+  const [editingLimit, setEditingLimit] = useState(false);
+  const [orders, setOrders] = useState<LimitOrder[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [quoting, setQuoting] = useState(false);
-  const [result, setResult] = useState<{ explorerUrl?: string; txHash?: string } | null>(null);
-  const [showLiquidity, setShowLiquidity] = useState(false);
+  const [result, setResult] = useState<{ explorerUrl?: string; note?: string } | null>(null);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   const [lpMode, setLpMode] = useState<'add' | 'remove'>('add');
   const [lpEth, setLpEth] = useState('0.05');
   const [lpFlz, setLpFlz] = useState('2500');
-  const [lpBase, setLpBase] = useState<'ETH' | 'FLZ'>('ETH');
   const [lpPercent, setLpPercent] = useState(100);
-  const [password, setPassword] = useState('');
   const [lpPosition, setLpPosition] = useState<{
     lpBalanceFormatted: string;
     ethShare: string;
@@ -78,6 +116,10 @@ export default function SwapPage() {
   } | null>(null);
 
   const side = tokenIn === 'ETH' ? 'buy' : 'sell';
+  const slippageBps = Math.round(Number(slippagePct) * 100);
+
+  // A quote request that has been overtaken must not overwrite a newer one.
+  const quoteSeq = useRef(0);
 
   const loadBalances = useCallback(async () => {
     try {
@@ -88,38 +130,11 @@ export default function SwapPage() {
       const flzTok = (data?.holdings?.tokens || []).find(
         (t: { symbol?: string }) => String(t.symbol || '').toUpperCase() === 'FLZ'
       );
-      setBalances({
-        eth: String(eth),
-        flz: flzTok?.balance != null ? String(flzTok.balance) : '0',
-      });
+      setBalances({ eth: String(eth), flz: flzTok?.balance != null ? String(flzTok.balance) : '0' });
     } catch {
-      /* ignore */
+      /* balances stay as they were */
     }
   }, []);
-
-  const balanceFor = useCallback(
-    (token: Token) => (token === 'ETH' ? balances.eth : balances.flz),
-    [balances]
-  );
-
-  function setMaxIn() {
-    const raw = balanceFor(tokenIn);
-    let n = Number(raw);
-    if (!Number.isFinite(n) || n <= 0) {
-      setAmountIn('0');
-      return;
-    }
-    // Leave a gas buffer when paying with ETH
-    if (tokenIn === 'ETH') {
-      n = Math.max(0, n - 0.00008);
-    }
-    const s =
-      n >= 1
-        ? n.toFixed(6).replace(/\.?0+$/, '')
-        : n.toPrecision(6).replace(/\.?0+$/, '');
-    setAmountIn(s || '0');
-    setResult(null);
-  }
 
   const loadPrice = useCallback(async () => {
     try {
@@ -127,39 +142,48 @@ export default function SwapPage() {
       const data = await res.json();
       if (data.price) setPrice(data.price);
     } catch {
-      /* ignore */
+      /* the rate row waits for the next refresh */
     }
   }, []);
 
   const loadQuote = useCallback(async () => {
-    setError('');
-    if (!amountIn || Number(amountIn) <= 0) {
+    const seq = ++quoteSeq.current;
+    if (!amountIn || !(Number(amountIn) > 0)) {
       setQuote(null);
       return;
     }
     setQuoting(true);
     try {
-      const q = new URLSearchParams({
-        amount: amountIn,
-        side,
-        tokenIn,
-        tokenOut,
-      });
+      const q = new URLSearchParams({ amount: amountIn, side, tokenIn, tokenOut, slippageBps: String(slippageBps) });
       const res = await fetch(`/api/swap/quote?${q}`);
       const data = await res.json();
+      if (seq !== quoteSeq.current) return;
       if (!res.ok) {
         setQuote(null);
         setError(data.error || 'Quote failed');
         return;
       }
+      setError('');
       setQuote(data);
     } catch {
-      setQuote(null);
-      setError('Quote failed');
+      if (seq === quoteSeq.current) {
+        setQuote(null);
+        setError('Quote failed');
+      }
     } finally {
-      setQuoting(false);
+      if (seq === quoteSeq.current) setQuoting(false);
     }
-  }, [amountIn, side, tokenIn, tokenOut]);
+  }, [amountIn, side, tokenIn, tokenOut, slippageBps]);
+
+  const loadOrders = useCallback(async () => {
+    try {
+      const res = await fetch('/api/swap/limit');
+      const data = await res.json();
+      if (res.ok) setOrders(data.orders || []);
+    } catch {
+      /* the list waits for the next refresh */
+    }
+  }, []);
 
   const loadLpPosition = useCallback(async () => {
     try {
@@ -183,42 +207,90 @@ export default function SwapPage() {
   useEffect(() => {
     loadPrice();
     loadBalances();
-  }, [loadPrice, loadBalances]);
+    loadOrders();
+  }, [loadPrice, loadBalances, loadOrders]);
+
+  // The quote follows the inputs, and refreshes on its own while the page is
+  // open, so the figure on screen is the pool as it is now.
+  useEffect(() => {
+    if (mode !== 'swap') return;
+    const first = setTimeout(() => loadQuote(), 320);
+    const every = setInterval(() => {
+      if (!busy) {
+        loadQuote();
+        loadPrice();
+      }
+    }, QUOTE_REFRESH_MS);
+    return () => {
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, [mode, loadQuote, loadPrice, busy]);
+
+  // Limit mode keeps the market rate and the order list current.
+  useEffect(() => {
+    if (mode !== 'limit') return;
+    const every = setInterval(() => {
+      loadPrice();
+      loadOrders();
+    }, QUOTE_REFRESH_MS);
+    return () => clearInterval(every);
+  }, [mode, loadPrice, loadOrders]);
 
   useEffect(() => {
-    if (showLiquidity) {
-      loadLpPosition();
+    if (mode === 'liquidity') loadLpPosition();
+  }, [mode, loadLpPosition]);
+
+  /** One whole in-token buys this many out-tokens at the pool's spot price. */
+  const marketRate = useMemo(() => {
+    if (!price) return null;
+    const r = Number(tokenIn === 'ETH' ? price.flzPerEth : price.ethPerFlz);
+    return Number.isFinite(r) && r > 0 ? r : null;
+  }, [price, tokenIn]);
+
+  // Start the limit price at the market rate whenever the pair turns round or
+  // the rate first arrives, so the field never opens on a stale direction.
+  useEffect(() => {
+    if (mode === 'limit' && marketRate && !limitPrice) setLimitPrice(plain(marketRate, 8));
+  }, [mode, marketRate, limitPrice]);
+
+  const balanceFor = (token: Token) => (token === 'ETH' ? balances.eth : balances.flz);
+
+  function setMaxIn() {
+    let n = Number(balanceFor(tokenIn));
+    if (!Number.isFinite(n) || n <= 0) {
+      setAmountIn('0');
       return;
     }
-    const t = setTimeout(() => loadQuote(), 320);
-    return () => clearTimeout(t);
-  }, [loadQuote, showLiquidity, loadLpPosition]);
-
-  // Keep LP ratio loosely in sync with pool when editing one side
-  useEffect(() => {
-    if (!price || !showLiquidity) return;
-    const flzPerEth = Number(price.flzPerEth);
-    if (!(flzPerEth > 0)) return;
-    if (lpBase === 'ETH') {
-      const eth = Number(lpEth);
-      if (eth > 0) setLpFlz(String(Number((eth * flzPerEth).toFixed(4))));
-    } else {
-      const flz = Number(lpFlz);
-      if (flz > 0) setLpEth(String(Number((flz / flzPerEth).toFixed(6))));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only rebalance when pool price loads / base changes
-  }, [price?.flzPerEth, showLiquidity, lpBase]);
+    // Leave a gas buffer when paying with ETH.
+    if (tokenIn === 'ETH') n = Math.max(0, n - 0.00008);
+    setAmountIn(plain(n) || '0');
+    setResult(null);
+  }
 
   function flipTokens() {
     setTokenIn(tokenOut);
     setTokenOut(tokenIn);
-    // If we had a quoted out, seed the new input with it for a smooth flip
-    if (quote?.amountOut) {
-      setAmountIn(String(Number(quote.amountOut).toPrecision(8)).replace(/\.?0+$/, '') || quote.amountOut);
-    }
+    if (mode === 'swap' && quote?.amountOut) setAmountIn(plain(Number(quote.amountOut), 8) || amountIn);
     setQuote(null);
+    setLimitPrice('');
     setResult(null);
     setError('');
+  }
+
+  function chooseToken(which: 'in' | 'out', token: Token) {
+    if ((which === 'in' ? tokenIn : tokenOut) !== token) flipTokens();
+  }
+
+  function commitSlippage(raw: string) {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < SLIPPAGE_MIN_PCT || n > SLIPPAGE_MAX_PCT) {
+      setError(`Slippage must be between ${SLIPPAGE_MIN_PCT}% and ${SLIPPAGE_MAX_PCT}%.`);
+      return;
+    }
+    setError('');
+    setSlippagePct(n.toFixed(2));
+    setEditingSlippage(false);
   }
 
   async function runSwap() {
@@ -235,6 +307,9 @@ export default function SwapPage() {
           tokenIn,
           tokenOut,
           password,
+          slippageBps,
+          // The minimum on screen. The server refuses a fill below it.
+          minOut: quote?.amountOutMin,
         }),
       });
       const data = await res.json();
@@ -242,7 +317,8 @@ export default function SwapPage() {
         setError(data.error || 'Swap failed');
         return;
       }
-      setResult({ explorerUrl: data.explorerUrl, txHash: data.txHash });
+      setResult({ explorerUrl: data.explorerUrl });
+      setPassword('');
       loadPrice();
       loadQuote();
       loadBalances();
@@ -253,7 +329,48 @@ export default function SwapPage() {
     }
   }
 
-  async function runLiquidity() {
+  async function placeOrder() {
+    setBusy(true);
+    setError('');
+    setResult(null);
+    try {
+      const res = await fetch('/api/swap/limit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'place', side, amount: amountIn, price: limitPrice, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Could not place the order.');
+        return;
+      }
+      setResult({ note: 'Limit order placed. It fills when the pool reaches your price.' });
+      setPassword('');
+      loadOrders();
+    } catch {
+      setError('Could not place the order.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelOrder(id: string) {
+    setError('');
+    try {
+      const res = await fetch('/api/swap/limit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel', id }),
+      });
+      const data = await res.json();
+      if (!res.ok) setError(data.error || 'Could not cancel the order.');
+      loadOrders();
+    } catch {
+      setError('Could not cancel the order.');
+    }
+  }
+
+  async function runLiquidity(body: Record<string, unknown>, failed: string) {
     setBusy(true);
     setError('');
     setResult(null);
@@ -261,399 +378,339 @@ export default function SwapPage() {
       const res = await fetch('/api/swap/liquidity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'add',
-          amountEth: lpEth,
-          amountToken: lpFlz,
-          token: 'FLZ',
-          password,
-        }),
+        body: JSON.stringify({ ...body, password }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Liquidity failed');
+        setError(data.error || failed);
         return;
       }
-      setResult({ explorerUrl: data.explorerUrl, txHash: data.txHash });
+      setResult({ explorerUrl: data.explorerUrl });
+      setPassword('');
       loadPrice();
       loadLpPosition();
+      loadBalances();
     } catch {
-      setError('Liquidity failed');
+      setError(failed);
     } finally {
       setBusy(false);
     }
   }
 
-  async function runRemoveLiquidity(percent = lpPercent) {
-    setBusy(true);
-    setError('');
-    setResult(null);
-    try {
-      const res = await fetch('/api/swap/liquidity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'remove', percent, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Remove liquidity failed');
-        return;
-      }
-      setResult({ explorerUrl: data.explorerUrl, txHash: data.txHash });
-      loadPrice();
-      loadLpPosition();
-    } catch {
-      setError('Remove liquidity failed');
-    } finally {
-      setBusy(false);
-    }
+  // What the out side is worth against the pool's spot price: the fees and the
+  // trade's own impact together, which is what the person gives up.
+  const costPct = useMemo(() => {
+    if (!quote || !marketRate) return null;
+    const ideal = Number(amountIn) * marketRate;
+    const got = Number(quote.amountOut);
+    if (!(ideal > 0) || !Number.isFinite(got)) return null;
+    return (got / ideal - 1) * 100;
+  }, [quote, marketRate, amountIn]);
+
+  /** An FLZ figure's worth in ETH at spot, for the line under it. */
+  function ethValueOf(token: Token, amount: number): string | null {
+    if (token !== 'FLZ' || !price || !(amount > 0)) return null;
+    return `${APPROX} ${fmt(amount * Number(price.ethPerFlz), 6)} ETH`;
   }
 
-  const removePreview = useMemo(() => {
-    if (!lpPosition) return null;
-    const lp = Number(lpPosition.lpBalanceFormatted);
-    if (!(lp > 0)) return null;
-    const frac = Math.min(100, Math.max(1, lpPercent)) / 100;
-    return {
-      eth: Number(lpPosition.ethShare) * frac,
-      flz: Number(lpPosition.flzShare) * frac,
-      lp: lp * frac,
-    };
-  }, [lpPosition, lpPercent]);
+  const limitOut = useMemo(() => {
+    const a = Number(amountIn);
+    const p = Number(limitPrice);
+    return a > 0 && p > 0 ? a * p : 0;
+  }, [amountIn, limitPrice]);
 
-  const rateLine = useMemo(() => {
-    if (!price) return null;
-    if (tokenIn === 'ETH') {
-      return `1 ETH ≈ ${fmt(price.flzPerEth, 2)} FLZ`;
-    }
-    return `1 FLZ ≈ ${fmt(price.ethPerFlz, 8)} ETH`;
-  }, [price, tokenIn]);
+  const limitVsMarket = marketRate && Number(limitPrice) > 0 ? (Number(limitPrice) / marketRate - 1) * 100 : null;
 
-  const ctaLabel = busy
+  const swapCta = busy
     ? 'Swapping...'
-    : !amountIn || Number(amountIn) <= 0
+    : !(Number(amountIn) > 0)
       ? 'Enter an amount'
-      : quoting
-        ? 'Fetching quote...'
-        : !quote
-          ? 'Enter an amount'
-          : `Swap ${tokenIn} for ${tokenOut}`;
+      : !quote
+        ? quoting
+          ? 'Fetching quote...'
+          : 'Enter an amount'
+        : `Swap ${tokenIn} for ${tokenOut}`;
+
+  const tradeTitle = mode === 'limit' ? 'Limit order' : 'Trade';
 
   return (
-    <div className="space-y-4">
+    <AppPage>
       <AppTopBar title="Swap" />
-      <div className="hidden md:block">
-        <AppDesktopTabs />
-      </div>
 
-      {/* Header row: title + small liquidity entry */}
-      <div className="flex items-center justify-between gap-3 px-0.5">
-        <div>
-          <p className="font-sans text-sm tracking-wide text-paper">Trade</p>
-          <p className="font-mono text-[11px] text-muted">GIWA Sepolia · ETH / FLZ</p>
+      <div className="!-mt-[17px] flex items-stretch gap-[10.5px]">
+        <div className="flex h-[36px] flex-1 rounded-[5px] border border-chrome-line bg-[#0e0f11]" role="tablist" aria-label="Trade type">
+          <ModeTab active={mode === 'swap'} onClick={() => setMode('swap')} icon={<SwapArrowsIcon size={15} />} label="Swap" />
+          <ModeTab active={mode === 'limit'} onClick={() => setMode('limit')} icon={<ChartLineIcon size={15} />} label="Limit" />
         </div>
         <button
           type="button"
-          onClick={() => {
-            setShowLiquidity((v) => !v);
-            setError('');
-            setResult(null);
-          }}
-          className="rounded-md border border-border bg-surface px-2.5 py-1.5 font-mono text-[11px] text-muted transition-colors hover:border-lime/40 hover:text-lime"
+          onClick={() => setMode(mode === 'liquidity' ? 'swap' : 'liquidity')}
+          aria-pressed={mode === 'liquidity'}
+          className={`hit-y-44 flex h-[33px] w-[104px] shrink-0 items-center justify-center gap-[9px] self-center rounded-[5px] border border-sun font-sans text-[9.8px] font-medium text-sun ${
+            mode === 'liquidity' ? 'bg-sun-wash' : 'bg-transparent'
+          }`}
         >
-          {showLiquidity ? 'Back to swap' : '+ Liquidity'}
+          <PlusIcon size={11} strokeWidth={2} />
+          Add liquidity
         </button>
       </div>
 
-      {!showLiquidity ? (
-        <section className="card overflow-hidden p-3 sm:p-4">
-          {/* You pay */}
-          <TokenPanel
-            label="You pay"
-            token={tokenIn}
-            amount={amountIn}
-            editable
-            balance={balanceFor(tokenIn)}
-            onMax={setMaxIn}
-            onAmountChange={(v) => {
-              setAmountIn(v);
-              setResult(null);
-            }}
-          />
-
-          {/* Flip */}
-          <div className="relative z-10 -my-2.5 flex justify-center">
-            <button
-              type="button"
-              onClick={flipTokens}
-              aria-label="Switch tokens"
-              className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-ink text-paper shadow-glow transition-transform hover:border-lime/50 hover:text-lime active:scale-95"
-            >
-              <FlipIcon />
-            </button>
-          </div>
-
-          {/* You receive */}
-          <TokenPanel
-            label="You receive"
-            token={tokenOut}
-            amount={quote ? fmt(quote.amountOut, 6) : quoting ? '…' : '0'}
-            editable={false}
-            muted={!quote}
-            balance={balanceFor(tokenOut)}
-          />
-
-          {/* Details */}
-          <div className="mt-3 space-y-1.5 rounded-md border border-border/80 bg-ink/50 px-3 py-2.5 font-mono text-[11px]">
-            {rateLine ? (
-              <div className="flex justify-between gap-2 text-muted">
-                <span>Rate</span>
-                <span className="text-paper">{rateLine}</span>
-              </div>
-            ) : null}
-            {quote ? (
-              <>
-                <div className="flex justify-between gap-2 text-muted">
-                  <span>Protocol fee</span>
-                  <span className="text-gold">
-                    {quote.feePct} (~{fmt(quote.fee, 6)} {quote.tokenIn})
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2 text-muted">
-                  <span>Pool fee</span>
-                  <span className="text-paper">{quote.poolFeePct || '0.30%'}</span>
-                </div>
-                <div className="flex justify-between gap-2 text-muted">
-                  <span>All-in</span>
-                  <span className="text-lime">{quote.allInPct || '0.60%'} + gas</span>
-                </div>
-                <div className="flex justify-between gap-2 text-muted">
-                  <span>Slippage</span>
-                  <span className="text-paper">{quote.slippagePct}</span>
-                </div>
-                <div className="flex justify-between gap-2 text-muted">
-                  <span>Min received</span>
-                  <span className="text-paper">
-                    {fmt(quote.amountOutMin, 6)} {quote.tokenOut}
-                  </span>
-                </div>
-                <p className="border-t border-border pt-2 text-[10px] leading-relaxed text-muted">
-                  {quote.disclosure}
+      {mode !== 'liquidity' ? (
+        <>
+          <section
+            className="rounded-[6px] border border-[#3a3017] px-[11.5px] pb-[13px] pt-[12px]"
+            style={{ background: 'linear-gradient(180deg, #13110b 0%, #0e0d0b 100%)' }}
+          >
+            <div className="mb-[9px] flex items-start justify-between">
+              <div>
+                <h2 className="m-0 font-sans text-[13.5px] font-semibold leading-[17px] text-white">{tradeTitle}</h2>
+                <p className="m-0 mt-[1px] font-sans text-[10px] text-[#9d9d9d]">
+                  GIWA Sepolia {DOT} ETH / FLZ
                 </p>
+              </div>
+              {mode === 'swap' ? (
+                <button
+                  type="button"
+                  onClick={() => setEditingSlippage((v) => !v)}
+                  aria-label="Slippage settings"
+                  aria-pressed={editingSlippage}
+                  className="hit-44 flex h-[28px] w-[28px] items-center justify-center rounded-[5px] border border-[#2a2b30] bg-[#0f0f10] text-[#e6e6e6] hover:text-white"
+                >
+                  <GearIcon size={14} />
+                </button>
+              ) : null}
+            </div>
+
+            <TokenPanel
+              label="From"
+              token={tokenIn}
+              balance={balanceFor(tokenIn)}
+              onMax={setMaxIn}
+              onToken={(t) => chooseToken('in', t)}
+              amount={
+                <input
+                  aria-label={`Amount of ${tokenIn}`}
+                  className="w-full bg-transparent text-right font-sans text-[20px] font-semibold text-white outline-none placeholder:text-[#5c5c60]"
+                  inputMode="decimal"
+                  value={amountIn}
+                  placeholder="0"
+                  onChange={(e) => {
+                    setAmountIn(e.target.value.replace(/[^0-9.]/g, ''));
+                    setResult(null);
+                  }}
+                />
+              }
+              sub={ethValueOf(tokenIn, Number(amountIn))}
+            />
+
+            <div className="relative z-10 -my-[10px] flex justify-center">
+              <button
+                type="button"
+                onClick={flipTokens}
+                aria-label="Switch tokens"
+                className="flex h-[34px] w-[34px] items-center justify-center rounded-full border-[1.5px] border-sun bg-[#0f0d07] text-sun"
+              >
+                <SwapVerticalIcon size={16} />
+              </button>
+            </div>
+
+            <TokenPanel
+              label="To"
+              token={tokenOut}
+              balance={balanceFor(tokenOut)}
+              onToken={(t) => chooseToken('out', t)}
+              amount={
+                <span className={`block truncate text-right font-sans text-[20px] font-semibold ${quote || mode === 'limit' ? 'text-white' : 'text-[#5c5c60]'}`}>
+                  {mode === 'limit'
+                    ? limitOut
+                      ? fmt(limitOut, 6)
+                      : '0'
+                    : quote
+                      ? fmt(quote.amountOut, 6)
+                      : quoting
+                        ? '...'
+                        : '0'}
+                </span>
+              }
+              sub={
+                mode === 'limit' ? (
+                  'At your price'
+                ) : quote ? (
+                  <>
+                    {ethValueOf(tokenOut, Number(quote.amountOut))}
+                    {costPct != null ? (
+                      <span className={costPct < 0 ? 'text-[#f05252]' : 'text-[#2fd27a]'}>
+                        {' '}
+                        ({costPct >= 0 ? '+' : ''}
+                        {costPct.toFixed(1)}%)
+                      </span>
+                    ) : null}
+                  </>
+                ) : null
+              }
+            />
+          </section>
+
+          <section className="!mt-[10px] rounded-[6px] border border-[#1f1f22] bg-[#0c0c0d] px-[18px]">
+            {mode === 'swap' ? (
+              <>
+                <DetailRow
+                  label="Rate"
+                  info="The pool's price right now, before fees."
+                  value={marketRate ? `1 ${tokenIn} ${APPROX} ${fmt(marketRate, tokenIn === 'ETH' ? 2 : 8)} ${tokenOut}` : '...'}
+                  action={
+                    <IconAction label="Refresh the quote" onClick={() => { loadPrice(); loadQuote(); }}>
+                      <RefreshIcon size={15} className={quoting ? 'animate-spin' : undefined} />
+                    </IconAction>
+                  }
+                />
+                <DetailRow
+                  label="Slippage"
+                  info="How far the price may move before the swap is refused."
+                  value={
+                    editingSlippage ? (
+                      <InlineNumber
+                        initial={slippagePct}
+                        suffix="%"
+                        label="Slippage percent"
+                        onCommit={commitSlippage}
+                        onCancel={() => setEditingSlippage(false)}
+                      />
+                    ) : (
+                      `${slippagePct}%`
+                    )
+                  }
+                  action={
+                    <IconAction label="Edit slippage" onClick={() => setEditingSlippage((v) => !v)}>
+                      <PencilIcon size={14} />
+                    </IconAction>
+                  }
+                />
+                <DetailRow
+                  label="Min received"
+                  info="The least this swap can return. Below this it does not go through."
+                  value={quote ? `${fmt(quote.amountOutMin, 6)} ${quote.tokenOut}` : '...'}
+                  sub={quote ? ethValueOf(tokenOut, Number(quote.amountOutMin)) : null}
+                  last
+                />
               </>
             ) : (
-              <p className="text-muted">
-                All-in about 0.60% (protocol 0.30% + pool 0.30%) plus network gas. Shown before you
-                confirm.
-              </p>
+              <>
+                <DetailRow
+                  label="Limit price"
+                  info="Your order fills only when the pool gives at least this much."
+                  value={
+                    editingLimit ? (
+                      <InlineNumber
+                        initial={limitPrice}
+                        prefix={`1 ${tokenIn} =`}
+                        suffix={tokenOut}
+                        label="Limit price"
+                        onCommit={(v) => {
+                          if (Number(v) > 0) {
+                            setLimitPrice(v);
+                            setEditingLimit(false);
+                          }
+                        }}
+                        onCancel={() => setEditingLimit(false)}
+                      />
+                    ) : (
+                      `1 ${tokenIn} = ${limitPrice ? fmt(limitPrice, tokenIn === 'ETH' ? 2 : 8) : '...'} ${tokenOut}`
+                    )
+                  }
+                  sub={
+                    limitVsMarket != null ? (
+                      <span className={limitVsMarket < 0 ? 'text-[#f05252]' : 'text-[#2fd27a]'}>
+                        {limitVsMarket >= 0 ? '+' : ''}
+                        {limitVsMarket.toFixed(2)}% vs market
+                      </span>
+                    ) : null
+                  }
+                  action={
+                    <IconAction label="Edit limit price" onClick={() => setEditingLimit((v) => !v)}>
+                      <PencilIcon size={14} />
+                    </IconAction>
+                  }
+                />
+                <DetailRow
+                  label="Market"
+                  info="The pool's price right now, before fees."
+                  value={marketRate ? `1 ${tokenIn} ${APPROX} ${fmt(marketRate, tokenIn === 'ETH' ? 2 : 8)} ${tokenOut}` : '...'}
+                  action={
+                    <IconAction label="Refresh the market price" onClick={() => loadPrice()}>
+                      <RefreshIcon size={15} />
+                    </IconAction>
+                  }
+                />
+                <DetailRow
+                  label="Min received"
+                  info="The order cannot fill for less than this."
+                  value={limitOut ? `${fmt(limitOut, 6)} ${tokenOut}` : '...'}
+                  sub={ethValueOf(tokenOut, limitOut)}
+                  last
+                />
+              </>
             )}
-          </div>
+          </section>
 
-          <div className="mt-3">
-            <PasswordField
-              label="Account password"
-              value={password}
-              onChange={setPassword}
-              autoComplete="current-password"
-            />
+          <div className="!mt-[10px] flex items-center gap-[14px] rounded-[6px] border border-[#5a4a1c] bg-[#14110a] px-[16px] py-[8px]">
+            <ShieldCheckIcon size={18} className="shrink-0 text-sun" />
+            <div className="min-w-0">
+              <p className="m-0 font-sans text-[9.2px] font-semibold text-white">
+                {mode === 'limit' ? 'Fills when the pool reaches your price' : 'Price quote updates in real time'}
+              </p>
+              <p className="m-0 mt-[2px] font-sans text-[7.8px] text-[#b5b5b5]">
+                {mode === 'limit'
+                  ? 'Checked every few seconds. Open for 7 days. Cancel any time.'
+                  : 'The final amount may change slightly due to market movement.'}
+              </p>
+            </div>
           </div>
+        </>
+      ) : (
+        <LiquidityPanel
+          price={price}
+          lpMode={lpMode}
+          setLpMode={(m) => {
+            setLpMode(m);
+            if (m === 'remove') loadLpPosition();
+          }}
+          lpEth={lpEth}
+          lpFlz={lpFlz}
+          setLpEth={setLpEth}
+          setLpFlz={setLpFlz}
+          lpPercent={lpPercent}
+          setLpPercent={setLpPercent}
+          lpPosition={lpPosition}
+        />
+      )}
 
+      <div className="!mt-[12px]">
+        <label htmlFor="swap-password" className="mb-[6px] block font-mono text-[9.4px] uppercase tracking-[0.12em] text-[#e6e6e6]">
+          Account password
+        </label>
+        <div className="flex h-[39px] items-center gap-[12px] rounded-[5px] border border-[#2a2b30] bg-[#0d0d0e] pl-[16px] pr-[12px] focus-within:border-sun/60">
+          <LockIcon size={15} className="shrink-0 text-[#d6d6d6]" />
+          <input
+            id="swap-password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="min-w-0 flex-1 bg-transparent font-sans text-[11px] text-white outline-none placeholder:text-[#7a7a7f]"
+          />
           <button
             type="button"
-            className="btn btn-primary mt-3 w-full py-3.5 text-base font-semibold"
-            disabled={busy || quoting || !quote || !password}
-            onClick={runSwap}
+            onClick={() => setShowPassword((v) => !v)}
+            aria-pressed={showPassword}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="hit-44 shrink-0 font-sans text-[9px] font-medium uppercase tracking-[0.06em] text-[#e6e6e6] hover:text-white"
           >
-            {ctaLabel}
+            {showPassword ? 'Hide' : 'Show'}
           </button>
-        </section>
-      ) : (
-        <section className="card space-y-3 p-3 sm:p-4">
-          <div className="flex gap-1 rounded-md border border-border bg-ink/40 p-1">
-            <button
-              type="button"
-              className={`flex-1 rounded-md py-2 font-sans text-xs font-semibold transition-colors ${
-                lpMode === 'add' ? 'bg-lime text-ink' : 'text-muted hover:text-paper'
-              }`}
-              onClick={() => setLpMode('add')}
-            >
-              Add
-            </button>
-            <button
-              type="button"
-              className={`flex-1 rounded-md py-2 font-sans text-xs font-semibold transition-colors ${
-                lpMode === 'remove' ? 'bg-lime text-ink' : 'text-muted hover:text-paper'
-              }`}
-              onClick={() => {
-                setLpMode('remove');
-                loadLpPosition();
-              }}
-            >
-              Remove
-            </button>
-          </div>
-
-          <p className="text-xs leading-relaxed text-muted">
-            {lpMode === 'add'
-              ? 'Deposit ETH + FLZ. LP tokens go to your Flizy wallet. Site only. No protocol fee on add.'
-              : 'Burn LP tokens to withdraw ETH + FLZ to your Flizy wallet. Site only. No protocol fee on remove.'}
-          </p>
-          <PasswordField
-            label="Account password"
-            value={password}
-            onChange={setPassword}
-            autoComplete="current-password"
-            required
-          />
-
-          {price ? (
-            <div className="rounded-md border border-border bg-ink/50 px-3 py-2 font-mono text-[11px] text-muted">
-              Pool {fmt(price.reserveWeth, 4)} ETH / {fmt(price.reserveFlz, 0)} FLZ
-              <span className="mx-2 text-border">·</span>
-              1 ETH ≈ {fmt(price.flzPerEth, 2)} FLZ
-            </div>
-          ) : null}
-
-          {lpMode === 'add' ? (
-            <>
-              <TokenPanel
-                label="ETH"
-                token="ETH"
-                amount={lpEth}
-                editable
-                onAmountChange={(v) => {
-                  setLpBase('ETH');
-                  setLpEth(v);
-                  const flzPerEth = Number(price?.flzPerEth || 0);
-                  if (flzPerEth > 0 && Number(v) > 0) {
-                    setLpFlz(String(Number((Number(v) * flzPerEth).toFixed(4))));
-                  }
-                }}
-              />
-
-              <div className="flex justify-center">
-                <span className="font-mono text-xs text-muted">+</span>
-              </div>
-
-              <TokenPanel
-                label="FLZ"
-                token="FLZ"
-                amount={lpFlz}
-                editable
-                onAmountChange={(v) => {
-                  setLpBase('FLZ');
-                  setLpFlz(v);
-                  const flzPerEth = Number(price?.flzPerEth || 0);
-                  if (flzPerEth > 0 && Number(v) > 0) {
-                    setLpEth(String(Number((Number(v) / flzPerEth).toFixed(6))));
-                  }
-                }}
-              />
-
-              <div className="rounded-md border border-border/80 bg-ink/40 px-3 py-2 font-mono text-[11px] text-muted">
-                <div className="flex justify-between gap-2">
-                  <span>Pair</span>
-                  <span className="text-paper">ETH / FLZ</span>
-                </div>
-                <div className="mt-1 flex justify-between gap-2">
-                  <span>Also shown as</span>
-                  <span className="text-paper">FLZ / ETH</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-primary w-full py-3.5 text-base font-semibold"
-                disabled={busy || !password || !(Number(lpEth) > 0) || !(Number(lpFlz) > 0)}
-                onClick={runLiquidity}
-              >
-                {busy ? 'Adding...' : 'Supply liquidity'}
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="rounded-md border border-border bg-surface/80 px-3 py-3 font-mono text-xs">
-                <div className="flex justify-between gap-2 text-muted">
-                  <span>Your LP</span>
-                  <span className="text-paper">
-                    {lpPosition ? fmt(lpPosition.lpBalanceFormatted, 6) : '…'} FLZ-LP
-                  </span>
-                </div>
-                <div className="mt-1.5 flex justify-between gap-2 text-muted">
-                  <span>Pooled ETH</span>
-                  <span className="text-paper">{lpPosition ? fmt(lpPosition.ethShare, 6) : '…'}</span>
-                </div>
-                <div className="mt-1 flex justify-between gap-2 text-muted">
-                  <span>Pooled FLZ</span>
-                  <span className="text-paper">{lpPosition ? fmt(lpPosition.flzShare, 4) : '…'}</span>
-                </div>
-                {lpPosition && lpPosition.poolShareBps > 0 ? (
-                  <div className="mt-1 flex justify-between gap-2 text-muted">
-                    <span>Pool share</span>
-                    <span className="text-paper">{(lpPosition.poolShareBps / 100).toFixed(2)}%</span>
-                  </div>
-                ) : null}
-              </div>
-
-              <div>
-                <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-muted">
-                  Amount to remove
-                </p>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[25, 50, 75, 100].map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setLpPercent(p)}
-                      className={`rounded-md border py-2 font-mono text-xs transition-colors ${
-                        lpPercent === p
-                          ? 'border-lime bg-lime/15 text-lime'
-                          : 'border-border text-muted hover:text-paper'
-                      }`}
-                    >
-                      {p === 100 ? 'Max' : `${p}%`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {removePreview ? (
-                <div className="rounded-md border border-border/80 bg-ink/50 px-3 py-2.5 font-mono text-[11px] text-muted">
-                  <div className="flex justify-between gap-2">
-                    <span>You receive (est.)</span>
-                    <span className="text-paper">{lpPercent}%</span>
-                  </div>
-                  <div className="mt-1.5 flex justify-between gap-2">
-                    <span>ETH</span>
-                    <span className="text-paper">~{fmt(removePreview.eth, 6)}</span>
-                  </div>
-                  <div className="mt-1 flex justify-between gap-2">
-                    <span>FLZ</span>
-                    <span className="text-paper">~{fmt(removePreview.flz, 4)}</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-muted">No LP position yet. Supply liquidity first.</p>
-              )}
-
-              <button
-                type="button"
-                className="btn btn-primary w-full py-3.5 text-base font-semibold"
-                disabled={
-                  busy ||
-                  !password ||
-                  !lpPosition ||
-                  !(Number(lpPosition.lpBalanceFormatted) > 0) ||
-                  !(lpPercent > 0)
-                }
-                onClick={() => runRemoveLiquidity(lpPercent)}
-              >
-                {busy ? 'Removing...' : `Remove ${lpPercent}% liquidity`}
-              </button>
-            </>
-          )}
-        </section>
-      )}
+        </div>
+      </div>
 
       {error ? <div className="alert alert-warn text-sm">{error}</div> : null}
       {result?.explorerUrl ? (
@@ -663,111 +720,385 @@ export default function SwapPage() {
             {result.explorerUrl}
           </a>
         </div>
+      ) : result?.note ? (
+        <div className="alert alert-ok text-sm">{result.note}</div>
       ) : null}
 
-      <p className="text-center font-mono text-[11px] text-muted">
-        In chat: <span className="text-paper">flizy buy 0.01 FLZ</span> or <span className="text-paper">/buy 0.01 FLZ</span>
-        {' · '}
-        <Link href="/dashboard/wallet" className="text-lime no-underline">
-          Fund wallet
-        </Link>
-      </p>
-    </div>
+      {mode === 'swap' ? (
+        <CtaButton disabled={busy || quoting || !quote || !password} onClick={runSwap}>
+          {swapCta}
+        </CtaButton>
+      ) : mode === 'limit' ? (
+        <CtaButton disabled={busy || !(Number(amountIn) > 0) || !(Number(limitPrice) > 0) || !password} onClick={placeOrder}>
+          {busy ? 'Placing...' : 'Place limit order'}
+        </CtaButton>
+      ) : lpMode === 'add' ? (
+        <CtaButton
+          disabled={busy || !password || !(Number(lpEth) > 0) || !(Number(lpFlz) > 0)}
+          onClick={() =>
+            runLiquidity({ action: 'add', amountEth: lpEth, amountToken: lpFlz, token: 'FLZ' }, 'Liquidity failed')
+          }
+        >
+          {busy ? 'Adding...' : 'Supply liquidity'}
+        </CtaButton>
+      ) : (
+        <CtaButton
+          disabled={busy || !password || !lpPosition || !(Number(lpPosition.lpBalanceFormatted) > 0)}
+          onClick={() => runLiquidity({ action: 'remove', percent: lpPercent }, 'Remove liquidity failed')}
+        >
+          {busy ? 'Removing...' : `Remove ${lpPercent}% liquidity`}
+        </CtaButton>
+      )}
+
+      {mode === 'limit' && orders.length ? (
+        <section className="rounded-[6px] border border-[#1f1f22] bg-[#0c0c0d] px-[14px] py-[12px]">
+          <h3 className="m-0 font-sans text-[11px] font-semibold text-white">Your limit orders</h3>
+          <ul className="m-0 mt-[9px] grid list-none gap-[5px] p-0">
+            {orders.map((o) => (
+              <li key={o.id} className="flex items-center gap-[10px] rounded-[5px] border border-[#1f1f22] bg-[#0f0f10] px-[11px] py-[8px]">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-sans text-[10px] text-white">
+                    {fmt(o.amountIn)} {o.tokenIn} for at least {fmt(o.minOut)} {o.tokenOut}
+                  </span>
+                  <span className="block truncate font-sans text-[8.4px] text-[#a9a9a9]">
+                    {orderStatusLine(o)}
+                  </span>
+                </span>
+                {o.status === 'open' ? (
+                  <button
+                    type="button"
+                    onClick={() => cancelOrder(o.id)}
+                    className="hit-y-44 shrink-0 rounded-[4px] border border-[#2a2b30] bg-[#0f0f10] px-[10px] py-[5px] font-sans text-[9px] text-[#e6e6e6] hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </AppPage>
+  );
+}
+
+function orderStatusLine(o: LimitOrder): string {
+  if (o.status === 'open') {
+    const left = new Date(o.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `Open until ${left}`;
+  }
+  if (o.status === 'filling') return 'Filling now';
+  if (o.status === 'filled') return 'Filled';
+  if (o.status === 'cancelled') return 'Cancelled';
+  if (o.status === 'expired') return 'Expired';
+  return o.error ? `Failed: ${o.error}` : 'Failed';
+}
+
+function ModeTab({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`flex flex-1 items-center justify-center gap-[13px] rounded-[5px] font-sans text-[10px] font-medium ${
+        active ? 'border-[1.5px] border-sun bg-sun-wash text-sun' : 'text-[#d6d6d6] hover:text-white'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function TokenLogo({ token, size = 36 }: { token: Token; size?: number }) {
+  if (token === 'ETH') {
+    return (
+      <span className="flex shrink-0 items-center justify-center rounded-full bg-[#627eea] text-white" style={{ width: size, height: size }}>
+        <EthDiamondIcon size={Math.round(size * 0.58)} />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-full border-[1.5px] border-sun bg-[#0a0a0a] font-sans font-bold text-sun"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.52) }}
+    >
+      F
+    </span>
   );
 }
 
 function TokenPanel({
   label,
   token,
-  amount,
-  editable,
-  muted,
   balance,
   onMax,
-  onAmountChange,
+  onToken,
+  amount,
+  sub,
 }: {
   label: string;
   token: Token;
-  amount: string;
-  editable: boolean;
-  muted?: boolean;
-  balance?: string;
+  balance: string;
   onMax?: () => void;
-  onAmountChange?: (v: string) => void;
+  onToken: (t: Token) => void;
+  amount: ReactNode;
+  sub?: ReactNode;
 }) {
-  const balN = balance != null ? Number(balance) : null;
-  const balLabel =
-    balN == null || !Number.isFinite(balN)
-      ? null
-      : balN === 0
-        ? '0'
-        : balN >= 1
-          ? balN.toLocaleString(undefined, { maximumFractionDigits: 4 })
-          : balN.toPrecision(4);
-
+  const bal = Number(balance);
+  const balLabel = !Number.isFinite(bal) || bal === 0 ? '0' : bal >= 1 ? fmt(bal, 4) : bal.toPrecision(4);
   return (
-    <div className="rounded-md border border-border bg-surface/80 px-3 py-3 transition-colors focus-within:border-lime/35">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted">{label}</span>
-        <div className="flex items-center gap-2">
-          {balLabel != null ? (
-            <span className="font-mono text-[10px] text-muted">
-              Bal {balLabel}
-              {editable && onMax ? (
-                <button
-                  type="button"
-                  onClick={onMax}
-                  className="ml-1.5 rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-lime hover:border-lime/50"
-                >
-                  Max
-                </button>
-              ) : null}
-            </span>
+    <div className="rounded-[5px] border border-[#23242a] bg-[#0d0d0e] px-[3.5px] pb-[3.5px]">
+      <div className="flex h-[29px] items-center justify-between pl-[7px] pr-[3.5px]">
+        <span className="font-sans text-[11.5px] font-medium text-white">{label}</span>
+        <span className="flex items-center gap-[8px]">
+          <span className="font-sans text-[10px] text-[#a9a9a9]">Balance: {balLabel}</span>
+          {onMax ? (
+            <button
+              type="button"
+              onClick={onMax}
+              className="hit-44 flex h-[21px] items-center rounded-[4px] border border-[#8a7428] bg-[#1c180c] px-[7px] font-sans text-[8.6px] font-bold text-sun"
+            >
+              MAX
+            </button>
           ) : null}
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-md border border-border bg-ink px-2.5 py-1 font-sans text-xs font-semibold tracking-wide ${
-              token === 'ETH' ? 'text-paper' : 'text-lime'
-            }`}
-          >
-            <TokenDot token={token} />
-            {token}
+        </span>
+      </div>
+      <div className="flex h-[59px] rounded-[5px] border border-[#2a2b30] bg-[#0b0b0c]">
+        <label className="relative flex w-[138px] shrink-0 cursor-pointer items-center gap-[11px] border-r border-[#2a2b30] pl-[11px] pr-[10px]">
+          <TokenLogo token={token} />
+          <span className="min-w-0 flex-1">
+            <span className="block font-sans text-[11.5px] font-semibold text-white">{token}</span>
+            <span className="block font-sans text-[9.2px] text-[#a9a9a9]">{token === 'ETH' ? 'Ethereum' : 'Flizy'}</span>
           </span>
+          <ChevronDownIcon size={11} className="shrink-0 text-[#d9d9d9]" />
+          <select
+            aria-label={`${label} token`}
+            value={token}
+            onChange={(e) => onToken(e.target.value as Token)}
+            className="absolute inset-0 cursor-pointer opacity-0"
+          >
+            <option value="ETH">ETH</option>
+            <option value="FLZ">FLZ</option>
+          </select>
+        </label>
+        <div className="flex min-w-0 flex-1 flex-col justify-center pl-[10px] pr-[11px]">
+          {amount}
+          {sub ? <span className="mt-[2px] block truncate text-right font-sans text-[9.5px] text-[#a9a9a9]">{sub}</span> : null}
         </div>
       </div>
-      {editable ? (
-        <input
-          className="w-full border-0 bg-transparent p-0 font-mono text-2xl text-paper outline-none placeholder:text-muted/50"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => onAmountChange?.(e.target.value.replace(/[^0-9.]/g, ''))}
-          placeholder="0"
-        />
-      ) : (
-        <p className={`font-mono text-2xl ${muted ? 'text-muted' : 'text-paper'}`}>{amount}</p>
-      )}
     </div>
   );
 }
 
-function TokenDot({ token }: { token: Token }) {
+function DetailRow({
+  label,
+  info,
+  value,
+  sub,
+  action,
+  last,
+}: {
+  label: string;
+  info: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  action?: ReactNode;
+  last?: boolean;
+}) {
   return (
-    <span
-      className={`inline-block h-2 w-2 rounded-full ${token === 'ETH' ? 'bg-paper/80' : 'bg-lime'}`}
-      aria-hidden
-    />
+    <div className={`flex min-h-[35px] items-center justify-between gap-[10px] py-[8px] ${last ? '' : 'border-b border-[#1f1f22]'}`}>
+      <span className="flex items-center gap-[9px] font-sans text-[10.5px] text-[#cfcfcf]">
+        {label}
+        <span title={info} aria-label={info} role="img" className="text-[#a9a9a9]">
+          <InfoIcon size={12} />
+        </span>
+      </span>
+      <span className="flex items-center gap-[12px]">
+        <span className="grid justify-items-end">
+          <span className="font-sans text-[10.5px] text-white">{value}</span>
+          {sub ? <span className="font-sans text-[9.5px] text-[#b5b5b5]">{sub}</span> : null}
+        </span>
+        {action}
+      </span>
+    </div>
   );
 }
 
-function FlipIcon() {
+function IconAction({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 5v14M12 5l-3.5 3.5M12 5l3.5 3.5M12 19l-3.5-3.5M12 19l3.5-3.5"
-        stroke="currentColor"
-        strokeWidth="1.85"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+    <button type="button" onClick={onClick} aria-label={label} className="hit-44 flex text-sun hover:brightness-110">
+      {children}
+    </button>
+  );
+}
+
+/** A number edited in place in a detail row. Enter or leaving the field saves; Escape cancels. */
+function InlineNumber({
+  initial,
+  prefix,
+  suffix,
+  label,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  prefix?: string;
+  suffix?: string;
+  label: string;
+  onCommit: (v: string) => void;
+  onCancel: () => void;
+}) {
+  const [v, setV] = useState(initial);
+  return (
+    <span className="flex items-center gap-[5px]">
+      {prefix ? <span>{prefix}</span> : null}
+      <input
+        autoFocus
+        aria-label={label}
+        inputMode="decimal"
+        value={v}
+        onChange={(e) => setV(e.target.value.replace(/[^0-9.]/g, ''))}
+        onBlur={() => onCommit(v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onCommit(v);
+          if (e.key === 'Escape') onCancel();
+        }}
+        className="w-[78px] rounded-[3px] border border-sun/60 bg-[#0b0b0c] px-[5px] py-[2px] text-right font-sans text-[10.5px] text-white outline-none"
       />
-    </svg>
+      {suffix ? <span>{suffix}</span> : null}
+    </span>
+  );
+}
+
+function CtaButton({ disabled, onClick, children }: { disabled: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="btn-sun !mt-[11px] h-[37px] w-full gap-[14px] rounded-[5px] font-sans text-[12.5px] font-medium tracking-[0.02em]"
+    >
+      {children}
+      <ArrowRightIcon size={15} strokeWidth={2} />
+    </button>
+  );
+}
+
+function LiquidityPanel({
+  price,
+  lpMode,
+  setLpMode,
+  lpEth,
+  lpFlz,
+  setLpEth,
+  setLpFlz,
+  lpPercent,
+  setLpPercent,
+  lpPosition,
+}: {
+  price: PriceInfo | null;
+  lpMode: 'add' | 'remove';
+  setLpMode: (m: 'add' | 'remove') => void;
+  lpEth: string;
+  lpFlz: string;
+  setLpEth: (v: string) => void;
+  setLpFlz: (v: string) => void;
+  lpPercent: number;
+  setLpPercent: (n: number) => void;
+  lpPosition: { lpBalanceFormatted: string; ethShare: string; flzShare: string; poolShareBps: number } | null;
+}) {
+  const flzPerEth = Number(price?.flzPerEth || 0);
+  const lp = Number(lpPosition?.lpBalanceFormatted || 0);
+  const frac = Math.min(100, Math.max(1, lpPercent)) / 100;
+  const field =
+    'h-[36px] w-full rounded-[4px] border border-[#2a2b30] bg-[#0b0b0c] px-[11px] text-right font-sans text-[14px] font-semibold text-white outline-none focus:border-sun/60';
+
+  return (
+    <section
+      className="grid gap-[11px] rounded-[6px] border border-[#3a3017] px-[11.5px] pb-[13px] pt-[12px]"
+      style={{ background: 'linear-gradient(180deg, #13110b 0%, #0e0d0b 100%)' }}
+    >
+      <div>
+        <h2 className="m-0 font-sans text-[13.5px] font-semibold text-white">Liquidity</h2>
+        <p className="m-0 mt-[4px] font-sans text-[10px] text-[#9d9d9d]">
+          {price
+            ? `Pool ${fmt(price.reserveWeth, 4)} ETH / ${fmt(price.reserveFlz, 0)} FLZ`
+            : `GIWA Sepolia ${DOT} ETH / FLZ`}
+        </p>
+      </div>
+      <div className="flex h-[32px] rounded-[5px] border border-chrome-line bg-[#0e0f11]" role="tablist" aria-label="Liquidity action">
+        <ModeTab active={lpMode === 'add'} onClick={() => setLpMode('add')} icon={<PlusIcon size={11} />} label="Add" />
+        <ModeTab active={lpMode === 'remove'} onClick={() => setLpMode('remove')} icon={<RefreshIcon size={11} />} label="Remove" />
+      </div>
+
+      {lpMode === 'add' ? (
+        <>
+          <label className="grid gap-[5px] font-sans text-[10px] text-[#cfcfcf]">
+            ETH
+            <input
+              className={field}
+              inputMode="decimal"
+              value={lpEth}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^0-9.]/g, '');
+                setLpEth(v);
+                if (flzPerEth > 0 && Number(v) > 0) setLpFlz(String(Number((Number(v) * flzPerEth).toFixed(4))));
+              }}
+            />
+          </label>
+          <label className="grid gap-[5px] font-sans text-[10px] text-[#cfcfcf]">
+            FLZ
+            <input
+              className={field}
+              inputMode="decimal"
+              value={lpFlz}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^0-9.]/g, '');
+                setLpFlz(v);
+                if (flzPerEth > 0 && Number(v) > 0) setLpEth(String(Number((Number(v) / flzPerEth).toFixed(6))));
+              }}
+            />
+          </label>
+          <p className="m-0 font-sans text-[9px] text-[#a9a9a9]">
+            LP tokens go to your Flizy wallet. No protocol fee on add.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="grid gap-[4px] rounded-[5px] border border-[#23242a] bg-[#0d0d0e] px-[11px] py-[9px] font-sans text-[10px] text-[#a9a9a9]">
+            <span className="flex justify-between">
+              Your LP <span className="text-white">{lpPosition ? fmt(lpPosition.lpBalanceFormatted, 6) : '...'} FLZ-LP</span>
+            </span>
+            <span className="flex justify-between">
+              Pooled ETH <span className="text-white">{lpPosition ? fmt(lpPosition.ethShare, 6) : '...'}</span>
+            </span>
+            <span className="flex justify-between">
+              Pooled FLZ <span className="text-white">{lpPosition ? fmt(lpPosition.flzShare, 4) : '...'}</span>
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-[5px]">
+            {[25, 50, 75, 100].map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setLpPercent(p)}
+                className={`h-[30px] rounded-[4px] border font-sans text-[10px] ${
+                  lpPercent === p ? 'border-sun bg-sun-wash text-sun' : 'border-[#2a2b30] bg-[#0f0f10] text-[#d6d6d6]'
+                }`}
+              >
+                {p === 100 ? 'Max' : `${p}%`}
+              </button>
+            ))}
+          </div>
+          <p className="m-0 font-sans text-[9px] text-[#a9a9a9]">
+            {lp > 0 && lpPosition
+              ? `You receive about ${fmt(Number(lpPosition.ethShare) * frac, 6)} ETH and ${fmt(Number(lpPosition.flzShare) * frac, 4)} FLZ.`
+              : 'No LP position yet. Supply liquidity first.'}
+          </p>
+        </>
+      )}
+    </section>
   );
 }

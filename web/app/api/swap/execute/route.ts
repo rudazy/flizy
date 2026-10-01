@@ -22,7 +22,7 @@ import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountT
 import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 import { requirePassword } from '../../../../lib/passwordGate.ts';
-import { bindAmountOutMin, isUnverifiedSwap } from '../../../../lib/swapGate.ts';
+import { bindAmountOutMin, isUnverifiedSwap, parseSlippageBps } from '../../../../lib/swapGate.ts';
 
 const ROUTE = 'POST /api/swap/execute';
 
@@ -110,6 +110,15 @@ export async function POST(req: Request) {
       }
     }
 
+    // The slippage picked on screen. The reviewed minimum above already binds
+    // the fill; this keeps the server's own floor at the same tolerance.
+    let slippageBps: number | undefined;
+    try {
+      slippageBps = parseSlippageBps(body.slippageBps);
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    }
+
     const { data: account } = await supabase
       .from('accounts')
       .select('id, agent_wallet_address')
@@ -128,6 +137,7 @@ export async function POST(req: Request) {
       amountIn,
       tokenIn,
       tokenOut,
+      slippageBps,
     });
     if (confirmedMin != null && quote.amountOut < confirmedMin) {
       return NextResponse.json(

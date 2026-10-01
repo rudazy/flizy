@@ -58,6 +58,12 @@
     },
     {
       "kind": "function",
+      "name": "limit_orders_before_insert",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "executed by trigger limit_orders_before_insert"
+    },
+    {
+      "kind": "function",
       "name": "release_account_tx_lock",
       "providedBy": "20260827000000_account_tx_locks.sql",
       "requiredBy": "lib/accountTxLock.js"
@@ -163,6 +169,12 @@
       "name": "invite_phone_claims",
       "providedBy": "20260813000000_invite_attribution.sql",
       "requiredBy": "lib/invite.js"
+    },
+    {
+      "kind": "table",
+      "name": "limit_orders",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "lib/limitOrders.js"
     },
     {
       "kind": "table",
@@ -289,6 +301,12 @@
       "name": "invite_phone_claims_no_update",
       "providedBy": "20260813000000_invite_attribution.sql",
       "requiredBy": "trigger on invite_phone_claims"
+    },
+    {
+      "kind": "trigger",
+      "name": "limit_orders_before_insert",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "trigger on limit_orders"
     },
     {
       "kind": "trigger",

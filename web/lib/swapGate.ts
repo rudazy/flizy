@@ -36,3 +36,21 @@ export function isUnverifiedSwap(
 export function bindAmountOutMin(serverMin: bigint, confirmedMin: bigint | null): bigint {
   return confirmedMin != null && confirmedMin > serverMin ? confirmedMin : serverMin;
 }
+
+/** The slippage a person may pick on the swap screen: 0.1% to 5%. */
+export const SLIPPAGE_BPS_MIN = 10;
+export const SLIPPAGE_BPS_MAX = 500;
+
+/**
+ * A requested slippage in basis points, or undefined for the server default.
+ * Anything outside the range is refused rather than clamped, so a request can
+ * never quietly trade at a looser minimum than the one on screen.
+ */
+export function parseSlippageBps(raw: unknown): number | undefined {
+  if (raw == null || String(raw).trim() === '') return undefined;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < SLIPPAGE_BPS_MIN || n > SLIPPAGE_BPS_MAX) {
+    throw new RangeError('Slippage must be between 0.1% and 5%.');
+  }
+  return n;
+}
