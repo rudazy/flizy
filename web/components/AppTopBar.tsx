@@ -25,7 +25,10 @@ export function AppTopBar({
   actionBusy,
 }: AppTopBarProps) {
   const { data } = useDashboard();
-  const subtitle = data?.account.display_name || data?.account.email || '';
+  // Who is signed in, by @username, else the display name. Never the email: it
+  // is personal, and this line is on every page and in every screenshot.
+  const username = data?.account.username;
+  const subtitle = username ? `@${username}` : data?.account.display_name || '';
   const [comingSoon, comingSoonNote] = useComingSoon();
 
   return (

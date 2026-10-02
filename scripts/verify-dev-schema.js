@@ -56,6 +56,11 @@ const EXPECTED_FUNCTIONS = declared.functions;
 
 const EXPECTED_TRIGGERS = declared.triggers;
 
+// Named check constraints, as "table.name". Postgres names unnamed column
+// checks itself, so only the named ones are declared, and extra ones on the
+// live side are notes, not problems.
+const EXPECTED_CHECKS = declared.checks;
+
 // Index names the migrations declare. Primary key and unique constraint
 // indexes are named by the constraint rather than declared, so they are
 // filtered out of the live side before the comparison instead.
@@ -151,6 +156,17 @@ async function main() {
     )
   ).map((r) => r.tgname);
   diff('triggers', EXPECTED_TRIGGERS, triggers);
+
+  const checks = (
+    await q(
+      `select c.relname || '.' || k.conname as name from pg_constraint k
+       join pg_class c on c.oid = k.conrelid
+       join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and k.contype = 'c'
+       order by 1`
+    )
+  ).map((r) => r.name);
+  diff('checks', EXPECTED_CHECKS, checks);
 
   const indexRows = await q(
     `select indexname, indexdef from pg_indexes where schemaname = 'public' order by indexname`

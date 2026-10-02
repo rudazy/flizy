@@ -3,6 +3,300 @@
   "surface": "bot",
   "objects": [
     {
+      "kind": "check",
+      "name": "account_emails.account_emails_email_format",
+      "providedBy": "20260805120000_claim_email_recipient.sql",
+      "requiredBy": "check on account_emails"
+    },
+    {
+      "kind": "check",
+      "name": "channel_identities.channel_identities_channel_check_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on channel_identities"
+    },
+    {
+      "kind": "check",
+      "name": "channel_identities.whatsapp_identities_sender_nonempty",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "check on channel_identities"
+    },
+    {
+      "kind": "check",
+      "name": "claims.claims_asset_token_consistency",
+      "providedBy": "20260822000000_claim_listed_tokens.sql",
+      "requiredBy": "check on claims"
+    },
+    {
+      "kind": "check",
+      "name": "claims.claims_invite_code_format_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on claims"
+    },
+    {
+      "kind": "check",
+      "name": "claims.claims_nft_token_id_shape",
+      "providedBy": "20260826000000_claim_nft_token_id.sql",
+      "requiredBy": "check on claims"
+    },
+    {
+      "kind": "check",
+      "name": "claims.claims_recipient_mode_check_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on claims"
+    },
+    {
+      "kind": "check",
+      "name": "claims.claims_status_check_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on claims"
+    },
+    {
+      "kind": "check",
+      "name": "claims.claims_to_channel_check",
+      "providedBy": "20260801130000_claim_platform_recipient.sql",
+      "requiredBy": "check on claims"
+    },
+    {
+      "kind": "check",
+      "name": "contacts.contacts_alias_format",
+      "providedBy": "20260721020000_user_contacts.sql",
+      "requiredBy": "check on contacts"
+    },
+    {
+      "kind": "check",
+      "name": "contacts.contacts_alias_nonempty",
+      "providedBy": "20260721020000_user_contacts.sql",
+      "requiredBy": "check on contacts"
+    },
+    {
+      "kind": "check",
+      "name": "identity_events.identity_events_channel_check",
+      "providedBy": "20260802160000_identity_events.sql",
+      "requiredBy": "check on identity_events"
+    },
+    {
+      "kind": "check",
+      "name": "identity_events.identity_events_event_type_check",
+      "providedBy": "20260802160000_identity_events.sql",
+      "requiredBy": "check on identity_events"
+    },
+    {
+      "kind": "check",
+      "name": "invite_attributions.invite_attributions_blocked_reason_check",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "check on invite_attributions"
+    },
+    {
+      "kind": "check",
+      "name": "invite_attributions.invite_attributions_not_self",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "check on invite_attributions"
+    },
+    {
+      "kind": "check",
+      "name": "invite_attributions.invite_attributions_source_check_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on invite_attributions"
+    },
+    {
+      "kind": "check",
+      "name": "invite_codes.invite_codes_code_format_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on invite_codes"
+    },
+    {
+      "kind": "check",
+      "name": "invite_events.invite_events_event_type_check",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "check on invite_events"
+    },
+    {
+      "kind": "check",
+      "name": "invite_phone_claims.invite_phone_claims_phone_format",
+      "providedBy": "20260813000000_invite_attribution.sql",
+      "requiredBy": "check on invite_phone_claims"
+    },
+    {
+      "kind": "check",
+      "name": "limit_orders.limit_orders_amount_in_check",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "check on limit_orders"
+    },
+    {
+      "kind": "check",
+      "name": "limit_orders.limit_orders_error_check",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "check on limit_orders"
+    },
+    {
+      "kind": "check",
+      "name": "limit_orders.limit_orders_expiry_check",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "check on limit_orders"
+    },
+    {
+      "kind": "check",
+      "name": "limit_orders.limit_orders_min_out_check",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "check on limit_orders"
+    },
+    {
+      "kind": "check",
+      "name": "limit_orders.limit_orders_side_check",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "check on limit_orders"
+    },
+    {
+      "kind": "check",
+      "name": "limit_orders.limit_orders_status_check",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "check on limit_orders"
+    },
+    {
+      "kind": "check",
+      "name": "limit_orders.limit_orders_tx_hash_check",
+      "providedBy": "20261001120000_limit_orders.sql",
+      "requiredBy": "check on limit_orders"
+    },
+    {
+      "kind": "check",
+      "name": "link_codes.link_codes_code_format",
+      "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "check on link_codes"
+    },
+    {
+      "kind": "check",
+      "name": "nft_offer_declines.nft_offer_declines_marketplace_check",
+      "providedBy": "20261002140000_nft_offer_declines.sql",
+      "requiredBy": "check on nft_offer_declines"
+    },
+    {
+      "kind": "check",
+      "name": "nft_offer_declines.nft_offer_declines_offer_id_check",
+      "providedBy": "20261002140000_nft_offer_declines.sql",
+      "requiredBy": "check on nft_offer_declines"
+    },
+    {
+      "kind": "check",
+      "name": "notifications.notifications_channel_check_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on notifications"
+    },
+    {
+      "kind": "check",
+      "name": "pay_codes.pay_codes_code_format_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on pay_codes"
+    },
+    {
+      "kind": "check",
+      "name": "payment_requests.payment_requests_from_channel_check",
+      "providedBy": "20260907000000_request_platform_recipient.sql",
+      "requiredBy": "check on payment_requests"
+    },
+    {
+      "kind": "check",
+      "name": "payment_requests.payment_requests_paid_amount_range_check",
+      "providedBy": "20260908020000_request_partial_and_remind.sql",
+      "requiredBy": "check on payment_requests"
+    },
+    {
+      "kind": "check",
+      "name": "payment_requests.payment_requests_recipient_mode_check",
+      "providedBy": "20260907000000_request_platform_recipient.sql",
+      "requiredBy": "check on payment_requests"
+    },
+    {
+      "kind": "check",
+      "name": "payment_requests.payment_requests_status_check_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on payment_requests"
+    },
+    {
+      "kind": "check",
+      "name": "pots.pots_closed_at_check",
+      "providedBy": "20260908000000_pots.sql",
+      "requiredBy": "check on pots"
+    },
+    {
+      "kind": "check",
+      "name": "pots.pots_code_not_blank_check",
+      "providedBy": "20260908000000_pots.sql",
+      "requiredBy": "check on pots"
+    },
+    {
+      "kind": "check",
+      "name": "pots.pots_name_not_blank_check",
+      "providedBy": "20260908000000_pots.sql",
+      "requiredBy": "check on pots"
+    },
+    {
+      "kind": "check",
+      "name": "pots.pots_status_check",
+      "providedBy": "20260908000000_pots.sql",
+      "requiredBy": "check on pots"
+    },
+    {
+      "kind": "check",
+      "name": "pots.pots_target_positive_check",
+      "providedBy": "20260908000000_pots.sql",
+      "requiredBy": "check on pots"
+    },
+    {
+      "kind": "check",
+      "name": "reserved_usernames.reserved_usernames_category_nonempty",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "check on reserved_usernames"
+    },
+    {
+      "kind": "check",
+      "name": "reserved_usernames.reserved_usernames_normalized_name_nonempty",
+      "providedBy": "20260811000000_reserved_usernames.sql",
+      "requiredBy": "check on reserved_usernames"
+    },
+    {
+      "kind": "check",
+      "name": "sessions.sessions_channel_check_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on sessions"
+    },
+    {
+      "kind": "check",
+      "name": "transfers.transfers_amount_eth_check_v2",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "requiredBy": "check on transfers"
+    },
+    {
+      "kind": "check",
+      "name": "trusted_add_tickets.trusted_add_tickets_addr_format",
+      "providedBy": "20260923000000_trusted_destination_hold.sql",
+      "requiredBy": "check on trusted_add_tickets"
+    },
+    {
+      "kind": "check",
+      "name": "trusted_add_tickets.trusted_add_tickets_code_format",
+      "providedBy": "20260923000000_trusted_destination_hold.sql",
+      "requiredBy": "check on trusted_add_tickets"
+    },
+    {
+      "kind": "check",
+      "name": "trusted_addresses.trusted_addresses_addr_format",
+      "providedBy": "20260721120000_phase_full_features.sql",
+      "requiredBy": "check on trusted_addresses"
+    },
+    {
+      "kind": "check",
+      "name": "trusted_addresses.trusted_addresses_status_check",
+      "providedBy": "20260923000000_trusted_destination_hold.sql",
+      "requiredBy": "check on trusted_addresses"
+    },
+    {
+      "kind": "check",
+      "name": "users.users_phone_nonempty",
+      "providedBy": "20260721000000_create_users.sql",
+      "requiredBy": "check on users"
+    },
+    {
       "kind": "function",
       "name": "accounts_enforce_username_not_reserved",
       "providedBy": "20260811000000_reserved_usernames.sql",
@@ -71,7 +365,7 @@
     {
       "kind": "function",
       "name": "schema_guard_objects",
-      "providedBy": "20260812000000_schema_guard.sql",
+      "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "lib/schemaGuard.js"
     },
     {
@@ -114,7 +408,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/router.js, lib/session.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/router.js, lib/saleNotice.js, lib/session.js"
     },
     {
       "kind": "table",

@@ -37,6 +37,7 @@ const PRESENCE_KEYS = {
   view: ['views'],
   function: ['functions'],
   trigger: ['triggers'],
+  check: ['checks'],
 };
 
 /**
@@ -169,6 +170,20 @@ export async function checkSchema(supabase, manifest) {
       ok: false,
       missing: [],
       message: formatGuardUnavailable(reason, guardMigration(manifest)),
+    };
+  }
+
+  // A guard function from before check constraints were tracked would make
+  // every required check look missing. Name the one migration that fixes that.
+  if (manifest.objects.some((o) => o.kind === 'check') && !Array.isArray(data.checks)) {
+    return {
+      ...base,
+      ok: false,
+      missing: [],
+      message: formatGuardUnavailable(
+        'is an older version that does not report check constraints',
+        guardMigration(manifest)
+      ),
     };
   }
 

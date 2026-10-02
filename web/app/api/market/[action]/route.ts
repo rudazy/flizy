@@ -16,6 +16,7 @@ import { assertCanPay, runMarketCalls, type MarketCall } from '../../../../lib/m
 import { MARKET_KIND, checkMarketRateLimit } from '../../../../lib/marketRateLimit.ts';
 import { notifyAllChannels } from '../../../../lib/notifyChannels';
 import { formatOfferReceived } from '../../../../lib/offerNotice.ts';
+import { noticeSales } from '../../../../lib/saleNotice.ts';
 import { payerLabel } from '../../../../lib/payNotice.ts';
 import { siteOrigin } from '../../../../lib/siteOrigin';
 import { ethFromWei } from '../../../../lib/nftFormat.ts';
@@ -397,6 +398,17 @@ export async function POST(req: Request, { params }: { params: { action: string 
         });
         await supabase.from('transfers').update({ status: 'confirmed', tx_hash: txHash }).eq('id', logRow.id);
         if (plan.offerTo) await noticeOffer(supabase, accountId, plan.offerTo);
+        // A sale tells the other side: the seller when someone buys, the buyer
+        // when their offer is accepted. Figures come from the Sold event.
+        if (action === 'buy' || action === 'offer-accept') {
+          await noticeSales({
+            provider: ctx.provider,
+            txHash,
+            marketAddress: ctx.market.address,
+            actorAccountId: accountId,
+            siteUrl: siteOrigin(),
+          });
+        }
         return NextResponse.json({ ok: true, txHash, explorerUrl: explorerTxUrl(ctx.chain, txHash), label: plan.label });
       } catch (sendErr) {
         await supabase

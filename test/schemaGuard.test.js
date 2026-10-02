@@ -31,8 +31,8 @@ before(async () => {
 /** Build a schema_guard_objects() payload that satisfies a manifest. */
 function presentFor(manifest, omit = []) {
   const dropped = new Set(omit);
-  const present = { tables: [], views: [], functions: [], triggers: [], rls_enabled: [] };
-  const bucket = { table: 'tables', view: 'views', function: 'functions', trigger: 'triggers' };
+  const present = { tables: [], views: [], functions: [], triggers: [], checks: [], rls_enabled: [] };
+  const bucket = { table: 'tables', view: 'views', function: 'functions', trigger: 'triggers', check: 'checks' };
 
   for (const object of manifest.objects) {
     if (dropped.has(object.name)) continue;
@@ -155,7 +155,8 @@ describe('assertSchema', () => {
       (err) => {
         assert.equal(err.schemaGuard, true);
         assert.match(err.message, /cannot call public\.schema_guard_objects\(\)/);
-        assert.match(err.message, /20260812000000_schema_guard\.sql/);
+        // The newest migration that replaces the guard function is the one to apply.
+        assert.match(err.message, /20261002150000_schema_guard_checks\.sql/);
         return true;
       }
     );
@@ -202,7 +203,8 @@ describe('the reserved-usernames incident', () => {
     assert.ok(RESERVED_OBJECTS.includes('reserved_usernames'), 'the table');
     assert.ok(RESERVED_OBJECTS.includes('accounts_username_not_reserved'), 'the trigger');
     assert.ok(RESERVED_OBJECTS.includes('username_reserved_key'), 'the normalise function');
-    assert.equal(RESERVED_OBJECTS.length, 4);
+    assert.ok(RESERVED_OBJECTS.includes('reserved_usernames.reserved_usernames_category_nonempty'), 'its check rules');
+    assert.equal(RESERVED_OBJECTS.length, 6);
   });
 
   it('refuses to start against the database production actually had', async () => {
@@ -244,5 +246,54 @@ describe('the reserved-usernames incident', () => {
     assert.equal(result.ok, false);
     assert.match(result.message, /table reserved_usernames/);
     assert.match(result.message, /20260811000000_reserved_usernames\.sql/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Check constraints
+// ---------------------------------------------------------------------------
+
+describe('check constraints', () => {
+  const RULE = 'transfers.transfers_amount_eth_check_v2';
+  const webManifest = require('../web/lib/generated/schemaManifest.json');
+
+  it('the bot and the site both require the transfers amount rule', () => {
+    for (const manifest of [botManifest, webManifest]) {
+      const rule = manifest.objects.find((o) => o.kind === 'check' && o.name === RULE);
+      assert.ok(rule, manifest.surface);
+      assert.equal(rule.providedBy, '20261002150000_schema_guard_checks.sql');
+    }
+  });
+
+  it('refuses to start when a required rule is missing, and names its migration', async () => {
+    await assert.rejects(
+      () => bot.assertSchema(fakeSupabase(presentFor(botManifest, [RULE])), { manifest: botManifest }),
+      (err) => {
+        assert.equal(err.schemaGuard, true);
+        assert.ok(err.message.includes(`check ${RULE}`));
+        assert.ok(err.message.includes('20261002150000_schema_guard_checks.sql'));
+        return true;
+      }
+    );
+    const result = await web.checkSchema(fakeSupabase(presentFor(webManifest, [RULE])), webManifest);
+    assert.equal(result.ok, false);
+    assert.ok(result.message.includes(`check ${RULE}`));
+  });
+
+  it('a guard function from before checks were tracked fails once, by name, not as every rule missing', async () => {
+    const old = presentFor(botManifest);
+    delete old.checks;
+    await assert.rejects(
+      () => bot.assertSchema(fakeSupabase(old), { manifest: botManifest }),
+      (err) => {
+        assert.ok(err.message.includes('does not report check constraints'));
+        assert.ok(err.message.includes('20261002150000_schema_guard_checks.sql'));
+        assert.ok(!err.message.includes('is missing'));
+        return true;
+      }
+    );
+    const result = await web.checkSchema(fakeSupabase(old), webManifest);
+    assert.equal(result.ok, false);
+    assert.ok(result.message.includes('does not report check constraints'));
   });
 });
