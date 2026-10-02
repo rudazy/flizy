@@ -193,3 +193,25 @@ describe('approval and royalty bounds', () => {
     assert.match(fs.readFileSync(path.join(__dirname, '..', 'web', 'components', 'NftTradeSheet.tsx'), 'utf8'), /maxRoyaltyBps: Number\(capped\)/);
   });
 });
+
+describe('zero-value marketplace rows', () => {
+  const MIGRATION = fs.readFileSync(
+    path.join(__dirname, '..', 'supabase', 'migrations', '20261002130000_transfers_nft_market_zero.sql'),
+    'utf8'
+  );
+
+  it('the migration allows amount 0 only for nft_market rows', () => {
+    assert.match(MIGRATION, /check \(amount_eth > 0 or \(kind = 'nft_market' and amount_eth = 0\)\)/);
+    assert.match(MIGRATION, /raise exception/);
+  });
+
+  it('every zero-amount marketplace row the code writes is kind nft_market', () => {
+    assert.match(MARKET, /amount_eth: ethers\.formatEther\(plan\.value\),[\s\S]{0,200}kind: MARKET_KIND,/);
+    const engine = fs.readFileSync(path.join(__dirname, '..', 'lib', 'engine', 'executeAcceptOffer.js'), 'utf8');
+    assert.match(engine, /amount_eth: '0',[\s\S]{0,120}kind: 'nft_market',/);
+  });
+
+  it('a row that cannot be written reports the database reason to the server log', () => {
+    assert.match(MARKET, /could not log marketplace action: \$\{logError\?\.message/);
+  });
+});

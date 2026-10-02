@@ -15,6 +15,7 @@ import {
 } from '../../../../../../../lib/nftApi.ts';
 import { checkTokenId, type NftItem } from '../../../../../../../lib/nftIndex.ts';
 import { FEE_BPS, MARKET_ABI } from '../../../../../../../lib/nftMarket.ts';
+import { declinedOfferIds } from '../../../../../../../lib/offerBook.ts';
 
 const ROUTE = 'GET /api/nfts/collections/[address]/tokens/[tokenId]';
 const NFT_ABI = [
@@ -62,8 +63,18 @@ export async function GET(_req: Request, { params }: { params: { address: string
     const card = { ...toCard(item, header.name, listing, valid, header.profile?.avatar ?? null), owner };
 
     const nowSec = Math.floor(Date.now() / 1000);
+    // Offers this viewer declined stay off their view of the NFT, as on My NFTs.
+    const declined = view.address ? await declinedOfferIds(accountId, view.address).catch(() => new Set<string>()) : new Set<string>();
     const offers = [...(view.state?.offers.values() ?? [])]
-      .filter((o) => o.collection === address && o.expiry >= nowSec && (o.tokenId == null || o.tokenId === tokenId))
+      .filter((o) => !declined.has(o.offerId))
+      // An expired offer cannot be accepted, but its maker still has to see it to
+      // cancel it and get the ETH back, so the viewer's own stay in the list.
+      .filter(
+        (o) =>
+          o.collection === address &&
+          (o.expiry >= nowSec || o.maker === viewer.address) &&
+          (o.tokenId == null || o.tokenId === tokenId)
+      )
       .sort((a, b) => (BigInt(b.amount) > BigInt(a.amount) ? 1 : BigInt(b.amount) < BigInt(a.amount) ? -1 : 0))
       .slice(0, 50);
 

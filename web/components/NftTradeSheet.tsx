@@ -257,7 +257,11 @@ export function NftTradeSheet({
               </label>
             ) : null}
 
-            {price != null && intent.action !== 'royalty' && intent.action !== 'withdraw' && intent.action !== 'cancel' ? (
+            {price != null &&
+            intent.action !== 'royalty' &&
+            intent.action !== 'withdraw' &&
+            intent.action !== 'cancel' &&
+            intent.action !== 'offer-cancel' ? (
               <div className="grid gap-[7px] rounded-[8px] border border-[#23242a] bg-[#0b0b0c] p-[12px]">
                 {intent.action === 'buy' || intent.action === 'offer' ? (
                   <>
@@ -296,6 +300,14 @@ export function NftTradeSheet({
             ) : null}
             {intent.action === 'withdraw' ? (
               <Row label="Amount" value={<Eth wei={price} />} strong />
+            ) : null}
+            {intent.action === 'offer-cancel' ? (
+              <>
+                <Row label="Back to your wallet" value={<Eth wei={price} />} strong />
+                <p className="m-0 font-sans text-[11px] leading-[16px] text-[#8d8d8d]">
+                  The full amount of the offer is returned. No fee is taken. Network gas is paid from your wallet.
+                </p>
+              </>
             ) : null}
 
             <PasswordField label="Account password" value={password} onChange={setPassword} autoComplete="current-password" />

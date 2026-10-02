@@ -132,6 +132,13 @@ export function ExploreNfts() {
 
       {tab === 'listed' ? (
         <>
+          <Link
+            href="/dashboard/explore/nfts/me"
+            className="hit-y-44 flex h-[36px] items-center justify-between rounded-[6px] border border-[#3a3b40] bg-[#0f0f10] px-[12px] font-sans text-[11px] font-medium text-white no-underline hover:border-sun"
+          >
+            My NFTs and offers
+            <ChevronRightIcon size={12} />
+          </Link>
           <section
             className="relative overflow-hidden rounded-[6px] border border-[#5a4a1c] pb-[14px] pl-[66px] pr-[27px] pt-[11px]"
             style={{ background: 'linear-gradient(135deg, #1a160c 0%, #14120b 45%, #100f0b 100%)' }}

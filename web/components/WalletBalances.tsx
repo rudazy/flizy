@@ -9,6 +9,7 @@ import { isHeld } from '../lib/dashboardTypes';
 import { VerifiedMark } from './VerifiedMark';
 import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
 import { WalletNfts } from './WalletNfts';
+import { WalletOffers } from './WalletOffers';
 import { EyeMark } from './BalanceEye';
 import {
   ChevronDownIcon,
@@ -402,6 +403,7 @@ export function WalletBalances() {
 
       {/* NFTs: every collection the wallet holds, from the explorer. */}
       <WalletNfts chainName={chainName} hidden={hidden} />
+      <WalletOffers hidden={hidden} />
       {comingSoonNote}
     </div>
   );

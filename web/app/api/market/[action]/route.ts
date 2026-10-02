@@ -14,6 +14,11 @@ import { MARKET_ABI, MAX_ROYALTY_BPS } from '../../../../lib/nftMarket.ts';
 import { verifiedCollection } from '../../../../lib/listedNfts';
 import { assertCanPay, runMarketCalls, type MarketCall } from '../../../../lib/marketExecute.ts';
 import { MARKET_KIND, checkMarketRateLimit } from '../../../../lib/marketRateLimit.ts';
+import { notifyAllChannels } from '../../../../lib/notifyChannels';
+import { formatOfferReceived } from '../../../../lib/offerNotice.ts';
+import { payerLabel } from '../../../../lib/payNotice.ts';
+import { siteOrigin } from '../../../../lib/siteOrigin';
+import { ethFromWei } from '../../../../lib/nftFormat.ts';
 
 const ACTIONS = ['list', 'cancel', 'buy', 'offer', 'offer-cancel', 'offer-accept', 'royalty', 'withdraw'] as const;
 type Action = (typeof ACTIONS)[number];
@@ -48,6 +53,8 @@ type Plan = {
   label: string;
   /** Finishes "Password is required to ..." */
   reason: string;
+  /** An offer on one NFT: its owner hears about it in chat once it is made. */
+  offerTo?: { owner: string; collection: string; tokenId: string; nftLabel: string; amountWei: bigint };
 };
 
 function field(body: Record<string, unknown>, key: string): unknown {
@@ -208,10 +215,12 @@ async function buildPlan(
     await requireErc721(nft);
     const rawToken = field(body, 'tokenId');
     const tokenId = rawToken == null || rawToken === '' ? null : tokenOf(body);
+    let tokenOwner: string | null = null;
     if (tokenId) {
       const owner = await nft.ownerOf(tokenId).catch(() => null);
       if (!owner) throw new MarketError('This token does not exist.');
-      if (ethers.getAddress(owner) === viewer) throw new MarketError('You already own this NFT.');
+      tokenOwner = ethers.getAddress(owner);
+      if (tokenOwner === viewer) throw new MarketError('You already own this NFT.');
     }
     const amount = ethAmount(field(body, 'amountEth'), 'offer');
     const expiry = expiryFrom(field(body, 'days'));
@@ -220,6 +229,10 @@ async function buildPlan(
       value: amount,
       label: `Offer ${ethers.formatEther(amount)} ETH for ${label(name, tokenId)}`,
       reason: unverifiedReason(collection, 'make an offer on'),
+      // A collection offer names no one token, so it has no single owner to tell.
+      offerTo: tokenId && tokenOwner
+        ? { owner: tokenOwner, collection, tokenId, nftLabel: label(name, tokenId), amountWei: amount }
+        : undefined,
     };
   }
 
@@ -264,6 +277,44 @@ async function buildPlan(
     label: `Buy ${label(name, tokenId)} for ${ethers.formatEther(reviewed)} ETH`,
     reason: unverifiedReason(collection, 'buy'),
   };
+}
+
+/**
+ * Tells an NFT's owner in chat that an offer was made on it, if the owner is a
+ * Flizy account. The owner is found by the wallet that holds the NFT, the same
+ * lookup chat uses for a received payment (lib/router.js). The offer is already
+ * on chain: a notice that fails to queue is logged, never reported as a failed
+ * offer.
+ */
+async function noticeOffer(
+  supabase: ReturnType<typeof getSupabase>,
+  offererId: string,
+  offer: NonNullable<Plan['offerTo']>
+) {
+  try {
+    const { data: owner } = await supabase
+      .from('accounts')
+      .select('id')
+      .ilike('agent_wallet_address', offer.owner.toLowerCase())
+      .maybeSingle();
+    if (!owner?.id || owner.id === offererId) return;
+    const { data: offerer } = await supabase
+      .from('accounts')
+      .select('username, display_name')
+      .eq('id', offererId)
+      .maybeSingle();
+    await notifyAllChannels(
+      owner.id,
+      formatOfferReceived({
+        amountEth: ethFromWei(offer.amountWei) ?? ethers.formatEther(offer.amountWei),
+        nftLabel: offer.nftLabel,
+        fromLabel: payerLabel(offerer),
+        itemUrl: `${siteOrigin()}/dashboard/explore/nfts/${offer.collection}/${offer.tokenId}`,
+      })
+    );
+  } catch {
+    console.warn('[market] offer notice was not queued');
+  }
 }
 
 /**
@@ -316,7 +367,7 @@ export async function POST(req: Request, { params }: { params: { action: string 
       }
       await assertCanPay(ctx.provider, viewer, plan.value, plan.calls.length);
 
-      const { data: logRow } = await supabase
+      const { data: logRow, error: logError } = await supabase
         .from('transfers')
         .insert({
           account_id: accountId,
@@ -332,7 +383,9 @@ export async function POST(req: Request, { params }: { params: { action: string 
         })
         .select('id')
         .maybeSingle();
-      if (!logRow?.id) throw new Error('could not log marketplace action');
+      // The database's reason goes to the server log through apiErrorBody; the
+      // person only ever sees the generic message.
+      if (!logRow?.id) throw new Error(`could not log marketplace action: ${logError?.message || 'no row returned'}`);
 
       try {
         const txHash = await runMarketCalls({
@@ -343,6 +396,7 @@ export async function POST(req: Request, { params }: { params: { action: string 
           calls: plan.calls,
         });
         await supabase.from('transfers').update({ status: 'confirmed', tx_hash: txHash }).eq('id', logRow.id);
+        if (plan.offerTo) await noticeOffer(supabase, accountId, plan.offerTo);
         return NextResponse.json({ ok: true, txHash, explorerUrl: explorerTxUrl(ctx.chain, txHash), label: plan.label });
       } catch (sendErr) {
         await supabase

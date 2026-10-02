@@ -103,6 +103,9 @@ export function NftItem({ address, tokenId }: { address: string; tokenId: string
   const v = data.viewer;
   const listed = t.priceWei != null;
   const credits = BigInt(v.credits || '0');
+  // The list keeps the viewer's own expired offers so they can cancel them; the
+  // best offer is only ever one that can still be accepted.
+  const liveOffers = data.offers.filter((o) => o.expiry * 1000 >= Date.now());
 
   const actions: Array<{ label: string; icon: ReactNode; primary: boolean; run: () => void }> = [];
   if (m.tradable && !m.paused) {
@@ -189,7 +192,7 @@ export function NftItem({ address, tokenId }: { address: string; tokenId: string
           </div>
         ) : (
           <p className="m-0 mt-[4px] font-sans text-[13px] text-white">
-            {data.offers.length ? `Best offer ${ethFromWei(data.offers[0].amount)} ETH` : 'No offers yet'}
+            {liveOffers.length ? `Best offer ${ethFromWei(liveOffers[0].amount)} ETH` : 'No offers yet'}
           </p>
         )}
         {/* The royalty is read from the marketplace, so it is only known once trading is live. */}
@@ -239,6 +242,11 @@ export function NftItem({ address, tokenId }: { address: string; tokenId: string
       </section>
 
       <Section title={`Offers${data.offers.length ? ` (${data.offers.length})` : ''}`}>
+        {v.isOwner ? (
+          <Link href="/dashboard/explore/nfts/me?tab=received" className="mb-[6px] block font-sans text-[12px] text-sun no-underline">
+            All offers on your NFTs
+          </Link>
+        ) : null}
         {data.offers.length ? (
           <ul className="m-0 list-none p-0">
             {data.offers.map((o) => {
@@ -249,6 +257,7 @@ export function NftItem({ address, tokenId }: { address: string; tokenId: string
                     <p className="m-0 font-sans text-[13px] font-semibold text-white">{ethFromWei(o.amount)} ETH</p>
                     <p className="m-0 mt-[2px] truncate font-sans text-[11.5px] text-[#9a9a9a]">
                       {o.tokenId ? 'For this NFT' : 'Collection offer'} · from {mine ? 'you' : shortAddr(o.maker)}
+                      {o.expiry * 1000 < Date.now() ? ' · expired' : ''}
                       {usdLabel(o.amount, data.usdPerEth) ? ` · ${usdLabel(o.amount, data.usdPerEth)}` : ''}
                     </p>
                   </div>

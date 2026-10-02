@@ -190,6 +190,12 @@
     },
     {
       "kind": "table",
+      "name": "nft_offer_declines",
+      "providedBy": "20261002140000_nft_offer_declines.sql",
+      "requiredBy": "lib/router.js"
+    },
+    {
+      "kind": "table",
       "name": "notifications",
       "providedBy": "20260725110000_notifications_outbox.sql",
       "requiredBy": "lib/notify.js"

@@ -125,6 +125,12 @@ export function WalletNfts({ chainName, hidden }: { chainName: string; hidden: b
           </li>
         ) : null}
       </ul>
+      <Link
+        href="/dashboard/explore/nfts/me"
+        className="mt-[8px] flex h-[32px] items-center justify-center rounded-[5px] border border-[#1f1f22] font-sans text-[9.6px] text-[#ececec] no-underline hover:text-white"
+      >
+        My NFTs and offers
+      </Link>
     </Card>
   );
 }
