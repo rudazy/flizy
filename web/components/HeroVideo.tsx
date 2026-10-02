@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-const SRC = '/hero/brag-loop.mp4';
-const POSTER = '/hero/brag-poster.jpg';
+const SRC = '/hero/flizy-demo.mp4';
+const POSTER = '/hero/flizy-demo-poster.jpg';
 
 /**
  * The launch video, shown beside the landing headline. The file has no audio
@@ -11,6 +11,12 @@ const POSTER = '/hero/brag-poster.jpg';
  *
  * Visitors who prefer reduced motion get the poster with player controls
  * instead of autoplay, and the clip is only fetched if they press play.
+ *
+ * It plays as part of the page, not as media to take away. The long-press and
+ * right-click menu (save, copy link, open in new tab) and the iOS long-press
+ * preview are suppressed, and the download, picture-in-picture and cast options
+ * are turned off where the browser honours those attributes. This is cosmetic:
+ * the file stays public at its URL like any other asset.
  */
 export function HeroVideo() {
   // null until the motion preference is read, so the server render and the
@@ -29,7 +35,7 @@ export function HeroVideo() {
     <div className="card overflow-hidden">
       <video
         key={animate ? 'autoplay' : 'still'}
-        className="block aspect-video w-full bg-ink object-cover"
+        className="block aspect-video w-full select-none bg-ink object-cover [-webkit-touch-callout:none]"
         src={SRC}
         poster={POSTER}
         aria-label="Flizy launch video: sending crypto from a chat message"
@@ -39,6 +45,10 @@ export function HeroVideo() {
         autoPlay={animate === true}
         controls={animate === false}
         preload={animate ? 'auto' : 'none'}
+        controlsList="nodownload noremoteplayback"
+        disablePictureInPicture
+        disableRemotePlayback
+        onContextMenu={(event) => event.preventDefault()}
       />
     </div>
   );

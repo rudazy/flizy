@@ -105,7 +105,7 @@ docs/demo-scripts/**
 # Local screen captures and demo edit intermediates
 *.mp4
 # The landing hero video is a site asset, not a capture.
-!web/public/hero/brag-loop.mp4
+!web/public/hero/flizy-demo.mp4
 Captures/
 .video-edit/
 flizy-demo-edit/

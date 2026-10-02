@@ -35,11 +35,24 @@ describe('HeroVideo', () => {
     assert.ok(HERO.includes("preload={animate ? 'auto' : 'none'}"));
   });
 
+  it('turns off the long-press menu, preview, download, picture-in-picture and cast', () => {
+    assert.ok(HERO.includes('onContextMenu={(event) => event.preventDefault()}'));
+    assert.ok(HERO.includes('[-webkit-touch-callout:none]'));
+    assert.ok(HERO.includes('controlsList="nodownload noremoteplayback"'));
+    assert.match(HERO, /\bdisablePictureInPicture\b/);
+    assert.match(HERO, /\bdisableRemotePlayback\b/);
+  });
+
   it('points at files that exist in public/', () => {
-    for (const file of ['hero/brag-loop.mp4', 'hero/brag-poster.jpg']) {
+    for (const file of ['hero/flizy-demo.mp4', 'hero/flizy-demo-poster.jpg']) {
       assert.ok(HERO.includes(`/${file}`), `${file} is not referenced`);
       assert.ok(fs.existsSync(path.join(WEB, 'public', file)), `${file} is missing`);
     }
+  });
+
+  it('serves the clip under a site name, not the tool that made it', () => {
+    assert.doesNotMatch(HERO, /brag/i);
+    assert.equal(fs.readdirSync(path.join(WEB, 'public', 'hero')).some((f) => /brag/i.test(f)), false);
   });
 });
 
