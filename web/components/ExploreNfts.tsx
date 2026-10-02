@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDashboard } from './DashboardProvider';
-import { ComingSoonPanel, useComingSoon } from './ComingSoon';
+import { ComingSoonPanel } from './ComingSoon';
 import { CopySetupPanel } from './CopySetupPanel';
 import { NFT_VIEWS, type NftViewId } from '../lib/tokenDiscovery';
 import {
@@ -68,7 +69,6 @@ export function ExploreNfts() {
   const raw = search.get('view');
   const tab: TabId = TABS.some((t) => t.id === raw) ? (raw as TabId) : 'listed';
   const { explorerBase } = useDashboard();
-  const [comingSoon, comingSoonNote] = useComingSoon();
   const [collections, setCollections] = useState<Collection[] | null>(null);
   const [error, setError] = useState('');
   // The mint warning opens short; Read Guide shows it in full.
@@ -180,14 +180,13 @@ export function ExploreNfts() {
                 Official collections listed and verified by Flizy
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => comingSoon('All collections')}
-              className="hit-y-44 flex h-[27px] shrink-0 items-center gap-[10px] rounded-[5px] border border-[#3a3b40] bg-[#0f0f10] px-[11px] font-sans text-[9.6px] text-[#ececec] hover:text-white"
+            <Link
+              href="/dashboard/explore/nfts"
+              className="hit-y-44 flex h-[27px] shrink-0 items-center gap-[10px] rounded-[5px] border border-[#3a3b40] bg-[#0f0f10] px-[11px] font-sans text-[9.6px] text-[#ececec] no-underline hover:text-white"
             >
               View All
               <ChevronRightIcon size={11} />
-            </button>
+            </Link>
           </div>
 
           {error ? <p className="alert alert-error m-0">{error}</p> : null}
@@ -202,14 +201,12 @@ export function ExploreNfts() {
                   key={c.address}
                   collection={c}
                   explorerBase={explorerBase}
-                  onView={() => comingSoon('Collection page')}
                 />
               ))}
             </div>
           ) : null}
         </>
       ) : null}
-      {comingSoonNote}
     </div>
   );
 }
@@ -217,11 +214,9 @@ export function ExploreNfts() {
 function CollectionCard({
   collection,
   explorerBase,
-  onView,
 }: {
   collection: Collection;
   explorerBase: string;
-  onView: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -326,14 +321,13 @@ function CollectionCard({
             divider
           />
         </div>
-        <button
-          type="button"
-          onClick={onView}
-          className="btn-sun mt-[9px] h-[25.5px] w-full justify-between rounded-[5px] px-[12px] font-sans text-[9.6px] font-medium"
+        <Link
+          href={`/dashboard/explore/nfts/${collection.address}`}
+          className="btn-sun mt-[9px] h-[25.5px] w-full justify-between rounded-[5px] px-[12px] font-sans text-[9.6px] font-medium no-underline"
         >
           <span className="flex-1 text-center">View Collection</span>
           <ChevronRightIcon size={11} strokeWidth={2.2} />
-        </button>
+        </Link>
       </div>
     </article>
   );

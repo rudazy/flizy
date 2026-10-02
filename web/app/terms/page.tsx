@@ -13,7 +13,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/terms',
 });
 
-const UPDATED = '14 August 2026';
+const UPDATED = '2 October 2026';
 
 export default function TermsPage() {
   const origin = siteOrigin();
@@ -86,6 +86,24 @@ export default function TermsPage() {
             and never cancelled, it stays held; we are not obliged to hunt the recipient or to
             auto-return after a deadline unless the product later says otherwise. Do not send
             value you cannot afford to leave in a hold.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <LegalH id="nfts">NFT marketplace</LegalH>
+          <p>
+            Listings, sales and offers run on a public marketplace contract. Every sale pays a
+            2% Flizy fee and any creator royalty the collection&apos;s owner has set, up to 10%;
+            both are shown before you confirm, and the seller receives the rest. A listing
+            leaves the NFT in your wallet until it sells. An offer holds your ETH in the
+            contract until it is accepted or you cancel it.
+          </p>
+          <p>
+            Any collection on the network can be traded here, not only the ones Flizy has
+            verified. Anyone can deploy a collection with any name and artwork. We do not
+            vouch for unverified collections, their metadata or their contracts, and only
+            verified collections can be sent in chat. Check the contract address before you
+            buy. A completed trade is on chain and we cannot reverse it.
           </p>
         </section>
 

@@ -8,9 +8,9 @@ import { useTapGesture } from './AppSection';
 import { isHeld } from '../lib/dashboardTypes';
 import { VerifiedMark } from './VerifiedMark';
 import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
+import { WalletNfts } from './WalletNfts';
 import { EyeMark } from './BalanceEye';
 import {
-  ArrowRightIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CopyIcon,
@@ -18,7 +18,6 @@ import {
   ExternalLinkIcon,
   GiwaMarkIcon,
   InfoIcon,
-  NftsIcon,
   PlusIcon,
   TokensIcon,
 } from './ExploreIcons';
@@ -114,12 +113,11 @@ export function WalletBalances() {
   const native = holdings?.holdings?.native || null;
   const chainName = holdings?.holdings?.chain?.name || 'GIWA Sepolia';
   const credit = Number(data.account.balance_eth || 0);
-  // Only what the wallet actually holds. The API returns every tracked token and
-  // listed collection at zero so other callers can read the balance; this list
-  // shows a row only when there is something in it. See isHeld: an unreadable
+  // Only what the wallet actually holds. The API returns every tracked token at
+  // zero so other callers can read the balance; this list shows a row only when
+  // there is something in it. See isHeld: an unreadable
   // row stays visible rather than being reported as none.
   const tokens = (holdings?.holdings?.tokens || []).filter((t) => isHeld(t.balance));
-  const nfts = (holdings?.holdings?.nfts || []).filter((n) => isHeld(n.balance));
 
   async function copyAddress() {
     if (!address) return;
@@ -402,60 +400,8 @@ export function WalletBalances() {
         </ul>
       </Card>
 
-      {/* NFTs */}
-      <Card className="px-[9.8px] pb-[9.5px] pt-[10.5px]">
-        <CardHeader
-          icon={<NftsIcon size={15} />}
-          title="NFTs"
-          subtitle={`Your NFTs on ${chainName}.`}
-          action={
-            <button
-              type="button"
-              onClick={() => comingSoon('All NFTs')}
-              className="hit-y-44 flex h-[28px] items-center gap-[14px] rounded-[4px] border border-[#3a3b40] bg-[#0f0f10] px-[10px] font-sans text-[9.6px] text-[#ececec] hover:text-white"
-            >
-              View all
-              <ArrowRightIcon size={12} strokeWidth={1.8} />
-            </button>
-          }
-        />
-        <ul className="m-0 mt-[11px] grid list-none gap-[5px] p-0">
-          {nfts.length ? (
-            nfts.map((n) => (
-              <li key={n.address}>
-                <a
-                  href={`${explorerBase}/token/${n.address}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex h-[53.5px] items-center gap-[12px] rounded-[5px] border border-[#1f1f22] bg-[#0d0d0e] pl-[7px] pr-[12px] no-underline"
-                >
-                  <span
-                    className="flex h-[45px] w-[45px] shrink-0 items-center justify-center rounded-[4px] text-sun"
-                    style={{ background: 'radial-gradient(circle at 50% 60%, #3a2508 0%, #140d05 70%)' }}
-                  >
-                    <NftsIcon size={18} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-sans text-[11.5px] font-medium text-white">{n.ticker}</span>
-                    <span className="block font-sans text-[9.3px] text-[#a9a9a9]">
-                      {hidden
-                        ? HIDDEN
-                        : n.balance == null
-                          ? n.error || 'n/a'
-                          : `${n.balance} ${Number(n.balance) === 1 ? 'item' : 'items'}`}
-                    </span>
-                  </span>
-                  <ChevronRightIcon size={13} className="shrink-0 text-[#cfcfcf]" />
-                </a>
-              </li>
-            ))
-          ) : (
-            <li className="rounded-[5px] border border-[#1f1f22] bg-[#0d0d0e] px-[10px] py-[12px] font-sans text-[9px] text-[#a9a9a9]">
-              Listed NFTs appear after you mint or receive them.
-            </li>
-          )}
-        </ul>
-      </Card>
+      {/* NFTs: every collection the wallet holds, from the explorer. */}
+      <WalletNfts chainName={chainName} hidden={hidden} />
       {comingSoonNote}
     </div>
   );

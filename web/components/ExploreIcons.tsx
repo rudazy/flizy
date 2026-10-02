@@ -583,3 +583,85 @@ export function FlameIcon({ size, className }: IconProps) {
     </svg>
   );
 }
+
+export function HeartIcon({ size, strokeWidth = 1.8, className, filled = false }: IconProps & { filled?: boolean }) {
+  return (
+    <Svg size={size} className={className}>
+      <path
+        strokeWidth={strokeWidth}
+        fill={filled ? 'currentColor' : 'none'}
+        d="M12 20s-7.5-4.4-7.5-10.1A4.4 4.4 0 0 1 12 7.1a4.4 4.4 0 0 1 7.5 2.8C19.5 15.6 12 20 12 20z"
+      />
+    </Svg>
+  );
+}
+
+export function CartIcon({ size, strokeWidth = 1.9, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M3 4h2.2l2.2 10.4a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.1L20.5 8H6.1" />
+        <path d="M9.5 20h.01M17 20h.01" strokeWidth={2.8} />
+      </g>
+    </Svg>
+  );
+}
+
+export function TagIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8a1.4 1.4 0 0 1 0 2l-6.1 6.1a1.4 1.4 0 0 1-2 0z" />
+        <path d="M8 8h.01" strokeWidth={2.8} />
+      </g>
+    </Svg>
+  );
+}
+
+export function FilterIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M4 6h16M7 12h10M10 18h4" />
+    </Svg>
+  );
+}
+
+export function SortIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M7 4v16M3.5 16.5L7 20l3.5-3.5M17 20V4M13.5 7.5L17 4l3.5 3.5" />
+    </Svg>
+  );
+}
+
+export function GridIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <rect x="4" y="4" width="6.5" height="6.5" rx="1.2" />
+        <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2" />
+        <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2" />
+        <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2" />
+      </g>
+    </Svg>
+  );
+}
+
+export function GlobeIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M3.5 12h17M12 3.5c2.3 2.4 3.4 5.2 3.4 8.5s-1.1 6.1-3.4 8.5c-2.3-2.4-3.4-5.2-3.4-8.5S9.7 5.9 12 3.5z" />
+      </g>
+    </Svg>
+  );
+}
+
+export function CloseIcon({ size, strokeWidth = 2, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M6 6l12 12M18 6L6 18" />
+    </Svg>
+  );
+}

@@ -53,6 +53,26 @@
       "pairFlzWeth": []
     }
   },
+  "marketplace": {
+    "address": "0x7e817b6c42C14C0eC90be76030f808eFB20dF64a",
+    "deployedAt": "2026-10-02",
+    "deployBlock": 37606175,
+    "deployTx": "0x3c07d8cdd1df6546d577bfe95a5507ccea441b950d1ac3e5eef369e09219e311",
+    "owner": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+    "feeRecipient": "0x042D82b3EaC96d9f5CddC52Fb80FE9d30f11A2a0",
+    "feeBps": 200,
+    "maxRoyaltyBps": 1000,
+    "constructorArgs": ["0x042D82b3EaC96d9f5CddC52Fb80FE9d30f11A2a0"],
+    "verified": true,
+    "explorer": "https://sepolia-explorer.giwa.io/address/0x7e817b6c42C14C0eC90be76030f808eFB20dF64a",
+    "notes": [
+      "NFT marketplace, ERC-721 only. Source: contracts/src/market/FlizyMarketplace.sol.",
+      "FEE_BPS is a constant (2%). The owner can change feeRecipient and pause new trades, never the fee.",
+      "Web reads CHAIN_GIWA_SEPOLIA_MARKETPLACE and CHAIN_GIWA_SEPOLIA_MARKETPLACE_FROM_BLOCK (deployBlock above).",
+      "Listings need per-token approval (approve), which every transfer clears, so a listing ends when the NFT leaves the wallet. A listing caps the royalty at the rate in force when it was made; acceptOffer takes the seller's maximum royalty rate.",
+      "Superseded: 0xB7d06801Cd089A8ba128fab5F28536547B58B5BB (block 37601187), an earlier build without those two protections. It never traded and is paused."
+    ]
+  },
   "explorerLinks": {
     "weth": "https://sepolia-explorer.giwa.io/address/0x3a13399f2741122B63c7710B2A85346B97C6BFDf",
     "flz": "https://sepolia-explorer.giwa.io/address/0x308be8f71DA695f18E70D2243a446e1fD1566BA6",

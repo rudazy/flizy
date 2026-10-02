@@ -40,7 +40,11 @@ describe('the eye covers every amount', () => {
     assert.match(BALANCES, /amount=\{hidden \? HIDDEN : t\.balance == null/);
     assert.match(BALANCES, /value=\{value != null && !hidden \?/);
     assert.match(BALANCES, /change=\{isFlz && !hidden \?/);
-    assert.match(BALANCES, /\{hidden\s*\?\s*HIDDEN\s*:\s*n\.balance == null/);
+    // NFTs moved to WalletNfts, which takes the same eye and hides held counts and listed prices.
+    assert.match(BALANCES, /<WalletNfts chainName=\{chainName\} hidden=\{hidden\} \/>/);
+    const NFTS = read('components/WalletNfts.tsx');
+    assert.match(NFTS, /hidden \? HIDDEN : ethFromWei\(n\.listedWei\)/);
+    assert.match(NFTS, /hidden \? HIDDEN : n\.amount/);
   });
 });
 

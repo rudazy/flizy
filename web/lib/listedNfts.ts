@@ -47,6 +47,42 @@ export function listedNfts(): ListedNft[] {
   return [{ ticker: 'giwaforge', address: ethers.getAddress(DEFAULT_GIWAFORGE) }];
 }
 
+/**
+ * What a verified collection's page shows beyond the chain: the words, the art
+ * and who made it. Keyed by ticker. A listed ticker without a profile still
+ * shows as verified, with the explorer's name and no banner.
+ */
+export type CollectionProfile = {
+  description: string;
+  banner: string | null;
+  avatar: string | null;
+  creator: string;
+  category: string | null;
+};
+
+const PROFILES: Record<string, CollectionProfile> = {
+  giwaforge: {
+    description:
+      'Giwaforge is the Flizy test collection on GIWA Sepolia: 500 NFTs, one free claim per wallet. ' +
+      'Holders can send theirs to anyone on WhatsApp or Telegram, by phone number, email or username, ' +
+      'and trade them here.',
+    banner: '/explore/nft-giwaforge.png',
+    avatar: '/explore/nft-giwaforge-avatar.png',
+    creator: 'Flizy',
+    category: 'Test',
+  },
+};
+
+export type VerifiedCollection = ListedNft & { profile: CollectionProfile | null };
+
+/** The registry entry for an address, or null when Flizy has not verified it. */
+export function verifiedCollection(address: string): VerifiedCollection | null {
+  if (!ethers.isAddress(address)) return null;
+  const target = ethers.getAddress(address);
+  const hit = listedNfts().find((col) => col.address === target);
+  return hit ? { ...hit, profile: PROFILES[hit.ticker] ?? null } : null;
+}
+
 export async function loadNftHoldings(
   provider: ethers.Provider,
   wallet: string

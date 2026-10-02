@@ -64,6 +64,12 @@
     },
     {
       "kind": "function",
+      "name": "nft_favorites_before_insert",
+      "providedBy": "20261002120000_nft_favorites.sql",
+      "requiredBy": "executed by trigger nft_favorites_before_insert"
+    },
+    {
+      "kind": "function",
       "name": "projects_handle_not_username",
       "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "executed by trigger projects_handle_not_username"
@@ -138,7 +144,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/tasks.ts"
+      "requiredBy": "web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/nftApi.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/tasks.ts"
     },
     {
       "kind": "table",
@@ -226,6 +232,12 @@
     },
     {
       "kind": "table",
+      "name": "nft_favorites",
+      "providedBy": "20261002120000_nft_favorites.sql",
+      "requiredBy": "web/app/api/nfts/favorites/route.ts"
+    },
+    {
+      "kind": "table",
       "name": "notifications",
       "providedBy": "20260725110000_notifications_outbox.sql",
       "requiredBy": "web/lib/notifyChannels.ts"
@@ -294,7 +306,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/pay/execute/route.ts, web/app/api/swap/execute/route.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
+      "requiredBy": "web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/swap/execute/route.ts, web/lib/marketRateLimit.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
     },
     {
       "kind": "table",
@@ -373,6 +385,12 @@
       "name": "limit_orders_before_insert",
       "providedBy": "20261001120000_limit_orders.sql",
       "requiredBy": "trigger on limit_orders"
+    },
+    {
+      "kind": "trigger",
+      "name": "nft_favorites_before_insert",
+      "providedBy": "20261002120000_nft_favorites.sql",
+      "requiredBy": "trigger on nft_favorites"
     },
     {
       "kind": "trigger",

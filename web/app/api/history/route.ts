@@ -85,6 +85,9 @@ function mapTransferRow(
     label = fromLabel
       ? `Received ${amount} ${asset} from ${fromLabel}`
       : `Received ${amount} ${asset}`;
+  } else if (kind === 'nft_market') {
+    // Written by POST /api/market/[action], e.g. "Buy Giwaforge #12 for 0.05 ETH".
+    label = labelExtra || 'NFT marketplace';
   } else {
     const dest = labelExtra || (to ? shortAddr(to) : '—');
     label = `Sent ${amount} ${asset} → ${dest}`;

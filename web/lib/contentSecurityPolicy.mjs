@@ -43,7 +43,10 @@ export function contentSecurityPolicy({ dev, dsn }) {
     // 'unsafe-inline' is required by Next's inline bootstrap and the gtag/clarity snippets.
     scriptSrc,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: https://www.googletagmanager.com https://c.clarity.ms",
+    // https: because NFT art lives on whatever host each collection's metadata
+    // names (web/lib/nftIndex.ts safeImageUrl). Images cannot run script, and
+    // http is still refused by upgrade-insecure-requests below.
+    "img-src 'self' data: https:",
     "font-src 'self' data:",
     `connect-src 'self' https://www.google-analytics.com https://*.clarity.ms${
       sentryOrigin ? ` ${sentryOrigin}` : ''

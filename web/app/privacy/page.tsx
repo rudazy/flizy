@@ -14,7 +14,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '19 September 2026';
+const UPDATED = '2 October 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -167,6 +167,13 @@ export default function PrivacyPage() {
             our email sender for verification codes. If you accepted analytics, the measurement
             services named above also receive the site usage described there, and nothing else.
             We do not sell it. We do not use advertising pixels.
+          </p>
+          <p>
+            The NFT pages read public chain data about your wallet through the GIWA block
+            explorer. NFT artwork loads from wherever that NFT&apos;s creator hosts it, so that
+            host sees your IP address and browser, as with any image on the web; we send it no
+            page address. The dollar estimate next to ETH prices is fetched by our servers from
+            CoinGecko, and nothing about you is sent with that request.
           </p>
         </section>
 
