@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { HeroVideo } from '../components/HeroVideo';
 import { HowToCallBot } from '../components/HowToCallBot';
 import { ResumeChatLink } from '../components/ResumeChatLink';
 import { hasSessionCookie } from '../lib/cookies';
@@ -69,9 +70,9 @@ export default function HomePage() {
     <div className="fade-up space-y-12 md:space-y-24">
       {signedIn ? <ResumeChatLink /> : null}
       {/* Hero — one promise, one proof point, one primary action */}
-      <section className="hero-grid relative -mx-6 px-6 py-12 md:py-24">
+      <section className="hero-grid relative -mx-6 grid gap-10 px-6 py-12 md:py-24 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center lg:gap-12">
         <div className="max-w-3xl">
-          <h1 className="font-sans text-3xl font-semibold tracking-wide text-paper sm:text-4xl md:text-6xl md:leading-[1.08]">
+          <h1 className="font-sans text-3xl font-semibold tracking-wide text-paper sm:text-4xl md:text-6xl md:leading-[1.08] lg:text-5xl">
             Send crypto on WhatsApp and Telegram.
             <br />
             <span className="bg-gradient-to-r from-[#e8c45a] to-[#c4893f] bg-clip-text text-transparent">
@@ -123,6 +124,8 @@ export default function HomePage() {
             )}
           </p>
         </div>
+
+        <HeroVideo />
       </section>
 
       {/* Proof — the product in four lines */}

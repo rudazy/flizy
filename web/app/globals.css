@@ -44,7 +44,19 @@ body {
   background-attachment: fixed;
 }
 
+/* The grid sits on its own layer so the fade-out mask applies to the grid only,
+   not to the hero content above it. */
 .hero-grid {
+  position: relative;
+  isolation: isolate;
+}
+
+.hero-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     linear-gradient(rgba(224, 184, 74, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(224, 184, 74, 0.04) 1px, transparent 1px);
