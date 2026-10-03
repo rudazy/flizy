@@ -1,0 +1,25 @@
+{
+  "name": "flizy-spike-privy-owner",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Research spike: a Privy embedded wallet as HybridDeleGator owner on GIWA Sepolia.",
+  "type": "module",
+  "scripts": {
+    "page": "vite --mode spike",
+    "server": "node server/server.cjs",
+    "headless": "node server/headless.cjs",
+    "rehearse": "node server/rehearse.cjs"
+  },
+  "dependencies": {
+    "@privy-io/react-auth": "3.45.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "viem": "2.56.9"
+  },
+  "devDependencies": {
+    "vite": "8.3.1"
+  },
+  "overrides": {
+    "ws": "8.21.3"
+  }
+}

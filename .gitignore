@@ -19,6 +19,8 @@ web/.env*.local
 **/.env.dev
 **/.env.dev.*
 !**/.env.dev.example
+# Throwaway keys for local research spikes under spikes/.
+spikes/**/.env.spike
 *.pem
 *.key
 id_rsa

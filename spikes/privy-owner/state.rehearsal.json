@@ -1,0 +1,293 @@
+{
+  "steps": {
+    "S1": {
+      "status": "PASS",
+      "at": "2026-10-03T08:59:15.375Z",
+      "address": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+      "recoveredMessage": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+      "recoveredTyped": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+      "walletClientType": "rehearsal-local-key"
+    },
+    "S2": {
+      "status": "PASS",
+      "at": "2026-10-03T08:59:54.873Z",
+      "gator": "0x5d4e51721502f578D7dE569DF73477FA9b8da820",
+      "owner": "0x8E22cB0962578a88514e3518eaaF7a473915A46D",
+      "codeKeccak": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+      "gatorEth": "20000000000000000",
+      "gatorFlz": "20000000000000000000",
+      "erc20Enforcer": {
+        "address": "0xF13Ca94B777090e3fF93D8C8FBAdacD057eB3080",
+        "tx": "0x8a288cc63a9a7fc35bcdd540ac68d2be1f44a0daa03a1b7f4872981d9bcf4c92",
+        "runtimeMatchesArtifact": true
+      },
+      "deployTx": "0x7c25f1e3c5cb0021d824f9d646aede2f6ef694cf8da6be39a4326cde8c34d4f2",
+      "funding": {
+        "gatorEth": "0x18432aa25e075f364518d5ab54d0beece72a6c8c64cdb7bab20a651826735f02",
+        "gatorFlz": "0x888e9c05a900a5befdfc28cb20a4ecfcbe6a78435d6e5f8d03b0b2e78b3519e9",
+        "delegateEth": "0x219bafcfe16e5116374704bf402052680b233e5bc595aa010e634c149a4965af"
+      }
+    },
+    "S3": {
+      "status": "PASS",
+      "at": "2026-10-03T09:00:10.481Z",
+      "transferTx": "0x6933a29963d840b55cd88c45f95f7ce1e5abac248ed96df138fb312fc5fce433",
+      "userOpSuccess": true,
+      "ownerBefore": "0x8E22cB0962578a88514e3518eaaF7a473915A46D",
+      "ownerAfter": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+      "addressUnchanged": true,
+      "codeUnchanged": true,
+      "oldDelegationDigest": "0x1b07bcf4a2bdf37f7658ef3ce8a97e0c598d95b883aec19b0d7283875d7f234f",
+      "oldOwnerDelegationMagicBefore": "0x1626ba7e",
+      "oldDelegationRedeemBefore": "would succeed",
+      "oldOwnerDelegationMagicAfter": "0xffffffff",
+      "oldDelegationRedeemAfter": "InvalidERC1271Signature()",
+      "oldOwnerUserOpMagicAfter": "0xffffffff"
+    },
+    "S4": {
+      "status": "PASS",
+      "at": "2026-10-03T09:00:15.163Z",
+      "signer": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+      "eth": {
+        "digest": "0xef309b689ae2338a2cdac37548ed8c1972cdc8cabb88e51bff907fbbbd07ac5c",
+        "recovered": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+        "magic": "0x1626ba7e"
+      },
+      "flz": {
+        "digest": "0x700dac2131bd95362b425cab76e7fd71b1eef48249090e252f42ca648b644388",
+        "recovered": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+        "magic": "0x1626ba7e"
+      },
+      "caveats": {
+        "eth": "NativeTokenTransferAmount cap 0.005 ETH, Timestamp before now+1d, AllowedTargets [sink]",
+        "flz": "ERC20TransferAmount FLZ cap 10, NativeTokenTransferAmount cap 0, Timestamp before now+1d, AllowedTargets [FLZ]"
+      }
+    },
+    "S5": {
+      "status": "PASS",
+      "at": "2026-10-03T09:00:36.343Z",
+      "a_ethInBounds": {
+        "ok": true,
+        "amount": "0.001 ETH",
+        "tx": "0xbc7bc28cab1a499be4c8916e3ae55279c5ec6968b68d60becac864d00122a44a",
+        "status": 1,
+        "gasUsed": "193263",
+        "delta": {
+          "gator": {
+            "eth": "-1000000000000000",
+            "flz": "0"
+          },
+          "sink": {
+            "eth": "1000000000000000",
+            "flz": "0"
+          }
+        }
+      },
+      "b_ethOutOfBounds": {
+        "ok": true,
+        "amount": "0.01 ETH",
+        "revert": {
+          "raw": "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000344e6174697665546f6b656e5472616e73666572416d6f756e74456e666f726365723a616c6c6f77616e63652d6578636565646564000000000000000000000000",
+          "selector": "0x08c379a0",
+          "text": "NativeTokenTransferAmountEnforcer:allowance-exceeded"
+        }
+      },
+      "c_flzInBounds": {
+        "ok": true,
+        "amount": "1 FLZ",
+        "tx": "0xdf70bfa895ab77a8f4100cbbcc2da4deba1be05e54cbb4cace1dde7f4c05abba",
+        "status": 1,
+        "gasUsed": "221859",
+        "delta": {
+          "gator": {
+            "eth": "0",
+            "flz": "-1000000000000000000"
+          },
+          "sink": {
+            "eth": "0",
+            "flz": "1000000000000000000"
+          }
+        }
+      },
+      "c_flzOutOfBounds": {
+        "ok": true,
+        "amount": "20 FLZ",
+        "revert": {
+          "raw": "0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002e45524332305472616e73666572416d6f756e74456e666f726365723a616c6c6f77616e63652d6578636565646564000000000000000000000000000000000000",
+          "selector": "0x08c379a0",
+          "text": "ERC20TransferAmountEnforcer:allowance-exceeded"
+        }
+      }
+    },
+    "S6": {
+      "status": "PASS",
+      "at": "2026-10-03T09:00:43.751Z",
+      "signer": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+      "userOpSignatureMagic": "0x1626ba7e",
+      "disableTx": "0x55991f278e85c5983c09fc97437dd2cf9d636ec9eacfac07671eb29fd757c864",
+      "userOpSuccess": true,
+      "delegationDigest": "0xef309b689ae2338a2cdac37548ed8c1972cdc8cabb88e51bff907fbbbd07ac5c",
+      "disabled": true,
+      "inBoundsReplay": "CannotUseADisabledDelegation()"
+    },
+    "S7": {
+      "status": "PASS",
+      "at": "2026-10-03T09:00:54.143Z",
+      "signer": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+      "userOpSignatureMagic": "0x1626ba7e",
+      "exitTx": "0x18eb02d846bc8b90832ed966cda327b81078f23f979e58581fdfb64269160526",
+      "userOpSuccess": true,
+      "revertReason": null,
+      "path": "Privy-signed PackedUserOperation, EntryPoint v0.7 handleOps sent directly by an EOA relayer, no bundler",
+      "exitEth": "0.01 ETH (twice the delegation cap)",
+      "exitFlz": "5 FLZ",
+      "privyEthDelta": "10000000000000000",
+      "privyFlzDelta": "5000000000000000000",
+      "gatorEthDelta": "0",
+      "gatorFlzDelta": "-5000000000000000000"
+    },
+    "S8": {
+      "status": "PASS",
+      "at": "2026-10-03T09:00:56.122Z",
+      "address": "0x5d4e51721502f578D7dE569DF73477FA9b8da820",
+      "codeKeccak": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+      "snapshots": [
+        {
+          "label": "after S2 deploy",
+          "block": 37672878,
+          "owner": "0x8E22cB0962578a88514e3518eaaF7a473915A46D",
+          "sameCode": true
+        },
+        {
+          "label": "before S3 transfer",
+          "block": 37672881,
+          "owner": "0x8E22cB0962578a88514e3518eaaF7a473915A46D",
+          "sameCode": true
+        },
+        {
+          "label": "after S3 transfer",
+          "block": 37672891,
+          "owner": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+          "sameCode": true
+        },
+        {
+          "label": "S8 final",
+          "block": 37672940,
+          "owner": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+          "sameCode": true
+        }
+      ],
+      "finalOwner": "0x84978621F53863717a2746C7266F3968Ebfd2b2a"
+    }
+  },
+  "privy": {
+    "address": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+    "walletClientType": "rehearsal-local-key"
+  },
+  "roles": {
+    "funder": "0x046468b2400a799d5897cDfbB4d1782E6B8EC788",
+    "owner": "0x8E22cB0962578a88514e3518eaaF7a473915A46D",
+    "delegate": "0x5bf9D5C71913233AdE339C2D34674c1f0F6cc2A2"
+  },
+  "sink": "0x54DA6E61010088AA82246d7cE3BD1287Ee6A53f6",
+  "erc20Enforcer": {
+    "address": "0xF13Ca94B777090e3fF93D8C8FBAdacD057eB3080",
+    "tx": "0x8a288cc63a9a7fc35bcdd540ac68d2be1f44a0daa03a1b7f4872981d9bcf4c92",
+    "runtimeMatchesArtifact": true
+  },
+  "gator": {
+    "address": "0x5d4e51721502f578D7dE569DF73477FA9b8da820",
+    "salt": "0xbf0de6927ba59d622de290e67bd2b4c397ba879098eeb25ffbde3ec925e2efed",
+    "deployTx": "0x7c25f1e3c5cb0021d824f9d646aede2f6ef694cf8da6be39a4326cde8c34d4f2"
+  },
+  "funding": {
+    "gatorEth": "0x18432aa25e075f364518d5ab54d0beece72a6c8c64cdb7bab20a651826735f02",
+    "gatorFlz": "0x888e9c05a900a5befdfc28cb20a4ecfcbe6a78435d6e5f8d03b0b2e78b3519e9",
+    "delegateEth": "0x219bafcfe16e5116374704bf402052680b233e5bc595aa010e634c149a4965af"
+  },
+  "snapshots": [
+    {
+      "label": "after S2 deploy",
+      "address": "0x5d4e51721502f578D7dE569DF73477FA9b8da820",
+      "codeKeccak": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+      "owner": "0x8E22cB0962578a88514e3518eaaF7a473915A46D",
+      "block": 37672878
+    },
+    {
+      "label": "before S3 transfer",
+      "address": "0x5d4e51721502f578D7dE569DF73477FA9b8da820",
+      "codeKeccak": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+      "owner": "0x8E22cB0962578a88514e3518eaaF7a473915A46D",
+      "block": 37672881
+    },
+    {
+      "label": "after S3 transfer",
+      "address": "0x5d4e51721502f578D7dE569DF73477FA9b8da820",
+      "codeKeccak": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+      "owner": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+      "block": 37672891
+    },
+    {
+      "label": "S8 final",
+      "address": "0x5d4e51721502f578D7dE569DF73477FA9b8da820",
+      "codeKeccak": "0xeea896c7b0a3442ea3a79a89e5109ac4e63728ec288722197f6391cd6112aa74",
+      "owner": "0x84978621F53863717a2746C7266F3968Ebfd2b2a",
+      "block": 37672940
+    }
+  ],
+  "delegations": {
+    "eth": {
+      "delegate": "0x5bf9D5C71913233AdE339C2D34674c1f0F6cc2A2",
+      "delegator": "0x5d4e51721502f578D7dE569DF73477FA9b8da820",
+      "authority": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "caveats": [
+        {
+          "enforcer": "0x163bD4BDcb68c4913deeFFa265ec54007d6C03CF",
+          "terms": "0x0000000000000000000000000000000000000000000000000011c37937e08000",
+          "args": "0x"
+        },
+        {
+          "enforcer": "0x24DD7326ae2275fD9D505526f62a3843d174C2eF",
+          "terms": "0x000000000000000000000000000000000000000000000000000000006ac2159b",
+          "args": "0x"
+        },
+        {
+          "enforcer": "0x6b50AD84c6Ba42d227bD8f88bCdC4B53d3fdA405",
+          "terms": "0x54DA6E61010088AA82246d7cE3BD1287Ee6A53f6",
+          "args": "0x"
+        }
+      ],
+      "salt": "17910180112",
+      "signature": "0x2f0fb303a65052e4661ef5b0f0c8a5439764d4a7fcba0a1d57262b317482baac320d38acb9ee43d2f452fc6926d9b47b0869049e92672ab707c1e3cb77e984601b"
+    },
+    "flz": {
+      "delegate": "0x5bf9D5C71913233AdE339C2D34674c1f0F6cc2A2",
+      "delegator": "0x5d4e51721502f578D7dE569DF73477FA9b8da820",
+      "authority": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "caveats": [
+        {
+          "enforcer": "0xF13Ca94B777090e3fF93D8C8FBAdacD057eB3080",
+          "terms": "0x308be8f71da695f18e70d2243a446e1fd1566ba60000000000000000000000000000000000000000000000008ac7230489e80000",
+          "args": "0x"
+        },
+        {
+          "enforcer": "0x163bD4BDcb68c4913deeFFa265ec54007d6C03CF",
+          "terms": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "args": "0x"
+        },
+        {
+          "enforcer": "0x24DD7326ae2275fD9D505526f62a3843d174C2eF",
+          "terms": "0x000000000000000000000000000000000000000000000000000000006ac2159b",
+          "args": "0x"
+        },
+        {
+          "enforcer": "0x6b50AD84c6Ba42d227bD8f88bCdC4B53d3fdA405",
+          "terms": "0x308be8f71DA695f18E70D2243a446e1fD1566BA6",
+          "args": "0x"
+        }
+      ],
+      "salt": "17910180113",
+      "signature": "0xa8e9758677f7c3bad0ea75f0bd7dfb8235c63cb62210a81db6f2fd2379de1ad2405f610dbbee7c063a0618986c378860ad7a6c44887569cd9f693e893def12811b"
+    }
+  }
+}
