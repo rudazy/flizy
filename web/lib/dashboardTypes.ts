@@ -108,6 +108,10 @@ export type ActivityItem = {
   /** What the payment was for, as the sender typed it. Null when unsaid. */
   note?: string | null;
   label: string;
+  /** The History filter this row sits under. */
+  category?: 'send' | 'receive' | 'swap' | 'claim' | 'nft';
+  /** The channel a payment went through ("Telegram", "Flizy app"), never the identity key. */
+  channel?: string | null;
 };
 
 export type HoldingsData = {

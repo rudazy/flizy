@@ -3,6 +3,8 @@ import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 import { apiErrorBody } from '../../../lib/apiError';
 import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
+import { ethUsd } from '../../../lib/ethUsd.ts';
+import { channelLabel, historyCategory, type HistoryCategory } from '../../../lib/historyRow.ts';
 // Shared with chat history — platform claims must show GitHub pay / Phone / X pay
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
@@ -46,6 +48,10 @@ export type ActivityItem = {
   /** What the payment was for, as the sender typed it. Null when unsaid. */
   note?: string | null;
   label: string;
+  /** The History filter this row sits under. */
+  category: HistoryCategory;
+  /** The channel a payment went through ("Telegram", "Flizy app"), never the identity key. */
+  channel?: string | null;
 };
 
 function shortAddr(addr: string) {
@@ -107,6 +113,8 @@ function mapTransferRow(
     createdAt: String(row.created_at),
     note: row.note ? String(row.note) : null,
     label,
+    category: historyCategory(type, kind),
+    channel: channelLabel(row.phone),
   };
 }
 
@@ -163,6 +171,8 @@ function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityI
     txHash,
     createdAt: String(row.claimed_at || row.created_at),
     label,
+    // A payout that reached the reader is money received; everything else about a claim stays under Claim.
+    category: !isSender && status === 'claimed' ? 'receive' : 'claim',
   };
 }
 
@@ -209,9 +219,13 @@ export async function GET() {
       // Settled activity is still worth returning without it.
     }
 
+    // For the approximate USD line. Null hides it; history still loads without a price.
+    const usdPerEth = await ethUsd().catch(() => null);
+
     // Backward-compatible transfers key for older clients
     return NextResponse.json({
       activity: items,
+      usdPerEth,
       waiting,
       transfers: transferRows.slice(0, 30),
       limit: 30,

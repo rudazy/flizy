@@ -26,6 +26,8 @@ type DashboardContextValue = {
   activity: ActivityItem[];
   /** Unclaimed money addressed to this account. Never mixed into activity. */
   waiting: PendingClaimItem[];
+  /** ETH in USD at the mainnet price, for the approximate USD line in History; null when unknown. */
+  historyUsdPerEth: number | null;
   holdings: HoldingsData | null;
   error: string;
   msg: string;
@@ -65,6 +67,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [history, setHistory] = useState<TransferRow[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [historyUsdPerEth, setHistoryUsdPerEth] = useState<number | null>(null);
   const [waiting, setWaiting] = useState<PendingClaimItem[]>([]);
   const [holdings, setHoldings] = useState<HoldingsData | null>(null);
   const [error, setError] = useState('');
@@ -117,6 +120,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const h = await histRes.json();
       setHistory(h.transfers || []);
       setActivity(h.activity || []);
+      setHistoryUsdPerEth(typeof h.usdPerEth === 'number' ? h.usdPerEth : null);
       setWaiting(h.waiting || []);
     }
     if (holdRes.ok) {
@@ -390,6 +394,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       history,
       activity,
       waiting,
+      historyUsdPerEth,
       holdings,
       error,
       msg,
@@ -414,6 +419,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       history,
       activity,
       waiting,
+      historyUsdPerEth,
       holdings,
       error,
       msg,
