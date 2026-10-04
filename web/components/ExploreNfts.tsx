@@ -7,6 +7,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDashboard } from './DashboardProvider';
 import { ComingSoonPanel } from './ComingSoon';
 import { CopySetupPanel } from './CopySetupPanel';
+import { MintList } from './MintList';
+import { MintCollections } from './MintCollections';
 import { NFT_VIEWS, type NftViewId } from '../lib/tokenDiscovery';
 import {
   BookOpenIcon,
@@ -42,6 +44,19 @@ const TABS = [
 
 type TabId = NftViewId | 'trending' | 'new' | 'top';
 
+/**
+ * The three sections of NFTs. Discover is the marketplace (and Copy Mint);
+ * Mint is live and upcoming drops; Collections is every collection on Flizy.
+ * ?nft= picks the section; ?view= still picks the Discover tab, so existing
+ * links keep working.
+ */
+const SECTIONS = [
+  { id: 'discover', label: 'Discover' },
+  { id: 'mint', label: 'Mint' },
+  { id: 'collections', label: 'Collections' },
+] as const;
+type SectionId = (typeof SECTIONS)[number]['id'];
+
 /** Card artwork by ticker. A collection without one gets a drawn tile instead. */
 const ARTWORK: Record<string, string> = {
   giwaforge: '/explore/nft-giwaforge.png',
@@ -57,7 +72,7 @@ function compact(n: number | null): string {
 }
 
 /**
- * NFT discovery, plus copy mint.
+ * NFTs: Discover (the marketplace, plus copy mint), Mint and Collections.
  *
  * The warning stays on the listed view. A collection someone does not hold is
  * still listed, because the address on this page is what a copy has to match.
@@ -68,6 +83,8 @@ export function ExploreNfts() {
   const pathname = usePathname() || '';
   const raw = search.get('view');
   const tab: TabId = TABS.some((t) => t.id === raw) ? (raw as TabId) : 'listed';
+  const rawSection = search.get('nft');
+  const section: SectionId = SECTIONS.some((s) => s.id === rawSection) ? (rawSection as SectionId) : 'discover';
   const { explorerBase } = useDashboard();
   const [collections, setCollections] = useState<Collection[] | null>(null);
   const [error, setError] = useState('');
@@ -75,7 +92,7 @@ export function ExploreNfts() {
   const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
-    if (tab !== 'listed') return;
+    if (tab !== 'listed' || section !== 'discover') return;
     let cancelled = false;
     (async () => {
       try {
@@ -91,7 +108,16 @@ export function ExploreNfts() {
     return () => {
       cancelled = true;
     };
-  }, [tab]);
+  }, [tab, section]);
+
+  function setSection(next: SectionId) {
+    const params = new URLSearchParams(search.toString());
+    params.set('s', 'nfts');
+    if (next === 'discover') params.delete('nft');
+    else params.set('nft', next);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
 
   function setTab(next: TabId) {
     const params = new URLSearchParams(search.toString());
@@ -102,8 +128,40 @@ export function ExploreNfts() {
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
+  const sectionTabs = (
+    <div className="grid grid-cols-3 gap-[4px] rounded-[7px] border border-[#2a2b30] bg-[#0d0d0e] p-[3px]" role="tablist" aria-label="NFTs">
+      {SECTIONS.map((s) => {
+        const active = section === s.id;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => setSection(s.id)}
+            className={`hit-y-44 h-[28px] rounded-[5px] font-sans text-[11px] ${
+              active ? 'bg-[#1c1a12] font-semibold text-sun' : 'text-[#cfcfcf] hover:text-white'
+            }`}
+          >
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  if (section !== 'discover') {
+    return (
+      <div className="!mt-[9px] grid w-full max-w-lg gap-[12px]">
+        {sectionTabs}
+        {section === 'mint' ? <MintList /> : <MintCollections />}
+      </div>
+    );
+  }
+
   return (
     <div className="!mt-[9px] grid w-full max-w-lg gap-[12px]">
+      {sectionTabs}
       <div className="flex border-b border-[#2a2b30]" role="tablist" aria-label="NFT section">
         {TABS.map((item) => {
           const active = tab === item.id;

@@ -51,7 +51,15 @@ export async function viewerWallet(accountId: string): Promise<{ address: string
     .select('agent_wallet_address')
     .eq('id', accountId)
     .maybeSingle();
-  const viaGator = pointerIsGator(accountId, data?.agent_wallet_address);
+  return walletForAccount(accountId, data?.agent_wallet_address);
+}
+
+/** viewerWallet for an account row already in hand (agent_wallet_address as stored). */
+export function walletForAccount(
+  accountId: string,
+  storedPointer: string | null | undefined
+): { address: string; viaGator: boolean } {
+  const viaGator = pointerIsGator(accountId, storedPointer);
   return {
     address: viaGator ? predictGatorAddress(accountId) : deriveAgentWallet(accountId).address,
     viaGator,
@@ -60,6 +68,7 @@ export async function viewerWallet(accountId: string): Promise<{ address: string
 
 const PROBE_ABI = [
   'function MAX_SUPPLY() view returns (uint256)',
+  'function maxSupply() view returns (uint256)',
   'function totalSupply() view returns (uint256)',
   'function claimed(address) view returns (bool)',
   'function ownerOf(uint256) view returns (address)',
@@ -87,7 +96,12 @@ export async function collectionHeader(ctx: NftContext, address: string): Promis
   const probe = new ethers.Contract(address, PROBE_ABI, ctx.provider);
   const [creation, maxSupply, totalSupply, freeMint, contractOwner] = await Promise.all([
     ctx.index.creation(address).catch(() => ({ creator: null, createdAt: null })),
-    probe.MAX_SUPPLY().then((v: bigint) => v.toString()).catch(() => null),
+    // Giwaforge names it MAX_SUPPLY; Flizy-native collections (FlizyCollection) maxSupply.
+    probe
+      .MAX_SUPPLY()
+      .catch(() => probe.maxSupply())
+      .then((v: bigint) => v.toString())
+      .catch(() => null),
     probe.totalSupply().then((v: bigint) => v.toString()).catch(() => null),
     probe.claimed(ethers.ZeroAddress).then(() => true).catch(() => false),
     probe.owner().then((v: string) => ethers.getAddress(v)).catch(() => null),

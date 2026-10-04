@@ -92,5 +92,39 @@
     "All six contracts are source verified on the explorer (full match).",
     "This V2 port builds on Solidity 0.8.24, not the canonical 0.5.16 / 0.6.6 split.",
     "The FLZ/WETH pair was created by the factory via CREATE2 and was verified directly at its own address (UniswapV2Pair takes no constructor args)."
-  ]
+  ],
+  "mint": {
+    "drop": {
+      "address": "0x8E5f6205EF8bd47AB17EC03D529a3456EA8a56cA",
+      "deployedAt": "2026-10-04",
+      "deployBlock": 37750102,
+      "deployTx": "0x8c72f89a3ceca49fea65b2cdd52507cc9354201cb60e793d8bf4b771cf7f1ff0",
+      "owner": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+      "feeRecipient": "0x042D82b3EaC96d9f5CddC52Fb80FE9d30f11A2a0",
+      "feeBps": 200,
+      "constructorArgs": [
+        "0x042D82b3EaC96d9f5CddC52Fb80FE9d30f11A2a0"
+      ],
+      "verified": true,
+      "explorer": "https://sepolia-explorer.giwa.io/address/0x8E5f6205EF8bd47AB17EC03D529a3456EA8a56cA"
+    },
+    "collectionFactory": {
+      "address": "0xFF6035Bb2ef88Ff5F158C411a2337FF767270746",
+      "deployedAt": "2026-10-04",
+      "deployBlock": 37750106,
+      "deployTx": "0x52a26f3d532645457417a36b70fb8acf55de51a1a6403db45cd89c86126a6db3",
+      "constructorArgs": [
+        "0x8E5f6205EF8bd47AB17EC03D529a3456EA8a56cA"
+      ],
+      "verified": true,
+      "explorer": "https://sepolia-explorer.giwa.io/address/0xFF6035Bb2ef88Ff5F158C411a2337FF767270746"
+    },
+    "notes": [
+      "Flizy Mint. Sources: contracts/src/mint/ (FlizyDrop, FlizyCollectionFactory, FlizyCollection, IFlizyMintable). Script: contracts/script/DeployMint.s.sol.",
+      "FEE_BPS is a constant (2%) on paid mints; free mints take no fee. The owner can change feeRecipient and pause new mints, never the fee.",
+      "Native collections: supply chosen by the creator, at most MAX_SUPPLY_CAP = 10,000; FlizyDrop is their only minter.",
+      "Web reads CHAIN_GIWA_SEPOLIA_DROP, CHAIN_GIWA_SEPOLIA_DROP_FROM_BLOCK (drop deployBlock) and CHAIN_GIWA_SEPOLIA_COLLECTION_FACTORY.",
+      "The verified FlizyCollection source on the explorer (part of the factory's verification) has one NatSpec comment that the repo has since dropped, on MAX_SUPPLY_CAP. Code is identical; only the solc metadata hash differs."
+    ]
+  }
 }

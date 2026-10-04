@@ -8,6 +8,7 @@ import {
   CartIcon,
   CheckIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   CopyIcon,
   EthDiamondIcon,
   ExternalLinkIcon,
@@ -22,8 +23,10 @@ import {
   TagIcon,
 } from './ExploreIcons';
 import { NftTradeSheet, type TradeIntent } from './NftTradeSheet';
+import { MintPanel, MintStatusPill, type MintDrop } from './MintPanel';
 import { FloorChartSheet, FloorSparkline, type SalePoint } from './NftFloorChart';
 import { bpsLabel, compactCount, ethFromWei, monthYear, shortAddr, timeAgo, usdLabel } from '../lib/nftFormat';
+import { isLiveStatus } from '../lib/mintFormat';
 
 type Header = {
   address: string;
@@ -89,7 +92,9 @@ const TABS = [
   { id: 'traits', label: 'Traits' },
   { id: 'about', label: 'About' },
 ] as const;
-type TabId = (typeof TABS)[number]['id'];
+/** Shown after Items while the collection mints through Flizy. */
+const MINT_TAB = { id: 'mint', label: 'Mint' } as const;
+type TabId = (typeof TABS)[number]['id'] | typeof MINT_TAB.id;
 
 const FILTERS = [
   { id: 'all', label: 'All items' },
@@ -235,9 +240,15 @@ export function NftCollection({ address }: { address: string }) {
   const pathname = usePathname() || '';
   const search = useSearchParams();
   const rawTab = search.get('tab');
-  const tab: TabId = TABS.some((t) => t.id === rawTab) ? (rawTab as TabId) : 'items';
+  const tab: TabId = TABS.some((t) => t.id === rawTab) || rawTab === MINT_TAB.id ? (rawTab as TabId) : 'items';
 
   const [data, setData] = useState<CollectionData | null>(null);
+  // The drop, when this collection mints through Flizy; null when it does not.
+  const [mintDrop, setMintDrop] = useState<MintDrop | null>(null);
+  const mintTab = {
+    id: MINT_TAB.id,
+    label: mintDrop && (mintDrop.status === 'ended' || mintDrop.status === 'sold_out') ? 'Mint ended' : MINT_TAB.label,
+  };
   const [error, setError] = useState('');
   const [items, setItems] = useState<ItemsData | null>(null);
   const [itemsError, setItemsError] = useState('');
@@ -287,6 +298,20 @@ export function NftCollection({ address }: { address: string }) {
   useEffect(() => {
     loadHeader();
   }, [loadHeader]);
+
+  const loadMint = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/mints/${address}`);
+      const body = await res.json().catch(() => ({}));
+      setMintDrop(res.ok && body.drop ? (body.drop as MintDrop) : null);
+    } catch {
+      setMintDrop(null);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    loadMint();
+  }, [loadMint]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 300);
@@ -534,6 +559,11 @@ export function NftCollection({ address }: { address: string }) {
               Not verified by Flizy
             </span>
           ) : null}
+          {mintDrop ? (
+            <span className="ml-[6px] mt-[7px] inline-flex">
+              <MintStatusPill status={mintDrop.status} contractManaged={mintDrop.contractManaged} />
+            </span>
+          ) : null}
         </div>
         <div className="flex shrink-0 gap-[8px]">
           <a
@@ -572,6 +602,29 @@ export function NftCollection({ address }: { address: string }) {
         <ChevronDownIcon size={13} className={descOpen ? 'rotate-180' : ''} />
       </button>
 
+      {/* Mint, while it is running or about to */}
+      {mintDrop && (isLiveStatus(mintDrop.status) || mintDrop.status === 'upcoming') && tab !== 'mint' ? (
+        <button
+          type="button"
+          onClick={() => setTab('mint')}
+          className="mt-[16px] flex w-full items-center justify-between gap-[12px] rounded-[12px] border border-[#5a4a1c] bg-[#14120b] px-[14px] py-[12px] text-left"
+        >
+          <span className="grid gap-[2px]">
+            <span className="font-sans text-[10.5px] font-semibold uppercase tracking-wide text-sun">Mint</span>
+            <span className="font-sans text-[16px] font-bold text-white">
+              {mintDrop.priceWei == null ? 'Price set by the contract' : mintDrop.priceWei === '0' ? 'Free mint' : `${ethFromWei(mintDrop.priceWei)} ETH`}
+            </span>
+            <span className="font-sans text-[11px] text-[#a9a9a9]">
+              {mintDrop.minted.toLocaleString('en-US')}
+              {mintDrop.maxSupply ? ` / ${mintDrop.maxSupply.toLocaleString('en-US')}` : ''} minted
+            </span>
+          </span>
+          <span className="btn-sun inline-flex h-[36px] items-center gap-[6px] rounded-[6px] px-[14px] font-sans text-[12.5px] font-semibold">
+            {isLiveStatus(mintDrop.status) ? 'Mint' : 'See mint'} <ChevronRightIcon size={12} />
+          </span>
+        </button>
+      ) : null}
+
       {/* Figures */}
       <section className="mt-[16px] grid grid-cols-3 rounded-[12px] border border-[#23242a] bg-[#0d0d0e] py-[14px]" aria-label="Collection figures">
         <Figure label="Floor price">
@@ -599,7 +652,7 @@ export function NftCollection({ address }: { address: string }) {
 
       {/* Tabs */}
       <div className="mt-[18px] flex overflow-x-auto border-b border-[#23242a] [scrollbar-width:none]" role="tablist" aria-label="Collection sections">
-        {TABS.map((t) => (
+        {(mintDrop ? [TABS[0], mintTab, ...TABS.slice(1)] : TABS).map((t) => (
           <button
             key={t.id}
             type="button"
@@ -615,6 +668,19 @@ export function NftCollection({ address }: { address: string }) {
           </button>
         ))}
       </div>
+
+      {tab === 'mint' ? (
+        <div className="mt-[14px]">
+          <MintPanel
+            collection={address}
+            onMinted={() => {
+              loadMint();
+              loadHeader();
+              loadItems(null);
+            }}
+          />
+        </div>
+      ) : null}
 
       {tab === 'items' ? (
         // minmax(0,1fr): an auto column would widen to the Featured row's full scroll width.
