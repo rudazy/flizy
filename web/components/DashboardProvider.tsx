@@ -50,6 +50,7 @@ type DashboardContextValue = {
   setDailyLimit: (limit: number | null, password: string) => Promise<boolean>;
   setUsername: (username: string) => Promise<boolean>;
   setAccountLocale: (locale: LocaleCode) => Promise<boolean>;
+  setDefaultCallingCode: (countryIso: string) => Promise<boolean>;
   setAttachInviteOnClaims: (enabled: boolean) => Promise<boolean>;
   explorerBase: string;
 };
@@ -356,6 +357,35 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [loadAccount, setLocale]
   );
 
+  const setDefaultCallingCode = useCallback(
+    async (countryIso: string) => {
+      setBusy('calling-code');
+      setMsg('');
+      try {
+        const res = await fetch('/api/account/calling-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ countryIso }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed');
+        setMsg(
+          countryIso
+            ? 'Country saved. Chat will add its code when a local number has none. You can change it anytime.'
+            : 'Country cleared. Chat will ask which country.'
+        );
+        await loadAccount();
+        return true;
+      } catch (err) {
+        setMsg(err instanceof Error ? err.message : 'Failed');
+        return false;
+      } finally {
+        setBusy('');
+      }
+    },
+    [loadAccount]
+  );
+
   const setAttachInviteOnClaims = useCallback(
     async (enabled: boolean) => {
       setBusy('invite-attach');
@@ -411,6 +441,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setDailyLimit,
       setUsername,
       setAccountLocale,
+      setDefaultCallingCode,
       setAttachInviteOnClaims,
       explorerBase,
     }),
@@ -434,6 +465,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setDailyLimit,
       setUsername,
       setAccountLocale,
+      setDefaultCallingCode,
       setAttachInviteOnClaims,
       explorerBase,
     ]

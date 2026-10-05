@@ -10,6 +10,18 @@
     },
     {
       "kind": "check",
+      "name": "accounts.accounts_default_calling_code_check",
+      "providedBy": "20261005120000_account_default_calling_code.sql",
+      "requiredBy": "check on accounts"
+    },
+    {
+      "kind": "check",
+      "name": "accounts.accounts_default_country_iso_check",
+      "providedBy": "20261005150000_account_default_country_iso.sql",
+      "requiredBy": "check on accounts"
+    },
+    {
+      "kind": "check",
       "name": "channel_identities.channel_identities_channel_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on channel_identities"

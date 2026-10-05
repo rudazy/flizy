@@ -84,6 +84,16 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
           Same wallet, same trusted list, same limits, same history on both. A number belongs to
           exactly one Flizy account.
         </p>
+        <div className="mt-4 border-t border-border pt-3">
+          <p className="font-sans text-sm text-paper">Send to a phone number</p>
+          <p className="mt-1.5 font-mono text-xs text-lime">
+            flizy send 0.01 ETH to +234 708 043 7343
+          </p>
+          <p className="mt-1.5 text-xs">
+            Phone numbers must include the country code. You can pick one country when you sign up,
+            and change it later on Account. Chat then adds that code. It is optional.
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[minmax(0,11rem)_1fr]">

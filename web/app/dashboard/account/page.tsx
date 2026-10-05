@@ -17,6 +17,7 @@ import { shortAddr } from '../../../lib/dashboardTypes';
 import { PayIdentity } from '../../../components/PayIdentity';
 import { AccountProjects } from '../../../components/AccountProjects';
 import type { LocaleCode } from '../../../lib/locale';
+import { SITE_PHONE_COUNTRIES, countryByIso, countryFlag } from '../../../lib/phoneFormat';
 import {
   clearAwaitingChatLink,
   markAwaitingChatLink,
@@ -29,6 +30,7 @@ const SLIDES = [
   'projects',
   'pay',
   'language',
+  'country',
   'chat',
   'platforms',
   'trusted',
@@ -55,8 +57,10 @@ export default function AccountPage() {
     setDailyLimit,
     setUsername,
     setAccountLocale,
+    setDefaultCallingCode,
   } = useDashboard();
   const [localeDraft, setLocaleDraft] = useState<LocaleCode>(locale);
+  const [countryIso, setCountryIso] = useState('');
 
   const [addr, setAddr] = useState('');
   const [label, setLabel] = useState('');
@@ -105,6 +109,17 @@ export default function AccountPage() {
       setUsernameInput(data.account.username);
     }
   }, [data?.account?.username]);
+
+  useEffect(() => {
+    const savedIso = String(data?.account?.default_country_iso || '').toUpperCase();
+    if (savedIso && countryByIso(savedIso)) {
+      setCountryIso(savedIso);
+      return;
+    }
+    const dial = String(data?.account?.default_calling_code || '');
+    const matches = SITE_PHONE_COUNTRIES.filter((country) => country.dial === dial);
+    setCountryIso(matches.length === 1 ? matches[0].iso : '');
+  }, [data?.account?.default_calling_code, data?.account?.default_country_iso]);
 
   useEffect(() => {
     let cancelled = false;
@@ -445,6 +460,17 @@ export default function AccountPage() {
     { id: 'projects', label: 'Projects' },
     { id: 'pay', label: 'Pay me', badge: data.pay?.username ? `@${data.pay.username}` : undefined },
     { id: 'language', label: t('account.language') },
+    {
+      id: 'country',
+      label: 'Country',
+      badge: data.account.default_country_iso
+        ? `${countryFlag(data.account.default_country_iso)} +${
+            countryByIso(data.account.default_country_iso)?.dial || data.account.default_calling_code || ''
+          }`
+        : data.account.default_calling_code
+          ? `+${data.account.default_calling_code}`
+          : undefined,
+    },
     { id: 'chat', label: 'Chat', badge: data.link ? undefined : '!' },
     { id: 'platforms', label: 'Platforms' },
     { id: 'trusted', label: 'Trusted', badge: String(data.trusted.length) },
@@ -800,6 +826,54 @@ export default function AccountPage() {
               Set a username on Profile first. Your Flizy number is issued then.
             </p>
           )}
+        </AppSection>
+      ) : null}
+
+      {slide === 'country' ? (
+        <AppSection
+          title="Country"
+          helper="Optional. Pick one country. Chat adds its code when you type a local number. Skip it and chat will ask. You can change it anytime."
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              await setDefaultCallingCode(countryIso);
+            }}
+            className="grid gap-3"
+          >
+            <div>
+              <label className="label" htmlFor="account-calling-code">
+                Your country
+              </label>
+              <select
+                id="account-calling-code"
+                className="input min-h-[44px]"
+                value={countryIso}
+                onChange={(event) => setCountryIso(event.target.value)}
+              >
+                <option value="">No default</option>
+                {countryIso && !countryByIso(countryIso) ? (
+                  <option value={countryIso}>Saved country {countryIso}</option>
+                ) : null}
+                {SITE_PHONE_COUNTRIES.map((country) => (
+                  <option key={country.iso} value={country.iso}>
+                    {countryFlag(country.iso)} {country.name} (+{country.dial})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs leading-relaxed text-muted">
+              Korea, then 10 1234 5678, is sent as +82 10 1234 5678. A send still shows the full
+              number and waits for confirm. A request still asks, because it is created immediately.
+            </p>
+            <button
+              type="submit"
+              className="btn btn-primary w-full py-3 font-semibold"
+              disabled={busy === 'calling-code'}
+            >
+              {busy === 'calling-code' ? 'Saving' : 'Save'}
+            </button>
+          </form>
         </AppSection>
       ) : null}
 

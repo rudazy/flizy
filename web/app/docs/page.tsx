@@ -48,9 +48,10 @@ const CMD_GROUPS: Array<{
         meaning: 'After a first Flizy pay succeeds, save that person as a trusted contact (or skip)',
       },
       {
-        wa: 'flizy send 0.01 to 2348012345678',
-        tg: '/send 0.01 to 2348012345678',
-        meaning: 'Hold for a phone until they claim (you can cancel until then)',
+        wa: 'flizy send 0.01 ETH to +234 708 043 7343',
+        tg: '/send 0.01 ETH to +234 708 043 7343',
+        meaning:
+          'Hold for a phone until they claim. The country code is required. Spaces and dashes are fine, and all three forms are the same number. A saved country code is optional and fills one in on a send.',
       },
       {
         wa: 'flizy send 0.01 to @user on github',
@@ -113,9 +114,9 @@ const CMD_GROUPS: Array<{
         meaning: 'Cancel holds you sent (while still pending)',
       },
       {
-        wa: 'flizy request 0.01 from 234…',
-        tg: '/request 0.01 from 234…',
-        meaning: 'Ask someone for money',
+        wa: 'flizy request 0.01 from +234 708 043 7343',
+        tg: '/request 0.01 from +234 708 043 7343',
+        meaning: 'Ask someone for money. A phone needs its country code.',
       },
       {
         wa: 'flizy pay',

@@ -126,4 +126,20 @@ describe('account id never leaves the server', () => {
     const out = webPublicAccount.toPublicAccount({ unlock_pin_hash: null });
     assert.equal(out.has_pin, false);
   });
+
+  it('emits a saved calling code only when that column was selected', () => {
+    const out = webPublicAccount.toPublicAccount({ default_calling_code: '233' });
+    assert.equal(out.default_calling_code, '233');
+    const absent = webPublicAccount.toPublicAccount({ email: 'a@b.c' });
+    assert.equal('default_calling_code' in absent, false);
+    const junk = webPublicAccount.toPublicAccount({ default_calling_code: '0234' });
+    assert.equal(junk.default_calling_code, null);
+    const korea = webPublicAccount.toPublicAccount({
+      default_calling_code: '82',
+      default_country_iso: 'kr',
+    });
+    assert.equal(korea.default_country_iso, 'KR');
+    const badIso = webPublicAccount.toPublicAccount({ default_country_iso: 'korea' });
+    assert.equal(badIso.default_country_iso, null);
+  });
 });

@@ -11,6 +11,7 @@ import { validatePassword } from '../../lib/passwordPolicy';
 import type { LocaleCode } from '../../lib/locale';
 import { safeNext } from '../../lib/safeNext.ts';
 import { HONEYPOT_FIELD } from '../../lib/honeypot.ts';
+import { SITE_PHONE_COUNTRIES, countryFlag } from '../../lib/phoneFormat';
 
 /**
  * Stage 1 only: email + password.
@@ -26,6 +27,7 @@ export function SignupForm() {
   const [inviteCode, setInviteCode] = useState('');
   // Honeypot. Stays empty for anyone using the form; see lib/honeypot.ts.
   const [honeypot, setHoneypot] = useState('');
+  const [countryIso, setCountryIso] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -76,6 +78,7 @@ export function SignupForm() {
           email,
           password,
           locale,
+          countryIso,
           inviteCode,
           [HONEYPOT_FIELD]: honeypot,
         }),
@@ -123,6 +126,28 @@ export function SignupForm() {
             value={locale}
             onChange={(code: LocaleCode) => setLocale(code)}
           />
+        </div>
+        <div>
+          <label className="label" htmlFor="signup-country">
+            Country <span className="font-normal text-muted">(optional)</span>
+          </label>
+          <select
+            id="signup-country"
+            className="input min-h-[44px]"
+            value={countryIso}
+            onChange={(event) => setCountryIso(event.target.value)}
+          >
+            <option value="">Skip for now</option>
+            {SITE_PHONE_COUNTRIES.map((country) => (
+              <option key={country.iso} value={country.iso}>
+                {countryFlag(country.iso)} {country.name} (+{country.dial})
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted">
+            Pick one country and chat can finish a local number. Korea, then 10 1234 5678, is sent
+            as +82 10 1234 5678. Skip this if you want. You can change it anytime.
+          </p>
         </div>
         <div>
           <label className="label" htmlFor="email">

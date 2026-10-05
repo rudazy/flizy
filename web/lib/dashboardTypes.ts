@@ -30,6 +30,10 @@ export type DashboardData = {
     has_pin: boolean;
     /** null = app default (or no daily cap if default is 0) */
     daily_send_limit_eth?: number | string | null;
+    /** Optional calling code. Null or absent means chat asks which country. */
+    default_calling_code?: string | null;
+    /** Optional ISO country. Null when no single country was picked. */
+    default_country_iso?: string | null;
   };
   trusted: Array<{ address: string; label: string }>;
   link?: {

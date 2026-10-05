@@ -12,8 +12,49 @@ import { readInviteCookie, readInviteSource } from '../../../../lib/inviteCookie
 import { parseEmail } from '../../../../lib/email';
 import { isHoneypotFilled } from '../../../../lib/honeypot.ts';
 import { checkSignupRateLimit, signupIpKey } from '../../../../lib/signupLimit.ts';
+import { countryByIso } from '../../../../lib/phoneFormat';
 
 const ROUTE = 'POST /api/auth/signup';
+
+const ACCOUNT_RETURNING =
+  'id, email, email_verified_at, display_name, username, username_changed_at, locale, agent_wallet_address';
+
+function missingAccountColumn(
+  error: { code?: string; message?: string } | null,
+  column: string
+) {
+  if (!error) return false;
+  const message = String(error.message || '');
+  return (
+    (error.code === '42703' || error.code === 'PGRST204' || /column|schema cache/i.test(message)) &&
+    new RegExp(column, 'i').test(message)
+  );
+}
+
+/**
+ * Country columns ship in a hand-applied migration. Signup still creates the
+ * account when those columns are not there yet. The country is simply unset.
+ */
+async function insertAccount(
+  supabase: ReturnType<typeof getSupabase>,
+  row: Record<string, unknown>
+) {
+  const payload = { ...row };
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const result = await supabase.from('accounts').insert(payload).select(ACCOUNT_RETURNING).single();
+    if (!result.error) return result;
+    if (missingAccountColumn(result.error, 'default_country_iso') && 'default_country_iso' in payload) {
+      delete payload.default_country_iso;
+      continue;
+    }
+    if (missingAccountColumn(result.error, 'default_calling_code') && 'default_calling_code' in payload) {
+      delete payload.default_calling_code;
+      continue;
+    }
+    return result;
+  }
+  return supabase.from('accounts').insert(payload).select(ACCOUNT_RETURNING).single();
+}
 
 /**
  * Stage 1 of onboarding: email + password only.
@@ -38,6 +79,10 @@ export async function POST(req: Request) {
     const email = parseEmail(body.email);
     const password = String(body.password || '');
     const locale = normalizeLocale(body.locale);
+    const chosen = countryByIso(String(body.countryIso || ''));
+    if (String(body.countryIso || '').trim() && !chosen) {
+      return NextResponse.json({ error: 'Pick a country from the list, or leave it empty.' }, { status: 400 });
+    }
 
     // The form sends type="email" required, which is the browser's opinion and
     // not a check. parseEmail is the one that counts: it bounds the length and
@@ -58,22 +103,20 @@ export async function POST(req: Request) {
     }
 
     const password_hash = hashPassword(password);
-    const { data, error } = await supabase
-      .from('accounts')
-      .insert({
-        email,
-        password_hash,
-        display_name: null,
-        username: null,
-        username_changed_at: null,
-        locale,
-        agent_wallet_address: null,
-        email_verified_at: null,
-      })
-      .select(
-        'id, email, email_verified_at, display_name, username, username_changed_at, locale, agent_wallet_address'
-      )
-      .single();
+    const inserted = await insertAccount(supabase, {
+      email,
+      password_hash,
+      display_name: null,
+      username: null,
+      username_changed_at: null,
+      locale,
+      agent_wallet_address: null,
+      email_verified_at: null,
+      ...(chosen
+        ? { default_calling_code: chosen.dial, default_country_iso: chosen.iso }
+        : {}),
+    });
+    const { data, error } = inserted;
 
     if (error) {
       if (String(error.message).includes('duplicate') || error.code === '23505') {

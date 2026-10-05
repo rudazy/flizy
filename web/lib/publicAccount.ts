@@ -28,6 +28,8 @@ export type AccountRow = {
   unlock_pin_hash?: string | null;
   password_hash?: string | null;
   daily_send_limit_eth?: number | string | null;
+  default_calling_code?: string | null;
+  default_country_iso?: string | null;
 };
 
 export type PublicAccount = {
@@ -47,6 +49,10 @@ export type PublicAccount = {
   balance_eth?: number | string;
   has_pin?: boolean;
   daily_send_limit_eth?: number | string | null;
+  /** Optional calling code for chat. Absent when the caller did not select it. */
+  default_calling_code?: string | null;
+  /** Optional ISO country for the flag. Absent when the caller did not select it. */
+  default_country_iso?: string | null;
 };
 
 /**
@@ -82,6 +88,14 @@ export function toPublicAccount(row: AccountRow | null | undefined): PublicAccou
       row.daily_send_limit_eth === null || row.daily_send_limit_eth === undefined
         ? null
         : row.daily_send_limit_eth;
+  }
+  if ('default_calling_code' in row) {
+    const code = String(row.default_calling_code || '').trim();
+    out.default_calling_code = /^[1-9]\d{0,3}$/.test(code) ? code : null;
+  }
+  if ('default_country_iso' in row) {
+    const iso = String(row.default_country_iso || '').trim().toUpperCase();
+    out.default_country_iso = /^[A-Z]{2}$/.test(iso) ? iso : null;
   }
 
   return out;

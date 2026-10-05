@@ -20,6 +20,11 @@ export const FLIZY_FAQ: Array<{ question: string; answer: string }> = [
       'A Flizy username or pay code, or a phone number, email, GitHub or X handle, even before the person joins. Unclaimed money waits, and you can cancel it from chat. A raw wallet address only works once you have saved it on the site with your password, and a new one waits 24 hours before it can receive.',
   },
   {
+    question: 'How do I send to a phone number?',
+    answer:
+      'Use the international format, for example flizy send 0.01 ETH to +234 708 043 7343. Spaces and dashes are fine. A number without a country code is not guessed. You can pick one country when you sign up, on Account, or in chat with country korea. That choice is optional and you can change it anytime. With Korea saved, 10 1234 5678 is sent as +82 10 1234 5678. On the website the country is selected for you, and Flizy stores the number in one form.',
+  },
+  {
     question: 'How do phone claims work?',
     answer:
       'If someone sends to your phone number, the funds sit in escrow until you claim. Phone holds show on the web dashboard, but you claim only in WhatsApp or Telegram after that number is proven on that chat (flizy claim).',

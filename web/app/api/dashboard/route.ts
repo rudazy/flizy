@@ -11,8 +11,41 @@ import { getPaySummary } from '../../../lib/payCode.ts';
 
 const ROUTE = 'GET /api/dashboard';
 
-const ACCOUNT_COLS =
+const ACCOUNT_COLS_BASE =
   'id, email, email_verified_at, display_name, username, username_changed_at, locale, agent_wallet_address, unlock_pin_hash, balance_eth, daily_send_limit_eth';
+const ACCOUNT_COLS_DIAL = `${ACCOUNT_COLS_BASE}, default_calling_code`;
+const ACCOUNT_COLS = `${ACCOUNT_COLS_DIAL}, default_country_iso`;
+
+/**
+ * The column arrives in a hand-applied migration. A deploy that lands first
+ * must still load the dashboard. A missing column reads as no saved country.
+ */
+function missingCallingCodeColumn(error: { code?: string; message?: string } | null) {
+  if (!error) return false;
+  const code = String(error.code || '');
+  const message = String(error.message || '');
+  return (
+    code === '42703' ||
+    code === 'PGRST204' ||
+    (/default_calling_code/i.test(message) && /column|schema cache/i.test(message))
+  );
+}
+
+async function selectAccount(
+  supabase: ReturnType<typeof getSupabase>,
+  accountId: string
+) {
+  const full = await supabase.from('accounts').select(ACCOUNT_COLS).eq('id', accountId).single();
+  if (!full.error) return full;
+  const message = String(full.error.message || '');
+  if (/default_country_iso/i.test(message)) {
+    const dial = await supabase.from('accounts').select(ACCOUNT_COLS_DIAL).eq('id', accountId).single();
+    if (!missingCallingCodeColumn(dial.error)) return dial;
+    return supabase.from('accounts').select(ACCOUNT_COLS_BASE).eq('id', accountId).single();
+  }
+  if (!missingCallingCodeColumn(full.error)) return full;
+  return supabase.from('accounts').select(ACCOUNT_COLS_BASE).eq('id', accountId).single();
+}
 
 export async function GET() {
   try {
@@ -22,11 +55,7 @@ export async function GET() {
     }
 
     const supabase = getSupabase();
-    let { data: account, error } = await supabase
-      .from('accounts')
-      .select(ACCOUNT_COLS)
-      .eq('id', accountId)
-      .single();
+    let { data: account, error } = await selectAccount(supabase, accountId);
 
     if (error || !account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
@@ -49,11 +78,7 @@ export async function GET() {
         account = updated;
       } else {
         // Re-read in case another request got there first
-        const { data: again } = await supabase
-          .from('accounts')
-          .select(ACCOUNT_COLS)
-          .eq('id', accountId)
-          .single();
+        const { data: again } = await selectAccount(supabase, accountId);
         if (again) account = again;
       }
     }

@@ -1000,7 +1000,8 @@ describe('sending to a name that is not saved', () => {
     // which is what taught people Flizy needs an address at all. Every one of
     // these routes works with nothing saved, and they have to come first.
     assert.match(msg, /do not need their address/i);
-    assert.match(msg, /flizy send 0\.01 to 2348012345678/, 'a phone');
+    assert.match(msg, /flizy send 0\.01 ETH to \+234 708 043 7343/, 'a phone');
+    assert.match(msg, /Phone numbers must include the country code/);
     assert.match(msg, /flizy send 0\.01 to john@email\.com/, 'an email');
     assert.match(msg, /flizy send 0\.01 to @john on telegram/, 'a Telegram user');
     assert.match(msg, /holds it until they claim/i, 'and say what happens next');
@@ -1014,5 +1015,219 @@ describe('sending to a name that is not saved', () => {
     // It is the recipient's address you save under their name, not your own.
     assert.match(msg, /0xTheirAddress/);
     assert.doesNotMatch(msg, /0xYourAddress/);
+  });
+});
+
+describe('a phone send names its country', () => {
+  it('asks which country and then holds for the number that reply builds', async () => {
+    const asked = await say('flizy send 0.01 ETH to 07080437343');
+    const prompt = lastText(asked);
+    assert.match(prompt, /Which country is this number from/);
+    assert.match(prompt, /Nigeria \+234/);
+    assert.match(prompt, /Ghana \+233/);
+    assert.match(prompt, /United Kingdom \+44/);
+    assert.doesNotMatch(prompt, /2347080437343/);
+    assert.equal(claimHoldCalls.length, 0);
+
+    const preview = await say('1');
+    assert.match(lastText(preview), /Claim plan \(hold for phone\)/);
+    assert.match(lastText(preview), /\+2347080437343/);
+
+    await say('confirm');
+    assert.equal(claimHoldCalls.length, 1);
+    assert.equal(claimHoldCalls[0].toWaHint, '2347080437343');
+  });
+
+  it('accepts spaces and dashes without asking', async () => {
+    for (const line of [
+      'flizy send 0.01 ETH to +234 708 043 7343',
+      'flizy send 0.01 ETH to +234-708-043-7343',
+    ]) {
+      const preview = await say(line);
+      assert.match(lastText(preview), /\+2347080437343/, line);
+      assert.doesNotMatch(lastText(preview), /Which country/, line);
+    }
+  });
+
+  it('uses a full number typed as the answer', async () => {
+    await say('flizy send 0.01 to 0708 043 7343');
+    const other = await say('+44 7700 900123');
+    assert.match(lastText(other), /\+447700900123/);
+    assert.doesNotMatch(lastText(other), /2347080437343/);
+  });
+
+  it('drops the question on cancel', async () => {
+    await say('flizy send 0.01 to 07080437343');
+    const cancelled = await say('cancel');
+    assert.match(lastText(cancelled), /^Cancelled\./);
+    const after = await say('1');
+    assert.equal(after.length, 0, 'a cancelled question must not answer a later 1');
+  });
+
+  it('uses a saved calling code and still shows the number before confirm', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '233';
+    const preview = await say('flizy send 0.01 ETH to 07080437343');
+    const body = textOf(preview).join('\n');
+    assert.match(body, /Added \+233 from your saved country code/);
+    assert.match(body, /Cancel if this number is a different country/);
+    assert.match(lastText(preview), /Claim plan \(hold for phone\)/);
+    assert.match(lastText(preview), /\+2337080437343/);
+    assert.doesNotMatch(body, /Which country is this number from/);
+    assert.equal(claimHoldCalls.length, 0);
+
+    await say('confirm');
+    assert.equal(claimHoldCalls.length, 1);
+    assert.equal(claimHoldCalls[0].toWaHint, '2337080437343');
+  });
+
+  it('does not save the answer to the country question', async () => {
+    await say('flizy send 0.01 ETH to 07080437343', '1');
+    assert.equal(fake.db.tables.accounts[0].default_calling_code ?? null, null);
+  });
+
+  it('still asks on a request when a code is saved', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '234';
+    const asked = await say('flizy request 0.01 from 07080437343');
+    const body = textOf(asked).join('\n');
+    assert.match(body, /Which country is this number from/);
+    assert.doesNotMatch(body, /Payment request created/);
+    assert.equal(fake.db.tables.accounts[0].default_calling_code, '234');
+  });
+
+  it('saves a named country from chat and then fills a local number', async () => {
+    const saved = await say('flizy country france');
+    assert.match(lastText(saved), /Saved France \+33/);
+    assert.equal(fake.db.tables.accounts[0].default_calling_code, '33');
+    assert.equal(fake.db.tables.accounts[0].default_country_iso, 'FR');
+
+    const preview = await say('flizy send 0.01 ETH to 07080437343');
+    assert.match(textOf(preview).join('\n'), /Added \+33 from your saved country code/);
+    assert.match(lastText(preview), /\+337080437343/);
+  });
+
+  it('adds the saved country to a 10-digit local number', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '1';
+    fake.db.tables.accounts[0].default_country_iso = 'US';
+    const preview = await say('flizy send 0.01 to 202 555 0100');
+    const body = textOf(preview).join('\n');
+    assert.match(body, /Added \+1 from your saved country code/);
+    assert.match(body, /United States/);
+    assert.match(lastText(preview), /\+12025550100/);
+    assert.doesNotMatch(lastText(preview), /\+2025550100/);
+    assert.doesNotMatch(body, /Which country is this number from/);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('asks when a saved +1 would also be a Chinese mobile', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '1';
+    fake.db.tables.accounts[0].default_country_iso = 'US';
+    const asked = await say('flizy send 0.01 to 138 1234 5678');
+    const body = textOf(asked).join('\n');
+    assert.match(body, /Which country is this number from/);
+    assert.doesNotMatch(body, /Added \+1/);
+    assert.doesNotMatch(body, /\+13812345678/);
+    assert.doesNotMatch(body, /\+113812345678/);
+    assert.equal(claimHoldCalls.length, 0);
+
+    const china = await say('china');
+    assert.match(lastText(china), /\+8613812345678/);
+    assert.doesNotMatch(lastText(china), /Which country is this number from/);
+    assert.doesNotMatch(lastText(china), /\+13812345678/);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('does not prefix a second 1 onto a Chinese mobile that fails the US check', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '1';
+    fake.db.tables.accounts[0].default_country_iso = 'US';
+    const asked = await say('flizy send 0.01 to 138 0013 8000');
+    const body = textOf(asked).join('\n');
+    assert.match(body, /Which country is this number from/);
+    assert.doesNotMatch(body, /113800138000/);
+    assert.doesNotMatch(body, /Added \+1/);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('keeps the country the person names, including a bare 11-digit result', async () => {
+    const asked = await say('flizy send 0.01 to 202 555 0100');
+    assert.match(lastText(asked), /Which country is this number from/);
+    const preview = await say('united states');
+    const body = textOf(preview).join('\n');
+    assert.match(lastText(preview), /\+12025550100/);
+    assert.doesNotMatch(body, /Which country is this number from/);
+    assert.doesNotMatch(body, /\+112025550100/);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('keeps a number that already includes the saved code', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '1';
+    fake.db.tables.accounts[0].default_country_iso = 'US';
+    const preview = await say('flizy send 0.01 to 1 202 555 0100');
+    const body = textOf(preview).join('\n');
+    assert.doesNotMatch(body, /Added \+1/);
+    assert.match(lastText(preview), /\+12025550100/);
+    assert.doesNotMatch(body, /\+112025550100/);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('adds China to a mobile that also looks like a US number', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '86';
+    fake.db.tables.accounts[0].default_country_iso = 'CN';
+    const preview = await say('flizy send 0.01 to 138 1234 5678');
+    const body = textOf(preview).join('\n');
+    assert.match(body, /Added \+86 from your saved country code/);
+    assert.match(body, /China/);
+    assert.match(lastText(preview), /\+8613812345678/);
+    assert.doesNotMatch(lastText(preview), /\+13812345678/);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('still asks on a request for that same mobile', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '86';
+    fake.db.tables.accounts[0].default_country_iso = 'CN';
+    const asked = await say('flizy request 0.01 from 138 1234 5678');
+    const body = textOf(asked).join('\n');
+    assert.match(body, /Which country is this number from/);
+    assert.doesNotMatch(body, /Payment request created/);
+    assert.doesNotMatch(body, /8613812345678/);
+  });
+
+  it('does not send an 11-digit local number as +1', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '86';
+    fake.db.tables.accounts[0].default_country_iso = 'CN';
+    const preview = await say('flizy send 0.01 to 138 0013 8000');
+    const body = textOf(preview).join('\n');
+    assert.match(body, /Added \+86 from your saved country code/);
+    assert.match(body, /China/);
+    assert.match(lastText(preview), /\+8613800138000/);
+    assert.doesNotMatch(lastText(preview), /\+13800138000/);
+    assert.equal(claimHoldCalls.length, 0);
+  });
+
+  it('adds Korea to a local number that has no trunk zero', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '82';
+    fake.db.tables.accounts[0].default_country_iso = 'KR';
+    const preview = await say('flizy send 0.01 to 10 1234 5678');
+    const body = textOf(preview).join('\n');
+    assert.match(body, /Added \+82 from your saved country code/);
+    assert.match(body, /South Korea/);
+    assert.match(lastText(preview), /\+821012345678/);
+    assert.doesNotMatch(body, /Which country is this number from/);
+  });
+
+  it('clears a saved country and then asks again', async () => {
+    fake.db.tables.accounts[0].default_calling_code = '234';
+    const cleared = await say('flizy country clear');
+    assert.match(lastText(cleared), /^Cleared\./);
+    assert.equal(fake.db.tables.accounts[0].default_calling_code, null);
+
+    const asked = await say('flizy send 0.01 ETH to 07080437343');
+    assert.match(lastText(asked), /Which country is this number from/);
+    assert.doesNotMatch(lastText(asked), /2347080437343/);
+  });
+
+  it('refuses an unknown country name', async () => {
+    const sent = await say('flizy country narnia');
+    assert.match(lastText(sent), /Name a country/);
+    assert.equal(fake.db.tables.accounts[0].default_calling_code ?? null, null);
   });
 });
