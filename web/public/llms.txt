@@ -26,6 +26,13 @@ testnet with source-verified contracts.
 - https://faucet.giwa.io : Official GIWA testnet faucet — paste Flizy wallet address to receive test ETH
 - https://x.com/Flizyapp : Official X account
 
+## Contact
+
+- support@flizy.app : Account help, and email about your account.
+- admin@flizy.app : Business communication.
+- contact@flizy.app : General questions.
+- privacy@flizy.app : Privacy and data requests, including account deletion.
+
 ## Channels
 
 - WhatsApp: commands are prefixed, for example `flizy send 0.01 to john`, then `confirm`.

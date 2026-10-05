@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ConsentReset } from '../../components/ConsentReset';
 import { LegalArticle, LegalH } from '../../components/LegalArticle';
+import { PublicMailList } from '../../components/PublicMailList';
 import { ENTITY_SENTENCE } from '../../lib/entity';
+import { publicMail } from '../../lib/publicMail';
 import { StructuredData, breadcrumbJsonLd } from '../../components/StructuredData';
 import { pageMetadata } from '../../lib/seo';
 import { siteOrigin } from '../../lib/siteOrigin';
@@ -14,10 +16,11 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '2 October 2026';
+const UPDATED = '5 October 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
+  const privacyBox = publicMail('privacy');
 
   return (
     <>
@@ -200,7 +203,14 @@ export default function PrivacyPage() {
             Account. You can remove extra emails and trusted addresses there too.
           </p>
           <p>
-            There is no self-serve full-account delete in the app today. Message us on X at{' '}
+            There is no self-serve full-account delete in the app today. Email{' '}
+            <a
+              href={`mailto:${privacyBox.address}`}
+              className="text-paper no-underline hover:text-lime"
+            >
+              {privacyBox.address}
+            </a>{' '}
+            from the address on the account, or message us on X at{' '}
             <a
               href="https://x.com/Flizyapp"
               className="text-paper no-underline hover:text-lime"
@@ -209,7 +219,7 @@ export default function PrivacyPage() {
             >
               @Flizyapp
             </a>{' '}
-            from an account you can tie to the Flizy email. We will delete or irreversibly
+            from an account you can tie to that email. We will delete or irreversibly
             anonymize account records we control (profile, emails, phone binds, platform IDs,
             sessions, invite attribution we can safely drop). We will not delete another
             person&apos;s data. We cannot delete confirmed chain transactions. If you have
@@ -220,8 +230,9 @@ export default function PrivacyPage() {
 
         <section className="space-y-3">
           <LegalH id="contact">Contact</LegalH>
+          <PublicMailList detailed className="list-disc space-y-2 pl-5" />
           <p>
-            Privacy requests:{' '}
+            You can also message{' '}
             <a
               href="https://x.com/Flizyapp"
               className="text-paper no-underline hover:text-lime"

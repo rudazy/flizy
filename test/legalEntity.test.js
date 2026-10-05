@@ -6,10 +6,9 @@
  * controller to mean anything, and terms need a named counterparty to bind
  * anyone. The footer named nobody either.
  *
- * The registration number now appears in four places, so the risk this guards
- * is drift: one of them being edited and the others left behind. Everything
- * reads from lib/entity.ts, and these tests check that it stays that way rather
- * than someone retyping the number into a page.
+ * The public wording is one sentence: the company is incorporated. It does not
+ * name a country and it does not publish a registration number. Everything
+ * reads from lib/entity.ts, and these tests check that it stays that way.
  *
  * Run: node --test test/legalEntity.test.js
  */
@@ -33,67 +32,71 @@ before(async () => {
   entity = await import('../web/lib/entity.ts');
 });
 
+const PUBLIC_LINE = 'Flizy Tek Ltd, an incorporated company';
+
+function walkWebSources() {
+  const out = [];
+  const skip = new Set(['node_modules', '.next']);
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (skip.has(entry.name)) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!/\.(tsx?|jsx?)$/.test(entry.name)) continue;
+      out.push([path.relative(WEB, full), fs.readFileSync(full, 'utf8')]);
+    }
+  };
+  walk(WEB);
+  return out;
+}
+
 describe('the entity is stated once and reused', () => {
-  it('carries a registered name, a registration number and a jurisdiction', () => {
-    assert.match(entity.ENTITY.legalName, /\S/);
-    assert.match(entity.ENTITY.rc, /^RC \d+$/);
-    assert.match(entity.ENTITY.jurisdiction, /\S/);
+  it('publishes the company name and nothing about the filing', () => {
+    assert.deepEqual(Object.keys(entity.ENTITY), ['legalName']);
+    assert.equal(entity.ENTITY.legalName, 'Flizy Tek Ltd');
+    assert.equal(entity.ENTITY.rc, undefined);
+    assert.equal(entity.ENTITY.rcNumber, undefined);
+    assert.equal(entity.ENTITY.jurisdiction, undefined);
   });
 
-  it('states the country in the legal documents and only there', () => {
-    // Owner decision 2026-09-23. The footer shows the company and its number;
-    // where it is incorporated is a term of the agreement, so it belongs in
-    // the documents. These two assertions are the whole rule.
-    assert.ok(
-      entity.ENTITY_SENTENCE.includes(entity.ENTITY.jurisdiction),
-      'the legal sentence must name the country'
-    );
-    assert.ok(
-      !entity.ENTITY_LINE.includes(entity.ENTITY.jurisdiction),
-      'the footer line must not name the country'
-    );
+  it('says the company is incorporated, without a country or a number', () => {
+    assert.equal(entity.ENTITY_SENTENCE, PUBLIC_LINE);
+    assert.equal(entity.ENTITY_LINE, PUBLIC_LINE);
+    for (const line of [entity.ENTITY_SENTENCE, entity.ENTITY_LINE]) {
+      assert.match(line, /incorporated/);
+      assert.doesNotMatch(line, /\bRC\b/i);
+      assert.doesNotMatch(line, /\d/);
+      assert.doesNotMatch(line, /Nigeria/);
+      assert.doesNotMatch(line, /incorporated in/i);
+    }
   });
 
-  it('the legal sentence reads exactly as agreed', () => {
-    assert.equal(
-      entity.ENTITY_SENTENCE,
-      'Flizy Tek Ltd (RC 9864520), a company incorporated in Nigeria'
-    );
-  });
-
-  it('the footer line reads exactly as agreed', () => {
-    assert.equal(entity.ENTITY_LINE, 'Flizy Tek Ltd · RC 9864520');
-  });
-
-  it('keeps the prose and data forms of the number in step', () => {
-    // Two spellings of one number is exactly the drift this file guards, so
-    // the data form has to be derivable from the prose one.
-    assert.equal(entity.ENTITY.rcNumber, entity.ENTITY.rc.replace(/^RC\s*/, ''));
-    assert.match(entity.ENTITY.rcNumber, /^\d+$/);
-  });
-
-  it('builds the footer line and the document sentence from those parts', () => {
+  it('builds both lines from the company name', () => {
     assert.ok(entity.ENTITY_LINE.includes(entity.ENTITY.legalName));
-    assert.ok(entity.ENTITY_LINE.includes(entity.ENTITY.rc));
     assert.ok(entity.ENTITY_SENTENCE.includes(entity.ENTITY.legalName));
-    assert.ok(entity.ENTITY_SENTENCE.includes(entity.ENTITY.rc));
   });
 
   it('is never retyped into a page', () => {
-    // A hardcoded number is the failure this file exists to prevent: it stays
-    // right until the day the real one changes, and then it is quietly wrong
-    // on a legal page.
-    const number = entity.ENTITY.rc.replace(/^RC\s*/, '');
     for (const [name, src] of [
       ['footer', FOOTER],
       ['terms', TERMS],
       ['privacy', PRIVACY],
       ['json-ld', JSONLD],
     ]) {
-      assert.ok(
-        !src.includes(number),
-        `${name} hardcodes the registration number instead of importing it`
-      );
+      assert.ok(!src.includes(PUBLIC_LINE), `${name} hardcodes the sentence instead of importing it`);
+      assert.doesNotMatch(src, /\bRC\s*\d/, `${name} publishes a registration number`);
+      assert.doesNotMatch(src, /incorporated in/i, `${name} names a country of incorporation`);
+    }
+  });
+
+  it('does not publish a registration number or a country of incorporation anywhere on the site', () => {
+    for (const [name, src] of walkWebSources()) {
+      assert.doesNotMatch(src, /\bRC\s*\d/, `${name} publishes a registration number`);
+      assert.doesNotMatch(src, /incorporated in/i, `${name} names a country of incorporation`);
+      assert.doesNotMatch(src, /Corporate Affairs Commission/, `${name} names the registrar`);
     }
   });
 });
@@ -128,13 +131,12 @@ describe('it appears where people and regulators look', () => {
     assert.match(JSONLD, /legalName: ENTITY\.legalName/);
   });
 
-  it('publishes the registration number as data, not as a sentence', () => {
-    // schema.org has no company-registration property, so PropertyValue is the
-    // documented way to carry a number together with its scheme. Free text
-    // gives a parser a string it cannot act on.
-    assert.match(JSONLD, /'@type': 'PropertyValue'/);
-    assert.match(JSONLD, /propertyID:/);
-    assert.match(JSONLD, /value: ENTITY\.rcNumber/);
+  it('does not publish a registration number in the Organization schema', () => {
+    assert.match(JSONLD, /legalName: ENTITY\.legalName/);
+    assert.doesNotMatch(JSONLD, /identifier:/);
+    assert.doesNotMatch(JSONLD, /propertyID:/);
+    assert.doesNotMatch(JSONLD, /rcNumber/);
+    assert.doesNotMatch(JSONLD, /ENTITY\.rc\b/);
   });
 });
 
@@ -157,8 +159,7 @@ describe('the documents stay reachable once signed in', () => {
 describe('no personal document is published', () => {
   it('ships no incorporation certificate or status report', () => {
     // The certificate carries a full legal name; the status report carries a
-    // residential address and a date of birth. The RC number proves the same
-    // thing and discloses neither.
+    // residential address and a date of birth. Neither document is published.
     const publicDir = path.join(WEB, 'public');
     const files = fs.readdirSync(publicDir).map((f) => f.toLowerCase());
     for (const f of files) {
@@ -188,7 +189,7 @@ describe('the JSON-LD block cannot be broken out of', () => {
     // Regression guard on the escape itself. If it ever grew broader it would
     // start corrupting the structured data it exists to protect.
     const { serializeJsonLd } = require('../web/lib/jsonLd.ts');
-    const graph = { name: 'Flizy', legalName: 'Flizy Tek Ltd', identifier: 'RC 9864520' };
+    const graph = { name: 'Flizy', legalName: 'Flizy Tek Ltd' };
     assert.deepEqual(JSON.parse(serializeJsonLd(graph)), graph);
   });
 

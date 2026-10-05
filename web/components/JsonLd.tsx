@@ -4,6 +4,7 @@
  */
 
 import { ENTITY } from '../lib/entity';
+import { PUBLIC_MAIL, publicMail } from '../lib/publicMail';
 import { serializeJsonLd } from '../lib/jsonLd';
 import { siteOrigin } from '../lib/siteOrigin';
 
@@ -31,17 +32,12 @@ export function JsonLd() {
         // company. Both are stated so the entity behind the site is machine
         // readable, matching the footer and the legal pages.
         legalName: ENTITY.legalName,
-        // A PropertyValue, not the prefixed free-text form. schema.org has no
-        // dedicated company-registration property (leiCode, vatID and duns are
-        // all something else), and this is the documented way to publish an
-        // identifier together with the scheme it belongs to. As bare text a
-        // parser gets a string it cannot act on, which defeats the point of
-        // stating it at all.
-        identifier: {
-          '@type': 'PropertyValue',
-          propertyID: 'Corporate Affairs Commission registration number',
-          value: ENTITY.rcNumber,
-        },
+        email: publicMail('contact').address,
+        contactPoint: PUBLIC_MAIL.map((box) => ({
+          '@type': 'ContactPoint',
+          email: box.address,
+          contactType: box.contactType,
+        })),
         url: origin,
         logo: {
           '@type': 'ImageObject',

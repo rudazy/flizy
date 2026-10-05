@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { LegalArticle, LegalH } from '../../components/LegalArticle';
 import { StructuredData, breadcrumbJsonLd } from '../../components/StructuredData';
+import { PublicMailList } from '../../components/PublicMailList';
 import { ENTITY_SENTENCE } from '../../lib/entity';
 import { pageMetadata } from '../../lib/seo';
 import { siteOrigin } from '../../lib/siteOrigin';
@@ -13,7 +14,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/terms',
 });
 
-const UPDATED = '2 October 2026';
+const UPDATED = '5 October 2026';
 
 export default function TermsPage() {
   const origin = siteOrigin();
@@ -142,8 +143,9 @@ export default function TermsPage() {
 
         <section className="space-y-3">
           <LegalH id="contact">Contact</LegalH>
+          <PublicMailList detailed className="list-disc space-y-2 pl-5" />
           <p>
-            Questions:{' '}
+            You can also message{' '}
             <a
               href="https://x.com/Flizyapp"
               className="text-paper no-underline hover:text-lime"

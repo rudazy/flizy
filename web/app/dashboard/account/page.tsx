@@ -15,6 +15,7 @@ import { LanguageSelect, useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { shortAddr } from '../../../lib/dashboardTypes';
 import { PayIdentity } from '../../../components/PayIdentity';
+import { PublicMailList } from '../../../components/PublicMailList';
 import { AccountProjects } from '../../../components/AccountProjects';
 import type { LocaleCode } from '../../../lib/locale';
 import { SITE_PHONE_COUNTRIES, countryByIso, countryFlag } from '../../../lib/phoneFormat';
@@ -1277,6 +1278,11 @@ export default function AccountPage() {
               {busy === 'logout' ? 'Signing out…' : 'Sign out'}
             </button>
           </div>
+          {/*
+            Same reason as the links above: the signed-in app has no footer,
+            so the mailboxes have to be reachable from this slide.
+          */}
+          <PublicMailList className="mt-4 space-y-1 text-xs" />
         </AppSection>
       ) : null}
     </AppPage>
