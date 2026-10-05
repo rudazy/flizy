@@ -15,7 +15,7 @@ import {
 } from '../lib/tokenDiscovery';
 import { formatEthDisplay } from '../lib/tokenFormat';
 import { useComingSoon } from './ComingSoon';
-import { CopySetupPanel } from './CopySetupPanel';
+import { CopyTradePanel } from './CopyTradePanel';
 import { VerifiedMark } from './VerifiedMark';
 import {
   ArrowRightIcon,
@@ -113,7 +113,8 @@ function ethRow(flz: DiscoveryToken): Row {
     change,
     spark: (flz.spark || []).filter((v) => v > 0).map((v) => 1 / v),
     stats: [
-      { value: 'Gas token', unit: null, label: 'On GIWA' },
+      // The pool prices ETH in FLZ. It does not give ETH a market cap.
+      { value: '-', unit: null, label: 'Market cap' },
       { ...eth(flz.liquidityEth), label: 'In the pool' },
     ],
     href: null,
@@ -166,8 +167,9 @@ export function ExploreTokens() {
   }
 
   const rows = useMemo(() => {
+    if (tab === 'copy') return [];
     const list = tokens || [];
-    const base = tab === 'discover' ? list.filter((t) => t.priceEth != null) : tokensForFilter(tab as TokenFilterId, list).tokens;
+    const base = tab === 'discover' ? list.filter((t) => t.priceEth != null) : tokensForFilter(tab, list).tokens;
     const out = base.map(flzRow);
     const flz = list.find((t) => t.symbol === 'FLZ');
     if (tab === 'discover' && flz && flz.flzPerEth) out.push(ethRow(flz));
@@ -204,7 +206,7 @@ export function ExploreTokens() {
         })}
       </div>
 
-      {tab === 'copy' ? <CopySetupPanel kind="trade" /> : null}
+      {tab === 'copy' ? <CopyTradePanel /> : null}
 
       {tab === 'discover' ? <Hero slide={slide} setSlide={setSlide} /> : null}
 

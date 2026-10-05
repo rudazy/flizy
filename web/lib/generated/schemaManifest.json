@@ -124,8 +124,20 @@
     },
     {
       "kind": "check",
+      "name": "copy_setups.copy_setups_mcap_usd_check",
+      "providedBy": "20261005200000_copy_trade_rules.sql",
+      "requiredBy": "check on copy_setups"
+    },
+    {
+      "kind": "check",
       "name": "copy_setups.copy_setups_per_trade_wei_check",
       "providedBy": "20260929120000_copy_setups.sql",
+      "requiredBy": "check on copy_setups"
+    },
+    {
+      "kind": "check",
+      "name": "copy_setups.copy_setups_sell_mode_check",
+      "providedBy": "20261005200000_copy_trade_rules.sql",
       "requiredBy": "check on copy_setups"
     },
     {
@@ -136,8 +148,26 @@
     },
     {
       "kind": "check",
+      "name": "copy_setups.copy_setups_trade_filters_check",
+      "providedBy": "20261005200000_copy_trade_rules.sql",
+      "requiredBy": "check on copy_setups"
+    },
+    {
+      "kind": "check",
+      "name": "copy_setups.copy_setups_usd_limits_check",
+      "providedBy": "20261005200000_copy_trade_rules.sql",
+      "requiredBy": "check on copy_setups"
+    },
+    {
+      "kind": "check",
       "name": "copy_wallets.copy_wallets_address_check",
       "providedBy": "20260929120000_copy_setups.sql",
+      "requiredBy": "check on copy_wallets"
+    },
+    {
+      "kind": "check",
+      "name": "copy_wallets.copy_wallets_buy_usd_cents_check",
+      "providedBy": "20261005200000_copy_trade_rules.sql",
       "requiredBy": "check on copy_wallets"
     },
     {
@@ -154,8 +184,26 @@
     },
     {
       "kind": "check",
+      "name": "copy_wallets.copy_wallets_mcap_usd_check",
+      "providedBy": "20261005200000_copy_trade_rules.sql",
+      "requiredBy": "check on copy_wallets"
+    },
+    {
+      "kind": "check",
       "name": "copy_wallets.copy_wallets_position_check",
       "providedBy": "20260929120000_copy_setups.sql",
+      "requiredBy": "check on copy_wallets"
+    },
+    {
+      "kind": "check",
+      "name": "copy_wallets.copy_wallets_sell_mode_check",
+      "providedBy": "20261005200000_copy_trade_rules.sql",
+      "requiredBy": "check on copy_wallets"
+    },
+    {
+      "kind": "check",
+      "name": "copy_wallets.copy_wallets_sell_usd_cents_check",
+      "providedBy": "20261005200000_copy_trade_rules.sql",
       "requiredBy": "check on copy_wallets"
     },
     {

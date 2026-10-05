@@ -268,4 +268,162 @@ describe('copy setup writes', () => {
   it('has no second paste parser beside copyPaste.splitWalletPaste', () => {
     assert.equal(copy.parseWalletPaste, undefined);
   });
+
+  it('keeps a renamed wallet when a later save leaves the name out', async () => {
+    await copy.saveCopySetup(
+      'acct-1',
+      tradeBody([A, B], { wallets: [
+        { address: A, enabled: true, label: 'Smart Money' },
+        { address: B, enabled: true },
+      ] }),
+      fake.client
+    );
+    const again = await copy.saveCopySetup('acct-1', tradeBody([A, B]), fake.client);
+    assert.deepEqual(
+      again.wallets.map((wallet) => wallet.label),
+      ['Smart Money', 'Wallet A']
+    );
+  });
+});
+
+function rulesBody(addresses, extra = {}, rows) {
+  return {
+    kind: 'trade',
+    wallets: rows || addresses.map((address) => ({ address, enabled: true })),
+    rules: {
+      commit: true,
+      buy: '10',
+      minMcap: '50k',
+      maxMcap: '5m',
+      copyBuys: true,
+      copySells: true,
+      sellMode: 'percent',
+      sellAmount: '40',
+      maxPerTrade: '10',
+      maxDaily: '100',
+      maxOpenPositions: 10,
+      ...extra,
+    },
+  };
+}
+
+describe('copy trade rules', () => {
+  it('stores cents, drops the old ETH limits, and lets every new wallet inherit', async () => {
+    await copy.saveCopySetup('acct-1', tradeBody([A], { allocationEth: '1.5' }), fake.client);
+    const saved = await copy.saveCopySetup('acct-1', rulesBody([A, B, C]), fake.client);
+    assert.equal(saved.allocationEth, '');
+    assert.equal(saved.rules.ready, true);
+    assert.equal(saved.rules.buyUsdCents, 1000);
+    assert.equal(saved.rules.minMcapUsd, 50000);
+    assert.equal(saved.rules.maxMcapUsd, 5000000);
+    assert.equal(saved.rules.sellMode, 'percent');
+    assert.equal(saved.rules.sellUsdCents, 0);
+    assert.equal(saved.rules.maxDailyUsdCents, 10000);
+    const row = fake.db.tables.copy_setups[0];
+    assert.equal(row.allocation_wei, '0');
+    assert.equal(row.buy_usd_cents, 1000);
+    assert.deepEqual(
+      saved.wallets.map((wallet) => wallet.override.buyUsdCents),
+      [null, null, null]
+    );
+  });
+
+  it('keeps a wallet off, a custom amount, and a rename, then clears the custom amount for every wallet', async () => {
+    const saved = await copy.saveCopySetup(
+      'acct-1',
+      rulesBody([A, B], { maxPerTrade: '50', maxDaily: '100' }, [
+        { address: A, enabled: true, label: 'Smart Money', override: { buy: '25', minMcap: '100k', maxMcap: '10m' } },
+        { address: B, enabled: true },
+      ]),
+      fake.client
+    );
+    assert.equal(saved.wallets[0].label, 'Smart Money');
+    assert.equal(saved.wallets[0].override.buyUsdCents, 2500);
+    assert.equal(saved.wallets[1].override.buyUsdCents, null);
+
+    await assert.rejects(
+      () =>
+        copy.saveCopySetup(
+          'acct-1',
+          rulesBody([A, B], { maxPerTrade: '10', maxDaily: '100' }, [
+            { address: A, enabled: true, override: { buy: '25' } },
+            { address: B, enabled: true },
+          ]),
+          fake.client
+        ),
+      /above the maximum/
+    );
+    assert.equal(fake.db.tables.copy_setups[0].max_trade_usd_cents, 5000);
+
+    const paused = await copy.saveCopySetup(
+      'acct-1',
+      rulesBody([A, B], { commit: false }, [
+        { address: A, enabled: false, override: { buy: '25', minMcap: '100k', maxMcap: '10m' } },
+        { address: B, enabled: true },
+      ]),
+      fake.client
+    );
+    assert.equal(paused.wallets[0].enabled, false);
+    assert.equal(paused.wallets[0].label, 'Smart Money');
+    assert.equal(paused.wallets[0].override.buyUsdCents, 2500);
+    assert.equal(paused.rules.maxTradeUsdCents, 5000);
+
+    const cleared = await copy.saveCopySetup(
+      'acct-1',
+      rulesBody([A, B], { maxPerTrade: '50', maxDaily: '100' }),
+      fake.client
+    );
+    assert.equal(cleared.wallets[0].label, 'Smart Money');
+    assert.equal(cleared.wallets[0].override.buyUsdCents, null);
+    assert.equal(cleared.wallets[1].override.buyUsdCents, null);
+  });
+
+  it('stores a fixed sell and refuses mint rules, a key, and a missing column', async () => {
+    const fixed = await copy.saveCopySetup(
+      'acct-1',
+      rulesBody([A], { sellMode: 'fixed', sellAmount: '5', maxPerTrade: '10' }),
+      fake.client
+    );
+    assert.equal(fixed.rules.sellMode, 'fixed');
+    assert.equal(fixed.rules.sellUsdCents, 500);
+
+    await assert.rejects(
+      () =>
+        copy.saveCopySetup(
+          'acct-1',
+          { ...rulesBody([B]), kind: 'mint' },
+          fake.client
+        ),
+      /Copy mint does not use trade rules/
+    );
+
+    await assert.rejects(
+      () => copy.saveCopySetup('acct-1', rulesBody([`0x${'11'.repeat(32)}`]), fake.client),
+      /key/i
+    );
+
+    const broken = {
+      from(table) {
+        if (table === 'accounts') return fake.client.from(table);
+        const error = { message: 'column copy_setups.buy_usd_cents does not exist' };
+        const builder = {
+          select() {
+            return builder;
+          },
+          eq() {
+            return builder;
+          },
+          maybeSingle: async () => ({ data: null, error }),
+          then(resolve, reject) {
+            return Promise.resolve({ data: null, error }).then(resolve, reject);
+          },
+        };
+        return builder;
+      },
+    };
+    await assert.rejects(
+      () => copy.readCopySetup('acct-1', 'trade', broken),
+      (err) => err.name === 'ClientError' && /not installed/.test(err.message)
+    );
+  });
 });

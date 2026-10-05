@@ -21,8 +21,9 @@ describe('tabs', () => {
   it('runs Discover, Copy Trade and every filter from the shared lists', () => {
     assert.match(TOKENS, /const \[DISCOVER, COPY\] = TOKEN_VIEWS;/);
     assert.match(TOKENS, /const TABS: Array<\{ id: TabId; label: string \}> = \[DISCOVER, COPY, \.\.\.TOKEN_FILTERS\];/);
-    assert.match(TOKENS, /tab === 'copy' \? <CopySetupPanel kind="trade" \/>/);
-    assert.match(TOKENS, /tokensForFilter\(tab as TokenFilterId, list\)\.tokens/);
+    assert.match(TOKENS, /tab === 'copy' \? <CopyTradePanel \/>/);
+    assert.match(TOKENS, /if \(tab === 'copy'\) return \[\];/);
+    assert.match(TOKENS, /tokensForFilter\(tab, list\)\.tokens/);
   });
 });
 

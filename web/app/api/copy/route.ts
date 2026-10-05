@@ -12,7 +12,7 @@ function fail(route: string, err: unknown) {
   return NextResponse.json(apiErrorBodyAllowingClientError(route, err), { status });
 }
 
-/** The saved copy setup. Reading it does not follow a wallet. */
+/** The saved copy setup. Reading it does not follow a wallet or send a trade. */
 export async function GET(req: Request) {
   try {
     const accountId = await getAccountIdFromCookie();
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   }
 }
 
-/** Replace this account's wallets and limits for one kind. */
+/** Replace this account's wallets and limits for one kind. Saving does not send a trade. */
 export async function PUT(req: Request) {
   try {
     const denied = rejectIfCrossOrigin(req);

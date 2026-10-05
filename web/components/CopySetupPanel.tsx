@@ -136,11 +136,11 @@ function Disclosure({
 }
 
 /**
- * Wallet list and limits for copy trade or copy mint.
+ * Wallet list and limits for copy mint.
  *
- * Each block stays closed until it is opened. Enter turns a paste into rows
- * immediately. The save is the account's configuration. Neither kind submits
- * a transaction from this panel.
+ * Copy trade has its own panel. Each block here stays closed until it is
+ * opened. Enter turns a paste into rows immediately. The save is the
+ * account's configuration. This panel does not submit a transaction.
  */
 export function CopySetupPanel({ kind }: { kind: Kind }) {
   const [draft, setDraft] = useState<Draft | null>(null);

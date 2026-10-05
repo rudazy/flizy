@@ -7,12 +7,32 @@
  *
  * Trade and mint are separate lists on purpose. Following a wallet into a
  * token buy is a different instruction from following it into a mint.
+ *
+ * Trade can also store dollar rules (a `rules` object on the save). Those
+ * rules are still only configuration. Mint never writes them. An older trade
+ * save with no `rules` object keeps the ETH limits this file already stored.
  */
 
 import { ethers } from 'ethers';
 import { getSupabase } from './supabase.ts';
 import { ClientError } from './apiError.ts';
 import { walletLabel } from './copyPaste.ts';
+import {
+  RULES_NOT_INSTALLED,
+  SETUP_RULE_COLUMNS,
+  WALLET_RULE_COLUMNS,
+  assertOverridesFit,
+  blankRules,
+  isMissingRulesColumn,
+  overrideFromRow,
+  overrideToColumns,
+  parseCommittedRules,
+  parseWalletOverride,
+  rulesFromRow,
+  rulesToColumns,
+  type CopyTradeRules,
+  type WalletOverride,
+} from './copyTradeRules.ts';
 
 export type Db = ReturnType<typeof getSupabase>;
 
@@ -27,6 +47,8 @@ export type CopyWallet = {
   label: string;
   enabled: boolean;
   position: number;
+  /** Null on mint and on an ETH-only trade save. Null fields inside mean "use the default". */
+  override: WalletOverride | null;
 };
 
 export type CopySetup = {
@@ -41,6 +63,8 @@ export type CopySetup = {
   copySells: boolean;
   slippagePct: string;
   saved: boolean;
+  /** Null for mint. For trade, ready is false until a dollar rule set is saved. */
+  rules: CopyTradeRules | null;
 };
 
 const MAX_WALLETS = 100;
@@ -64,6 +88,13 @@ function nextLabel(used: Set<number>): string {
   while (used.has(index)) index += 1;
   return walletLabel(index);
 }
+
+type WalletDraft = {
+  address: string;
+  enabled: boolean;
+  label: string | null;
+  override: WalletOverride | null;
+};
 
 type Normalized = {
   kind: CopyKind;
@@ -119,32 +150,57 @@ function asBoolean(value: unknown, label: string): boolean {
   return value;
 }
 
-function assignLabels(
-  previous: { address: string; label: string }[],
-  next: { address: string; enabled: boolean }[]
-): CopyWallet[] {
+/**
+ * A name the person typed wins. A save that leaves the name out keeps the
+ * previous one, including a rename such as "Smart Money". Only a wallet with
+ * no name at all gets the next Wallet A / Wallet B label.
+ */
+function readLabel(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw !== 'string') throw new ClientError('A wallet name needs 1 to 32 characters.');
+  if (/[\u0000-\u001f\u007f]/.test(raw)) {
+    throw new ClientError('A wallet name needs 1 to 32 characters.');
+  }
+  const text = raw.replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  if ([...text].length > 32) throw new ClientError('A wallet name needs 1 to 32 characters.');
+  return text;
+}
+
+function assignLabels(previous: { address: string; label: string }[], next: WalletDraft[]): CopyWallet[] {
   const prior = new Map(previous.map((wallet) => [wallet.address.toLowerCase(), wallet.label]));
   const used = new Set<number>();
   const drafted = next.map((wallet) => {
-    const kept = prior.get(wallet.address.toLowerCase());
-    const index = kept ? labelIndex(kept) : null;
-    if (kept && index != null) {
-      used.add(index);
-      return { address: wallet.address, enabled: wallet.enabled, label: kept };
-    }
-    return { address: wallet.address, enabled: wallet.enabled, label: '' };
+    const kept = prior.get(wallet.address.toLowerCase()) ?? null;
+    const chosen = wallet.label ?? kept ?? '';
+    const index = chosen ? labelIndex(chosen) : null;
+    if (index != null) used.add(index);
+    return { ...wallet, label: chosen };
   });
   return drafted.map((wallet, position) => {
-    const label = wallet.label || nextLabel(used);
-    const index = labelIndex(label);
-    if (index != null) used.add(index);
+    let label = wallet.label;
+    if (!label) {
+      label = nextLabel(used);
+      const index = labelIndex(label);
+      if (index != null) used.add(index);
+    }
     return {
       address: wallet.address,
       label,
       enabled: wallet.enabled,
       position: position + 1,
+      override: wallet.override,
     };
   });
+}
+
+function assertUniqueLabels(wallets: CopyWallet[]) {
+  const seen = new Set<string>();
+  for (const wallet of wallets) {
+    const key = wallet.label.toLowerCase();
+    if (seen.has(key)) throw new ClientError('Each wallet needs its own name.');
+    seen.add(key);
+  }
 }
 
 function normalizeCopyInput(
@@ -160,27 +216,7 @@ function normalizeCopyInput(
   if (!Array.isArray(input.wallets)) throw new ClientError('Add wallets as a list.');
   if (input.wallets.length > MAX_WALLETS) throw new ClientError('100 wallets is the limit.');
 
-  const own = ownAddress && ethers.isAddress(ownAddress) ? ethers.getAddress(ownAddress).toLowerCase() : null;
-  const seen = new Set<string>();
-  const parsed: { address: string; enabled: boolean }[] = [];
-  for (const entry of input.wallets) {
-    if (!entry || typeof entry !== 'object') throw new ClientError('Each wallet needs an address.');
-    const row = entry as Record<string, unknown>;
-    const addressRaw = typeof row.address === 'string' ? row.address.trim() : '';
-    if (/^(0x)?[0-9a-fA-F]{64}$/.test(addressRaw)) {
-      throw new ClientError('Paste addresses only. A line looked like a key, so nothing was added.');
-    }
-    if (!ethers.isAddress(addressRaw)) throw new ClientError('One of those is not a wallet address.');
-    const address = ethers.getAddress(addressRaw);
-    if (address.toLowerCase() === ZERO) throw new ClientError('One of those is not a wallet address.');
-    if (own && address.toLowerCase() === own) {
-      throw new ClientError('That is your own Flizy wallet.');
-    }
-    const key = address.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    parsed.push({ address, enabled: asBoolean(row.enabled, 'Each wallet is on or off.') });
-  }
+  const parsed = parseWalletEntries(input.wallets, ownAddress, false);
 
   const allocationWei = ethToWei(input.allocationEth, 'Allocation');
   const perTradeWei = ethToWei(input.perTradeEth, kindRaw === 'mint' ? 'Max per mint' : 'Amount per trade');
@@ -218,9 +254,11 @@ function normalizeCopyInput(
     throw new ClientError('Trade copying does not take a mint count.');
   }
 
+  const wallets = assignLabels(previous, parsed);
+  assertUniqueLabels(wallets);
   return {
     kind: kindRaw,
-    wallets: assignLabels(previous, parsed),
+    wallets,
     allocationWei: allocationWei.toString(),
     perTradeWei: perTradeWei.toString(),
     maxTradeWei: maxTradeWei.toString(),
@@ -260,7 +298,44 @@ function emptyCopySetup(kind: CopyKind): CopySetup {
     copySells: kind === 'trade',
     slippagePct: '1',
     saved: false,
+    rules: null,
   };
+}
+
+function parseWalletEntries(entries: unknown[], ownAddress: string | null, tradeRules: boolean): WalletDraft[] {
+  const own = ownAddress && ethers.isAddress(ownAddress) ? ethers.getAddress(ownAddress).toLowerCase() : null;
+  const seen = new Set<string>();
+  const parsed: WalletDraft[] = [];
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') throw new ClientError('Each wallet needs an address.');
+    const row = entry as Record<string, unknown>;
+    const addressRaw = typeof row.address === 'string' ? row.address.trim() : '';
+    if (/^(0x)?[0-9a-fA-F]{64}$/.test(addressRaw)) {
+      throw new ClientError('Paste addresses only. A line looked like a key, so nothing was added.');
+    }
+    if (!ethers.isAddress(addressRaw)) throw new ClientError('One of those is not a wallet address.');
+    const address = ethers.getAddress(addressRaw);
+    if (address.toLowerCase() === ZERO) throw new ClientError('One of those is not a wallet address.');
+    if (own && address.toLowerCase() === own) {
+      throw new ClientError('That is your own Flizy wallet.');
+    }
+    const key = address.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    parsed.push({
+      address,
+      enabled: asBoolean(row.enabled, 'Each wallet is on or off.'),
+      label: readLabel(row.label),
+      override: tradeRules ? parseWalletOverride(row.override) : null,
+    });
+  }
+  return parsed;
+}
+
+function rethrowCopy(error: { message?: string } | null): never {
+  const message = error?.message || 'Copy setup could not be saved.';
+  if (isMissingRulesColumn(message)) throw new ClientError(RULES_NOT_INSTALLED);
+  throw new Error(message);
 }
 
 type SetupRow = {
@@ -274,23 +349,24 @@ type SetupRow = {
   slippage_bps: number;
 };
 
-type WalletRow = {
-  address: string;
-  label: string;
-  enabled: boolean;
-  position: number;
-};
+const ETH_SETUP_COLUMNS =
+  'allocation_wei, per_trade_wei, max_trade_wei, max_daily_wei, max_daily_count, copy_buys, copy_sells, slippage_bps';
 
-function toSetup(kind: CopyKind, row: SetupRow | null, wallets: WalletRow[]): CopySetup {
+function toSetup(
+  kind: CopyKind,
+  row: (SetupRow & Record<string, unknown>) | null,
+  wallets: Array<Record<string, unknown>>
+): CopySetup {
   const base = emptyCopySetup(kind);
   const ordered = wallets
     .slice()
-    .sort((a, b) => a.position - b.position)
+    .sort((a, b) => Number(a.position) - Number(b.position))
     .map((wallet) => ({
-      address: wallet.address,
-      label: wallet.label,
+      address: String(wallet.address),
+      label: String(wallet.label),
       enabled: wallet.enabled === true,
-      position: wallet.position,
+      position: Number(wallet.position),
+      override: kind === 'trade' ? overrideFromRow(wallet) : null,
     }));
   if (!row) return { ...base, wallets: ordered };
   return {
@@ -305,29 +381,35 @@ function toSetup(kind: CopyKind, row: SetupRow | null, wallets: WalletRow[]): Co
     copySells: row.copy_sells === true,
     slippagePct: bpsToPct(Number(row.slippage_bps)),
     saved: true,
+    rules: kind === 'trade' ? rulesFromRow(row) : null,
   };
 }
 
 export async function readCopySetup(accountId: string, kind: CopyKind, client?: Db): Promise<CopySetup> {
   const supabase = db(client);
+  const setupColumns =
+    kind === 'trade' ? `${ETH_SETUP_COLUMNS}, ${SETUP_RULE_COLUMNS.join(', ')}` : ETH_SETUP_COLUMNS;
+  const walletColumns =
+    kind === 'trade'
+      ? `address, label, enabled, position, ${WALLET_RULE_COLUMNS.join(', ')}`
+      : 'address, label, enabled, position';
   const [{ data: setup, error: setupError }, { data: wallets, error: walletError }] = await Promise.all([
-    supabase
-      .from('copy_setups')
-      .select(
-        'allocation_wei, per_trade_wei, max_trade_wei, max_daily_wei, max_daily_count, copy_buys, copy_sells, slippage_bps'
-      )
-      .eq('account_id', accountId)
-      .eq('kind', kind)
-      .maybeSingle(),
-    supabase
-      .from('copy_wallets')
-      .select('address, label, enabled, position')
-      .eq('account_id', accountId)
-      .eq('kind', kind),
+    supabase.from('copy_setups').select(setupColumns).eq('account_id', accountId).eq('kind', kind).maybeSingle(),
+    supabase.from('copy_wallets').select(walletColumns).eq('account_id', accountId).eq('kind', kind),
   ]);
-  if (setupError) throw new Error(setupError.message);
-  if (walletError) throw new Error(walletError.message);
-  return toSetup(kind, (setup as SetupRow | null) ?? null, (wallets as WalletRow[] | null) ?? []);
+  if (setupError) {
+    if (kind === 'trade') rethrowCopy(setupError);
+    throw new Error(setupError.message);
+  }
+  if (walletError) {
+    if (kind === 'trade') rethrowCopy(walletError);
+    throw new Error(walletError.message);
+  }
+  return toSetup(
+    kind,
+    (setup as (SetupRow & Record<string, unknown>) | null) ?? null,
+    (wallets as unknown as Array<Record<string, unknown>> | null) ?? []
+  );
 }
 
 const COPY_SETUP_STALE = 'These settings changed in another tab. Reload and save again.';
@@ -357,11 +439,14 @@ export async function saveCopySetup(accountId: string, body: unknown, client?: D
   const version = (versionRow as { updated_at?: string } | null)?.updated_at ?? null;
 
   const current = await readCopySetup(accountId, kind, supabase);
-  const normalized = normalizeCopyInput(
-    body,
-    current.wallets,
-    (account as { agent_wallet_address?: string | null }).agent_wallet_address ?? null
-  );
+  const ownAddress = (account as { agent_wallet_address?: string | null }).agent_wallet_address ?? null;
+  if (kind === 'mint' && hasRules(body)) {
+    throw new ClientError('Copy mint does not use trade rules.');
+  }
+  if (kind === 'trade' && hasRules(body)) {
+    return saveTradeRules(supabase, accountId, body, current, ownAddress, version);
+  }
+  const normalized = normalizeCopyInput(body, current.wallets, ownAddress);
 
   const settings = {
     allocation_wei: normalized.allocationWei,
@@ -394,39 +479,7 @@ export async function saveCopySetup(accountId: string, body: unknown, client?: D
     }
   }
 
-  if (normalized.wallets.length) {
-    const { error: upsertError } = await supabase.from('copy_wallets').upsert(
-      normalized.wallets.map((wallet) => ({
-        account_id: accountId,
-        kind: normalized.kind,
-        address: wallet.address,
-        label: wallet.label,
-        enabled: wallet.enabled,
-        position: wallet.position,
-      })),
-      { onConflict: 'account_id,kind,address' }
-    );
-    if (upsertError) throw new Error(upsertError.message);
-  }
-
-  // One delete for every row not in the saved list. The list is built only from
-  // addresses normalizeCopyInput validated and checksummed (0x plus 40 hex), the
-  // same form the upsert above stored, so it is safe inside a PostgREST filter.
-  let removal = supabase
-    .from('copy_wallets')
-    .delete()
-    .eq('account_id', accountId)
-    .eq('kind', normalized.kind);
-  if (normalized.wallets.length) {
-    const keep = normalized.wallets.map((wallet) => wallet.address);
-    if (!keep.every((address) => /^0x[0-9a-fA-F]{40}$/.test(address))) {
-      throw new Error('copy wallet list was not normalized');
-    }
-    removal = removal.not('address', 'in', `(${keep.join(',')})`);
-  }
-  const { error: deleteError } = await removal;
-  if (deleteError) throw new Error(deleteError.message);
-
+  await replaceWallets(supabase, accountId, normalized.kind, normalized.wallets, false);
   return readCopySetup(accountId, normalized.kind, supabase);
 }
 
@@ -435,4 +488,115 @@ function kindOf(body: unknown): CopyKind {
   const kind = String((body as { kind?: unknown }).kind || '');
   if (!isCopyKind(kind)) throw new ClientError('Choose trade or mint.');
   return kind;
+}
+
+function hasRules(body: unknown): boolean {
+  if (!body || typeof body !== 'object') return false;
+  const rules = (body as { rules?: unknown }).rules;
+  return Boolean(rules) && typeof rules === 'object' && !Array.isArray(rules);
+}
+
+/**
+ * Dollar rules for trade. `commit` writes the rule set and clears the old ETH
+ * limits (they are not the bounds any more). A save with commit false only
+ * changes the wallet list and leaves a saved rule set where it is.
+ */
+async function saveTradeRules(
+  supabase: Db,
+  accountId: string,
+  body: unknown,
+  current: CopySetup,
+  ownAddress: string | null,
+  version: string | null
+): Promise<CopySetup> {
+  const input = body as Record<string, unknown>;
+  if (!Array.isArray(input.wallets)) throw new ClientError('Add wallets as a list.');
+  if (input.wallets.length > MAX_WALLETS) throw new ClientError('100 wallets is the limit.');
+
+  const rulesBody = input.rules as Record<string, unknown>;
+  const commit = rulesBody.commit === true;
+  const drafts = parseWalletEntries(input.wallets, ownAddress, true);
+  const wallets = assignLabels(current.wallets, drafts);
+  assertUniqueLabels(wallets);
+
+  const basis = current.rules ?? blankRules();
+  const stored = commit ? parseCommittedRules(rulesBody) : basis;
+  assertOverridesFit(stored, wallets.map((wallet) => wallet.override));
+
+  const updatedAt = new Date().toISOString();
+  const settings = commit
+    ? {
+        allocation_wei: '0',
+        per_trade_wei: '0',
+        max_trade_wei: '0',
+        max_daily_wei: '0',
+        max_daily_count: 0,
+        ...rulesToColumns(stored),
+        updated_at: updatedAt,
+      }
+    : { updated_at: updatedAt };
+
+  if (version) {
+    const { data: moved, error: setupError } = await supabase
+      .from('copy_setups')
+      .update(settings)
+      .eq('account_id', accountId)
+      .eq('kind', 'trade')
+      .eq('updated_at', version)
+      .select('account_id');
+    if (setupError) rethrowCopy(setupError);
+    if (!Array.isArray(moved) || moved.length === 0) throw new ClientError(COPY_SETUP_STALE);
+  } else {
+    const { error: setupError } = await supabase
+      .from('copy_setups')
+      .insert({ account_id: accountId, kind: 'trade', ...settings });
+    if (setupError) {
+      if ((setupError as { code?: string }).code === '23505') throw new ClientError(COPY_SETUP_STALE);
+      rethrowCopy(setupError);
+    }
+  }
+
+  await replaceWallets(supabase, accountId, 'trade', wallets, true);
+  return readCopySetup(accountId, 'trade', supabase);
+}
+
+async function replaceWallets(
+  supabase: Db,
+  accountId: string,
+  kind: CopyKind,
+  wallets: CopyWallet[],
+  withOverrides: boolean
+) {
+  // One delete for every row not in the saved list. The list is built only from
+  // addresses that were validated and checksummed (0x plus 40 hex), the same
+  // form the upsert stores, so it is safe inside a PostgREST filter.
+  if (wallets.length) {
+    const { error: upsertError } = await supabase.from('copy_wallets').upsert(
+      wallets.map((wallet) => ({
+        account_id: accountId,
+        kind,
+        address: wallet.address,
+        label: wallet.label,
+        enabled: wallet.enabled,
+        position: wallet.position,
+        ...(withOverrides && wallet.override ? overrideToColumns(wallet.override) : {}),
+      })),
+      { onConflict: 'account_id,kind,address' }
+    );
+    if (upsertError) {
+      if (withOverrides) rethrowCopy(upsertError);
+      throw new Error(upsertError.message);
+    }
+  }
+
+  let removal = supabase.from('copy_wallets').delete().eq('account_id', accountId).eq('kind', kind);
+  if (wallets.length) {
+    const keep = wallets.map((wallet) => wallet.address);
+    if (!keep.every((address) => /^0x[0-9a-fA-F]{40}$/.test(address))) {
+      throw new Error('copy wallet list was not normalized');
+    }
+    removal = removal.not('address', 'in', `(${keep.join(',')})`);
+  }
+  const { error: deleteError } = await removal;
+  if (deleteError) throw new Error(deleteError.message);
 }
