@@ -1,9 +1,9 @@
 /**
  * Wallet Scan: range, totals, chips, search and the words on a row.
- * Pure (no React, no fetch). The screen reads the activity the dashboard
- * already loaded, which is the latest moves from the history route, so a
- * figure here is not a lifetime total. Volume is a dollar amount only when
- * every settled row in the window is ETH and a rate exists. An empty window,
+ * Pure (no React, no fetch). The screen reads the Flizy-wide feed, which is
+ * the latest moves from every account, so a figure here is not a lifetime
+ * total. Volume is a dollar amount only when every settled row in the window
+ * is ETH and a rate exists. An empty window,
  * or one with no settled ETH, is $0.00. A settled row in another asset, or
  * settled ETH with no rate, is a hyphen. Failed rows stay in the counts and
  * stay out of the volume.
@@ -135,17 +135,29 @@ export function scanWho(value: string | null | undefined): string {
   return /^0x[0-9a-fA-F]{40}$/.test(value) ? shortAddr(value) : value;
 }
 
+/** A Flizy username already checked by the feed. Anything else is not a name. */
+export function scanActor(row: ActivityItem): string | null {
+  const actor = typeof row.actor === 'string' ? row.actor.trim() : '';
+  return /^@[a-z][a-z0-9]{2,23}$/.test(actor) ? actor : null;
+}
+
+function actorPrefix(row: ActivityItem): string {
+  const actor = scanActor(row);
+  return actor ? `${actor} · ` : '';
+}
+
 export function scanHeadline(row: ActivityItem): string {
+  const who = actorPrefix(row);
   const chip = scanChipOf(row);
-  if (chip === 'nft' || chip === 'pool' || chip === 'other') return row.label || scanKind(row);
+  if (chip === 'nft' || chip === 'pool' || chip === 'other') return `${who}${row.label || scanKind(row)}`;
   if (chip === 'swap' && row.amountSecondary && row.assetSecondary) {
-    return `${formatAmount(row.amount)} ${row.asset} → ${formatAmount(row.amountSecondary)} ${row.assetSecondary}`;
+    return `${who}${formatAmount(row.amount)} ${row.asset} → ${formatAmount(row.amountSecondary)} ${row.assetSecondary}`;
   }
   const amount = `${formatAmount(row.amount)} ${row.asset}`;
-  if (chip === 'swap') return amount;
-  const who = scanWho(row.counterparty);
-  if (row.direction === 'in') return who ? `${amount} from ${who}` : amount;
-  return who ? `${amount} → ${who}` : amount;
+  if (chip === 'swap') return `${who}${amount}`;
+  const peer = scanWho(row.counterparty);
+  if (row.direction === 'in') return `${who}${peer ? `${amount} from ${peer}` : amount}`;
+  return `${who}${peer ? `${amount} → ${peer}` : amount}`;
 }
 
 export function scanSubline(row: ActivityItem): string {

@@ -15,7 +15,8 @@ import {
   SwapArrowsIcon,
 } from './ExploreIcons';
 import type { ActivityItem } from '../lib/dashboardTypes';
-import { activityRows, statusPill, type Tone } from '../lib/historyView';
+import { parseScanFocus } from '../lib/flizyFeed';
+import { statusPill, type Tone } from '../lib/historyView';
 import {
   SCAN_CHIPS,
   SCAN_RANGES,
@@ -26,6 +27,7 @@ import {
   formatScanPct,
   formatScanUsd,
   relativeWhen,
+  scanActor,
   scanChannel,
   scanChipOf,
   scanHeadline,
@@ -45,13 +47,25 @@ const LEDGER_GRID =
   'lg:grid-cols-[40px_92px_minmax(0,1fr)_minmax(88px,150px)_92px_76px_116px_16px] lg:gap-x-3';
 
 /**
- * Wallet Scan. The same activity History reads, arranged as a range, four
- * totals and a ledger. Dollars appear only when walletScan can price the
- * window. The instrument is drawn here. It is not a picture of sample trades.
+ * Wallet Scan. Moves from every Flizy account, arranged as a range, four
+ * totals and a ledger. A whole username that belongs to an account, or a
+ * whole address, switches the cards and the list to that account. A name
+ * that is not an account leaves the cards on everyone. Clearing the box
+ * returns to everyone.
+ * History stays the signed-in account. Dollars appear only when walletScan
+ * can price the window. The instrument is drawn here. It is not a picture
+ * of sample trades.
  */
 export function WalletScan() {
-  const { activity, history, historyUsdPerEth, explorerBase } = useDashboard();
-  const rows = activityRows(activity, history);
+  const { explorerBase, refreshing } = useDashboard();
+  const [feed, setFeed] = useState<ActivityItem[] | null>(null);
+  const [usdPerEth, setUsdPerEth] = useState<number | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [focused, setFocused] = useState<ActivityItem[] | null>(null);
+  const [focusKey, setFocusKey] = useState('');
+  const [focusPending, setFocusPending] = useState(false);
+  const [missingName, setMissingName] = useState('');
+  const rows = feed ?? [];
   const [range, setRange] = useState<ScanRange>('24h');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -66,6 +80,75 @@ export function WalletScan() {
   const datesRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (refreshing) return;
+    let cancel = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/scan');
+        if (!res.ok) throw new Error('unavailable');
+        const body = (await res.json()) as { activity?: ActivityItem[]; usdPerEth?: unknown };
+        if (cancel) return;
+        setUnavailable(false);
+        setFeed(Array.isArray(body.activity) ? body.activity : []);
+        setUsdPerEth(typeof body.usdPerEth === 'number' ? body.usdPerEth : null);
+      } catch {
+        if (cancel) return;
+        setUnavailable(true);
+        setFeed((current) => current ?? []);
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [refreshing]);
+
+  useEffect(() => {
+    const focus = parseScanFocus(query);
+    if (!focus) {
+      setFocused(null);
+      setFocusKey('');
+      setFocusPending(false);
+      setMissingName('');
+      return;
+    }
+    if (refreshing) return;
+    const key = focus.kind === 'username' ? focus.username : focus.address;
+    setFocusPending(true);
+    setMissingName('');
+    let cancel = false;
+    const handle = setTimeout(() => {
+      (async () => {
+        try {
+          const res = await fetch(`/api/scan?q=${encodeURIComponent(key)}`);
+          if (!res.ok) throw new Error('unavailable');
+          const body = (await res.json()) as { activity?: ActivityItem[]; found?: boolean };
+          if (cancel) return;
+          if (body.found === false) {
+            setFocused(null);
+            setFocusKey('');
+            setMissingName(key);
+          } else {
+            setFocused(Array.isArray(body.activity) ? body.activity : []);
+            setFocusKey(key);
+            setMissingName('');
+          }
+        } catch {
+          if (cancel) return;
+          setFocused(null);
+          setFocusKey('');
+          setMissingName('');
+        } finally {
+          if (!cancel) setFocusPending(false);
+        }
+      })();
+    }, 300);
+    return () => {
+      cancel = true;
+      clearTimeout(handle);
+    };
+  }, [query, refreshing]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -92,8 +175,23 @@ export function WalletScan() {
   }, [datesOpen, filterOpen, sortOpen]);
 
   const now = Date.now();
-  const stats = scanStats(rows, range, now, historyUsdPerEth, from, to);
-  const visible = filterScanRows(rows, { range, now, from, to, chip, status, query, sort });
+  const loaded = feed !== null;
+  const focus = parseScanFocus(query);
+  const focusActive = Boolean(focus && focused && focusKey === (focus.kind === 'username' ? focus.username : focus.address));
+  const cardsReady = focusPending ? false : focusActive || loaded;
+  const statRows = focusActive && focused ? focused : rows;
+  const stats = scanStats(statRows, range, now, usdPerEth, from, to);
+  const visible = filterScanRows(focusActive && focused ? focused : rows, {
+    range,
+    now,
+    from,
+    to,
+    chip,
+    status,
+    query: focusActive ? '' : query,
+    sort,
+  });
+  const focusCaption = focusActive && focus ? (focus.kind === 'username' ? `@${focus.username}` : scanWho(focus.address)) : '';
   const sortLabel = SCAN_SORTS.find((item) => item.id === sort)?.label || 'Latest first';
 
   function pickRange(id: Exclude<ScanRange, 'custom'>) {
@@ -144,9 +242,9 @@ export function WalletScan() {
               Scan
             </h2>
             <p className="mb-0 mt-3 max-w-md font-sans text-[13px] leading-relaxed text-[#d4ccbf] sm:text-[14px]">
-              Recent activity on Flizy, in one place.
+              Recent activity across every Flizy account.
               <br />
-              Swaps, sends, receives, pools, NFTs and more.
+              Swaps, sends, claims, pools, NFTs and more.
             </p>
             <div className="mt-4 max-w-[9rem]">
               <div className="section-rule" />
@@ -207,15 +305,20 @@ export function WalletScan() {
         </div>
       </section>
 
+      {focusCaption ? (
+        <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-sun">Showing {focusCaption}</p>
+      ) : missingName ? (
+        <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#9a9388]">No account named @{missingName}</p>
+      ) : null}
       <div
         className={`flex min-w-0 gap-2.5 overflow-x-auto sm:grid sm:grid-cols-4 sm:overflow-visible ${NO_SCROLL}`}
         role="list"
-        aria-label="Totals for this range"
+        aria-label={focusCaption ? `Totals for ${focusCaption}` : 'Totals for this range'}
       >
-        <StatCard icon={<BarsGlyph />} value={formatScanUsd(stats.volumeUsd)} label="Volume" pct={stats.volumePct} unavailable={stats.volumeUsd == null} />
-        <StatCard icon={<RowsGlyph />} value={String(stats.transactions)} label="Transactions" pct={stats.transactionsPct} />
-        <StatCard icon={<SwapArrowsIcon size={15} />} value={String(stats.swaps)} label="Swaps" pct={stats.swapsPct} />
-        <StatCard icon={<NftsIcon size={15} />} value={String(stats.nfts)} label="NFTs" pct={stats.nftsPct} />
+        <StatCard icon={<BarsGlyph />} value={cardsReady ? formatScanUsd(stats.volumeUsd) : '-'} label="Volume" pct={cardsReady ? stats.volumePct : null} unavailable={!cardsReady || stats.volumeUsd == null} />
+        <StatCard icon={<RowsGlyph />} value={cardsReady ? String(stats.transactions) : '-'} label="Transactions" pct={cardsReady ? stats.transactionsPct : null} />
+        <StatCard icon={<SwapArrowsIcon size={15} />} value={cardsReady ? String(stats.swaps) : '-'} label="Swaps" pct={cardsReady ? stats.swapsPct : null} />
+        <StatCard icon={<NftsIcon size={15} />} value={cardsReady ? String(stats.nfts) : '-'} label="NFTs" pct={cardsReady ? stats.nftsPct : null} />
       </div>
 
       <section className="min-w-0 rounded-[16px] border border-[#2c2820] bg-[#0e0d0b]">
@@ -226,7 +329,7 @@ export function WalletScan() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search transactions, tokens, addresses..."
+              placeholder="Search a username, address, token..."
               autoComplete="off"
               className="min-w-0 flex-1 bg-transparent font-sans text-base text-white outline-none placeholder:text-[#8a847c]"
             />
@@ -357,7 +460,13 @@ export function WalletScan() {
               <SearchIcon size={16} />
             </div>
             <p className="m-0 mt-3 text-center font-sans text-[13px] text-[#c8c0b2]">
-              {query.trim() ? 'Nothing matches that search.' : 'Nothing in this range.'}
+              {!loaded
+                ? 'Loading activity.'
+                : unavailable && rows.length === 0
+                  ? 'Activity is unavailable right now.'
+                  : !focusActive && query.trim()
+                    ? 'Nothing matches that search.'
+                    : 'Nothing in this range.'}
             </p>
           </div>
         ) : (
@@ -451,6 +560,7 @@ function ScanRow({
   onToggle: () => void;
 }) {
   const kind = scanKind(row);
+  const actor = scanActor(row);
   const pill = statusPill(row.status);
   const channel = scanChannel(row.channel);
   const headline = scanHeadline(row);
@@ -505,6 +615,7 @@ function ScanRow({
       </button>
       {open ? (
         <div id={detailsId} className="grid gap-2 border-t border-[#2c2820] px-4 py-3 lg:pl-[4.75rem]">
+          {actor ? <p className="m-0 font-sans text-[12px] text-sun">{actor}</p> : null}
           <p className="m-0 break-words font-sans text-[13px] leading-relaxed text-[#f3efe6]">{row.label}</p>
           {row.note ? <p className="m-0 break-words font-sans text-[12px] leading-relaxed text-[#9a9388]">{row.note}</p> : null}
           {url ? (

@@ -762,7 +762,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/saleNotice.ts, web/lib/tasks.ts"
+      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/invite.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/saleNotice.ts, web/lib/tasks.ts"
     },
     {
       "kind": "table",
@@ -774,7 +774,7 @@
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts"
+      "requiredBy": "web/app/api/scan/route.ts, web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts"
     },
     {
       "kind": "table",
@@ -942,7 +942,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/swap/execute/route.ts, web/lib/marketRateLimit.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
+      "requiredBy": "web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/marketRateLimit.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
     },
     {
       "kind": "table",

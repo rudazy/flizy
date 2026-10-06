@@ -116,6 +116,11 @@ export type ActivityItem = {
   category?: 'send' | 'receive' | 'swap' | 'claim' | 'nft';
   /** The channel a payment went through ("Telegram", "Flizy app"), never the identity key. */
   channel?: string | null;
+  /**
+   * Public @username of the Flizy account that made the move. Scan only.
+   * Absent on a personal history row. Never a phone, an email, or an account id.
+   */
+  actor?: string | null;
 };
 
 export type HoldingsData = {

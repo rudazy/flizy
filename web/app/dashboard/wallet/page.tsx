@@ -15,8 +15,8 @@ import { WalletScan } from '../../../components/WalletScan';
 import { HistoryIcon, PlusCircleIcon, ScanIcon, WalletIcon } from '../../../components/ExploreIcons';
 
 /**
- * Balances, History, Fund, Scan. History sits second because it is the
- * day-grouped list. Scan is the range and the totals over the same activity.
+ * Balances, History, Fund, Scan. History sits second because it is this
+ * account's day-grouped list. Scan is every Flizy account, over a range.
  */
 const SLIDES = ['balances', 'history', 'fund', 'scan'] as const;
 

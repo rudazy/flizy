@@ -177,6 +177,13 @@ describe('chips, search and sort', () => {
     assert.deepEqual(oldest.map((item) => item.id), ['early', 'late']);
     assert.equal(scan.scanHeadline(early), '1 ETH → 1,000 FLZ');
     assert.equal(scan.scanHeadline(row({ amount: '1000', counterparty: address })), '1,000 ETH → 0x1234...5678');
+    assert.equal(
+      scan.scanHeadline(row({ amount: '1000', counterparty: address, actor: '@ada' })),
+      '@ada · 1,000 ETH → 0x1234...5678'
+    );
+    assert.equal(scan.scanHeadline(row({ amount: '1000', counterparty: address, actor: '+2348012345678' })), '1,000 ETH → 0x1234...5678');
+    assert.equal(scan.scanActor(row({ actor: '@ada' })), '@ada');
+    assert.equal(scan.scanActor(row({ actor: '2348012345678' })), null);
   });
 
   it('names the site channel and drops a chain label', () => {
@@ -222,6 +229,16 @@ describe('the screen does not ship the sample figures', () => {
     assert.ok(source.includes('Nothing in this range.'));
     assert.ok(source.includes('Nothing matches that search.'));
     assert.ok(!source.includes('All your onchain activity'));
+  });
+
+  it('reads every Flizy account from the scan feed, not the signed-in history', () => {
+    const ui = fs.readFileSync(path.join(web, 'components', 'WalletScan.tsx'), 'utf8');
+    assert.ok(ui.includes('/api/scan'));
+    assert.ok(ui.includes('/api/scan?q='));
+    assert.ok(ui.includes('every Flizy account'));
+    assert.ok(ui.includes('Showing '));
+    assert.ok(ui.includes('No account named @'));
+    assert.ok(!ui.includes('activityRows'));
   });
 
   it('keeps money-in green and failed red, with no second blue', () => {
