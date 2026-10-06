@@ -5,6 +5,7 @@
 
 import { randomInt } from 'crypto';
 import { normalizeUsername } from './username.ts';
+import { closureOf, isMissingClosureColumn } from './accountClosure.ts';
 
 export const PAY_CODE_ALPHABET = '0123456789';
 export const PAY_CODE_LENGTH = 9;
@@ -77,6 +78,28 @@ export async function ensurePayCode(
   return { ok: false, reason: 'exhausted' };
 }
 
+async function readPayableAccount(
+  supabase: PayClient,
+  column: string,
+  value: string,
+  columns: string,
+  failLabel: string
+): Promise<{
+  closed: boolean;
+  row: { id?: string; username?: string | null; display_name?: string | null } | null;
+}> {
+  const wider = `${columns}, deleted_at, deactivated_at`;
+  let result = await supabase.from('accounts').select(wider).eq(column, value).maybeSingle();
+  if (result.error && isMissingClosureColumn(result.error)) {
+    result = await supabase.from('accounts').select(columns).eq(column, value).maybeSingle();
+  }
+  if (result.error && !isMissingRelation(result.error)) {
+    throw new Error(`${failLabel}: ${result.error.message}`);
+  }
+  if (closureOf(result.data) === 'deleted') return { closed: true, row: null };
+  return { closed: false, row: result.data || null };
+}
+
 export async function resolvePayCode(
   supabase: PayClient,
   raw: unknown
@@ -98,19 +121,19 @@ export async function resolvePayCode(
     throw new Error(`pay code lookup failed: ${error.message}`);
   }
   if (!data?.account_id) return null;
-  const { data: acc, error: accErr } = await supabase
-    .from('accounts')
-    .select('username, display_name')
-    .eq('id', data.account_id)
-    .maybeSingle();
-  if (accErr && !isMissingRelation(accErr)) {
-    throw new Error(`pay code account read failed: ${accErr.message}`);
-  }
+  const acc = await readPayableAccount(
+    supabase,
+    'id',
+    data.account_id,
+    'username, display_name',
+    'pay code account read failed'
+  );
+  if (acc.closed) return null;
   return {
     accountId: data.account_id,
     code: data.code,
-    username: acc?.username || null,
-    displayName: acc?.display_name || null,
+    username: acc.row?.username || null,
+    displayName: acc.row?.display_name || null,
   };
 }
 
@@ -169,25 +192,25 @@ export async function resolvePayRef(
 } | null> {
   const asUser = normalizeUsername(raw);
   if (asUser && /^[a-z][a-z0-9]{2,23}$/.test(asUser)) {
-    const { data: acc, error } = await supabase
-      .from('accounts')
-      .select('id, username, display_name')
-      .eq('username', asUser)
-      .maybeSingle();
-    if (error && !isMissingRelation(error)) {
-      throw new Error(`pay username lookup failed: ${error.message}`);
-    }
-    if (acc?.id) {
+    const acc = await readPayableAccount(
+      supabase,
+      'username',
+      asUser,
+      'id, username, display_name',
+      'pay username lookup failed'
+    );
+    if (acc.closed) return null;
+    if (acc.row?.id) {
       const { data: pay } = await supabase
         .from('pay_codes')
         .select('code')
-        .eq('account_id', acc.id)
+        .eq('account_id', acc.row.id)
         .maybeSingle();
       return {
-        accountId: acc.id,
+        accountId: acc.row.id,
         code: pay?.code || null,
-        username: acc.username || asUser,
-        displayName: acc.display_name || null,
+        username: acc.row.username || asUser,
+        displayName: acc.row.display_name || null,
       };
     }
   }

@@ -20,12 +20,20 @@ import {
   buildLoginDeviceValue,
   loginDeviceMatches,
 } from './loginDevice.ts';
+import { closureOf, isMissingClosureColumn } from './accountClosure.ts';
 
 const COOKIE = 'flizy_session';
 /** Cookie written by the pre-session build. Cleared on sight, never trusted. */
 const LEGACY_COOKIE = 'flizy_account';
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+let warnedMissingClosure = false;
+function warnMissingClosureOnce(): void {
+  if (warnedMissingClosure) return;
+  warnedMissingClosure = true;
+  console.warn('[session] account closure columns are not on this database yet');
+}
 
 /**
  * Cookie present, not a live session. Use only for chrome (hide Log in).
@@ -99,6 +107,25 @@ export async function getAccountIdFromCookie(): Promise<string | null> {
 
   if (error || !data) return null;
   if (new Date(data.expires_at).getTime() < Date.now()) return null;
+
+  const { data: account, error: accountError } = await supabase
+    .from('accounts')
+    .select('deleted_at, deactivated_at')
+    .eq('id', data.account_id)
+    .maybeSingle();
+  if (accountError) {
+    if (isMissingClosureColumn(accountError)) {
+      warnMissingClosureOnce();
+      return data.account_id;
+    }
+    return null;
+  }
+  // No row means the session points at an account that is not there.
+  // closureOf(null) is open for lookups that have not loaded a row; a
+  // session is not one of those lookups.
+  if (!account) return null;
+  const state = closureOf(account);
+  if (state === 'deleted' || state === 'deactivated') return null;
   return data.account_id;
 }
 

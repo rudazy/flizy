@@ -19,9 +19,17 @@ export function LoginForm() {
   const [devCode, setDevCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [accountNote, setAccountNote] = useState('');
 
   useEffect(() => {
-    setNext(safeNext(new URLSearchParams(window.location.search).get('next')));
+    const params = new URLSearchParams(window.location.search);
+    setNext(safeNext(params.get('next')));
+    const account = params.get('account');
+    if (account === 'deleted') {
+      setAccountNote('This sign-in was deleted and cannot be restored.');
+    } else if (account === 'deactivated') {
+      setAccountNote('This account is paused. Enter the account password to bring it back.');
+    }
   }, []);
 
   /**
@@ -80,6 +88,11 @@ export function LoginForm() {
       <p className="text-xs uppercase tracking-[0.18em] text-gold">{t('auth.login.kicker')}</p>
       <h1 className="mt-3 font-sans text-3xl tracking-wide text-paper">{t('auth.login.title')}</h1>
       <p className="mt-2 text-sm text-muted">{t('auth.login.blurb')}</p>
+      {accountNote ? (
+        <div className="alert mt-4 text-sm" role="status">
+          {accountNote}
+        </div>
+      ) : null}
 
       <form onSubmit={onSubmit} className="card mt-8 space-y-5 p-6 md:p-8">
         <div>

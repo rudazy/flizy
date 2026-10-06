@@ -112,6 +112,37 @@ describe('resolvePayCode', () => {
     const byCode = await resolvePayRef(fake.client, issued.code);
     assert.equal(byCode.accountId, ACC);
   });
+
+  it('still pays a paused account and refuses a deleted one', async () => {
+    const open = seed();
+    const issued = await ensurePayCode(open.client, ACC);
+    const paused = createFakeSupabase({
+      accounts: [
+        {
+          id: ACC,
+          username: 'payer',
+          display_name: 'Payer',
+          deactivated_at: '2026-10-06T00:00:00.000Z',
+        },
+      ],
+      pay_codes: [{ account_id: ACC, code: issued.code }],
+    });
+    const gone = createFakeSupabase({
+      accounts: [
+        {
+          id: ACC,
+          username: 'payer',
+          display_name: 'Payer',
+          deleted_at: '2026-10-06T00:00:00.000Z',
+        },
+      ],
+      pay_codes: [{ account_id: ACC, code: issued.code }],
+    });
+    assert.equal((await resolvePayCode(paused.client, issued.code)).accountId, ACC);
+    assert.equal((await resolvePayRef(paused.client, '@payer')).accountId, ACC);
+    assert.equal(await resolvePayCode(gone.client, issued.code), null);
+    assert.equal(await resolvePayRef(gone.client, '@payer'), null);
+  });
 });
 
 describe('merchant history', () => {
@@ -217,5 +248,17 @@ describe('web mirror agrees', () => {
       { length: web.PAY_CODE_LENGTH, alphabet: web.PAY_CODE_ALPHABET },
       { length: PAY_CODE_LENGTH, alphabet: require('../lib/payCode').PAY_CODE_ALPHABET }
     );
+  });
+
+  it('refuses a deleted account on both copies', async () => {
+    const fake = seed();
+    const issued = await ensurePayCode(fake.client, ACC);
+    fake.db.tables.accounts[0].deleted_at = '2026-10-06T00:00:00.000Z';
+    assert.equal(await resolvePayCode(fake.client, issued.code), null);
+    assert.equal(await web.resolvePayCode(fake.client, issued.code), null);
+    fake.db.tables.accounts[0].deleted_at = null;
+    fake.db.tables.accounts[0].deactivated_at = '2026-10-06T00:00:00.000Z';
+    assert.equal((await resolvePayRef(fake.client, '@payer')).accountId, ACC);
+    assert.equal((await web.resolvePayRef(fake.client, '@payer')).accountId, ACC);
   });
 });

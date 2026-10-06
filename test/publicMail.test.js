@@ -74,7 +74,6 @@ describe('pages render the list instead of retyping an address', () => {
     ['components/PublicMailList.tsx', true],
     ['app/terms/page.tsx', false],
     ['app/privacy/page.tsx', false],
-    ['app/dashboard/account/page.tsx', false],
     ['components/JsonLd.tsx', false],
   ];
 
@@ -86,7 +85,8 @@ describe('pages render the list instead of retyping an address', () => {
     }
     const list = read('components', 'PublicMailList.tsx');
     assert.match(list, /mailto:\$\{box\.address\}/);
-    assert.match(list, /PUBLIC_MAIL\.map/);
+    assert.match(list, /PUBLIC_MAIL\.filter/);
+    assert.match(read('components', 'SiteFooter.tsx'), /ids=\{\['contact'\]\}/);
   });
 
   it('does not hardcode a flizy.app mailbox outside the list', () => {
@@ -97,13 +97,16 @@ describe('pages render the list instead of retyping an address', () => {
     }
   });
 
-  it('puts privacy on the deletion paragraph and every mailbox on both legal pages', () => {
+  it('gives privacy its address and terms the support address', () => {
     const privacy = read('app', 'privacy', 'page.tsx');
+    const terms = read('app', 'terms', 'page.tsx');
     assert.match(privacy, /publicMail\('privacy'\)/);
     assert.match(privacy, /mailto:\$\{privacyBox\.address\}/);
     assert.match(privacy, /id="delete"/);
-    assert.match(privacy, /<PublicMailList detailed/);
-    assert.match(read('app', 'terms', 'page.tsx'), /<PublicMailList detailed/);
+    assert.match(privacy, /ids=\{\['privacy'\]\}/);
+    assert.doesNotMatch(privacy, /ids=\{\['(support|admin|contact)'\]\}/);
+    assert.match(terms, /ids=\{\['support'\]\}/);
+    assert.doesNotMatch(terms, /ids=\{\['(privacy|admin|contact)'\]\}/);
   });
 
   it('publishes every mailbox in the Organization schema, with contact as the general email', () => {

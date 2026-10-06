@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { AccountClosureSheet } from '../../../components/AccountClosureSheet';
+import { AccountProfile } from '../../../components/AccountProfile';
 import { AppTopBar } from '../../../components/AppTopBar';
 import {
   AppPage,
@@ -9,13 +11,13 @@ import {
   AppSlideNav,
   useSlide,
 } from '../../../components/AppSection';
+import { useComingSoon } from '../../../components/ComingSoon';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
 import { LanguageSelect, useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { shortAddr } from '../../../lib/dashboardTypes';
 import { PayIdentity } from '../../../components/PayIdentity';
-import { PublicMailList } from '../../../components/PublicMailList';
 import { AccountProjects } from '../../../components/AccountProjects';
 import type { LocaleCode } from '../../../lib/locale';
 import { SITE_PHONE_COUNTRIES, countryByIso, countryFlag } from '../../../lib/phoneFormat';
@@ -44,13 +46,16 @@ type SlideId = (typeof SLIDES)[number];
 
 export default function AccountPage() {
   const search = useSearchParams();
+  const router = useRouter();
   const { t, locale } = useLocale();
+  const [comingSoon, comingSoonNote] = useComingSoon();
   const {
     data,
     busy,
     msg,
     setMsg,
     setBusy,
+    load,
     generateLink,
     addTrusted,
     removeTrusted,
@@ -91,17 +96,16 @@ export default function AccountPage() {
   const [verifyTarget, setVerifyTarget] = useState<'primary' | string>('primary');
   const [addEmailOpen, setAddEmailOpen] = useState(false);
   const [addEmailStep, setAddEmailStep] = useState<'email' | 'code'>('email');
-  const [usernameOpen, setUsernameOpen] = useState(false);
+  const [profileEditor, setProfileEditor] = useState<'email' | 'username' | 'name' | null>(null);
+  const [nameDraft, setNameDraft] = useState('');
   const [awaitingChat, setAwaitingChat] = useState<ChatLinkChannel | null>(null);
+  const [closureOpen, setClosureOpen] = useState(false);
 
-  // Smart default slide when no ?s= — open the first thing that still needs work.
+  // Account opens on the profile. Every other slide stays on the chip row.
   const defaultSlide = useMemo((): SlideId => {
-    if (!data) return 'profile';
-    if (!data.account.has_pin) return 'pin';
-    if (!data.link) return 'chat';
     if (search.get('github')) return 'platforms';
     return 'profile';
-  }, [data, search]);
+  }, [search]);
 
   const [slide, setSlide] = useSlide(SLIDES, defaultSlide);
 
@@ -110,6 +114,10 @@ export default function AccountPage() {
       setUsernameInput(data.account.username);
     }
   }, [data?.account?.username]);
+
+  useEffect(() => {
+    setNameDraft(data?.account?.display_name || '');
+  }, [data?.account?.display_name]);
 
   useEffect(() => {
     const savedIso = String(data?.account?.default_country_iso || '').toUpperCase();
@@ -268,6 +276,25 @@ export default function AccountPage() {
     }
   }
 
+  async function closeAccount(
+    body: { action: 'deactivate' } | { action: 'delete'; password: string }
+  ): Promise<string | null> {
+    try {
+      const res = await fetch('/api/account/closure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return typeof json.error === 'string' ? json.error : 'Could not close the account.';
+      }
+      return null;
+    } catch {
+      return 'Could not close the account.';
+    }
+  }
+
   /**
    * An add begun in chat arrives as ?add=CODE.
    *
@@ -354,7 +381,37 @@ export default function AccountPage() {
 
   async function onUsername(e: React.FormEvent) {
     e.preventDefault();
-    await setUsername(usernameInput);
+    const ok = await setUsername(usernameInput);
+    if (ok) setProfileEditor(null);
+  }
+
+  async function onDisplayName(e: React.FormEvent) {
+    e.preventDefault();
+    if (!data?.account?.username) {
+      setMsg('Set a username first.');
+      return;
+    }
+    setBusy('display-name');
+    setMsg('');
+    try {
+      const res = await fetch('/api/account/profile', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          username: data.account.username,
+          displayName: nameDraft.trim(),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Could not save the display name.');
+      setMsg('Display name saved.');
+      setProfileEditor(null);
+      await load();
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Could not save the display name.');
+    } finally {
+      setBusy('');
+    }
   }
 
   async function refreshEmails() {
@@ -452,51 +509,70 @@ export default function AccountPage() {
       ? 'App default'
       : `${data.account.daily_send_limit_eth} ETH / UTC day`;
 
-  const nav = [
-    {
-      id: 'profile',
-      label: t('account.profile'),
-      badge: data.account.username ? `@${data.account.username}` : undefined,
-    },
-    { id: 'projects', label: 'Projects' },
-    { id: 'pay', label: 'Pay me', badge: data.pay?.username ? `@${data.pay.username}` : undefined },
-    { id: 'language', label: t('account.language') },
-    {
-      id: 'country',
-      label: 'Country',
-      badge: data.account.default_country_iso
-        ? `${countryFlag(data.account.default_country_iso)} +${
-            countryByIso(data.account.default_country_iso)?.dial || data.account.default_calling_code || ''
-          }`
-        : data.account.default_calling_code
-          ? `+${data.account.default_calling_code}`
-          : undefined,
-    },
-    { id: 'chat', label: 'Chat', badge: data.link ? undefined : '!' },
-    { id: 'platforms', label: 'Platforms' },
-    { id: 'trusted', label: 'Trusted', badge: String(data.trusted.length) },
-    { id: 'pin', label: 'PIN', badge: data.account.has_pin ? undefined : '!' },
-    { id: 'limits', label: 'Limits' },
-    { id: 'security', label: 'Security' },
-  ];
-
   return (
     <AppPage>
       <AppTopBar title="Account" />
+      {comingSoonNote}
+      <AccountClosureSheet
+        open={closureOpen}
+        onClose={() => setClosureOpen(false)}
+        onDeactivate={() => closeAccount({ action: 'deactivate' })}
+        onDelete={(password) => closeAccount({ action: 'delete', password })}
+      />
       {msg ? <div className="alert alert-ok text-sm">{msg}</div> : null}
 
-      <AppSlideNav items={nav} activeId={slide} onSelect={setSlide} />
+      <AppSlideNav
+        items={[
+          {
+            id: 'profile',
+            label: t('account.profile'),
+            badge: data.account.username ? `@${data.account.username}` : undefined,
+          },
+          { id: 'projects', label: 'Projects' },
+          { id: 'pay', label: 'Pay me', badge: data.pay?.username ? `@${data.pay.username}` : undefined },
+          { id: 'language', label: t('account.language') },
+          {
+            id: 'country',
+            label: 'Country',
+            badge: data.account.default_country_iso
+              ? `${countryFlag(data.account.default_country_iso)} +${
+                  countryByIso(data.account.default_country_iso)?.dial || data.account.default_calling_code || ''
+                }`
+              : data.account.default_calling_code
+                ? `+${data.account.default_calling_code}`
+                : undefined,
+          },
+          { id: 'chat', label: 'Chat', badge: data.link ? undefined : '!' },
+          { id: 'platforms', label: 'Platforms' },
+          { id: 'trusted', label: 'Trusted', badge: String(data.trusted.length) },
+          { id: 'pin', label: 'PIN', badge: data.account.has_pin ? undefined : '!' },
+          { id: 'limits', label: 'Limits' },
+          { id: 'security', label: 'Security' },
+        ]}
+        activeId={slide}
+        onSelect={setSlide}
+      />
 
-      {/* One slide at a time — chips switch the panel, they do not scroll the page */}
       {slide === 'profile' ? (
-        <AppSection title={t('account.profile')} helper={t('account.profileHelper')}>
-          {data.account.display_name &&
-          data.account.display_name.toLowerCase() !== String(data.account.username || '').toLowerCase() ? (
-            <p className="mb-4 text-sm text-paper">{data.account.display_name}</p>
-          ) : null}
-
+        <div className="w-full max-w-lg">
+        <AccountProfile
+          username={data.account.username || ''}
+          displayName={data.account.display_name || ''}
+          email={emailList?.primary || data.account.email || ''}
+          address={data.account.agent_wallet_address || ''}
+          invites={data.invite?.attributed ?? 0}
+          credits={data.invite?.credits ?? 0}
+          onEmail={() => setProfileEditor((cur) => (cur === 'email' ? null : 'email'))}
+          onUsername={() => setProfileEditor((cur) => (cur === 'username' ? null : 'username'))}
+          onName={() => setProfileEditor((cur) => (cur === 'name' ? null : 'name'))}
+          onWallet={() => router.push('/dashboard/wallet')}
+          onSecurity={() => setSlide('security')}
+          onSoon={comingSoon}
+          onOpen={setSlide}
+          onDelete={() => setClosureOpen(true)}
+          emailPanel={
+            profileEditor === 'email' ? (
           <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">Emails</p>
             <ul className="space-y-2 text-sm">
               <li className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-mono text-paper">
@@ -730,41 +806,11 @@ export default function AccountPage() {
               </form>
             )}
           </div>
-
-          <div className="mt-4 border-t border-border pt-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-sans text-sm tracking-wide text-paper">Invite</span>
-              <span className="font-sans text-sm tracking-wide text-paper">
-                {data.invite?.attributed ?? 0}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-sans text-sm tracking-wide text-paper">Credit</span>
-              <span className="font-sans text-sm tracking-wide text-paper">
-                {data.invite?.credits ?? 0}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 border-t border-border pt-4">
-            <div className="flex items-start justify-between gap-3">
-              <span className="font-sans text-sm tracking-wide text-paper">Username</span>
-              <div className="flex flex-col items-end gap-1.5">
-                <span className="font-mono text-sm text-paper">
-                  {data.account.username ? `@${data.account.username}` : '—'}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-ghost !px-2 !py-0.5 text-[11px] leading-none"
-                  onClick={() => setUsernameOpen((open) => !open)}
-                  aria-expanded={usernameOpen}
-                >
-                  Change username
-                </button>
-              </div>
-            </div>
-            {usernameOpen ? (
-              <div className="mt-3 space-y-3">
+            ) : null
+          }
+          usernamePanel={
+            profileEditor === 'username' ? (
+              <div className="space-y-3">
                 {nextChange ? (
                   <p className="text-xs text-gold">
                     {t('account.usernameCooldown', { date: nextChange })}
@@ -802,9 +848,30 @@ export default function AccountPage() {
                   </form>
                 ) : null}
               </div>
-            ) : null}
-          </div>
-        </AppSection>
+            ) : null
+          }
+          namePanel={
+            profileEditor === 'name' ? (
+              <form onSubmit={onDisplayName} className="grid gap-2">
+                <input
+                  className="input"
+                  placeholder="Display name"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value.slice(0, 64))}
+                  maxLength={64}
+                />
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full py-3 font-semibold"
+                  disabled={busy === 'display-name'}
+                >
+                  {busy === 'display-name' ? 'Saving' : 'Save display name'}
+                </button>
+              </form>
+            ) : null
+          }
+        />
+        </div>
       ) : null}
 
       {slide === 'projects' ? <AccountProjects /> : null}
@@ -1278,11 +1345,6 @@ export default function AccountPage() {
               {busy === 'logout' ? 'Signing out…' : 'Sign out'}
             </button>
           </div>
-          {/*
-            Same reason as the links above: the signed-in app has no footer,
-            so the mailboxes have to be reachable from this slide.
-          */}
-          <PublicMailList className="mt-4 space-y-1 text-xs" />
         </AppSection>
       ) : null}
     </AppPage>

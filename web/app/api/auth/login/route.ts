@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabase } from '../../../../lib/supabase';
 import { hashPassword, verifyPassword } from '../../../../lib/cryptoPin';
-import { createSession, hasTrustedLoginDevice } from '../../../../lib/cookies';
+import { createSession, hasTrustedLoginDevice, revokeAllSessions } from '../../../../lib/cookies';
 import { toPublicAccount } from '../../../../lib/publicAccount';
 import { apiErrorBody } from '../../../../lib/apiError';
 import {
@@ -15,6 +15,7 @@ import {
   LOGIN_LOCKED,
   recordFailedLogin,
 } from '../../../../lib/loginAttempts.ts';
+import { closureOf, isMissingClosureColumn } from '../../../../lib/accountClosure.ts';
 
 const ROUTE = 'POST /api/auth/login';
 
@@ -50,11 +51,21 @@ export async function POST(req: Request) {
       }
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('accounts')
-      .select('id, email, email_verified_at, password_hash, display_name')
+      .select('id, email, email_verified_at, password_hash, display_name, deleted_at, deactivated_at')
       .eq('email', email)
       .maybeSingle();
+
+    if (error && isMissingClosureColumn(error)) {
+      const retry = await supabase
+        .from('accounts')
+        .select('id, email, email_verified_at, password_hash, display_name')
+        .eq('email', email)
+        .maybeSingle();
+      data = retry.data ? { ...retry.data, deleted_at: null, deactivated_at: null } : null;
+      error = retry.error;
+    }
 
     // An account lookup that fails must not describe the accounts table to
     // whoever is trying to log in.
@@ -74,6 +85,15 @@ export async function POST(req: Request) {
         }
       }
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+
+    // Said only after the password matches, so a wrong password still looks
+    // like any other wrong password.
+    if (closureOf(data) === 'deleted') {
+      return NextResponse.json(
+        { error: 'This account was deleted and cannot be restored.', code: 'ACCOUNT_DELETED' },
+        { status: 403 }
+      );
     }
 
     /*
@@ -113,6 +133,33 @@ export async function POST(req: Request) {
         return NextResponse.json(
           { error: consumed.error, code: consumed.code || 'LOGIN_CODE' },
           { status: consumed.status }
+        );
+      }
+    }
+
+    if (closureOf(data) === 'deactivated') {
+      // Drop every old session before the pause flag clears. A revoke that
+      // failed at deactivate would otherwise start working again the moment
+      // this update lands, and this request has not created its own row yet.
+      try {
+        await revokeAllSessions(data.id);
+      } catch (err) {
+        return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
+      }
+      const { data: restored, error: restoreError } = await supabase
+        .from('accounts')
+        .update({ deactivated_at: null })
+        .eq('id', data.id)
+        .is('deleted_at', null)
+        .select('id')
+        .maybeSingle();
+      if (restoreError) {
+        return NextResponse.json(apiErrorBody(ROUTE, restoreError), { status: 500 });
+      }
+      if (!restored) {
+        return NextResponse.json(
+          { error: 'This account was deleted and cannot be restored.', code: 'ACCOUNT_DELETED' },
+          { status: 403 }
         );
       }
     }

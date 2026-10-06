@@ -18,7 +18,7 @@ export function SiteFooter({ signedIn = false }: { signedIn?: boolean }) {
             it has to be readable without any further action.
           */}
           <p className="mt-4 text-xs text-muted">{ENTITY_LINE}</p>
-          <PublicMailList className="mt-3 space-y-1 text-sm" />
+          <PublicMailList ids={['contact']} className="mt-3 space-y-1 text-sm" />
         </div>
         <div className="flex flex-wrap gap-5 text-sm text-muted">
           <Link href="/how-it-works" className="text-muted no-underline hover:text-lime">

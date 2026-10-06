@@ -143,7 +143,7 @@ export default function TermsPage() {
 
         <section className="space-y-3">
           <LegalH id="contact">Contact</LegalH>
-          <PublicMailList detailed className="list-disc space-y-2 pl-5" />
+          <PublicMailList ids={['support']} detailed className="list-disc space-y-2 pl-5" />
           <p>
             You can also message{' '}
             <a

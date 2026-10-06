@@ -203,7 +203,22 @@ export default function PrivacyPage() {
             Account. You can remove extra emails and trusted addresses there too.
           </p>
           <p>
-            There is no self-serve full-account delete in the app today. Email{' '}
+            Account has two ways to close the sign-in. Deactivate pauses it. Sign in
+            with the account password and it comes back. A new browser still asks for
+            the emailed code before the pause is lifted. Chat does not run while the
+            account is paused. Payments sent to the username or Flizy number can still
+            arrive.
+          </p>
+          <p>
+            Delete is a later step on the same screen and it asks for the account
+            password. It cannot be restored. Chat stops. The username and Flizy number
+            no longer receive payments. The button does not move funds, and delete is
+            refused while the Flizy wallet still holds ETH. The account row and the
+            wallet pointer stay. Confirmed chain transactions stay on the chain.
+          </p>
+          <p>
+            Unlink and extra-email removal stay available while the account is open.
+            For records this screen does not erase, email{' '}
             <a
               href={`mailto:${privacyBox.address}`}
               className="text-paper no-underline hover:text-lime"
@@ -219,9 +234,7 @@ export default function PrivacyPage() {
             >
               @Flizyapp
             </a>{' '}
-            from an account you can tie to that email. We will delete or irreversibly
-            anonymize account records we control (profile, emails, phone binds, platform IDs,
-            sessions, invite attribution we can safely drop). We will not delete another
+            from an account you can tie to that email. We will not delete another
             person&apos;s data. We cannot delete confirmed chain transactions. If you have
             pending escrow, say so; we will cancel unclaimed holds back to the sender where
             the product already allows cancel.
@@ -230,7 +243,7 @@ export default function PrivacyPage() {
 
         <section className="space-y-3">
           <LegalH id="contact">Contact</LegalH>
-          <PublicMailList detailed className="list-disc space-y-2 pl-5" />
+          <PublicMailList ids={['privacy']} detailed className="list-disc space-y-2 pl-5" />
           <p>
             You can also message{' '}
             <a

@@ -1,8 +1,8 @@
 /**
  * Public mailboxes for flizy.app.
  *
- * One list, because the footer, the Terms, the Privacy policy, the account
- * security slide, and the Organization JSON-LD all name the same addresses.
+ * One list. The site footer names contact. Terms names support. The Privacy
+ * policy names privacy. The Organization JSON-LD publishes the whole list.
  * Each address has one job.
  */
 
