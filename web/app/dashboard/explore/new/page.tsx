@@ -520,7 +520,7 @@ export default function NewTaskPage() {
 
         {step === 3 ? (
           <>
-            <FormCard icon={<ClockIcon size={12.5} />} title="Rules & limits" subtitle="Set the deadline, number of winners and optional limits.">
+            <FormCard icon={<ClockIcon size={12.5} />} title="Rules & limits" subtitle="Live on publish. No participant cap.">
               <div className="-mt-[3px] grid grid-cols-[1.32fr_1fr_1.12fr] gap-x-[9.5px]">
                 <div>
                   <FieldLabel htmlFor="t-ends" small>Deadline</FieldLabel>
@@ -537,17 +537,14 @@ export default function NewTaskPage() {
                   </SelectBox>
                 </div>
                 <div>
-                  <FieldLabel small>
-                    Entry limit <span className="font-normal text-[#bdbdbd]">(optional)</span>
-                  </FieldLabel>
-                  <FakeSelect
-                    onClick={() => comingSoon('Entry limit')}
-                    label="Entry limit, coming soon"
-                    icon={<InfinityIcon size={11} />}
-                    small
-                  >
-                    No limit
-                  </FakeSelect>
+                  <FieldLabel small>Participants</FieldLabel>
+                  <div className="flex h-[22px] w-full items-center gap-[12px] rounded-[3.5px] border border-[#25272c] bg-[#0d0d0f] pl-[9px] pr-[9px] font-sans text-[7px] text-[#f0f0f0]">
+                    <InfinityIcon size={11} />
+                    <span className="flex-1 truncate">No limit</span>
+                  </div>
+                  <p className="m-0 mt-[5px] font-sans text-[5.8px] text-[#8f8f8f]">
+                    No participant cap.
+                  </p>
                 </div>
               </div>
             </FormCard>

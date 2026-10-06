@@ -462,6 +462,7 @@ const REVIEW_LIST_LIMIT = 500;
 
 /** Normalised the way reservedKey is, so spacing, case and doubled letters do not dodge it. */
 const BRAND_KEY = 'flizy';
+const BRAND_NAME_ERROR = 'Names and titles cannot use the Flizy name.';
 
 async function isAdminAccount(accountId: string, supabase: Db): Promise<boolean> {
   const { data, error } = await supabase.from('accounts').select('is_admin').eq('id', accountId).maybeSingle();
@@ -477,7 +478,7 @@ async function isAdminAccount(accountId: string, supabase: Db): Promise<boolean>
 async function refuseBrandName(accountId: string, values: string[], supabase: Db) {
   if (!values.some((v) => reservedKey(v).includes(BRAND_KEY))) return;
   if (await isAdminAccount(accountId, supabase)) return;
-  throw new ClientError('Names and titles cannot use the Flizy name.');
+  throw new ClientError(BRAND_NAME_ERROR);
 }
 
 async function countRows(
@@ -1050,6 +1051,15 @@ export type OwnedProject = {
   description: string;
 };
 
+/** An owned project plus how many of its tasks are still open. */
+export type OwnedProjectListItem = OwnedProject & {
+  activeTasks: number;
+};
+
+export type ProjectHandleCheck =
+  | { available: true; handle: string }
+  | { available: false; reason: string };
+
 const PROJECT_LINK_LABEL: Record<string, string> = {
   website: 'Website',
   x: 'X',
@@ -1173,8 +1183,59 @@ export async function isHandleTakenByProject(name: string, client?: Db): Promise
   return Boolean(data);
 }
 
-/** The projects an account may publish as. The owner id is not returned. */
-export async function listOwnProjects(accountId: string, client?: Db) {
+/**
+ * Whether this handle can be saved on a new project.
+ *
+ * Same order as createProject, so the sentence shown while typing is the
+ * sentence submit would use. Reserved, a username clash, and a handle another
+ * project already has all share one sentence. The signed-in account's own
+ * username is a clash here. The username picker treats that name as free.
+ */
+export async function projectHandleAvailable(
+  raw: string,
+  accountId: string,
+  client?: Db
+): Promise<ProjectHandleCheck> {
+  const checked = validateUsername(raw);
+  if (!checked.ok) return { available: false, reason: checked.error };
+  const handle = checked.username;
+  const supabase = db(client);
+
+  if (await isUsernameReserved(supabase, handle)) {
+    return { available: false, reason: USERNAME_UNAVAILABLE };
+  }
+
+  const { data: takenByAccount, error } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('username', handle)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (takenByAccount) return { available: false, reason: USERNAME_UNAVAILABLE };
+
+  // Before the "already a project" check, because createProject refuses the
+  // brand name before insert. A taken handle that also carries the brand name
+  // is told about the brand name.
+  if (reservedKey(handle).includes(BRAND_KEY) && !(await isAdminAccount(accountId, supabase))) {
+    return { available: false, reason: BRAND_NAME_ERROR };
+  }
+
+  if (await isHandleTakenByProject(handle, supabase)) {
+    return { available: false, reason: USERNAME_UNAVAILABLE };
+  }
+
+  return { available: true, handle };
+}
+
+/**
+ * The projects an account may publish as. The owner id is not returned.
+ *
+ * activeTasks counts rows that are still open: status live, and a deadline
+ * still ahead. That is the same answer deriveTaskState gives, because a
+ * completed or cancelled row is never open and a live row whose deadline has
+ * passed is not either. A count that fails leaves the projects in place.
+ */
+export async function listOwnProjects(accountId: string, client?: Db): Promise<OwnedProjectListItem[]> {
   const supabase = db(client);
   const { data, error } = await supabase
     .from('projects')
@@ -1182,7 +1243,36 @@ export async function listOwnProjects(accountId: string, client?: Db) {
     .eq('owner_account_id', accountId)
     .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
-  return (data || []) as OwnedProject[];
+  const projects = (data || []) as OwnedProject[];
+  if (projects.length === 0) return [];
+
+  const nowIso = new Date().toISOString();
+  let counts = new Map<string, number>();
+  try {
+    const pairs = await Promise.all(
+      projects.map(async (project) => {
+        const counted = await supabase
+          .from('tasks')
+          .select('id', { count: 'exact', head: true })
+          .eq('project_id', project.id)
+          .eq('status', 'live')
+          .gt('ends_at', nowIso);
+        if (counted.error) throw new Error(counted.error.message);
+        return [project.id, counted.count || 0] as const;
+      })
+    );
+    counts = new Map(pairs);
+  } catch {
+    counts = new Map();
+  }
+
+  return projects.map((project) => ({
+    id: project.id,
+    handle: project.handle,
+    name: project.name,
+    description: String(project.description || ''),
+    activeTasks: counts.get(project.id) || 0,
+  }));
 }
 
 export type ProjectActivity = { at: string; label: string };

@@ -96,7 +96,10 @@ describe('New task page', () => {
     assert.match(NEW, /onHelp=\{\(\) => comingSoon\('Help'\)\}/);
     assert.match(NEW, /onClick=\{\(\) => comingSoon\('More requirements'\)\}/);
     assert.match(NEW, /onClick=\{\(\) => comingSoon\('Distribution'\)\}/);
-    assert.match(NEW, /onClick=\{\(\) => comingSoon\('Entry limit'\)\}/);
+    // There is no participant cap, so this is a statement, not a control that
+    // is waiting to be built.
+    assert.match(NEW, /No participant cap\./);
+    assert.doesNotMatch(NEW, /comingSoon\('Entry limit'\)/);
     // Points has no server support, so its chip must not choose a reward kind.
     assert.match(NEW, /\{ label: 'Points', kind: null \}/);
     assert.match(NEW, /if \(!chip\.kind\) \{\s*comingSoon\(chip\.label\);\s*return;/);
