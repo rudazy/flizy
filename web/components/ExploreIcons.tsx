@@ -79,6 +79,15 @@ export function SearchIcon({ size, strokeWidth = 1.8, className }: IconProps) {
   );
 }
 
+/** Pulse trace for the Wallet Scan tab. */
+export function ScanIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M3 12h3.2l2.2-5.2 3.2 10.4 2.4-5.2H21" />
+    </Svg>
+  );
+}
+
 export function BellIcon({ size, strokeWidth = 1.8, className }: IconProps) {
   return (
     <Svg size={size} className={className}>

@@ -26,13 +26,19 @@ const PANELS = read('components', 'ActivityPanels.tsx');
 const NAV = read('components', 'AppBottomNav.tsx');
 
 describe('the slide exists, in the order the lock specifies', () => {
-  it('Wallet declares Balances, History, Fund, Power', () => {
-    assert.match(WALLET, /SLIDES = \['balances', 'history', 'fund', 'power'\]/);
+  it('Wallet declares Balances, History, Fund, Scan', () => {
+    assert.match(WALLET, /SLIDES = \['balances', 'history', 'fund', 'scan'\]/);
   });
 
   it('History is second in the visible nav, not appended at the end', () => {
     const ids = [...WALLET.matchAll(/\{ id: '([a-z]+)', label: '[^']+'/g)].map((m) => m[1]);
-    assert.deepEqual(ids, ['balances', 'history', 'fund', 'power']);
+    assert.deepEqual(ids, ['balances', 'history', 'fund', 'scan']);
+  });
+
+  it('Scan replaced Power', () => {
+    assert.match(WALLET, /slide === 'scan' \? <WalletScan/);
+    assert.ok(!/id: 'power'/.test(WALLET), 'Power is still a wallet slide');
+    assert.ok(!WALLET.includes('Optional crypto tools'));
   });
 
   it('the slide renders the panels', () => {

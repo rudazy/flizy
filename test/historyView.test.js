@@ -120,3 +120,26 @@ describe('usdLine', () => {
     assert.equal(view.usdLine('0.05', 'ETH', null), null);
   });
 });
+
+describe('activityRows', () => {
+  it('keeps a loaded activity list and only falls back when that list is empty', () => {
+    const activity = [{ ...base, id: 'live' }];
+    const history = [{
+      id: 'old',
+      amount_eth: '1',
+      to_address: '0xabc',
+      status: 'confirmed',
+      created_at: base.createdAt,
+      kind: 'swap',
+      asset: 'ETH',
+    }];
+    assert.equal(view.activityRows(activity, history)[0].id, 'live');
+    const fallback = view.activityRows([], history);
+    assert.equal(fallback.length, 1);
+    assert.equal(fallback[0].type, 'swap');
+    assert.equal(fallback[0].direction, 'out');
+    assert.equal(fallback[0].asset, 'ETH');
+    assert.equal(fallback[0].label, 'Sent 1 ETH');
+    assert.equal(view.activityRows([], [{ ...history[0], kind: 'transfer' }])[0].type, 'transfer');
+  });
+});

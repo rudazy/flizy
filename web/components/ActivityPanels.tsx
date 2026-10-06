@@ -18,6 +18,7 @@ import { shortAddr } from '../lib/dashboardTypes';
 import { formatAmount } from '../lib/amountDisplay';
 import {
   HISTORY_FILTERS,
+  activityRows,
   categoryOf,
   groupByDay,
   matchesFilter,
@@ -133,21 +134,7 @@ export function ActivityPanels({ showWalletLink = true }: Props) {
   const [filter, setFilter] = useState<HistoryFilter>('all');
   const [open, setOpen] = useState<string | null>(null);
 
-  const rows: ActivityItem[] =
-    activity.length > 0
-      ? activity
-      : history.map((row) => ({
-          id: row.id,
-          type: (row.kind === 'swap' ? 'swap' : 'transfer') as ActivityItem['type'],
-          direction: 'out' as const,
-          amount: row.amount_eth,
-          asset: row.asset || 'ETH',
-          status: row.status,
-          txHash: row.tx_hash,
-          createdAt: row.created_at,
-          label: `Sent ${row.amount_eth} ${row.asset || 'ETH'}`,
-          counterparty: row.to_address,
-        }));
+  const rows = activityRows(activity, history);
 
   const visible = rows.filter((row) => matchesFilter(row, filter));
 

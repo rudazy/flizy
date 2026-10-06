@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { AppTopBar } from '../../../components/AppTopBar';
 import {
   AppPage,
@@ -12,14 +11,14 @@ import { ActivityPanels } from '../../../components/ActivityPanels';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
 import { WalletBalances } from '../../../components/WalletBalances';
-import { BoltIcon, HistoryIcon, PlusCircleIcon, WalletIcon } from '../../../components/ExploreIcons';
+import { WalletScan } from '../../../components/WalletScan';
+import { HistoryIcon, PlusCircleIcon, ScanIcon, WalletIcon } from '../../../components/ExploreIcons';
 
 /**
- * Order is the product lock of 2026-09-17: Balances | History | Fund | Power.
- * History sits second because it is the thing people check after a balance,
- * not an afterthought behind the funding instructions.
+ * Balances, History, Fund, Scan. History sits second because it is the
+ * day-grouped list. Scan is the range and the totals over the same activity.
  */
-const SLIDES = ['balances', 'history', 'fund', 'power'] as const;
+const SLIDES = ['balances', 'history', 'fund', 'scan'] as const;
 
 export default function WalletPage() {
   const { data, refreshing, refreshAll } = useDashboard();
@@ -31,7 +30,7 @@ export default function WalletPage() {
     { id: 'balances', label: 'Balances', icon: <WalletIcon size={15} /> },
     { id: 'history', label: 'History', icon: <HistoryIcon size={15} /> },
     { id: 'fund', label: 'Fund', icon: <PlusCircleIcon size={15} /> },
-    { id: 'power', label: 'Power', icon: <BoltIcon size={16} /> },
+    { id: 'scan', label: 'Scan', icon: <ScanIcon size={15} /> },
   ];
 
   return (
@@ -124,32 +123,7 @@ export default function WalletPage() {
         </AppSection>
       ) : null}
 
-      {slide === 'power' ? (
-        <AppSection title="Power" helper="Optional crypto tools. Daily money stays in chat.">
-          <div className="space-y-0 divide-y divide-border">
-            <Link
-              href="/dashboard/swap"
-              className="flex items-center justify-between py-3 no-underline first:pt-0"
-            >
-              <div>
-                <p className="font-sans text-sm text-paper">Swap</p>
-                <p className="mt-0.5 text-xs text-muted">Trade a token from your Flizy wallet</p>
-              </div>
-              <span className="text-muted" aria-hidden>
-                →
-              </span>
-            </Link>
-            <div className="py-3 last:pb-0">
-              <p className="font-sans text-sm text-paper">Chat sends</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                <span className="text-paper">flizy send 0.01 to name</span>
-                {' · '}
-                <span className="text-paper">flizy send 0.01 to @user on github</span>
-              </p>
-            </div>
-          </div>
-        </AppSection>
-      ) : null}
+      {slide === 'scan' ? <WalletScan /> : null}
     </AppPage>
   );
 }

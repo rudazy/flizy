@@ -4,7 +4,7 @@
  * the Wallet slide and the History tab, which share ActivityPanels, agree.
  */
 
-import type { ActivityItem } from './dashboardTypes';
+import type { ActivityItem, TransferRow } from './dashboardTypes';
 
 export type HistoryFilter = 'all' | 'send' | 'receive' | 'swap' | 'claim' | 'nft';
 
@@ -114,4 +114,25 @@ export function usdLine(amount: string | number, asset: string, usdPerEth: numbe
   if (!Number.isFinite(n) || n <= 0) return null;
   const usd = n * usdPerEth;
   return `≈ $${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * The list History and Scan both read. A loaded activity list wins. The
+ * transfer fallback is only for a response that predates the activity field,
+ * and it stays a flat sent row: the history route is what knows direction.
+ */
+export function activityRows(activity: ActivityItem[], history: TransferRow[]): ActivityItem[] {
+  if (activity.length > 0) return activity;
+  return history.map((row) => ({
+    id: row.id,
+    type: (row.kind === 'swap' ? 'swap' : 'transfer') as ActivityItem['type'],
+    direction: 'out' as const,
+    amount: row.amount_eth,
+    asset: row.asset || 'ETH',
+    status: row.status,
+    txHash: row.tx_hash,
+    createdAt: row.created_at,
+    label: `Sent ${row.amount_eth} ${row.asset || 'ETH'}`,
+    counterparty: row.to_address,
+  }));
 }

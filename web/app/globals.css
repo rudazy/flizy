@@ -408,6 +408,33 @@ textarea {
   }
 }
 
+/* Slow gold ring on the Scan instrument. It is decorative only. */
+@keyframes scanOrbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.scan-orbit {
+  animation: scanOrbit 36s linear infinite;
+}
+
+.scan-desk button:focus-visible,
+.scan-desk a:focus-visible,
+.scan-desk input:focus-visible {
+  outline: 2px solid #e0b84a;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-orbit {
+    animation: none;
+  }
+}
+
 /* Soft divider for premium sections */
 .section-rule {
   height: 1px;
