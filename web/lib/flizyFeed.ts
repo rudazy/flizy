@@ -2,10 +2,14 @@
  * The public shape of one Flizy move, for Scan.
  *
  * History is one account. This is every account, and the only fields that
- * leave the server are the ones the ledger draws. A phone key, an email, an
- * account id, and a claim recipient hint are read at most to choose a rail
- * name, then dropped. A phone or an email written into a label or a note
- * is dropped the same way.
+ * leave the server are the ones the ledger draws. A payment shows its rail
+ * (GitHub pay, Telegram pay, Phone pay, Email pay, Flizy pay), never the
+ * recipient's handle, saved name or display name. A Flizy @username shows
+ * only while that account keeps "Show username on Scan" on; the route passes
+ * null for an account that turned it off, and the row then shows the rail and
+ * the short wallet address instead. The sender's note stays in their own
+ * History. A phone key, an email, an account id, and a claim recipient hint
+ * are read at most to choose a rail name, then dropped.
  */
 
 import { shortAddr, type ActivityItem } from './dashboardTypes.ts';
@@ -16,7 +20,6 @@ import { validateUsername } from './username.ts';
 /** Newest rows kept. A figure on Scan is not a lifetime total. */
 export const FEED_LIMIT = 100;
 
-const NOTE_MAX = 280;
 const LABEL_MAX = 160;
 const HASH = /^0x[0-9a-fA-F]{64}$/;
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -34,13 +37,11 @@ export type TransferScanRow = {
   counterparty_label?: string | null;
   amount_secondary?: string | null;
   asset_secondary?: string | null;
-  note?: string | null;
 };
 
 export type ClaimScanRow = {
   id?: string | number | null;
   to_channel?: string | null;
-  to_display_handle?: string | null;
   to_wa_hint?: string | null;
   to_email?: string | null;
   amount_eth?: string | number | null;
@@ -97,9 +98,9 @@ function isWholeEmail(value: string): boolean {
 }
 
 /**
- * Text safe to show on the shared desk.
- * A phone or an email is removed. A username, a pay code, and an ordinary
- * note stay. Control characters are flattened so a label cannot add a line.
+ * Text safe to show on the shared desk, used only for marketplace and mint
+ * labels (collection and token names). A phone or an email is removed.
+ * Control characters are flattened so a label cannot add a line.
  */
 function publicText(value: unknown, max: number): string | null {
   const raw = String(value ?? '').trim();
@@ -113,20 +114,7 @@ function publicText(value: unknown, max: number): string | null {
   return safe || null;
 }
 
-function noteOrNull(value: unknown): string | null {
-  return publicText(value, NOTE_MAX);
-}
-
-/** A public handle. Not an email, not a phone, not a bare numeric id. */
-function publicHandle(value: unknown): string | null {
-  const handle = String(value || '').trim().replace(/^@+/, '');
-  if (!handle || handle.length > 39) return null;
-  if (/[.@+\s]/.test(handle) || /^\d+$/.test(handle)) return null;
-  if (!/^[A-Za-z0-9_-]+$/.test(handle)) return null;
-  return `@${handle}`;
-}
-
-/** Rail name only. The hint that proved the rail is not part of the name. */
+/** Rail name only. The handle, phone or email that proved the rail is not part of the name. */
 export function claimRail(row: ClaimScanRow): string {
   const channel = String(row.to_channel || '').trim().toLowerCase();
   if (channel === 'github') return 'GitHub pay';
@@ -148,13 +136,37 @@ function claimHash(row: ClaimScanRow): string | null {
   return hashOrNull(row.hold_tx_hash);
 }
 
-/** One transfer, from the account that made it. One payment stays one row. */
-export function scanTransferItem(row: TransferScanRow, username: unknown): ActivityItem {
+export const FLIZY_PAY = 'Flizy pay';
+
+/**
+ * The label a payment to a Flizy account was logged with: its username
+ * ("@name") or the web pay page ("flizy pay"). Used only when the route could
+ * not match the address to an account; such a row names no one.
+ */
+function isFlizyPayLabel(label: unknown): boolean {
+  const text = String(label || '').trim();
+  return text.toLowerCase() === 'flizy pay' || (text.startsWith('@') && validateUsername(text).ok);
+}
+
+/**
+ * The Flizy account a transfer went to, as Scan may show it: its username, or
+ * null when that account hides it (or none could be read).
+ */
+export type ScanRecipient = { username: string | null };
+
+/**
+ * One transfer, from the account that made it. One payment stays one row.
+ * `username` is the sender's, null when hidden. `recipient` is set when the
+ * money went to a Flizy account.
+ */
+export function scanTransferItem(row: TransferScanRow, username: unknown, recipient: ScanRecipient | null = null): ActivityItem {
   const kind = String(row.kind || 'transfer').toLowerCase();
   const asset = String(row.asset || 'ETH').toUpperCase();
   const amount = row.amount_eth ?? '0';
   const to = publicAddress(row.to_address);
-  const labelExtra = publicText(row.counterparty_label, LABEL_MAX) || '';
+  // The recipient label is a saved name, a username or a display name, so it
+  // is read only on marketplace rows, where it names a collection or token.
+  const marketLabel = kind === 'nft_market' ? publicText(row.counterparty_label, LABEL_MAX) : null;
   const outAmt = row.amount_secondary ? String(row.amount_secondary) : null;
   const outAsset = row.asset_secondary ? String(row.asset_secondary) : null;
 
@@ -162,14 +174,20 @@ export function scanTransferItem(row: TransferScanRow, username: unknown): Activ
   if (kind === 'swap') type = 'swap';
   else if (kind === 'withdraw' || kind === 'withdraw_token') type = 'withdraw';
 
+  const actor = publicActor(username);
+  const flizy = type === 'transfer' && kind !== 'nft_market' ? recipient ?? (isFlizyPayLabel(row.counterparty_label) ? { username: null } : null) : null;
+  const payee = flizy ? publicActor(flizy.username) : null;
+  const dest = payee || (to ? shortAddr(to) : '');
+
   let label = '';
   if (type === 'swap') {
     label = outAmt && outAsset ? `${amount} ${asset} → ${outAmt} ${outAsset}` : `Swap ${amount} ${asset}`;
   } else if (kind === 'nft_market') {
-    label = labelExtra || 'NFT marketplace';
+    label = marketLabel || 'NFT marketplace';
   } else {
-    const dest = labelExtra || (to ? shortAddr(to) : '');
-    label = dest ? `Sent ${amount} ${asset} → ${dest}` : `Sent ${amount} ${asset}`;
+    const sent = dest ? `Sent ${amount} ${asset} → ${dest}` : `Sent ${amount} ${asset}`;
+    // With the sender named, the rail is its own line; without, it leads.
+    label = flizy && !actor ? `${FLIZY_PAY} · ${sent}` : sent;
   }
 
   return {
@@ -180,26 +198,25 @@ export function scanTransferItem(row: TransferScanRow, username: unknown): Activ
     asset,
     amountSecondary: outAmt,
     assetSecondary: outAsset,
-    counterparty: labelExtra || to || null,
+    counterparty: payee || to || null,
     status: String(row.status || 'unknown'),
     txHash: hashOrNull(row.tx_hash),
     createdAt: String(row.created_at || ''),
-    note: noteOrNull(row.note),
+    note: null,
     label,
     category: historyCategory(type, kind),
     channel: channelLabel(row.phone),
-    actor: publicActor(username),
+    actor,
+    rail: flizy ? FLIZY_PAY : null,
   };
 }
 
-/** One claim, without the recipient phone, email, or external id. */
+/** One claim: the rail only, never the recipient's handle, phone, email, or external id. */
 export function scanClaimItem(row: ClaimScanRow, username: unknown): ActivityItem {
   const status = String(row.status || 'pending');
   const amount = row.amount_eth ?? '0';
   const asset = String(row.asset || 'ETH').toUpperCase();
   const rail = claimRail(row);
-  const peer = publicHandle(row.to_display_handle);
-  const peerBit = peer ? ` · ${peer}` : '';
   const word =
     status === 'claimed' ? 'claimed' : status === 'cancelled' || status === 'canceled' ? 'cancelled' : status === 'processing' ? 'processing' : 'held';
 
@@ -209,14 +226,15 @@ export function scanClaimItem(row: ClaimScanRow, username: unknown): ActivityIte
     direction: 'out',
     amount,
     asset,
-    counterparty: peer,
+    counterparty: null,
     status,
     txHash: claimHash(row),
     createdAt: String(row.claimed_at || row.created_at || ''),
     note: null,
-    label: `${rail}${peerBit} · ${word} · ${amount} ${asset}`,
+    label: `${rail} · ${word} · ${amount} ${asset}`,
     category: 'claim',
     actor: publicActor(username),
+    rail,
   };
 }
 

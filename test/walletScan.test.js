@@ -250,3 +250,35 @@ describe('the screen does not ship the sample figures', () => {
     }
   });
 });
+
+describe('Scan username visibility', () => {
+  const address = '0x1234567890abcdef1234567890abcdef12345678';
+
+  it('puts the sender first and the rail under it, or the rail first when the sender is hidden', () => {
+    const shown = row({ amount: '1', counterparty: address, actor: '@carol', rail: 'Flizy pay' });
+    assert.equal(scan.scanHeadline(shown), '@carol · 1 ETH → 0x1234...5678');
+    assert.equal(scan.scanRailLine(shown), 'Flizy pay');
+    const hidden = row({ amount: '1', counterparty: address, actor: null, rail: 'Flizy pay' });
+    assert.equal(scan.scanHeadline(hidden), 'Flizy pay · 1 ETH → 0x1234...5678');
+    assert.equal(scan.scanRailLine(hidden), null);
+    assert.equal(scan.scanRailLine(row({ actor: '@ada', rail: '<b>x</b>' })), null);
+  });
+
+  it('the route shows a username only when the account allows it, and a hidden one is not searchable', () => {
+    const route = fs.readFileSync(path.join(__dirname, '..', 'web', 'app', 'api', 'scan', 'route.ts'), 'utf8');
+    assert.match(route, /account\.scan_show_username === true \? account\.username \?\? null : null/);
+    assert.match(route, /account\.data\.scan_show_username !== true\) return \{ activity: \[\], found: false/);
+    assert.doesNotMatch(route, /names\.set\(String\(owner\.id\), owner\.username/);
+  });
+
+  it('the setting is a real switch saved by its own route', () => {
+    const ui = fs.readFileSync(path.join(__dirname, '..', 'web', 'components', 'AccountProfile.tsx'), 'utf8');
+    assert.match(ui, /role="switch"/);
+    assert.match(ui, /fetch\('\/api\/account\/scan-visibility', \{\s*method: 'POST'/);
+    const api = fs.readFileSync(path.join(__dirname, '..', 'web', 'app', 'api', 'account', 'scan-visibility', 'route.ts'), 'utf8');
+    assert.match(api, /typeof body\?\.showUsername !== 'boolean'/);
+    assert.match(api, /rejectIfCrossOrigin\(req\)/);
+    const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '20261008120000_scan_show_username.sql'), 'utf8');
+    assert.match(sql, /scan_show_username boolean not null default true/);
+  });
+});

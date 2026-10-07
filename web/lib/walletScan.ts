@@ -141,9 +141,23 @@ export function scanActor(row: ActivityItem): string | null {
   return /^@[a-z][a-z0-9]{2,23}$/.test(actor) ? actor : null;
 }
 
+/** How a payment travelled ("Flizy pay"), as the feed named it. */
+function scanRail(row: ActivityItem): string | null {
+  const rail = typeof row.rail === 'string' ? row.rail.trim() : '';
+  return /^[A-Za-z]+ pay$|^Claim$/.test(rail) ? rail : null;
+}
+
+/** The sender leads the headline; a sender who hides their name is replaced by the rail. */
 function actorPrefix(row: ActivityItem): string {
   const actor = scanActor(row);
-  return actor ? `${actor} · ` : '';
+  if (actor) return `${actor} · `;
+  const rail = scanRail(row);
+  return rail ? `${rail} · ` : '';
+}
+
+/** The rail as its own line under the headline, when the sender leads it. */
+export function scanRailLine(row: ActivityItem): string | null {
+  return scanActor(row) ? scanRail(row) : null;
 }
 
 export function scanHeadline(row: ActivityItem): string {

@@ -20,7 +20,7 @@ const EMAIL = 'person@example.com';
 const HASH = '0x' + 'ab'.repeat(32);
 const KEYS = [
   'id', 'type', 'direction', 'amount', 'asset', 'amountSecondary', 'assetSecondary',
-  'counterparty', 'status', 'txHash', 'createdAt', 'note', 'label', 'category', 'channel', 'actor',
+  'counterparty', 'status', 'txHash', 'createdAt', 'note', 'label', 'category', 'channel', 'actor', 'rail',
 ];
 
 function assertPublic(item, secret) {
@@ -32,7 +32,7 @@ function assertPublic(item, secret) {
 }
 
 describe('a transfer from any account', () => {
-  it('names the account and the channel, and drops the phone key', () => {
+  it('names the account and the channel, and drops the phone key and the note', () => {
     const item = feed.scanTransferItem({
       id: 'row-1',
       account_id: '11111111-1111-1111-1111-111111111111',
@@ -51,7 +51,8 @@ describe('a transfer from any account', () => {
     assert.equal(item.channel, 'WhatsApp');
     assert.equal(item.category, 'send');
     assert.equal(item.direction, 'out');
-    assert.equal(item.note, 'rent');
+    // The note is the sender's own: it stays in their History.
+    assert.equal(item.note, null);
     assert.equal(item.txHash, HASH);
     assert.ok(!JSON.stringify(item).includes('11111111'));
   });
@@ -82,27 +83,70 @@ describe('a transfer from any account', () => {
     assert.equal(again.counterparty, null);
     assert.equal(item.counterparty, null);
     assert.equal(item.label, 'Sent 0.01 ETH');
-    assert.equal(item.note, 'reach or');
-    const named = feed.scanTransferItem({
-      id: 'row-named',
+    assert.equal(item.note, null);
+  });
+
+  it('names a Flizy payee only while each side shows its username on Scan', () => {
+    const to = '0x1234567890abcdef1234567890abcdef12345678';
+    const pay = (sender, recipient) => feed.scanTransferItem({
+      id: 'row-pay',
       amount_eth: '1',
-      to_address: '0x1234567890abcdef1234567890abcdef12345678',
-      counterparty_label: '@ludarep',
+      to_address: to,
+      counterparty_label: '@bob',
       note: 'rent',
       status: 'confirmed',
       created_at: '2026-10-06T12:00:00.000Z',
-    }, 'ada');
-    assert.equal(named.counterparty, '@ludarep');
-    assert.equal(named.note, 'rent');
-    assert.match(named.label, /@ludarep/);
-    const code = feed.scanTransferItem({
-      id: 'row-code',
-      amount_eth: '1',
-      counterparty_label: '123456789',
+    }, sender, recipient);
+    // Both shown: sender leads, payee named, the rail is its own line.
+    const both = pay('carol', { username: 'bob' });
+    assert.equal(both.actor, '@carol');
+    assert.equal(both.label, 'Sent 1 ETH → @bob');
+    assert.equal(both.counterparty, '@bob');
+    assert.equal(both.rail, 'Flizy pay');
+    // Payee hid it: their short wallet instead.
+    const payeeHidden = pay('carol', { username: null });
+    assert.equal(payeeHidden.label, 'Sent 1 ETH → 0x1234...5678');
+    assert.equal(payeeHidden.counterparty, to);
+    assert.equal(payeeHidden.rail, 'Flizy pay');
+    assert.ok(!JSON.stringify(payeeHidden).includes('bob'));
+    // Both hid it: nobody named, the rail leads.
+    const none = pay(null, { username: null });
+    assert.equal(none.actor, null);
+    assert.equal(none.label, 'Flizy pay · Sent 1 ETH → 0x1234...5678');
+    for (const secret of ['bob', 'carol', 'rent']) assert.ok(!JSON.stringify(none).includes(secret), secret);
+    // Unmatched address but logged as a Flizy pay: still the rail, never the label's name.
+    const unmatched = pay('carol', null);
+    assert.equal(unmatched.rail, 'Flizy pay');
+    assert.equal(unmatched.label, 'Sent 1 ETH → 0x1234...5678');
+    assert.ok(!JSON.stringify(unmatched).includes('bob'));
+  });
+
+  it('never shows a saved name or a display name', () => {
+    for (const label of ['john', 'Ada Lovelace', 'paycode77']) {
+      const item = feed.scanTransferItem({
+        id: 'row-named',
+        amount_eth: '1',
+        to_address: '0x1234567890abcdef1234567890abcdef12345678',
+        counterparty_label: label,
+        status: 'confirmed',
+        created_at: '2026-10-06T12:00:00.000Z',
+      }, 'ada');
+      assert.ok(!JSON.stringify(item).includes(label), label);
+      assert.equal(item.label, 'Sent 1 ETH → 0x1234...5678');
+      assert.equal(item.rail, null);
+    }
+  });
+
+  it('keeps marketplace labels, which name collections and tokens', () => {
+    const item = feed.scanTransferItem({
+      id: 'row-nft',
+      kind: 'nft_market',
+      amount_eth: '0.1',
+      counterparty_label: 'Buy Franky #3 for 0.1 ETH',
       status: 'confirmed',
       created_at: '2026-10-06T12:00:00.000Z',
     }, 'ada');
-    assert.equal(code.counterparty, '123456789');
+    assert.equal(item.label, 'Buy Franky #3 for 0.1 ETH');
   });
 
   it('turns a platform key into a name and refuses a username that is not one', () => {
@@ -150,7 +194,7 @@ describe('a claim from any account', () => {
     assert.equal(item.category, 'claim');
   });
 
-  it('keeps a public handle and drops a bare id', () => {
+  it('shows the rail only, never the recipient handle', () => {
     const shown = feed.scanClaimItem({
       id: 'claim-2',
       to_channel: 'github',
@@ -162,7 +206,9 @@ describe('a claim from any account', () => {
       created_at: '2026-10-01T00:00:00.000Z',
       claimed_at: '2026-10-06T15:00:00.000Z',
     }, 'ada');
-    assert.equal(shown.label, 'GitHub pay · @octocat · claimed · 1 ETH');
+    assert.equal(shown.label, 'GitHub pay · claimed · 1 ETH');
+    assert.equal(shown.counterparty, null);
+    assert.ok(!JSON.stringify(shown).includes('octocat'));
     assert.equal(shown.createdAt, '2026-10-06T15:00:00.000Z');
     const hidden = feed.scanClaimItem({
       id: 'claim-3',

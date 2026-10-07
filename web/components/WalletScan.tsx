@@ -31,6 +31,7 @@ import {
   scanChannel,
   scanChipOf,
   scanHeadline,
+  scanRailLine,
   scanKind,
   scanStats,
   scanWho,
@@ -564,6 +565,7 @@ function ScanRow({
   const pill = statusPill(row.status);
   const channel = scanChannel(row.channel);
   const headline = scanHeadline(row);
+  const rail = scanRailLine(row);
   const when = relativeWhen(row.createdAt, now);
   const url = explorerTxUrl(explorerBase, row.txHash);
   const detailsId = `scan-${row.id}`;
@@ -584,8 +586,11 @@ function ScanRow({
               <KindLabel kind={kind} />
               <span className="shrink-0 font-mono text-[11px] text-[#8f887c]">{when}</span>
             </span>
-            <span className="truncate font-sans text-[14px] font-medium text-white" title={headline}>
-              {headline}
+            <span className="grid min-w-0">
+              <span className="truncate font-sans text-[14px] font-medium text-white" title={headline}>
+                {headline}
+              </span>
+              {rail ? <span className="truncate font-sans text-[11.5px] text-[#9a9388]">{rail}</span> : null}
             </span>
             <span className="flex min-w-0 items-center gap-2">
               <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate font-sans text-[12px] text-[#c8c0b2]">
@@ -601,8 +606,11 @@ function ScanRow({
         <span className={`hidden w-full items-center px-4 py-3.5 lg:grid ${LEDGER_GRID}`}>
           <KindIcon row={row} />
           <KindLabel kind={kind} />
-          <span className="min-w-0 truncate font-sans text-[14px] font-medium text-white" title={headline}>
-            {headline}
+          <span className="grid min-w-0">
+            <span className="truncate font-sans text-[14px] font-medium text-white" title={headline}>
+              {headline}
+            </span>
+            {rail ? <span className="truncate font-sans text-[11.5px] text-[#9a9388]">{rail}</span> : null}
           </span>
           <span className="flex min-w-0 items-center gap-1.5 font-sans text-[12px] text-[#c8c0b2]">
             <AssetBits row={row} />

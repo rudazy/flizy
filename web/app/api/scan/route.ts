@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 import { apiErrorBody } from '../../../lib/apiError';
@@ -11,16 +12,17 @@ import {
   scanTransferItem,
   type ClaimScanRow,
   type ScanFocus,
+  type ScanRecipient,
   type TransferScanRow,
 } from '../../../lib/flizyFeed.ts';
 
 const ROUTE = 'GET /api/scan';
 
 const TRANSFER_COLUMNS =
-  'id, account_id, amount_eth, to_address, status, tx_hash, created_at, phone, kind, asset, counterparty_label, amount_secondary, asset_secondary, note';
+  'id, account_id, amount_eth, to_address, status, tx_hash, created_at, phone, kind, asset, counterparty_label, amount_secondary, asset_secondary';
 
 const CLAIM_COLUMNS =
-  'id, from_account_id, to_channel, to_display_handle, to_wa_hint, to_email, amount_eth, asset, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at';
+  'id, from_account_id, to_channel, to_wa_hint, to_email, amount_eth, asset, status, hold_tx_hash, refund_tx_hash, claim_tx_hash, created_at, claimed_at';
 
 const CLAIM_FOCUS_COLUMNS = `${CLAIM_COLUMNS}, to_account_id`;
 
@@ -59,6 +61,17 @@ function dedupe<T extends { id?: string | number | null }>(groups: T[][]): T[] {
   return rows;
 }
 
+type ScanAccount = { id?: unknown; username?: string | null; scan_show_username?: boolean | null };
+
+/**
+ * The username Scan may show for an account: null when the account turned off
+ * "Show username on Scan". Only an explicit true shows it, so a row read
+ * without the column names nobody.
+ */
+function scanName(account: ScanAccount): string | null {
+  return account.scan_show_username === true ? account.username ?? null : null;
+}
+
 async function namesFor(
   supabase: ReturnType<typeof getSupabase>,
   transferRows: Named[],
@@ -67,17 +80,61 @@ async function namesFor(
   const ids = [...new Set([...accountIds(transferRows, 'account_id'), ...accountIds(claimRows, 'from_account_id')])];
   const names = new Map<string, string | null>();
   if (ids.length === 0) return names;
-  const accounts = await supabase.from('accounts').select('id, username').in('id', ids);
+  const accounts = await supabase.from('accounts').select('id, username, scan_show_username').in('id', ids);
   if (accounts.error) return names;
-  for (const account of accounts.data || []) {
-    names.set(String(account.id), account.username ?? null);
+  for (const account of (accounts.data || []) as ScanAccount[]) {
+    names.set(String(account.id), scanName(account));
   }
   return names;
 }
 
-function toActivity(transferRows: Array<TransferScanRow & Named>, claimRows: Array<ClaimScanRow & Named>, names: Map<string, string | null>) {
+/**
+ * Transfers that went to a Flizy account's wallet, keyed by lowercase address.
+ * Wallets are stored checksummed, so both spellings are asked for.
+ */
+async function recipientsFor(
+  supabase: ReturnType<typeof getSupabase>,
+  transferRows: TransferScanRow[]
+): Promise<Map<string, ScanRecipient>> {
+  const found = new Map<string, ScanRecipient>();
+  const wanted = new Set<string>();
+  for (const row of transferRows) {
+    const kind = String(row.kind || 'transfer').toLowerCase();
+    if (kind === 'swap' || kind === 'nft_market' || kind.startsWith('withdraw')) continue;
+    const to = storedAddress(row.to_address);
+    if (to) wanted.add(to);
+  }
+  if (wanted.size === 0) return found;
+  const spellings = [...wanted].flatMap((a) => {
+    try {
+      return [a, ethers.getAddress(a)];
+    } catch {
+      return [a];
+    }
+  });
+  const accounts = await supabase
+    .from('accounts')
+    .select('username, scan_show_username, agent_wallet_address')
+    .in('agent_wallet_address', spellings);
+  if (accounts.error) return found;
+  for (const account of (accounts.data || []) as Array<ScanAccount & { agent_wallet_address?: string | null }>) {
+    const wallet = storedAddress(account.agent_wallet_address);
+    if (wallet) found.set(wallet, { username: scanName(account) });
+  }
+  return found;
+}
+
+async function toActivity(
+  supabase: ReturnType<typeof getSupabase>,
+  transferRows: Array<TransferScanRow & Named>,
+  claimRows: Array<ClaimScanRow & Named>,
+  names: Map<string, string | null>
+) {
+  const recipients = await recipientsFor(supabase, transferRows);
   return mergeFeed([
-    ...transferRows.map((row) => scanTransferItem(row, names.get(String(row.account_id || '')))),
+    ...transferRows.map((row) =>
+      scanTransferItem(row, names.get(String(row.account_id || '')), recipients.get(storedAddress(row.to_address) || '') ?? null)
+    ),
     ...claimRows.map((row) => scanClaimItem(row, names.get(String(row.from_account_id || '')))),
   ]);
 }
@@ -91,17 +148,18 @@ async function loadGeneral(supabase: ReturnType<typeof getSupabase>) {
   const transferRows = (transfers.data || []) as Array<TransferScanRow & Named>;
   const claimRows = (claims.data || []) as Array<ClaimScanRow & Named>;
   const names = await namesFor(supabase, transferRows, claimRows);
-  return { activity: toActivity(transferRows, claimRows, names), found: null as boolean | null };
+  return { activity: await toActivity(supabase, transferRows, claimRows, names), found: null as boolean | null };
 }
 
 async function loadUsername(supabase: ReturnType<typeof getSupabase>, username: string) {
   const account = await supabase
     .from('accounts')
-    .select('id, username, agent_wallet_address')
+    .select('id, username, agent_wallet_address, scan_show_username')
     .eq('username', username)
     .maybeSingle();
   if (account.error) return { error: account.error };
-  if (!account.data?.id) return { activity: [], found: false as boolean | null };
+  // A hidden username is not searchable: the answer matches no such account.
+  if (!account.data?.id || account.data.scan_show_username !== true) return { activity: [], found: false as boolean | null };
   const focusAccountId = String(account.data.id);
   const wallet = storedAddress(account.data.agent_wallet_address);
   const [sent, received, claimsOut, claimsIn, labelled] = await Promise.all([
@@ -131,14 +189,18 @@ async function loadUsername(supabase: ReturnType<typeof getSupabase>, username: 
   ]);
   const names = await namesFor(supabase, transferRows, claimRows);
   names.set(focusAccountId, account.data.username ?? username);
-  return { activity: toActivity(transferRows, claimRows, names), found: true as boolean | null };
+  return { activity: await toActivity(supabase, transferRows, claimRows, names), found: true as boolean | null };
 }
 
 async function loadAddress(supabase: ReturnType<typeof getSupabase>, address: string) {
   const exact = storedAddress(address);
   if (!exact) return { activity: [], found: true as boolean | null };
   // One wallet belongs to one account. The limit only bounds a bad row.
-  const owners = await supabase.from('accounts').select('id, username').ilike('agent_wallet_address', exact).limit(8);
+  const owners = await supabase
+    .from('accounts')
+    .select('id, username, scan_show_username')
+    .ilike('agent_wallet_address', exact)
+    .limit(8);
   if (owners.error) return { error: owners.error };
   const ownerRows = owners.data || [];
   const sentGroups = await Promise.all(
@@ -158,8 +220,8 @@ async function loadAddress(supabase: ReturnType<typeof getSupabase>, address: st
     (labelled.data || []) as Array<TransferScanRow & Named>,
   ]);
   const names = await namesFor(supabase, transferRows, []);
-  for (const owner of ownerRows) names.set(String(owner.id), owner.username ?? null);
-  return { activity: toActivity(transferRows, [], names), found: true as boolean | null };
+  for (const owner of ownerRows as ScanAccount[]) names.set(String(owner.id), scanName(owner));
+  return { activity: await toActivity(supabase, transferRows, [], names), found: true as boolean | null };
 }
 
 export async function GET(request: Request) {
@@ -182,7 +244,7 @@ export async function GET(request: Request) {
     }
 
     const usdPerEth = await ethUsd().catch(() => null);
-    const body: { activity: ReturnType<typeof toActivity>; usdPerEth: number | null; limit: number; found?: boolean } = {
+    const body: { activity: Awaited<ReturnType<typeof toActivity>>; usdPerEth: number | null; limit: number; found?: boolean } = {
       activity: loaded.activity || [],
       usdPerEth,
       limit: FEED_LIMIT,

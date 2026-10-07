@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   ChartLineIcon,
   ChevronRightIcon,
@@ -11,6 +11,7 @@ import {
   LockIcon,
   PeopleIcon,
   PersonIcon,
+  ScanIcon,
   ShieldCheckIcon,
   UserPlusIcon,
   WalletIcon,
@@ -138,6 +139,83 @@ function SoonToggle({
         />
       </span>
     </button>
+  );
+}
+
+/**
+ * "Show username on Scan": a real setting, saved as soon as it is flipped.
+ * Off, Scan never shows the @username: payments to this account show its
+ * short wallet address, and its own payments show only how they travelled.
+ */
+function ScanUsernameToggle() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let live = true;
+    fetch('/api/account/scan-visibility')
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (live && res.ok && typeof data.showUsername === 'boolean') setOn(data.showUsername);
+        else if (live) setError('Could not load this setting.');
+      })
+      .catch(() => live && setError('Could not load this setting.'));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function flip() {
+    if (on == null || busy) return;
+    const next = !on;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/account/scan-visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ showUsername: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || typeof data.showUsername !== 'boolean') throw new Error();
+      setOn(data.showUsername);
+    } catch {
+      setError('That did not save. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="border-t border-[#26262a]">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on === true}
+        disabled={on == null || busy}
+        onClick={() => void flip()}
+        className="hit-y-44 flex min-h-[44px] w-full items-center gap-3 px-3.5 py-2 text-left disabled:opacity-60"
+      >
+        <span className="text-[#c8c2b8]">
+          <ScanIcon size={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-sans text-[13px] text-[#f3f1ec]">Show username on Scan</span>
+          <span className="block font-sans text-[11.5px] leading-[16px] text-[#8f8a82]">
+            {on === null
+              ? error || 'Loading...'
+              : on
+                ? 'On: your @username shows on payments you send and receive.'
+                : 'Off: Scan shows your short wallet address, never your username.'}
+          </span>
+        </span>
+        <span className={`relative h-[22px] w-[40px] shrink-0 rounded-full ${on ? 'bg-[#f7d047]' : 'bg-[#3a3a3e]'}`} aria-hidden>
+          <span className={`absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white ${on ? 'left-[20px]' : 'left-[2px]'}`} />
+        </span>
+      </button>
+      {error && on !== null ? <p className="m-0 px-3.5 pb-2 font-sans text-[11.5px] text-[#e0b070]">{error}</p> : null}
+    </div>
   );
 }
 
@@ -419,6 +497,7 @@ export function AccountProfile({
 
       <Card icon={<EyeIcon size={16} />} title="Privacy & Visibility" hint="Control what others can see of your profile.">
         <Row icon={<GlobeIcon size={16} />} label="Profile visibility" value="Public" onClick={() => onSoon('Profile visibility')} />
+        <ScanUsernameToggle />
         <SoonToggle on icon={<ChartLineIcon size={16} />} label="Show trading stats" onSoon={() => onSoon('Show trading stats')} />
         <SoonToggle on icon={<PeopleIcon size={16} />} label="Show followers & following" onSoon={() => onSoon('Show followers and following')} />
         <SoonToggle on={false} icon={<WalletIcon size={16} />} label="Show wallet address" onSoon={() => onSoon('Show wallet address')} />

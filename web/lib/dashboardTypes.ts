@@ -119,8 +119,11 @@ export type ActivityItem = {
   /**
    * Public @username of the Flizy account that made the move. Scan only.
    * Absent on a personal history row. Never a phone, an email, or an account id.
+   * Null when the account turned off "Show username on Scan".
    */
   actor?: string | null;
+  /** How a payment travelled ("Flizy pay", "GitHub pay"), never who it went to. Scan only. */
+  rail?: string | null;
 };
 
 export type HoldingsData = {
