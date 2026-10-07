@@ -14,10 +14,11 @@ import {
 import { useComingSoon } from '../../../components/ComingSoon';
 import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
-import { LanguageSelect, useLocale } from '../../../components/LocaleProvider';
+import { useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { shortAddr } from '../../../lib/dashboardTypes';
 import { PayIdentity } from '../../../components/PayIdentity';
+import { CountryPanel, LanguagePanel } from '../../../components/AccountPrefs';
 import { AccountProjects } from '../../../components/AccountProjects';
 import type { LocaleCode } from '../../../lib/locale';
 import { SITE_PHONE_COUNTRIES, countryByIso, countryFlag } from '../../../lib/phoneFormat';
@@ -119,16 +120,18 @@ export default function AccountPage() {
     setNameDraft(data?.account?.display_name || '');
   }, [data?.account?.display_name]);
 
-  useEffect(() => {
+  // The saved country as one ISO code, or '' when none is saved or the code is shared.
+  const savedCountryIso = useMemo(() => {
     const savedIso = String(data?.account?.default_country_iso || '').toUpperCase();
-    if (savedIso && countryByIso(savedIso)) {
-      setCountryIso(savedIso);
-      return;
-    }
+    if (savedIso && countryByIso(savedIso)) return savedIso;
     const dial = String(data?.account?.default_calling_code || '');
     const matches = SITE_PHONE_COUNTRIES.filter((country) => country.dial === dial);
-    setCountryIso(matches.length === 1 ? matches[0].iso : '');
+    return matches.length === 1 ? matches[0].iso : '';
   }, [data?.account?.default_calling_code, data?.account?.default_country_iso]);
+
+  useEffect(() => {
+    setCountryIso(savedCountryIso);
+  }, [savedCountryIso]);
 
   useEffect(() => {
     let cancelled = false;
@@ -877,102 +880,39 @@ export default function AccountPage() {
       {slide === 'projects' ? <AccountProjects /> : null}
 
       {slide === 'pay' ? (
-        <AppSection
-          title="Pay me"
-          helper="Print the QR with your name under it. A scan or that @username opens Flizy pay."
-        >
-          {data.pay ? (
-            <PayIdentity
-              url={data.pay.url}
-              qrUrl={data.pay.qrUrl}
-              code={data.pay.code}
-              username={data.pay.username}
-              displayName={data.pay.displayName || data.account.display_name}
-            />
-          ) : (
-            <p className="text-sm text-muted">
-              Set a username on Profile first. Your Flizy number is issued then.
-            </p>
-          )}
-        </AppSection>
+        data.pay ? (
+          <PayIdentity url={data.pay.url} qrUrl={data.pay.qrUrl} code={data.pay.code} username={data.pay.username} />
+        ) : (
+          <AppSection title="Pay me" helper="Print the QR with your Flizy number under it. A scan or your @username opens Flizy pay.">
+            <p className="text-sm text-muted">Set a username on Profile first. Your Flizy number is issued then.</p>
+          </AppSection>
+        )
       ) : null}
 
       {slide === 'country' ? (
-        <AppSection
-          title="Country"
-          helper="Optional. Pick one country. Chat adds its code when you type a local number. Skip it and chat will ask. You can change it anytime."
-        >
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              await setDefaultCallingCode(countryIso);
-            }}
-            className="grid gap-3"
-          >
-            <div>
-              <label className="label" htmlFor="account-calling-code">
-                Your country
-              </label>
-              <select
-                id="account-calling-code"
-                className="input min-h-[44px]"
-                value={countryIso}
-                onChange={(event) => setCountryIso(event.target.value)}
-              >
-                <option value="">No default</option>
-                {countryIso && !countryByIso(countryIso) ? (
-                  <option value={countryIso}>Saved country {countryIso}</option>
-                ) : null}
-                {SITE_PHONE_COUNTRIES.map((country) => (
-                  <option key={country.iso} value={country.iso}>
-                    {countryFlag(country.iso)} {country.name} (+{country.dial})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="text-xs leading-relaxed text-muted">
-              Korea, then 10 1234 5678, is sent as +82 10 1234 5678. A send still shows the full
-              number and waits for confirm. A request still asks, because it is created immediately.
-            </p>
-            <button
-              type="submit"
-              className="btn btn-primary w-full py-3 font-semibold"
-              disabled={busy === 'calling-code'}
-            >
-              {busy === 'calling-code' ? 'Saving' : 'Save'}
-            </button>
-          </form>
-        </AppSection>
+        <CountryPanel
+          value={countryIso}
+          saved={savedCountryIso}
+          onChange={setCountryIso}
+          onSave={() => void setDefaultCallingCode(countryIso)}
+          saving={busy === 'calling-code'}
+        />
       ) : null}
 
       {slide === 'language' ? (
-        <AppSection title={t('account.language')} helper={t('account.languageHelper')}>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              await setAccountLocale(localeDraft);
-            }}
-            className="grid gap-3"
-          >
-            <div>
-              <label className="label" htmlFor="account-locale">
-                {t('account.language')}
-              </label>
-              <LanguageSelect
-                id="account-locale"
-                value={localeDraft}
-                onChange={setLocaleDraft}
-              />
-            </div>
-            <button
-              type="submit"
-              className="btn btn-primary w-full py-3 font-semibold"
-              disabled={busy === 'locale'}
-            >
-              {busy === 'locale' ? t('account.languageSaving') : t('account.languageSave')}
-            </button>
-          </form>
-        </AppSection>
+        <LanguagePanel
+          eyebrow={t('account.preferences')}
+          title={t('account.language')}
+          text={t('account.languageHelper')}
+          saved={locale}
+          value={localeDraft}
+          onChange={setLocaleDraft}
+          onSave={() => void setAccountLocale(localeDraft)}
+          saving={busy === 'locale'}
+          saveLabel={t('account.languageSave')}
+          savingLabel={t('account.languageSaving')}
+          currentLabel={t('account.languageCurrent')}
+        />
       ) : null}
 
       {slide === 'chat' ? (

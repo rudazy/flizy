@@ -65,6 +65,8 @@ const en = {
   'account.language': 'Language',
   'account.languageHelper':
     'UI language for this account. Chat bots stay English until channel translation ships.',
+  'account.preferences': 'Preferences',
+  'account.languageCurrent': 'Current',
   'account.languageSave': 'Save language',
   'account.languageSaving': 'Saving…',
   'account.languageSaved': 'Language saved.',
@@ -131,6 +133,8 @@ const ko: Record<MessageKey, string> = {
   'account.language': '언어',
   'account.languageHelper':
     '이 계정의 화면 언어입니다. 채팅 봇은 채널 번역 전까지 영어입니다.',
+  'account.preferences': '환경설정',
+  'account.languageCurrent': '현재',
   'account.languageSave': '언어 저장',
   'account.languageSaving': '저장 중…',
   'account.languageSaved': '언어가 저장되었습니다.',
@@ -192,6 +196,8 @@ const zh: Record<MessageKey, string> = {
   'account.usernameSaving': '保存中…',
   'account.language': '语言',
   'account.languageHelper': '本账户的界面语言。聊天机器人在频道翻译上线前仍为英语。',
+  'account.preferences': '偏好设置',
+  'account.languageCurrent': '当前',
   'account.languageSave': '保存语言',
   'account.languageSaving': '保存中…',
   'account.languageSaved': '语言已保存。',
