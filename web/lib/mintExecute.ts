@@ -49,6 +49,8 @@ export async function runMintTx(args: {
   viewer: { address: string; viaGator: boolean };
   password: string;
   tx: MintTx;
+  /** Runs under the account lock before anything is sent; throw to refuse. */
+  underLock?: () => Promise<void>;
 }): Promise<{ txHash: string }> {
   const { supabase, ctx, accountId, viewer, tx } = args;
 
@@ -61,6 +63,7 @@ export async function runMintTx(args: {
   const lock = await tryAccountTxLock(supabase, accountId, MARKET_KIND);
   if (!lock.ok) throw new MintError(lock.error, 409);
   try {
+    if (args.underLock) await args.underLock();
     // Under the lock: a check taken before it would let two requests both
     // read today's total before either one's row exists.
     if (tx.value > 0n) {

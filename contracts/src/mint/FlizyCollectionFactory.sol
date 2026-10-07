@@ -2,12 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {FlizyCollection} from "./FlizyCollection.sol";
+import {FlizyLayeredCollection} from "./FlizyLayeredCollection.sol";
 
 /**
  * @title FlizyCollectionFactory
  * @notice Deploys Flizy-native collections. The caller becomes the collection
  * owner and royalty receiver; the FlizyDrop fixed here is its only minter.
- * CollectionCreated is the index of every native collection.
+ * create makes a single-image collection; createWithMetadata makes one whose
+ * tokens each have their own metadata under a fixed base URI.
+ * CollectionCreated is the index of every native collection, both kinds.
  */
 contract FlizyCollectionFactory {
     address public immutable drop;
@@ -40,6 +43,22 @@ contract FlizyCollectionFactory {
     ) external returns (address collection) {
         collection = address(
             new FlizyCollection(name, symbol, maxSupply, image, msg.sender, drop, msg.sender, royaltyBps)
+        );
+        isFlizyCollection[collection] = true;
+        emit CollectionCreated(collection, msg.sender, name, symbol, maxSupply, royaltyBps);
+    }
+
+    /// @notice A collection whose token metadata is baseURI + id + ".json"; image is its cover.
+    function createWithMetadata(
+        string memory name,
+        string memory symbol,
+        uint256 maxSupply,
+        string memory image,
+        string memory baseURI,
+        uint96 royaltyBps
+    ) external returns (address collection) {
+        collection = address(
+            new FlizyLayeredCollection(name, symbol, maxSupply, image, baseURI, msg.sender, drop, msg.sender, royaltyBps)
         );
         isFlizyCollection[collection] = true;
         emit CollectionCreated(collection, msg.sender, name, symbol, maxSupply, royaltyBps);

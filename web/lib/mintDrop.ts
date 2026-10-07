@@ -37,12 +37,14 @@ export const DROP_ABI = [
   'function allowlistMinted(address collection, address wallet) view returns (uint256)',
   'function publicMinted(address collection, address wallet) view returns (uint256)',
   'function paused() view returns (bool)',
+  'function feeRecipient() view returns (address)',
   'event Minted(address indexed collection, address indexed wallet, bool allowlist, uint256 quantity, uint256 firstTokenId, uint256 paid, uint256 fee)',
 ];
 export const DROP_IFACE = new ethers.Interface(DROP_ABI);
 
 const FACTORY_ABI = [
   'function create(string name, string symbol, uint256 maxSupply, string image, uint96 royaltyBps) returns (address)',
+  'function createWithMetadata(string name, string symbol, uint256 maxSupply, string image, string baseURI, uint96 royaltyBps) returns (address)',
   'function isFlizyCollection(address) view returns (bool)',
   'event CollectionCreated(address indexed collection, address indexed creator, string name, string symbol, uint256 maxSupply, uint96 royaltyBps)',
 ];

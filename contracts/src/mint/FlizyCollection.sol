@@ -188,7 +188,7 @@ contract FlizyCollection is IFlizyMintable {
     }
 
     /// @notice On-chain JSON: {"name":"<name> #<id>","image":"<image>"}, base64.
-    function tokenURI(uint256 tokenId) external view returns (string memory) {
+    function tokenURI(uint256 tokenId) external view virtual returns (string memory) {
         ownerOf(tokenId);
         bytes memory json = abi.encodePacked(
             '{"name":"', name, " #", _toString(tokenId), '","image":"', image, '"}'
@@ -239,7 +239,7 @@ contract FlizyCollection is IFlizyMintable {
     }
 
     /// @dev https:// or ipfs://, printable ASCII, no quote, backslash or space.
-    function _safeImage(bytes memory s) private pure returns (bool) {
+    function _safeImage(bytes memory s) internal pure returns (bool) {
         if (!_safeText(s, 512)) return false;
         for (uint256 i = 0; i < s.length; i++) {
             if (s[i] == " ") return false;
@@ -255,7 +255,7 @@ contract FlizyCollection is IFlizyMintable {
         return true;
     }
 
-    function _toString(uint256 value) private pure returns (string memory) {
+    function _toString(uint256 value) internal pure returns (string memory) {
         if (value == 0) return "0";
         uint256 digits;
         for (uint256 v = value; v != 0; v /= 10) digits++;

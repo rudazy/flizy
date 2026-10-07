@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MintActionSheet, SheetRow } from './MintActionSheet';
 import { NftArt } from './NftCollection';
+import { CollectionCreator, type CreatorStart } from './CollectionCreator';
+import { AiCollectionCreator } from './AiCollectionCreator';
 import { CheckIcon, ChevronRightIcon, PlusIcon } from './ExploreIcons';
 import { ethFromWei, shortAddr } from '../lib/nftFormat';
 import { safeImageUrl } from '../lib/nftIndex';
 
-type Mode = 'choose' | 'new' | 'existing';
+type Mode = 'choose' | 'flizy' | 'ai' | 'new' | 'existing';
 
 type Detection = {
   collection: string;
@@ -59,14 +61,16 @@ function artOk(url: string): boolean {
 }
 
 /**
- * Create a Mint: a new Flizy collection, or bring one that already exists.
- * A new collection is deployed from the creator's wallet and then set up on
- * the manage page. An existing one is checked first (Verify collection) and
- * becomes Flizy-managed or Contract-managed depending on what the contract
- * supports.
+ * Create a Mint. Create with Flizy builds a collection from the creator's
+ * artwork layers (see CollectionCreator). Import brings a contract that
+ * already exists: it is checked first (Verify collection) and becomes
+ * Flizy-managed or Contract-managed depending on what the contract supports.
+ * The manual path deploys a single-image collection from the creator's wallet
+ * and sets it up on the manage page. Generate with AI is shown, not open.
  */
 export function MintCreate() {
   const [mode, setMode] = useState<Mode>('choose');
+  const [start, setStart] = useState<CreatorStart | null>(null);
 
   return (
     <div className="grid w-full gap-[16px] pt-[6px]">
@@ -87,21 +91,96 @@ export function MintCreate() {
 
       {mode === 'choose' ? (
         <div className="grid gap-[10px]">
+          <div>
+            <h2 className="m-0 font-sans text-[16px] font-semibold text-white">Create your NFT collection</h2>
+            <p className="m-0 mt-[3px] font-sans text-[12.5px] text-[#a9a9a9]">Choose how you want to create your collection.</p>
+          </div>
+          <div className="grid gap-[10px] lg:grid-cols-3">
+            <Path
+              icon={<LayersIcon size={20} />}
+              title="Create with Flizy"
+              lead="Build a collection from your own artwork layers."
+              text="Upload layers such as backgrounds, bodies, clothes, eyes and accessories. Flizy combines them into unique NFTs and writes the metadata."
+              action="Create with Flizy"
+              onClick={() => {
+                setStart(null);
+                setMode('flizy');
+              }}
+            />
+            <Path
+              icon={<SparkIcon size={20} />}
+              title="Generate with AI"
+              lead="Describe your idea and let Flizy build the collection."
+              text="Describe the characters, art style, traits, rarity and size, and Flizy generates the artwork, traits and metadata."
+              action="Generate with AI"
+              onClick={() => setMode('ai')}
+            />
+            <Path
+              icon={<UploadBoxIcon size={20} />}
+              title="Import existing collection"
+              lead="Already have your NFT collection? Bring it to Flizy."
+              text="Your contract already exists. Flizy checks what it supports and gives your community a mint page."
+              action="Import collection"
+              onClick={() => setMode('existing')}
+            />
+          </div>
+          <div className="mt-[6px] flex items-center gap-[10px] font-sans text-[11px] uppercase tracking-wide text-[#8d8d8d]">
+            <span className="h-px flex-1 bg-[#23242a]" />
+            Advanced / Manual
+            <span className="h-px flex-1 bg-[#23242a]" />
+          </div>
           <Choice
-            title="New Flizy collection"
-            text="Flizy deploys the collection to your wallet and runs the mint: phases, allowlist, limits and price."
+            title="Create a collection manually"
+            text="One image for every NFT. Flizy deploys the collection to your wallet and runs the mint: phases, allowlist, limits and price."
             onClick={() => setMode('new')}
           />
-          <Choice
-            title="Bring an existing collection"
-            text="Your contract already exists. Flizy checks what it supports and gives your community a mint page."
-            onClick={() => setMode('existing')}
-          />
         </div>
+      ) : null}
+      {mode === 'flizy' ? <CollectionCreator start={start} onBack={() => setMode('choose')} /> : null}
+      {mode === 'ai' ? (
+        <AiCollectionCreator
+          onBack={() => setMode('choose')}
+          onReady={(next) => {
+            setStart(next);
+            setMode('flizy');
+            window.scrollTo({ top: 0 });
+          }}
+        />
       ) : null}
       {mode === 'new' ? <NewCollection onBack={() => setMode('choose')} /> : null}
       {mode === 'existing' ? <ExistingCollection onBack={() => setMode('choose')} /> : null}
     </div>
+  );
+}
+
+/** One way to create. */
+function Path({
+  icon,
+  title,
+  lead,
+  text,
+  action,
+  onClick,
+}: {
+  icon: ReactNode;
+  title: string;
+  lead: string;
+  text: string;
+  action: string;
+  onClick: () => void;
+}) {
+  return (
+    <section className="flex flex-col gap-[8px] rounded-[12px] border border-[#2a2b30] bg-[#0d0d0e] p-[14px]">
+      <span className="flex h-[38px] w-[38px] items-center justify-center rounded-[9px] border border-[#3a3017] bg-[#1c180c] text-sun">
+        {icon}
+      </span>
+      <h3 className="m-0 font-sans text-[15px] font-semibold text-white">{title}</h3>
+      <p className="m-0 font-sans text-[13px] font-medium text-[#e6e6e6]">{lead}</p>
+      <p className="m-0 flex-1 font-sans text-[12px] leading-[17px] text-[#a9a9a9]">{text}</p>
+      <button type="button" onClick={onClick} className="btn-sun mt-[4px] h-[40px] gap-[6px] rounded-[8px] font-sans text-[13px]">
+        {action} <ChevronRightIcon size={13} />
+      </button>
+    </section>
   );
 }
 
@@ -356,5 +435,32 @@ function ExistingCollection({ onBack }: { onBack: () => void }) {
         </>
       ) : null}
     </div>
+  );
+}
+
+function LayersIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3 21 8l-9 5-9-5 9-5z" />
+      <path d="m3 12.5 9 5 9-5M3 17l9 5 9-5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SparkIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3.5 13.9 9.6 20 11.5l-6.1 1.9L12 19.5l-1.9-6.1L4 11.5l6.1-1.9L12 3.5z" />
+      <path d="M19 3v3M17.5 4.5h3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function UploadBoxIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" />
+      <path d="M4 14v4.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V14" />
+    </svg>
   );
 }

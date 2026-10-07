@@ -14,6 +14,7 @@ import {
 } from '../../../../lib/mintDrop.ts';
 import { MAX_DROPS_PER_ACCOUNT, creatorDropCount, insertDrop } from '../../../../lib/mintDrops.ts';
 import { MintError, runMintTx } from '../../../../lib/mintExecute.ts';
+import { factorySupportsMetadata } from '../../../../lib/generatedRequest.ts';
 import {
   artworkUrl,
   chainText,
@@ -29,7 +30,8 @@ const ROUTE = 'POST /api/mints/collections';
 /**
  * Create a Flizy-native collection from the creator's wallet through the
  * factory. The creator is its owner and royalty receiver; FlizyDrop is its only
- * minter. The new address is read from the factory's CollectionCreated event
+ * minter. With a baseURI the collection is a generated one, each NFT with its
+ * own metadata file. The new address is read from the factory's CollectionCreated event
  * in the receipt, matched to this creator, never taken from the request.
  *
  * If the chain step succeeds and saving the drop row fails, the collection
@@ -52,6 +54,9 @@ export async function POST(req: Request) {
     const royaltyBps = intField(field(body, 'royaltyBps') ?? 0, 'Royalty', 0, NATIVE_MAX_ROYALTY_BPS);
     const description = pageText(field(body, 'description'), 2000);
     const bannerUrl = artworkUrl(field(body, 'bannerUrl'), 'Banner', false);
+    // A generated collection: one metadata file per NFT under this folder.
+    const baseURI = artworkUrl(field(body, 'baseURI'), 'Metadata folder', false);
+    if (baseURI && !baseURI.endsWith('/')) throw new MintError('Metadata folder must end with a slash.');
 
     // Before the transaction, so nobody pays gas for a collection Flizy will not list.
     if ((await creatorDropCount(accountId)) >= MAX_DROPS_PER_ACCOUNT) {
@@ -59,6 +64,9 @@ export async function POST(req: Request) {
     }
 
     const ctx = nftContext();
+    if (baseURI && !(await factorySupportsMetadata(ctx.provider, cfg.factory))) {
+      return NextResponse.json({ error: 'Launching generated collections is not live yet.' }, { status: 503 });
+    }
     const supabase = getSupabase();
     const viewer = await viewerWallet(accountId);
     const { txHash } = await runMintTx({
@@ -72,7 +80,9 @@ export async function POST(req: Request) {
           {
             target: cfg.factory,
             value: 0n,
-            data: FACTORY_IFACE.encodeFunctionData('create', [name, symbol, BigInt(supply), image, BigInt(royaltyBps)]),
+            data: baseURI
+              ? FACTORY_IFACE.encodeFunctionData('createWithMetadata', [name, symbol, BigInt(supply), image, baseURI, BigInt(royaltyBps)])
+              : FACTORY_IFACE.encodeFunctionData('create', [name, symbol, BigInt(supply), image, BigInt(royaltyBps)]),
           },
         ],
         value: 0n,
