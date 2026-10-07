@@ -129,7 +129,23 @@ export async function listAccountTokens(accountId: string, client?: Db): Promise
   }));
 }
 
-export async function addAccountToken(accountId: string, raw: string, deps: Deps = {}) {
+/** What the contract says about itself, read before anything is saved. */
+export async function previewAccountToken(raw: string, deps: Deps = {}): Promise<SavedToken> {
+  const address = checksum(raw);
+  if (address === flzAddress(deps)) throw new ClientError('FLZ is already on your wallet.');
+  const chain = deps.chain || (await defaultChain());
+  const meta = await chain.meta(address);
+  return { address, symbol: meta.symbol, decimals: meta.decimals };
+}
+
+/**
+ * What the person typed for the symbol and decimals. The saved row always takes
+ * both from the contract; a value typed here only has to agree with it, so a
+ * wrong decimals can never scale a balance.
+ */
+export type ClaimedToken = { symbol?: string | null; decimals?: number | null };
+
+export async function addAccountToken(accountId: string, raw: string, deps: Deps = {}, claimed: ClaimedToken = {}) {
   const address = checksum(raw);
   if (address === flzAddress(deps)) throw new ClientError('FLZ is already on your wallet.');
   const supabase = db(deps.client);
@@ -140,6 +156,13 @@ export async function addAccountToken(accountId: string, raw: string, deps: Deps
   }
   const chain = deps.chain || (await defaultChain());
   const meta = await chain.meta(address);
+  const symbol = typeof claimed.symbol === 'string' ? claimed.symbol.trim() : '';
+  if (symbol && symbol.toUpperCase() !== meta.symbol.toUpperCase()) {
+    throw new ClientError(`That contract's symbol is ${meta.symbol}.`);
+  }
+  if (claimed.decimals != null && claimed.decimals !== meta.decimals) {
+    throw new ClientError(`That contract uses ${meta.decimals} decimals.`);
+  }
   const { error } = await supabase.from('account_tokens').upsert(
     {
       account_id: accountId,

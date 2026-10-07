@@ -152,3 +152,41 @@ describe('account token migration', () => {
     assert.match(sql, /account_tokens_address_check is missing/);
   });
 });
+
+describe('the add token dialog', () => {
+  const deps = () => ({
+    client: fake.client,
+    flzAddress: FLZ,
+    chain: chainFor({ symbol: 'AAA', decimals: 6 }, '0'),
+  });
+
+  it('previews a contract from the chain without saving it, and refuses FLZ', async () => {
+    const found = await store.previewAccountToken(TOKEN.toLowerCase(), deps());
+    assert.deepEqual(found, { address: ethers.getAddress(TOKEN), symbol: 'AAA', decimals: 6 });
+    assert.equal((fake.db.tables.account_tokens || []).length, 0);
+    await assert.rejects(() => store.previewAccountToken(FLZ, deps()), /already on your wallet/);
+  });
+
+  it('a typed symbol or decimals must match the chain, and the chain value is what is saved', async () => {
+    await assert.rejects(
+      () => store.addAccountToken('acct-1', TOKEN, deps(), { symbol: 'XYZ', decimals: 6 }),
+      /That contract's symbol is AAA\./
+    );
+    await assert.rejects(
+      () => store.addAccountToken('acct-1', TOKEN, deps(), { symbol: 'AAA', decimals: 18 }),
+      /That contract uses 6 decimals\./
+    );
+    assert.equal((fake.db.tables.account_tokens || []).length, 0);
+    const saved = await store.addAccountToken('acct-1', TOKEN, deps(), { symbol: 'aaa', decimals: 6 });
+    assert.equal(saved.symbol, 'AAA');
+    assert.equal(saved.decimals, 6);
+  });
+
+  it('the route reads a contract behind a session and passes only checked values on', () => {
+    const route = fs.readFileSync(path.join(ROOT, 'web', 'app', 'api', 'wallet', 'tokens', 'route.ts'), 'utf8');
+    const get = route.slice(route.indexOf('export async function GET'), route.indexOf('export async function POST'));
+    assert.match(get, /if \(!accountId\) return NextResponse\.json\(\{ error: 'Not logged in' \}, \{ status: 401 \}\);/);
+    assert.match(route, /Number\.isInteger\(decimals\) && decimals >= 0 && decimals <= 255/);
+    assert.match(route, /addAccountToken\(accountId, addressFrom\(body\), \{\}, claimedFrom\(body\)\)/);
+  });
+});

@@ -10,6 +10,7 @@ import { VerifiedMark } from './VerifiedMark';
 import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
 import { WalletNfts } from './WalletNfts';
 import { WalletOffers } from './WalletOffers';
+import { AddTokenSheet } from './AddTokenSheet';
 import { EyeMark } from './BalanceEye';
 import {
   ChevronDownIcon,
@@ -62,7 +63,7 @@ export function WalletBalances() {
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [contract, setContract] = useState('');
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [tokenNote, setTokenNote] = useState('');
   const [tokenError, setTokenError] = useState('');
   const [tokenBusy, setTokenBusy] = useState(false);
@@ -134,35 +135,6 @@ export function WalletBalances() {
 
   function openExplorer() {
     if (address) window.open(`${explorerBase}/address/${address}`, '_blank', 'noopener,noreferrer');
-  }
-
-  async function addToken() {
-    if (tokenBusy || !contract.trim()) return;
-    setTokenBusy(true);
-    setTokenError('');
-    setTokenNote('');
-    try {
-      const res = await fetch('/api/wallet/tokens', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: contract }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setTokenError(body.error || 'Could not add that token.');
-        return;
-      }
-      const symbol = body.token?.symbol || 'Token';
-      const balance = body.token?.balance;
-      const holds = balance != null && Number(balance) > 0;
-      setTokenNote(holds ? `${symbol} added.` : `${symbol} added. It shows here once this wallet holds some.`);
-      setContract('');
-      await refreshAll();
-    } catch {
-      setTokenError('Could not add that token.');
-    } finally {
-      setTokenBusy(false);
-    }
   }
 
   async function removeToken(tokenAddress: string) {
@@ -298,8 +270,11 @@ export function WalletBalances() {
           action={
             <button
               type="button"
-              onClick={() => setAddingToken((open) => !open)}
-              aria-expanded={addingToken}
+              onClick={() => {
+                if (addingToken) setAddingToken(false);
+                else setSheetOpen(true);
+              }}
+              aria-haspopup={addingToken ? undefined : 'dialog'}
               className="hit-y-44 flex h-[26px] items-center gap-[10px] rounded-[4px] border border-sun bg-[#14120a] px-[10.5px] font-sans text-[9.6px] font-semibold text-sun"
             >
               <PlusIcon size={11} strokeWidth={2} />
@@ -308,38 +283,6 @@ export function WalletBalances() {
           }
         />
 
-        {addingToken ? (
-          <form
-            className="mt-[8px] grid gap-[6px]"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void addToken();
-            }}
-          >
-            <label className="grid gap-[4px]">
-              <span className="font-sans text-[8px] leading-[11px] text-[#a9a9a9]">
-                Paste a contract. Any token sent to this address can be added. Only a verified token can be sent on
-                socials.
-              </span>
-              <input
-                className="h-[30px] rounded-[4px] border border-[#2a2b30] bg-[#0b0b0c] px-[9px] font-mono text-[9px] text-[#ececec] outline-none focus:border-sun/60"
-                value={contract}
-                spellCheck={false}
-                autoComplete="off"
-                autoFocus
-                aria-label="Token contract"
-                onChange={(event) => setContract(event.target.value)}
-              />
-            </label>
-            <button
-              type="submit"
-              className="btn-sun h-[30px] rounded-[4px] font-sans text-[10px]"
-              disabled={tokenBusy || !contract.trim()}
-            >
-              Add
-            </button>
-          </form>
-        ) : null}
         {tokenError ? <p className="alert alert-error mt-[8px]">{tokenError}</p> : null}
         {tokenNote ? <p className="m-0 mt-[8px] font-sans text-[8.5px] text-[#a9a9a9]">{tokenNote}</p> : null}
 
@@ -404,6 +347,24 @@ export function WalletBalances() {
       {/* NFTs: every collection the wallet holds, from the explorer. */}
       <WalletNfts chainName={chainName} hidden={hidden} />
       <WalletOffers hidden={hidden} />
+      <AddTokenSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onAdded={(message) => {
+          setSheetOpen(false);
+          setTokenError('');
+          setTokenNote(message);
+          void refreshAll();
+        }}
+        onManage={
+          tokens.some((t) => t.added)
+            ? () => {
+                setSheetOpen(false);
+                setAddingToken(true);
+              }
+            : null
+        }
+      />
       {comingSoonNote}
     </div>
   );
