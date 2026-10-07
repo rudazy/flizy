@@ -554,7 +554,7 @@ export default function AccountPage() {
       />
 
       {slide === 'profile' ? (
-        <div className="w-full max-w-lg">
+        <div className="w-full">
         <AccountProfile
           username={data.account.username || ''}
           displayName={data.account.display_name || ''}

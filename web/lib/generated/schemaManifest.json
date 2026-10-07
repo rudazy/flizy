@@ -864,7 +864,7 @@
       "kind": "table",
       "name": "nft_favorites",
       "providedBy": "20261002120000_nft_favorites.sql",
-      "requiredBy": "web/app/api/nfts/favorites/route.ts"
+      "requiredBy": "web/app/api/nfts/favorites/route.ts, web/app/api/nfts/liked/route.ts"
     },
     {
       "kind": "table",

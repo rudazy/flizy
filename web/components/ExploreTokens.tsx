@@ -180,7 +180,7 @@ export function ExploreTokens() {
   const filterEmpty = tab !== 'discover' && tab !== 'copy' ? tokensForFilter(tab, []).empty : '';
 
   return (
-    <div className="!mt-[9px] grid w-full max-w-lg grid-cols-[minmax(0,1fr)] gap-[12px]">
+    <div className="!mt-[9px] grid w-full grid-cols-[minmax(0,1fr)] gap-[12px]">
       <div
         className="-mx-4 flex overflow-x-auto border-b border-[#2a2b30] px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="tablist"

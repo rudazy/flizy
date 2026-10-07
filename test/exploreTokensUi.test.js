@@ -64,7 +64,9 @@ describe('rows and Trade', () => {
   it('lays each token out on one line, never wider than the screen', () => {
     assert.match(TOKENS, /<article className="flex h-\[38\.5px\] min-w-0 items-center/);
     assert.match(TOKENS, /className="grid grid-cols-\[minmax\(0,1fr\)\] gap-\[5px\]"/);
-    assert.match(TOKENS, /grid w-full max-w-lg grid-cols-\[minmax\(0,1fr\)\]/);
+    // Full width like Home and Wallet; minmax(0,1fr) still keeps a row from pushing past the screen.
+    assert.match(TOKENS, /grid w-full grid-cols-\[minmax\(0,1fr\)\]/);
+    assert.doesNotMatch(TOKENS, /max-w-lg/);
   });
 
   it('opens the swap on the row\'s own pair from Trade', () => {

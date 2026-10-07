@@ -152,7 +152,7 @@ export function ExploreNfts() {
 
   if (section !== 'discover') {
     return (
-      <div className="!mt-[9px] grid w-full max-w-lg gap-[12px]">
+      <div className="!mt-[9px] grid w-full gap-[12px]">
         {sectionTabs}
         {section === 'mint' ? <MintList /> : <MintCollections />}
       </div>
@@ -160,7 +160,7 @@ export function ExploreNfts() {
   }
 
   return (
-    <div className="!mt-[9px] grid w-full max-w-lg gap-[12px]">
+    <div className="!mt-[9px] grid w-full gap-[12px]">
       {sectionTabs}
       <div className="flex border-b border-[#2a2b30]" role="tablist" aria-label="NFT section">
         {TABS.map((item) => {
@@ -260,7 +260,7 @@ export function ExploreNfts() {
             <p className="m-0 font-sans text-[10px] text-[#a9a9a9]">No collections are listed on this network yet.</p>
           ) : null}
           {collections && collections.length > 0 ? (
-            <div className="grid grid-cols-2 gap-[10px]">
+            <div className="grid grid-cols-2 gap-[10px] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {collections.map((c) => (
                 <CollectionCard
                   key={c.address}
@@ -311,7 +311,7 @@ function CollectionCard({
     <article className="overflow-hidden rounded-[6px] border border-[#23242a] bg-[#0d0d0e]">
       <div className="relative h-[87px] bg-[#0b0b10]">
         {art ? (
-          <Image src={art} alt={`${collection.name} artwork`} fill sizes="(max-width: 512px) 50vw, 240px" className="object-cover" />
+          <Image src={art} alt={`${collection.name} artwork`} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw" className="object-cover" />
         ) : (
           <div
             className="flex h-full items-center justify-center font-sans text-[30px] font-bold text-sun"

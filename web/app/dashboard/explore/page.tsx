@@ -124,9 +124,8 @@ function TasksSlide() {
   }
 
   return (
-    // The shell widens to 1200px from the small breakpoint. This column stays
-    // phone width, which is what the layout is drawn for.
-    <div className="grid w-full max-w-lg">
+    // Full width of the shell, the same as Home and Wallet, on a phone and a desktop.
+    <div className="grid w-full">
       <div className="mt-[-3px] flex items-end gap-[14px]">
         <div
           className="mb-[3px] flex flex-1 items-end gap-[10px] border-b border-[#1e2024]"

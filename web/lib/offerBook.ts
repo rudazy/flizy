@@ -1,5 +1,6 @@
 /**
- * A wallet's offer book: the offers it has made, and the offers it can accept.
+ * A wallet's offer book: the offers it has made, the offers it can accept, and
+ * its past bids.
  *
  * Made: every open offer this wallet placed, expired ones included, because an
  * expired offer's ETH stays in the marketplace until its maker cancels it.
@@ -10,11 +11,14 @@
  * first, so the market is never scanned token by token; then each offer and
  * each ownership is re-read from the chain. Offers the owner declined
  * (nft_offer_declines) are left out.
+ *
+ * Past: offers this wallet made that are closed, read from the marketplace
+ * events already loaded. See closedBids in nftMarket.ts.
  */
 
 import { ethers } from 'ethers';
 import { getSupabase } from './supabase';
-import { MARKET_ABI, listingKey, type OpenOffer } from './nftMarket.ts';
+import { MARKET_ABI, closedBids, listingKey, type ClosedBid, type MarketEvent, type OpenOffer } from './nftMarket.ts';
 import { marketView, type NftContext } from './nftApi.ts';
 import { verifiedCollection } from './listedNfts';
 
@@ -35,9 +39,32 @@ export type BookOffer = {
   royaltyBps: number;
 };
 
+export type PastBid = ClosedBid & { collectionName: string; image: string | null };
+
 const MAX_OFFERS = 100;
 const WALLET_PAGES = 3;
 const NFT_ABI = ['function ownerOf(uint256) view returns (address)'];
+
+/** closedBids with the collection's name and art, from the index and the Flizy registry. */
+async function pastBids(ctx: NftContext, events: MarketEvent[], wallet: string): Promise<PastBid[]> {
+  const closed = closedBids(events, wallet);
+  const labels = new Map<string, { name: string; image: string | null }>();
+  await Promise.all(
+    [...new Set(closed.map((b) => b.collection))].slice(0, 25).map(async (address) => {
+      const collection = await ctx.index.collection(address).catch(() => null);
+      const verified = verifiedCollection(address);
+      labels.set(address, {
+        name: collection?.name ?? `${address.slice(0, 6)}...${address.slice(-4)}`,
+        image: verified?.profile?.avatar ?? collection?.icon ?? null,
+      });
+    })
+  );
+  return closed.map((b) => ({
+    ...b,
+    collectionName: labels.get(b.collection)?.name ?? `${b.collection.slice(0, 6)}...${b.collection.slice(-4)}`,
+    image: labels.get(b.collection)?.image ?? null,
+  }));
+}
 
 /** Declined offer ids for this account on this marketplace. */
 export async function declinedOfferIds(accountId: string, marketplace: string): Promise<Set<string>> {
@@ -71,8 +98,8 @@ export async function offerBook(
   ctx: NftContext,
   accountId: string,
   wallet: string
-): Promise<{ made: BookOffer[]; received: BookOffer[] }> {
-  if (!ctx.market) return { made: [], received: [] };
+): Promise<{ made: BookOffer[]; received: BookOffer[]; past: PastBid[] }> {
+  if (!ctx.market) return { made: [], received: [], past: [] };
   const market = new ethers.Contract(ctx.market.address, MARKET_ABI, ctx.provider);
   const view = await marketView(ctx);
   const all = [...(view.state?.offers.values() ?? [])];
@@ -147,12 +174,14 @@ export async function offerBook(
     };
   };
 
-  const [made, received] = await Promise.all([
+  const [made, received, closed] = await Promise.all([
     Promise.all(madeCandidates.map((o) => build(o, 'made'))),
     Promise.all(receivedCandidates.map((o) => build(o, 'received'))),
+    pastBids(ctx, view.state?.events ?? [], wallet),
   ]);
   return {
     made: made.filter((o): o is BookOffer => o != null),
     received: received.filter((o): o is BookOffer => o != null),
+    past: closed,
   };
 }

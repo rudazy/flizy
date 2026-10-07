@@ -473,7 +473,7 @@ export function AccountProjects() {
   if (!creating) {
     const atCap = (projects?.length ?? 0) >= PROJECT_CAP;
     return (
-      <div className="grid w-full max-w-lg gap-[13px]">
+      <div className="grid w-full gap-[13px]">
         <WorkspaceHero count={projects === null ? null : projects.length} />
         {projects === null ? (
           <p className="m-0 px-[2px] font-sans text-[10px] text-[#8f8f8f]">Loading projects.</p>
@@ -554,7 +554,7 @@ export function AccountProjects() {
   const shownHandle = handle.trim();
 
   return (
-    <form onSubmit={onSubmit} noValidate className="grid w-full max-w-lg">
+    <form onSubmit={onSubmit} noValidate className="grid w-full">
       <nav aria-label="Breadcrumb" className="-mt-[5px] flex h-[18px] items-center font-sans text-[11px] leading-none">
         <button
           type="button"

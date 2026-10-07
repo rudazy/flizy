@@ -119,7 +119,7 @@ export function HeldToken({ address }: { address: string }) {
     return (
       <AppPage>
         <AppTopBar title="Token" />
-        <div className="grid w-full max-w-lg gap-3">
+        <div className="grid w-full gap-3">
           <p className="m-0 text-sm text-muted">{loadError || 'Loading...'}</p>
           <Link href="/dashboard/wallet" className="text-sm text-lime no-underline">
             Wallet
@@ -175,7 +175,7 @@ export function HeldToken({ address }: { address: string }) {
   return (
     <AppPage>
       <AppTopBar title={held.symbol} />
-      <div className="grid w-full max-w-lg gap-4">
+      <div className="grid w-full gap-4">
         <Link href="/dashboard/wallet" className="text-xs text-muted no-underline">
           Wallet
         </Link>

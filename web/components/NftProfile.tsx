@@ -34,10 +34,27 @@ type MyNft = {
   listedWei: string | null;
 };
 
+type PastBid = {
+  offerId: string;
+  collection: string;
+  collectionName: string;
+  tokenId: string | null;
+  amountWei: string;
+  outcome: 'accepted' | 'cancelled';
+  madeAt: string | null;
+  closedAt: string | null;
+  txHash: string;
+  image: string | null;
+};
+
+type LikedNft = MyNft & { likedAt: string | null };
+
 const TABS = [
   { id: 'items', label: 'Items' },
   { id: 'received', label: 'Offers received' },
   { id: 'made', label: 'Offers made' },
+  { id: 'past', label: 'Past bids' },
+  { id: 'liked', label: 'Likes' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -48,7 +65,8 @@ function endsLabel(o: BookOffer): string {
 
 /**
  * The viewer's own NFT page: what they hold, the offers they can accept or
- * decline, and the offers they made, each cancellable for its full amount.
+ * decline, the offers they made (each cancellable for its full amount), their
+ * past bids, accepted or cancelled, and the NFTs they hearted.
  */
 export function NftProfile() {
   const router = useRouter();
@@ -56,10 +74,12 @@ export function NftProfile() {
   const search = useSearchParams();
   const raw = search.get('tab');
   const tab: TabId = TABS.some((t) => t.id === raw) ? (raw as TabId) : 'items';
-  const { data: dash } = useDashboard();
+  const { data: dash, explorerBase } = useDashboard();
 
   const [nfts, setNfts] = useState<MyNft[] | null>(null);
-  const [book, setBook] = useState<{ made: BookOffer[]; received: BookOffer[] } | null>(null);
+  const [book, setBook] = useState<{ made: BookOffer[]; received: BookOffer[]; past: PastBid[] } | null>(null);
+  const [liked, setLiked] = useState<LikedNft[] | null>(null);
+  const [likedError, setLikedError] = useState('');
   const [usdPerEth, setUsdPerEth] = useState<number | null>(null);
   const [network, setNetwork] = useState('GIWA Sepolia');
   const [enabled, setEnabled] = useState(true);
@@ -72,7 +92,7 @@ export function NftProfile() {
       const res = await fetch('/api/nfts/offers');
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Could not load your offers.');
-      setBook({ made: body.made ?? [], received: body.received ?? [] });
+      setBook({ made: body.made ?? [], received: body.received ?? [], past: body.past ?? [] });
       setUsdPerEth(typeof body.usdPerEth === 'number' ? body.usdPerEth : null);
       setEnabled(body.enabled !== false);
       if (typeof body.network === 'string') setNetwork(body.network);
@@ -94,10 +114,23 @@ export function NftProfile() {
     }
   }, []);
 
+  const loadLiked = useCallback(async () => {
+    try {
+      const res = await fetch('/api/nfts/liked');
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Could not load your likes.');
+      setLiked(Array.isArray(body.liked) ? body.liked : []);
+      setLikedError('');
+    } catch (e) {
+      setLikedError(e instanceof Error ? e.message : 'Could not load your likes.');
+    }
+  }, []);
+
   useEffect(() => {
     loadBook();
     loadNfts();
-  }, [loadBook, loadNfts]);
+    loadLiked();
+  }, [loadBook, loadNfts, loadLiked]);
 
   function setTab(next: TabId) {
     const params = new URLSearchParams(search.toString());
@@ -113,7 +146,10 @@ export function NftProfile() {
     items: nfts?.length ?? null,
     received: book?.received.length ?? null,
     made: book?.made.length ?? null,
+    past: book?.past.length ?? null,
+    liked: liked?.length ?? null,
   };
+  const tabError = tab === 'items' ? nftsError : tab === 'liked' ? likedError : bookError;
 
   return (
     <div className="-mt-4 w-full min-w-0 pb-[calc(var(--app-nav-clearance)+16px)] md:pb-16">
@@ -131,9 +167,12 @@ export function NftProfile() {
       <section className="mt-[6px] rounded-[12px] border border-[#23242a] bg-[#0d0d0e] p-[14px]">
         <p className="m-0 truncate font-sans text-[18px] font-bold text-white">{name}</p>
         {wallet ? <p className="m-0 mt-[2px] font-sans text-[12px] text-[#a9a9a9]">{shortAddr(wallet)}</p> : null}
-        <div className="mt-[12px] grid grid-cols-3">
+        <div className="mt-[12px] grid grid-cols-3 gap-y-[12px] sm:grid-cols-5">
           {TABS.map((t, i) => (
-            <div key={t.id} className={`min-w-0 ${i ? 'border-l border-[#23242a] pl-[12px]' : ''}`}>
+            <div
+              key={t.id}
+              className={`min-w-0 border-[#23242a] ${i % 3 ? 'border-l pl-[12px]' : ''} ${i ? 'sm:border-l sm:pl-[12px]' : ''}`}
+            >
               <span className="block font-sans text-[19px] font-semibold text-white">{counts[t.id] ?? '-'}</span>
               <span className="block truncate font-sans text-[11px] text-[#a9a9a9]">{t.label}</span>
             </div>
@@ -160,37 +199,16 @@ export function NftProfile() {
       </div>
 
       {/* Each tab shows only the error of what it loads. */}
-      {(tab === 'items' ? nftsError : bookError) ? (
-        <p className="alert alert-error m-0 mt-[12px]">{tab === 'items' ? nftsError : bookError}</p>
-      ) : null}
+      {tabError ? <p className="alert alert-error m-0 mt-[12px]">{tabError}</p> : null}
       {!enabled ? <p className="m-0 mt-[12px] font-sans text-[12.5px] text-[#a9a9a9]">Trading opens when the Flizy marketplace goes live.</p> : null}
 
       {tab === 'items' ? (
         <div className="mt-[14px]">
           {!nfts && !nftsError ? <Muted>Loading...</Muted> : null}
           {nfts && nfts.length === 0 && !nftsError ? <Muted>NFTs appear here after you mint, buy or receive them.</Muted> : null}
-          <div className="grid grid-cols-2 gap-[10px]">
+          <div className={GRID}>
             {(nfts ?? []).map((n) => (
-              <Link
-                key={`${n.collection}:${n.tokenId}`}
-                href={`/dashboard/explore/nfts/${n.collection}/${n.tokenId}`}
-                className="min-w-0 overflow-hidden rounded-[12px] border border-[#23242a] bg-[#0d0d0e] no-underline"
-              >
-                <NftArt src={n.image} alt={n.name} initial={n.collectionName} className="aspect-square w-full" />
-                <div className="px-[10px] pb-[10px] pt-[8px]">
-                  <p className="m-0 flex items-center gap-[5px] font-sans text-[13px] font-medium text-white">
-                    <span className="truncate">{n.name}</span>
-                    {n.verified ? (
-                      <span className="inline-flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full bg-sun text-[#1a1405]">
-                        <CheckIcon size={8} strokeWidth={3} />
-                      </span>
-                    ) : null}
-                  </p>
-                  <p className="m-0 mt-[3px] font-sans text-[11.5px] text-[#9a9a9a]">
-                    {n.listedWei ? `Listed for ${ethFromWei(n.listedWei)} ETH` : 'Not listed'}
-                  </p>
-                </div>
-              </Link>
+              <NftTile key={`${n.collection}:${n.tokenId}`} nft={n} />
             ))}
           </div>
         </div>
@@ -244,6 +262,28 @@ export function NftProfile() {
         </div>
       ) : null}
 
+      {tab === 'past' ? (
+        <div className="mt-[12px] grid grid-cols-[minmax(0,1fr)] gap-[8px]">
+          {!book && !bookError ? <Muted>Loading...</Muted> : null}
+          {book && book.past.length === 0 ? <Muted>Offers you made show here once they are accepted or cancelled.</Muted> : null}
+          {(book?.past ?? []).map((b) => (
+            <PastBidRow key={`${b.offerId}:${b.txHash}`} bid={b} usdPerEth={usdPerEth} explorerBase={explorerBase} />
+          ))}
+        </div>
+      ) : null}
+
+      {tab === 'liked' ? (
+        <div className="mt-[14px]">
+          {!liked && !likedError ? <Muted>Loading...</Muted> : null}
+          {liked && liked.length === 0 && !likedError ? <Muted>NFTs you heart on a collection page show here.</Muted> : null}
+          <div className={GRID}>
+            {(liked ?? []).map((n) => (
+              <NftTile key={`${n.collection}:${n.tokenId}`} nft={n} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {intent ? (
         <NftTradeSheet
           intent={intent.intent}
@@ -261,8 +301,85 @@ export function NftProfile() {
   );
 }
 
+/** Two cards across on a phone, more as the screen widens. */
+const GRID = 'grid grid-cols-2 gap-[10px] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5';
+
 function Muted({ children }: { children: ReactNode }) {
   return <p className="m-0 font-sans text-[12.5px] text-[#a9a9a9]">{children}</p>;
+}
+
+function NftTile({ nft }: { nft: MyNft }) {
+  return (
+    <Link
+      href={`/dashboard/explore/nfts/${nft.collection}/${nft.tokenId}`}
+      className="min-w-0 overflow-hidden rounded-[12px] border border-[#23242a] bg-[#0d0d0e] no-underline"
+    >
+      <NftArt src={nft.image} alt={nft.name} initial={nft.collectionName} className="aspect-square w-full" />
+      <div className="px-[10px] pb-[10px] pt-[8px]">
+        <p className="m-0 flex items-center gap-[5px] font-sans text-[13px] font-medium text-white">
+          <span className="truncate">{nft.name}</span>
+          {nft.verified ? (
+            <span className="inline-flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full bg-sun text-[#1a1405]">
+              <CheckIcon size={8} strokeWidth={3} />
+            </span>
+          ) : null}
+        </p>
+        <p className="m-0 mt-[3px] font-sans text-[11.5px] text-[#9a9a9a]">
+          {nft.listedWei ? `Listed for ${ethFromWei(nft.listedWei)} ETH` : 'Not listed'}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+function shortDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** A closed offer: accepted, so the NFT came to this wallet, or cancelled, so the ETH went back. */
+function PastBidRow({ bid, usdPerEth, explorerBase }: { bid: PastBid; usdPerEth: number | null; explorerBase: string }) {
+  const accepted = bid.outcome === 'accepted';
+  const what = bid.tokenId ? `${bid.collectionName} #${bid.tokenId}` : `Any ${bid.collectionName}`;
+  const usd = usdLabel(bid.amountWei, usdPerEth);
+  const href = bid.tokenId ? `/dashboard/explore/nfts/${bid.collection}/${bid.tokenId}` : `/dashboard/explore/nfts/${bid.collection}`;
+  const when = shortDate(bid.closedAt);
+  return (
+    <div className="flex items-center gap-[12px] rounded-[12px] border border-[#23242a] bg-[#0d0d0e] p-[8px]">
+      <Link href={href} className="flex min-w-0 flex-1 items-center gap-[12px] no-underline">
+        <NftArt src={bid.image} alt="" initial={bid.collectionName} className="h-[54px] w-[54px] shrink-0 rounded-[9px]" />
+        <div className="min-w-0">
+          <p className="m-0 truncate font-sans text-[13.5px] font-medium text-white">{what}</p>
+          <p className="m-0 mt-[2px] truncate font-sans text-[12px] text-white">
+            {ethFromWei(bid.amountWei)} ETH{usd ? <span className="text-[#9a9a9a]"> · {usd}</span> : null}
+          </p>
+          <p className="m-0 mt-[2px] truncate font-sans text-[11px] text-[#8d8d8d]">
+            {accepted ? 'Accepted. The NFT came to your wallet.' : 'Cancelled. The ETH went back to your wallet.'}
+            {when ? ` ${when}` : ''}
+          </p>
+        </div>
+      </Link>
+      <div className="flex shrink-0 flex-col items-end gap-[6px]">
+        <span
+          className={`rounded-full border px-[8px] py-[2px] font-sans text-[11px] ${
+            accepted ? 'border-[#1f6b45] bg-[#123224] text-[#3ddc84]' : 'border-[#3a3b40] bg-[#141416] text-[#cfcfcf]'
+          }`}
+        >
+          {accepted ? 'Accepted' : 'Cancelled'}
+        </span>
+        <a
+          href={`${explorerBase}/tx/${bid.txHash}`}
+          target="_blank"
+          rel="noreferrer"
+          className="hit-y-44 font-sans text-[11px] text-[#a9a9a9] no-underline hover:text-white"
+        >
+          Transaction
+        </a>
+      </div>
+    </div>
+  );
 }
 
 function OfferRow({

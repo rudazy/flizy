@@ -69,7 +69,7 @@ export function MintCreate() {
   const [mode, setMode] = useState<Mode>('choose');
 
   return (
-    <div className="mx-auto grid w-full max-w-lg gap-[16px] pt-[6px]">
+    <div className="grid w-full gap-[16px] pt-[6px]">
       <div className="flex items-center justify-between">
         <Link href="/dashboard/explore?s=nfts&nft=mint" className="hit-y-44 font-sans text-[12.5px] text-[#cfcfcf] no-underline hover:text-white">
           Back to Mint

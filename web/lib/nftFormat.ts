@@ -74,3 +74,18 @@ export function compactCount(n: number | string | null | undefined): string {
 export function bpsLabel(bps: number): string {
   return `${Number((bps / 100).toFixed(2))}%`;
 }
+
+/**
+ * Rows grouped by collection, one group per collection in the order each first
+ * appears, rows kept in their order. Addresses are compared without case.
+ */
+export function groupByCollection<T extends { collection: string }>(rows: T[]): Array<{ collection: string; items: T[] }> {
+  const groups = new Map<string, { collection: string; items: T[] }>();
+  for (const row of rows) {
+    const key = row.collection.toLowerCase();
+    const group = groups.get(key);
+    if (group) group.items.push(row);
+    else groups.set(key, { collection: row.collection, items: [row] });
+  }
+  return [...groups.values()];
+}

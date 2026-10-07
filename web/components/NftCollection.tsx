@@ -823,7 +823,7 @@ export function NftCollection({ address }: { address: string }) {
           ) : null}
 
           {layout === 'grid' ? (
-            <div className="grid grid-cols-2 gap-[10px]">
+            <div className="grid grid-cols-2 gap-[10px] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {visible.map((card) => (
                 <ItemCard
                   key={card.tokenId}

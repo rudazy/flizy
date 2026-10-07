@@ -244,6 +244,55 @@ export function foldMarket(events: MarketEvent[]): MarketState {
   return { listings, offers, sales, events };
 }
 
+/** An offer a wallet made that is no longer open. */
+export type ClosedBid = {
+  offerId: string;
+  collection: string;
+  /** The NFT the offer named; for an accepted collection offer, the NFT that was sold to the wallet. */
+  tokenId: string | null;
+  amountWei: string;
+  outcome: 'accepted' | 'cancelled';
+  madeAt: string | null;
+  closedAt: string | null;
+  /** The transaction that closed it. */
+  txHash: string;
+};
+
+/**
+ * Offers `wallet` made that are closed, the most recently closed first: accepted,
+ * when a sale settled against the offer and the NFT went to the wallet, or
+ * cancelled, when its ETH went back. An expired offer nobody cancelled is still
+ * open on-chain, so it is not here; it stays under the offers made.
+ *
+ * `events` must be oldest first, as decodeMarketLogs returns them.
+ */
+export function closedBids(events: MarketEvent[], wallet: string, limit = 100): ClosedBid[] {
+  const open = new Map<string, Extract<MarketEvent, { kind: 'offerMade' }>>();
+  const closed: ClosedBid[] = [];
+  for (const e of events) {
+    if (e.kind === 'offerMade') {
+      if (e.maker === wallet) open.set(e.offerId, e);
+      continue;
+    }
+    const offerId = e.kind === 'offerCancelled' ? e.offerId : e.kind === 'sold' && e.offerId !== '0' ? e.offerId : null;
+    const made = offerId ? open.get(offerId) : undefined;
+    if (!offerId || !made) continue;
+    open.delete(offerId);
+    const accepted = e.kind === 'sold';
+    closed.push({
+      offerId,
+      collection: made.collection,
+      tokenId: accepted ? e.tokenId : made.anyToken ? null : made.tokenId,
+      amountWei: accepted ? e.price : made.amount,
+      outcome: accepted ? 'accepted' : 'cancelled',
+      madeAt: made.timestamp,
+      closedAt: e.timestamp,
+      txHash: e.txHash,
+    });
+  }
+  return closed.reverse().slice(0, limit);
+}
+
 export type CollectionMarket = {
   floorWei: string | null;
   volumeWei: string;

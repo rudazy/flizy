@@ -137,7 +137,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
     return (
       <AppPage>
         <AppTopBar title="Token" />
-        <div className="grid w-full max-w-lg gap-3">
+        <div className="grid w-full gap-3">
           <p className="m-0 text-sm text-muted">This token is not listed.</p>
           <Link href="/dashboard/explore?s=tokens" className="text-sm text-lime no-underline">
             Tokens
@@ -241,7 +241,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   return (
     <AppPage>
       <AppTopBar title={market?.symbol || 'FLZ'} />
-      <div className="grid w-full max-w-lg gap-4">
+      <div className="grid w-full gap-4">
         <Link href="/dashboard/explore?s=tokens" className="text-xs text-muted no-underline">
           Tokens
         </Link>

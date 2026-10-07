@@ -8,7 +8,8 @@ const ROUTE = 'GET /api/nfts/offers';
 
 /**
  * The viewer's offer book: offers they made (expired ones included, so their
- * ETH can be taken back) and offers they can accept now. See web/lib/offerBook.ts.
+ * ETH can be taken back), offers they can accept now, and their past bids,
+ * accepted or cancelled. See web/lib/offerBook.ts.
  */
 export async function GET() {
   try {
@@ -16,7 +17,7 @@ export async function GET() {
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
     const ctx = nftContext();
-    if (!ctx.market) return NextResponse.json({ made: [], received: [], enabled: false, usdPerEth: null, network: ctx.chain.name });
+    if (!ctx.market) return NextResponse.json({ made: [], received: [], past: [], enabled: false, usdPerEth: null, network: ctx.chain.name });
     const viewer = await viewerWallet(accountId);
     const [book, usdPerEth] = await Promise.all([offerBook(ctx, accountId, viewer.address), usdRate()]);
 

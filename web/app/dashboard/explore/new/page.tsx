@@ -328,7 +328,7 @@ export default function NewTaskPage() {
     <AppPage>
       {header}
 
-      <form onSubmit={onSubmit} noValidate className="!mt-0 grid w-full max-w-lg gap-[7.5px] px-[2.5px] sm:px-0">
+      <form onSubmit={onSubmit} noValidate className="!mt-0 grid w-full gap-[7.5px] px-[2.5px] sm:px-0">
         <div className="grid grid-cols-2 gap-[5px]" role="radiogroup" aria-label="Create as">
           <CreatorCard
             active={personal}

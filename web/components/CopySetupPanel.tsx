@@ -240,7 +240,7 @@ export function CopySetupPanel({ kind }: { kind: Kind }) {
   const mint = kind === 'mint';
 
   return (
-    <div className="grid w-full max-w-lg gap-3">
+    <div className="grid w-full gap-3">
       <Disclosure title="Status" open={statusOpen} onToggle={() => setStatusOpen((open) => !open)}>
         <p className="m-0 text-sm leading-relaxed text-paper">
           {mint
