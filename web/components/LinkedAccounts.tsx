@@ -6,6 +6,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { HeroArt, PREF_CARD, PrefHero } from './AccountPrefs';
+import { BrandTile, ConfirmPassword, GhostButton, InfoNote, LinkedChip, brandCard } from './AccountConnections';
 
 type Identity = {
   channel: string;
@@ -73,19 +75,15 @@ function callbackMessage(
   return map[status] || map.error;
 }
 
+/** Gold seal with a tick, next to a linked platform's name. */
 function VerifiedMark() {
   return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      className="h-3.5 w-3.5 shrink-0 text-lime"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M2.5 8.5l3.5 3.5 7.5-8" />
+    <svg viewBox="0 0 24 24" aria-label="Verified" role="img" className="h-[20px] w-[20px] shrink-0">
+      <path
+        fill="#f7d047"
+        d="M12 1.8l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9 1.7 2.4-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 22.2l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1.4 12l1.7-2.4-.3-2.9 2.7-1.2 1.2-2.7 2.9.3z"
+      />
+      <path d="M7.8 12.3l2.8 2.8 5.6-6" fill="none" stroke="#0b0b0b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -176,133 +174,126 @@ export function LinkedAccounts() {
   }
 
   return (
-    <div className="space-y-3">
-      {notice ? (
-        <p
-          className={`rounded-md border px-3 py-2 font-mono text-[11px] ${
-            notice.tone === 'ok'
-              ? 'border-lime/40 bg-lime/10 text-lime'
-              : 'border-gold/40 bg-gold/10 text-gold'
-          }`}
-        >
-          {notice.text}
-        </p>
-      ) : null}
+    <section className={PREF_CARD}>
+      <PrefHero
+        eyebrow="Platforms"
+        title="Connect your"
+        accent="platforms"
+        text="Link GitHub, Discord, or X so people can send claims to you on that platform."
+        art={<HeroArt src="/account/platforms-hero.webp" />}
+      />
 
-      {identities === null ? (
-        <p className="font-mono text-xs text-muted">Loading...</p>
-      ) : (
-        PLATFORMS.map((p) => {
-          const row = identities.find((i) => i.channel === p.channel) || null;
-          return (
-            <div
-              key={p.channel}
-              className="rounded-md border border-border bg-ink/40 px-3 py-3"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-sans text-sm text-paper">{p.label}</span>
-                    {row ? <VerifiedMark /> : null}
+      <div className="grid gap-3 px-4 pb-5 pt-2">
+        {notice ? (
+          <p
+            role="status"
+            className={`m-0 rounded-[12px] border px-3.5 py-2.5 font-sans text-[13px] ${
+              notice.tone === 'ok' ? 'border-[#1f4a2c] bg-[#0f2a18] text-[#4ade80]' : 'border-[#5a4a1f] bg-[#16130b] text-sun'
+            }`}
+          >
+            {notice.text}
+          </p>
+        ) : null}
+
+        {identities === null ? (
+          <p className="m-0 px-1 py-4 font-sans text-[13px] text-[#9a958c]">Loading...</p>
+        ) : (
+          PLATFORMS.map((p) => {
+            const row = identities.find((i) => i.channel === p.channel) || null;
+            const handle = row?.handle ? `@${row.handle}` : null;
+            return (
+              <div key={p.channel} className={`rounded-[16px] border p-4 ${brandCard(p.channel, Boolean(row))}`}>
+                <div className="flex items-center gap-4">
+                  <BrandTile brand={p.channel} dim={!row && p.channel === 'x'} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-sans text-[16px] font-semibold text-white">{p.label}</span>
+                      {row ? (
+                        <>
+                          <VerifiedMark />
+                          <LinkedChip />
+                        </>
+                      ) : null}
+                    </div>
+                    <p className={`m-0 mt-1 truncate font-sans text-[15px] ${row ? 'font-medium text-sun' : 'text-[#9a958c]'}`}>
+                      {row ? handle || 'Linked' : 'Not linked'}
+                    </p>
                   </div>
-                  <p
-                    className={`mt-0.5 truncate font-mono text-xs ${
-                      row ? 'text-lime' : 'text-muted'
-                    }`}
-                  >
-                    {row ? (row.handle ? `@${row.handle}` : 'linked') : 'Not linked'}
-                  </p>
-                </div>
-                {row ? (
-                  // X stays gated on purpose. Linking X is paused, so unlinking it
-                  // would be a one-way door: the row would be gone with no way to
-                  // put it back. Do not lift this until X linking works again.
-                  <button
-                    type="button"
-                    className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
-                    disabled={busy || p.channel === 'x'}
-                    onClick={() => toggleUnlink(p.channel)}
-                  >
-                    {unlinking === p.channel ? 'Cancel' : 'Unlink'}
-                  </button>
-                ) : p.channel === 'x' ? (
-                  <button
-                    type="button"
-                    className="btn btn-primary shrink-0 px-3 py-1.5 text-xs opacity-50"
-                    disabled
-                    title="X linking is temporarily unavailable"
-                  >
-                    Link X
-                  </button>
-                ) : (
-                  <a
-                    href={p.startHref}
-                    className="btn btn-primary shrink-0 px-3 py-1.5 text-xs no-underline"
-                  >
-                    Link {p.label}
-                  </a>
-                )}
-              </div>
-
-              {p.channel === 'x' ? (
-                <p className="mt-2 font-mono text-[10px] text-muted">
-                  {row
-                    ? 'X linking is temporarily disabled, so unlinking is held too - you could not link it back yet. It stays connected until X is available again.'
-                    : 'X linking is temporarily disabled. You can still see it here; GitHub and Discord work.'}
-                </p>
-              ) : null}
-
-              {unlinking === p.channel ? (
-                // A form, not a bare input: without one there is no submit control
-                // and Enter does nothing, so the prompt asks for a password and
-                // then gives no way to send it.
-                <form
-                  className="mt-3 space-y-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void confirmUnlink(p.channel);
-                  }}
-                >
-                  <p className="font-mono text-[11px] text-muted">
-                    Unlinking frees this {p.label} for another account and stops claims to it
-                    here.
-                  </p>
-                  <input
-                    type="password"
-                    className="input w-full"
-                    placeholder="Account password"
-                    value={password}
-                    autoComplete="current-password"
-                    autoFocus
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      className="btn btn-primary px-3 py-1.5 text-xs"
-                      disabled={busy || !password}
-                    >
-                      {busy ? 'Unlinking...' : `Confirm unlink ${p.label}`}
-                    </button>
+                  {row ? (
+                    // X stays gated on purpose. Linking X is paused, so unlinking it
+                    // would be a one-way door: the row would be gone with no way to
+                    // put it back. Do not lift this until X linking works again.
+                    <GhostButton disabled={busy || p.channel === 'x'} onClick={() => toggleUnlink(p.channel)}>
+                      {unlinking === p.channel ? 'Cancel' : 'Unlink'}
+                    </GhostButton>
+                  ) : p.channel === 'x' ? (
                     <button
                       type="button"
-                      className="btn btn-ghost px-3 py-1.5 text-xs"
-                      disabled={busy}
-                      onClick={() => toggleUnlink(p.channel)}
+                      disabled
+                      title="X linking is temporarily unavailable"
+                      className="btn-sun inline-flex h-[44px] shrink-0 items-center rounded-[10px] px-5 font-sans text-[14px] font-semibold opacity-50"
                     >
-                      Cancel
+                      Link X
                     </button>
-                  </div>
-                </form>
-              ) : null}
-            </div>
-          );
-        })
-      )}
+                  ) : (
+                    <a
+                      href={p.startHref}
+                      className="btn-sun inline-flex h-[44px] shrink-0 items-center rounded-[10px] px-5 font-sans text-[14px] font-semibold no-underline"
+                    >
+                      Link {p.label}
+                    </a>
+                  )}
+                </div>
 
-      <p className="font-mono text-[10px] text-muted">
-        One identity per platform. Money routes on the platform id, not the handle.
-      </p>
-    </div>
+                {row ? (
+                  <div className="mt-4 flex items-center gap-2.5 border-t border-white/[0.06] pt-3 font-sans text-[13px] text-[#9a958c]">
+                    <PersonGlyph />
+                    {handle ? <span className="truncate">{handle}</span> : null}
+                    {handle ? <span aria-hidden>·</span> : null}
+                    <span>Verified identity</span>
+                  </div>
+                ) : null}
+
+                {p.channel === 'x' ? (
+                  <div className="mt-3">
+                    <InfoNote tone="gold">
+                      {row
+                        ? 'X linking is temporarily disabled, so unlinking is held too - you could not link it back yet. It stays connected until X is available again.'
+                        : 'X linking is temporarily disabled. You can still see it here; GitHub and Discord work.'}
+                    </InfoNote>
+                  </div>
+                ) : null}
+
+                {unlinking === p.channel ? (
+                  <ConfirmPassword
+                    intro={`Unlinking frees this ${p.label} for another account and stops claims to it here.`}
+                    value={password}
+                    onChange={setPassword}
+                    onSubmit={() => void confirmUnlink(p.channel)}
+                    onCancel={() => toggleUnlink(p.channel)}
+                    busy={busy}
+                    confirmLabel={`Confirm unlink ${p.label}`}
+                    busyLabel="Unlinking..."
+                  />
+                ) : null}
+              </div>
+            );
+          })
+        )}
+
+        <div className="mt-1 border-t border-[#26262a] pt-4">
+          <InfoNote>One identity per platform. Money routes on the platform id, not the handle.</InfoNote>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PersonGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4.5 20.5c1-4 4-6 7.5-6s6.5 2 7.5 6" />
+    </svg>
   );
 }

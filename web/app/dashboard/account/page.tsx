@@ -12,13 +12,12 @@ import {
   useSlide,
 } from '../../../components/AppSection';
 import { useComingSoon } from '../../../components/ComingSoon';
-import { CopyButton } from '../../../components/CopyButton';
 import { useDashboard } from '../../../components/DashboardProvider';
 import { useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
-import { shortAddr } from '../../../lib/dashboardTypes';
 import { PayIdentity } from '../../../components/PayIdentity';
 import { CountryPanel, LanguagePanel } from '../../../components/AccountPrefs';
+import { ChatAppsPanel, TrustedPanel } from '../../../components/AccountConnections';
 import { AccountProjects } from '../../../components/AccountProjects';
 import type { LocaleCode } from '../../../lib/locale';
 import { SITE_PHONE_COUNTRIES, countryByIso, countryFlag } from '../../../lib/phoneFormat';
@@ -71,10 +70,11 @@ export default function AccountPage() {
 
   const [addr, setAddr] = useState('');
   const [label, setLabel] = useState('');
-  const [password, setPassword] = useState('');
+  const [confirmAdd, setConfirmAdd] = useState(false);
+  // The last save or delete in a trusted-wallet sheet was refused; msg then holds why.
+  const [sheetRefused, setSheetRefused] = useState(false);
   /** Ticket code from a chat-started add, passed back so the add can spend it. */
   const [ticket, setTicket] = useState('');
-  const [removePassword, setRemovePassword] = useState('');
   const [removing, setRemoving] = useState<string | null>(null);
   const [pin, setPin] = useState('');
   const [pinPassword, setPinPassword] = useState('');
@@ -303,8 +303,8 @@ export default function AccountPage() {
    *
    * The ticket carries the address across so it does not have to be retyped,
    * which matters most for "save this merchant": the payer has never seen that
-   * 0x. It fills the form and nothing more. The password below is still what
-   * authorises the add.
+   * 0x. It fills the form and nothing more. The password asked for in the
+   * save sheet is still what authorises the add.
    */
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('add');
@@ -334,28 +334,36 @@ export default function AccountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function onAddTrusted(e: React.FormEvent) {
-    e.preventDefault();
+  /** Open the save sheet. An older notice is cleared so the sheet only ever shows this save's error. */
+  function onAddTrusted() {
+    setSheetRefused(false);
+    setConfirmAdd(true);
+  }
+
+  async function onConfirmAdd(password: string) {
+    setSheetRefused(false);
     const ok = await addTrusted({ address: addr, label, password, ticket });
     if (ok) {
+      setConfirmAdd(false);
       setAddr('');
       setLabel('');
-      setPassword('');
       setTicket('');
+    } else {
+      setSheetRefused(true);
     }
   }
 
-  async function onRemove(address: string) {
-    if (!removePassword) {
-      setRemoving(address);
-      setMsg('Enter your password below, then click Remove again.');
-      return;
-    }
-    const ok = await removeTrusted(address, removePassword);
-    if (ok) {
-      setRemovePassword('');
-      setRemoving(null);
-    }
+  function onRemove(address: string) {
+    setSheetRefused(false);
+    setRemoving(address);
+  }
+
+  async function onConfirmRemove(password: string) {
+    if (!removing) return;
+    setSheetRefused(false);
+    const ok = await removeTrusted(removing, password);
+    if (ok) setRemoving(null);
+    else setSheetRefused(true);
   }
 
   async function onPin(e: React.FormEvent) {
@@ -916,262 +924,48 @@ export default function AccountPage() {
       ) : null}
 
       {slide === 'chat' ? (
-        <AppSection
-          title="Chat apps"
-          helper="Link WhatsApp or Telegram with a one-time code. Unlink anytime (password). Phone claims only pay out in the chat where the number is proven."
-          badge={chatLinks.length ? String(chatLinks.length) : data.link ? 'Ready' : 'Needed'}
-          badgeTone={chatLinks.length || data.link ? 'lime' : 'gold'}
-        >
-          {chatLinks.length > 0 ? (
-            <div className="mb-4 space-y-2">
-              <p className="label">Linked</p>
-              {chatLinks.map((row) => (
-                <div
-                  key={row.channel}
-                  className="rounded-md border border-border bg-ink/40 px-3 py-3"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-sans text-sm text-paper">
-                        {row.channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}
-                      </p>
-                      <p className="mt-0.5 font-mono text-xs text-lime">
-                        {row.phone || (row.has_phone ? 'Phone on file' : 'Linked (no phone yet)')}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost shrink-0 px-3 py-1.5 text-xs"
-                      disabled={busy === 'unlink-chat'}
-                      onClick={() => toggleUnlinkChat(row.channel)}
-                    >
-                      {unlinkChat === row.channel ? 'Cancel' : 'Unlink'}
-                    </button>
-                  </div>
-                  {unlinkChat === row.channel ? (
-                    // A form, not a bare input: without one there is no submit
-                    // control and Enter does nothing, so the prompt asks for a
-                    // password and then gives no way to send it.
-                    <form
-                      className="mt-3 space-y-2"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        void onUnlinkChat(row.channel);
-                      }}
-                    >
-                      <p className="text-xs text-muted">
-                        Removes this chat and its phone proof from Flizy. Pending phone claims need
-                        that number proven again in chat to claim.
-                      </p>
-                      <input
-                        type="password"
-                        className="input w-full"
-                        placeholder="Account password"
-                        value={unlinkChatPassword}
-                        autoComplete="current-password"
-                        autoFocus
-                        onChange={(e) => setUnlinkChatPassword(e.target.value)}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="submit"
-                          className="btn btn-primary px-3 py-1.5 text-xs"
-                          disabled={busy === 'unlink-chat' || !unlinkChatPassword}
-                        >
-                          {busy === 'unlink-chat'
-                            ? 'Unlinking...'
-                            : `Confirm unlink ${row.channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'}`}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost px-3 py-1.5 text-xs"
-                          disabled={busy === 'unlink-chat'}
-                          onClick={() => toggleUnlinkChat(row.channel)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  ) : null}
-                </div>
-              ))}
-              <p className="text-xs text-muted">
-                In chat you can also send{' '}
-                <span className="font-mono text-paper">flizy unlink</span> to disconnect that app.
-              </p>
-            </div>
-          ) : (
-            <p className="mb-4 text-xs text-muted">No chat app linked yet.</p>
-          )}
-
-          <button
-            type="button"
-            className="btn btn-primary w-full py-3.5 text-base font-semibold"
-            onClick={() => generateLink()}
-            disabled={busy === 'link'}
-          >
-            {busy === 'link' ? 'Generating...' : data.link ? 'Generate a new code' : 'Generate code'}
-          </button>
-          {data.link ? (
-            <div className="mt-4 space-y-3 rounded border border-border bg-ink p-4">
-              <p className="font-sans text-2xl tracking-wide text-lime">{data.link.code}</p>
-              <p className="text-xs text-muted">
-                Expires {new Date(data.link.expiresAt).toLocaleString()}
-              </p>
-              <div className="mono-box text-sm">flizy link {data.link.code}</div>
-              <a
-                href={data.link.waDeepLink}
-                className="btn btn-primary flex w-full items-center justify-center py-3 text-sm font-semibold no-underline"
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => {
-                  markAwaitingChatLink('whatsapp');
-                  setAwaitingChat('whatsapp');
-                }}
-              >
-                Link WhatsApp
-              </a>
-              {data.link.telegramDeepLink ? (
-                <a
-                  href={data.link.telegramDeepLink}
-                  className="btn btn-primary flex w-full items-center justify-center py-3 text-sm font-semibold no-underline"
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => {
-                  markAwaitingChatLink('telegram');
-                  setAwaitingChat('telegram');
-                }}
-                >
-                  Link Telegram
-                </a>
-              ) : null}
-              <CopyButton value={`flizy link ${data.link.code}`} label="Copy message" />
-              {awaitingChat ? (
-                <p className="text-xs text-muted">
-                  Waiting for {awaitingChat === 'telegram' ? 'Telegram' : 'WhatsApp'}. After
-                  you start the bot, this page will show connected.
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </AppSection>
+        <ChatAppsPanel
+          links={chatLinks}
+          code={data.link ?? null}
+          generating={busy === 'link'}
+          onGenerate={() => void generateLink()}
+          unlinking={unlinkChat}
+          password={unlinkChatPassword}
+          onPassword={setUnlinkChatPassword}
+          onToggleUnlink={toggleUnlinkChat}
+          onConfirmUnlink={(channel) => void onUnlinkChat(channel)}
+          unlinkBusy={busy === 'unlink-chat'}
+          awaiting={awaitingChat}
+          onStart={(channel) => {
+            markAwaitingChatLink(channel);
+            setAwaitingChat(channel);
+          }}
+        />
       ) : null}
 
-      {slide === 'platforms' ? (
-        <AppSection
-          title="Platforms"
-          helper="Link GitHub, Discord, or X so people can send claims to you on that platform."
-          badge="GitHub"
-        >
-          <LinkedAccounts />
-        </AppSection>
-      ) : null}
+      {slide === 'platforms' ? <LinkedAccounts /> : null}
 
       {slide === 'trusted' ? (
-        <AppSection
-          title="Trusted wallets"
-          helper="Only these names can receive chat sends."
-          badge={`${data.trusted.length}`}
-        >
-          <form onSubmit={onAddTrusted} className="grid gap-3">
-            {ticket ? (
-              /*
-               * Provenance, because the whole design rests on this moment.
-               * Chat cannot add a destination, so the password below is the
-               * defence. A prefilled address with no explanation defeats that:
-               * it reads as something the site chose, and the one plausible
-               * attack left is getting somebody to authorise an address a chat
-               * message put there. Name where it came from and ask them to
-               * check it.
-               */
-              <p className="text-xs text-muted">
-                This address came from a request in your chat app. Check it
-                matches who you meant to pay before saving.
-              </p>
-            ) : null}
-            <div>
-              <label className="label">Name</label>
-              <input
-                className="input"
-                placeholder="nald, mum, junior"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Wallet address</label>
-              <input
-                className="input"
-                placeholder="0x..."
-                value={addr}
-                onChange={(e) => setAddr(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Account password</label>
-              <input
-                className="input"
-                type="password"
-                placeholder="Confirm it is you"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-            </div>
-            <button className="btn btn-primary" type="submit" disabled={busy === 'trusted'}>
-              {busy === 'trusted' ? 'Saving...' : 'Save trusted wallet'}
-            </button>
-          </form>
-          <div className="mt-6 space-y-3">
-            <p className="label">Saved</p>
-            {data.trusted.length === 0 ? (
-              <p className="text-sm text-muted">None yet.</p>
-            ) : (
-              data.trusted.map((t) => (
-                <div
-                  key={t.address}
-                  className="flex flex-col gap-2 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm text-lime">{t.label || 'unnamed'}</p>
-                    <p className="truncate text-xs text-muted">{t.address}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <CopyButton value={t.address} label="Copy" />
-                    <button
-                      type="button"
-                      className="btn btn-ghost text-sm"
-                      onClick={() => onRemove(t.address)}
-                      disabled={busy === 'remove'}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-            {data.trusted.length > 0 ? (
-              <div className="pt-2">
-                <label className="label">Password to remove</label>
-                <input
-                  className="input"
-                  type="password"
-                  placeholder={
-                    removing
-                      ? `Password to remove ${shortAddr(removing)}`
-                      : 'Enter password, then Remove'
-                  }
-                  value={removePassword}
-                  onChange={(e) => setRemovePassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-              </div>
-            ) : null}
-          </div>
-        </AppSection>
+        <TrustedPanel
+          fromChat={Boolean(ticket)}
+          name={label}
+          onName={setLabel}
+          address={addr}
+          onAddress={setAddr}
+          onSave={onAddTrusted}
+          confirmingSave={confirmAdd}
+          onCancelSave={() => setConfirmAdd(false)}
+          onConfirmSave={(pw) => void onConfirmAdd(pw)}
+          saving={busy === 'trusted'}
+          saveError={confirmAdd && sheetRefused ? msg : ''}
+          saved={data.trusted}
+          removing={removing}
+          onRemove={onRemove}
+          onCancelRemove={() => setRemoving(null)}
+          onConfirmRemove={(pw) => void onConfirmRemove(pw)}
+          removeBusy={busy === 'remove'}
+          removeError={removing && sheetRefused ? msg : ''}
+        />
       ) : null}
 
       {slide === 'pin' ? (

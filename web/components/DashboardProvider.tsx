@@ -212,7 +212,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         if (!res.ok) throw new Error(json.error || 'Failed');
         setMsg(`Saved trusted wallet "${input.label.trim() || input.address}".`);
         track('trusted_address_added');
-        await load();
+        // Only the account row holds the list; history and holdings did not change.
+        await loadAccount();
         return true;
       } catch (err) {
         setMsg(err instanceof Error ? err.message : 'Failed');
@@ -221,7 +222,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setBusy('');
       }
     },
-    [load]
+    [loadAccount]
   );
 
   const removeTrusted = useCallback(
@@ -237,7 +238,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
         setMsg('Trusted wallet removed.');
-        await load();
+        await loadAccount();
         return true;
       } catch (err) {
         setMsg(err instanceof Error ? err.message : 'Failed');
@@ -246,7 +247,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setBusy('');
       }
     },
-    [load]
+    [loadAccount]
   );
 
   const setUnlockPin = useCallback(
