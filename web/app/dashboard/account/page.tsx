@@ -203,7 +203,6 @@ export default function AccountPage() {
     const wa = search.get('whatsapp');
     if (tg === 'linked' || wa === 'linked') {
       setSlide('chat');
-      setMsg(tg === 'linked' ? 'Telegram connected.' : 'WhatsApp connected.');
       clearAwaitingChatLink();
       setAwaitingChat(null);
       const params = new URLSearchParams(search.toString());
@@ -233,7 +232,6 @@ export default function AccountPage() {
         if (chats.some((r: { channel: string }) => r.channel === awaitingChat)) {
           clearAwaitingChatLink();
           setAwaitingChat(null);
-          setMsg(awaitingChat === 'telegram' ? 'Telegram connected.' : 'WhatsApp connected.');
         }
       } catch {
         /* next tick */
@@ -383,11 +381,10 @@ export default function AccountPage() {
         window.location.href = '/login';
         return null;
       }
-      setMsg(
-        json.signedOutElsewhere === false
-          ? 'Password changed. Other devices could not be signed out: sign out on them yourself.'
-          : 'Password changed. Other devices were signed out.'
-      );
+      // Silent on success. Other devices still signed in is a warning to act on, so it is said.
+      if (json.signedOutElsewhere === false) {
+        setMsg('Password changed, but other devices could not be signed out: sign out on them yourself.');
+      }
       return null;
     } catch {
       return 'Could not change the password. Try again.';
@@ -396,14 +393,8 @@ export default function AccountPage() {
     }
   }
 
-  async function onPin(pin: string, password: string) {
-    const ok = await setUnlockPin(pin, password);
-    if (ok) {
-      setMsg(
-        'Unlock PIN saved. In chat: flizy lock or /lock, then flizy unlock or /unlock with your PIN.'
-      );
-    }
-    return ok;
+  function onPin(pin: string, password: string) {
+    return setUnlockPin(pin, password);
   }
 
   async function onUsername(e: React.FormEvent) {
@@ -431,7 +422,6 @@ export default function AccountPage() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Could not save the display name.');
-      setMsg('Display name saved.');
       setProfileEditor(null);
       await load();
     } catch (err) {
@@ -520,9 +510,6 @@ export default function AccountPage() {
       }
       setUnlinkChatPassword('');
       setUnlinkChat(null);
-      setMsg(
-        `${channel === 'whatsapp' ? 'WhatsApp' : 'Telegram'} unlinked. Phone claims no longer match via that chat until you link again.`
-      );
       setChatLinks((prev) => prev.filter((r) => r.channel !== channel));
     } catch {
       setMsg('Could not unlink. Try again.');
@@ -546,7 +533,6 @@ export default function AccountPage() {
         onDeactivate={() => closeAccount({ action: 'deactivate' })}
         onDelete={(password) => closeAccount({ action: 'delete', password })}
       />
-      {msg ? <div className="alert alert-ok text-sm">{msg}</div> : null}
 
       <AppSlideNav
         items={[
@@ -653,7 +639,6 @@ export default function AccountPage() {
                             additional: body.additional || [],
                             claimable: body.claimable || [],
                           });
-                          setMsg('Email unlinked.');
                         } catch (err) {
                           setMsg(err instanceof Error ? err.message : 'Could not unlink email');
                         } finally {
@@ -703,7 +688,6 @@ export default function AccountPage() {
                     await verifyEmailCode('primary');
                     setVerifyCode('');
                     await refreshEmails();
-                    setMsg('Added successfully');
                   } catch (err) {
                     setMsg(err instanceof Error ? err.message : 'Could not verify');
                   } finally {
@@ -806,7 +790,6 @@ export default function AccountPage() {
                     setAddEmailStep('email');
                     setExtraEmail('');
                     await refreshEmails();
-                    setMsg('Added successfully');
                   } catch (err) {
                     setMsg(err instanceof Error ? err.message : 'Could not verify');
                   } finally {

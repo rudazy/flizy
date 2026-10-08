@@ -15,7 +15,7 @@ import { useDashboard } from './DashboardProvider';
 const IS_DEV_BUILD = process.env.NODE_ENV !== 'production';
 
 export function EmailVerifyGate() {
-  const { data, load, setMsg } = useDashboard();
+  const { data, load } = useDashboard();
   const email = data?.account?.email || '';
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState('');
@@ -86,7 +86,6 @@ export function EmailVerifyGate() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Could not verify');
-      setMsg('Email verified. Welcome to Flizy.');
       await load();
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Could not verify');

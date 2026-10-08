@@ -10,7 +10,7 @@ import { useDashboard } from './DashboardProvider';
 import { validateUsername } from '../lib/username';
 
 export function ProfileCompleteGate() {
-  const { load, setMsg } = useDashboard();
+  const { load } = useDashboard();
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -105,7 +105,6 @@ export function ProfileCompleteGate() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Could not save profile');
-      setMsg('Profile saved. Welcome to Flizy.');
       await load();
     } catch (err) {
       refuse(err instanceof Error ? err.message : 'Could not save profile');

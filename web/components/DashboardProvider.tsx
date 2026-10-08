@@ -180,7 +180,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       // itself, which chose the channel for the user: the code is single use, so
       // sending that prefilled message spent it, and the Telegram button beside
       // it was then pointing at a dead code. Let the user pick.
-      setMsg('Link code ready. It works once, on whichever chat app you open first.');
       track('link_code_generated');
       await loadAccount();
       return json as { code?: string; waDeepLink?: string; expiresAt?: string };
@@ -210,7 +209,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
-        setMsg(`Saved trusted wallet "${input.label.trim() || input.address}".`);
         track('trusted_address_added');
         // Only the account row holds the list; history and holdings did not change.
         await loadAccount();
@@ -237,7 +235,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
-        setMsg('Trusted wallet removed.');
         await loadAccount();
         return true;
       } catch (err) {
@@ -262,9 +259,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
-        setMsg(
-          'Unlock PIN saved. On WhatsApp: flizy lock (no password) · flizy unlock then reply with this PIN or your account password. Any unlock block from wrong attempts is cleared.'
-        );
         await loadAccount();
         return true;
       } catch (err) {
@@ -289,11 +283,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
-        setMsg(
-          limit == null
-            ? 'Daily limit cleared (app default).'
-            : `Daily ETH send limit set to ${limit} ETH (UTC day). It covers ETH sends from chat and the web.`
-        );
         await loadAccount();
         return true;
       } catch (err) {
@@ -318,8 +307,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
-        const u = json.account?.username ? `@${json.account.username}` : 'Username';
-        setMsg(`${u} saved. Claimed-by notifications will use this label.`);
         await loadAccount();
         return true;
       } catch (err) {
@@ -345,7 +332,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
         setLocale(normalizeLocale(json.account?.locale || locale));
-        setMsg('Language saved.');
         await loadAccount();
         return true;
       } catch (err) {
@@ -370,11 +356,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
-        setMsg(
-          countryIso
-            ? 'Country saved. Chat will add its code when a local number has none. You can change it anytime.'
-            : 'Country cleared. Chat will ask which country.'
-        );
         await loadAccount();
         return true;
       } catch (err) {
@@ -399,11 +380,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');
-        setMsg(
-          enabled
-            ? 'New claims you send will carry your invite.'
-            : 'New claims you send will not carry an invite.'
-        );
         await loadAccount();
         return true;
       } catch (err) {
