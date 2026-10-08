@@ -481,6 +481,19 @@ async function refuseBrandName(accountId: string, values: string[], supabase: Db
   throw new ClientError(BRAND_NAME_ERROR);
 }
 
+/**
+ * Whether a project handle is held by public.reserved_usernames for this
+ * account. The brand entries ("flizy", "flizybot", ...) keep the name from
+ * ordinary accounts; for a project handle the brand rule above already does
+ * that, and an admin is the one account allowed to publish as Flizy. Every
+ * other reserved name (admin, support, ...) stays refused for everyone.
+ */
+async function isProjectHandleReserved(handle: string, accountId: string, supabase: Db): Promise<boolean> {
+  if (!(await isUsernameReserved(supabase, handle))) return false;
+  if (!reservedKey(handle).includes(BRAND_KEY)) return true;
+  return !(await isAdminAccount(accountId, supabase));
+}
+
 async function countRows(
   query: PromiseLike<{ count: number | null; error: { message: string } | null }>
 ): Promise<number> {
@@ -1123,7 +1136,7 @@ export async function createProject(
   const links = checkedProjectLinks(input.links);
 
   const supabase = db(client);
-  if (await isUsernameReserved(supabase, handle)) throw new ClientError(USERNAME_UNAVAILABLE);
+  if (await isProjectHandleReserved(handle, accountId, supabase)) throw new ClientError(USERNAME_UNAVAILABLE);
 
   // A handle that is somebody's username would make one name two identities.
   // The projects_handle_not_username trigger holds the same rule underneath.
@@ -1201,7 +1214,7 @@ export async function projectHandleAvailable(
   const handle = checked.username;
   const supabase = db(client);
 
-  if (await isUsernameReserved(supabase, handle)) {
+  if (await isProjectHandleReserved(handle, accountId, supabase)) {
     return { available: false, reason: USERNAME_UNAVAILABLE };
   }
 

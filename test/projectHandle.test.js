@@ -93,6 +93,28 @@ describe('project handle availability', () => {
     assert.deepEqual(admin, { available: true, handle: 'flizyhq' });
   });
 
+  it('lets an admin check and create a reserved brand handle, and nobody else', async () => {
+    fake.db.tables.reserved_usernames.push({ normalized_name: 'flizy' });
+    const person = await T.projectHandleAvailable('flizy', ALICE, c());
+    assert.equal(person.available, false);
+    assert.equal(person.reason, USERNAME_UNAVAILABLE);
+    await assert.rejects(
+      () => T.createProject(ALICE, { name: 'Team One', handle: 'flizy' }, c()),
+      { message: USERNAME_UNAVAILABLE }
+    );
+
+    const admin = await T.projectHandleAvailable('flizy', ADMIN, c());
+    assert.deepEqual(admin, { available: true, handle: 'flizy' });
+    const made = await T.createProject(ADMIN, { name: 'Flizy', handle: 'flizy' }, c());
+    assert.equal(made.handle, 'flizy');
+  });
+
+  it('keeps a reserved name that is not the brand refused for an admin too', async () => {
+    const admin = await T.projectHandleAvailable('admin', ADMIN, c());
+    assert.equal(admin.available, false);
+    assert.equal(admin.reason, USERNAME_UNAVAILABLE);
+  });
+
   it('tells a taken brand handle about the brand name, which is what create would say', async () => {
     fake.db.tables.projects.push({
       id: 'p-brand',
