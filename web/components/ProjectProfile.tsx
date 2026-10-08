@@ -1,58 +1,79 @@
 'use client';
 
 import { useState } from 'react';
+import type { ProjectLeaderboard } from '../lib/tasks';
 import { TaskCard, type TaskCardData } from './TaskCard';
 import { LocalWhen } from './LocalWhen';
+import { Leaderboard } from './ProjectLeaderboard';
 
 /**
- * Tasks and the record of what the project has done.
+ * Tasks, the XP leaderboard, and the record of what the project has done.
  *
- * Two panels, not three. A bounty is a task until it is a different object,
- * and an empty tab would only look like a feature.
+ * Tasks are split by whether they still take entries, so somebody arriving
+ * from a shared link sees what they can join first.
  */
+type Tab = 'live' | 'ended' | 'leaderboard' | 'activity';
+
 export function ProjectProfile({
   tasks,
   activity,
+  leaderboard,
 }: {
   tasks: TaskCardData[];
   activity: Array<{ at: string; label: string }>;
+  leaderboard: ProjectLeaderboard;
 }) {
-  const [tab, setTab] = useState<'tasks' | 'activity'>('tasks');
+  const [tab, setTab] = useState<Tab>('live');
+  const live = tasks.filter((t) => t.state === 'live');
+  const ended = tasks.filter((t) => t.state !== 'live');
+
+  // The third entry is the label under 480px, where four full labels do not fit.
+  const tabs: Array<[Tab, string, string | null, number | null]> = [
+    ['live', 'Live', null, live.length],
+    ['ended', 'Ended', null, ended.length],
+    ['leaderboard', 'Leaderboard', 'XP', leaderboard.earners],
+    ['activity', 'Activity', null, null],
+  ];
 
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-2 gap-1 rounded-md border border-border p-1" role="tablist">
-        {(
-          [
-            ['tasks', 'Tasks'],
-            ['activity', 'Activity'],
-          ] as const
-        ).map(([id, label]) => (
+      <div className="grid grid-cols-4 gap-1 rounded-md border border-border p-1" role="tablist">
+        {tabs.map(([id, label, short, count]) => (
           <button
             key={id}
             type="button"
             role="tab"
             aria-selected={tab === id}
             onClick={() => setTab(id)}
-            className={`rounded-md px-3 py-2 font-sans text-sm tracking-wide transition-colors ${
+            className={`flex min-w-0 items-center justify-center gap-1 rounded-md px-1 py-2 font-sans text-[13px] tracking-wide transition-colors ${
               tab === id ? 'bg-lime/10 text-lime' : 'text-muted hover:text-paper'
             }`}
           >
-            {label}
+            {short ? (
+              <>
+                <span className="truncate min-[480px]:hidden">{short}</span>
+                <span className="hidden truncate min-[480px]:inline">{label}</span>
+              </>
+            ) : (
+              <span className="truncate">{label}</span>
+            )}
+            {count !== null ? <span className="font-mono text-[10px] opacity-70">{count}</span> : null}
           </button>
         ))}
       </div>
 
-      {tab === 'tasks' ? (
-        tasks.length ? (
+      {tab === 'live' || tab === 'ended' ? (
+        (tab === 'live' ? live : ended).length ? (
           <div className="grid gap-4">
-            {tasks.map((task) => (
+            {(tab === 'live' ? live : ended).map((task) => (
               <TaskCard key={task.ref} task={task} />
             ))}
           </div>
         ) : (
-          <p className="m-0 text-sm text-muted">No tasks yet.</p>
+          <p className="m-0 text-sm text-muted">{tab === 'live' ? 'No live tasks right now.' : 'No ended tasks yet.'}</p>
         )
+      ) : tab === 'leaderboard' ? (
+        <Leaderboard board={leaderboard} />
       ) : activity.length ? (
         <ul className="m-0 grid list-none gap-3 p-0">
           {activity.map((item, i) => (

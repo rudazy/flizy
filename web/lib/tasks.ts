@@ -54,6 +54,7 @@ export type TaskRow = {
   completed_at: string | null;
   cancelled_at: string | null;
   created_at: string;
+  xp_reward?: number | null;
 };
 
 /**
@@ -109,7 +110,7 @@ export function parseXPostUrl(raw: unknown): { handle: string; postId: string; c
 }
 
 const TASK_SELECT =
-  'id, ref, creator_account_id, project_id, title, description, reward_kind, reward_asset, reward_total, reward_display, winners_count, distribution, requires_x_identity, ends_at, status, completed_at, cancelled_at, created_at';
+  'id, ref, creator_account_id, project_id, title, description, reward_kind, reward_asset, reward_total, reward_display, winners_count, distribution, requires_x_identity, ends_at, status, completed_at, cancelled_at, created_at, xp_reward';
 
 export type TaskListItem = {
   ref: number;
@@ -119,6 +120,8 @@ export type TaskListItem = {
   participants: number;
   endsAt: string;
   state: TaskState;
+  /** XP each winner earns. Project tasks only; null when the task carries none. */
+  xpReward: number | null;
   /** verified: a project Flizy has verified. Always false for a personal creator. */
   creator: { kind: 'project' | 'personal'; name: string; handle: string | null; verified: boolean };
 };
@@ -212,11 +215,17 @@ export async function listTasks(
     participants: counts.get(r.id) || 0,
     endsAt: r.ends_at,
     state: deriveTaskState(r, now),
+    xpReward: xpRewardOf(r),
     creator: creators.get(r.id) || { kind: 'personal', name: 'Flizy', handle: null, verified: false },
   }));
 }
 
 const LIST_LIMIT = 60;
+
+function xpRewardOf(row: Pick<TaskRow, 'xp_reward'>): number | null {
+  const xp = Number(row.xp_reward);
+  return Number.isInteger(xp) && xp > 0 ? xp : null;
+}
 
 /**
  * How many people entered each task.
@@ -299,6 +308,7 @@ export type TaskDetail = {
   endsAt: string;
   state: TaskState;
   requiresXIdentity: boolean;
+  xpReward: number | null;
   creator: TaskListItem['creator'];
   isCreator: boolean;
   requirements: Array<{ id: string; kind: string; label: string }>;
@@ -368,6 +378,7 @@ export async function getTaskByRef(
     endsAt: task.ends_at,
     state,
     requiresXIdentity: task.requires_x_identity,
+    xpReward: xpRewardOf(task),
     creator: creators.get(task.id) || { kind: 'personal', name: 'Flizy', handle: null, verified: false },
     isCreator: Boolean(viewer && viewer === task.creator_account_id),
     requirements: ((reqs as { data: unknown[] }).data || []) as TaskDetail['requirements'],
@@ -436,6 +447,8 @@ export type CreateTaskInput = {
   distribution?: Array<{ place: number; amount: string }>;
   endsAt: string;
   projectId?: string | null;
+  /** XP each winner earns. Only on a project task. */
+  xpReward?: number | null;
   requirements: Array<{ kind: string; label: string }>;
   links?: Array<{ kind: string; label: string; url: string }>;
 };
@@ -454,7 +467,19 @@ const PROJECT_LINK_KINDS = new Set(['website', 'x', 'telegram', 'docs', 'github'
  * requests in flight. That bounds a nuisance; it is not an authorisation rule.
  */
 export const MAX_PROJECTS_PER_ACCOUNT = 5;
+/** Personal tasks only. A project task counts against its project instead. */
 export const MAX_LIVE_TASKS_PER_ACCOUNT = 10;
+/**
+ * Live tasks one project may have at once. Unlike the ceilings above this one
+ * is also held by the tasks_project_live_cap trigger, under a lock on the
+ * project row, because several members can publish for one project.
+ */
+export const MAX_LIVE_TASKS_PER_PROJECT = 5;
+export const MAX_MEMBERS_PER_PROJECT = 20;
+/** Projects one account can be a member of. Bounds its list and what others can put on it. */
+export const MAX_PROJECTS_JOINED_PER_ACCOUNT = 10;
+export const MAX_TASK_XP = 100000;
+const PROJECT_LIVE_CAP_ERROR = `This project has ${MAX_LIVE_TASKS_PER_PROJECT} live tasks. Publish more when one ends.`;
 export const MAX_TASKS_PER_ACCOUNT_PER_DAY = 10;
 export const MAX_SUBMISSIONS_PER_ACCOUNT_PER_HOUR = 30;
 
@@ -499,6 +524,44 @@ async function isProjectHandleReserved(handle: string, accountId: string, supaba
   if (!(await isUsernameReserved(supabase, handle))) return false;
   if (!reservedKey(handle).includes(BRAND_KEY)) return true;
   return !(await isAdminAccount(accountId, supabase));
+}
+
+export type ProjectRole = 'owner' | 'member';
+
+/**
+ * The caller's standing on a project: its owner, a member the owner added, or
+ * nothing. Owner and member may publish tasks for it and edit its details;
+ * only the owner manages members.
+ */
+async function projectAccess(accountId: string, projectId: string, supabase: Db): Promise<ProjectRole | null> {
+  const { data: project, error } = await supabase
+    .from('projects')
+    .select('id, owner_account_id')
+    .eq('id', projectId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!project) return null;
+  if (String((project as { owner_account_id: string }).owner_account_id) === accountId) return 'owner';
+
+  const { data: member, error: memberErr } = await supabase
+    .from('project_members')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('account_id', accountId)
+    .maybeSingle();
+  if (memberErr) throw new Error(memberErr.message);
+  return member ? 'member' : null;
+}
+
+/** XP is a whole number, set only on a project task. Absent or empty means none. */
+function checkedXpReward(raw: unknown, projectId: string | null): number | null {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const xp = Number(raw);
+  if (!Number.isInteger(xp) || xp < 1 || xp > MAX_TASK_XP) {
+    throw new ClientError(`XP must be a whole number from 1 to ${MAX_TASK_XP}.`);
+  }
+  if (!projectId) throw new ClientError('XP can only be set on a project task.');
+  return xp;
 }
 
 async function countRows(
@@ -576,33 +639,44 @@ export async function createTask(accountId: string, input: CreateTaskInput, clie
 
   const supabase = db(client);
 
-  // A project may only be used by the account that owns it. Without this a ref
-  // guessed from another account would let anyone publish under their name.
+  // A project may only be used by its owner or a member. Without this an id
+  // guessed from another account would let anyone publish under its name.
   let projectId: string | null = null;
   if (input.projectId) {
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', input.projectId)
-      .eq('owner_account_id', accountId)
-      .maybeSingle();
-    if (!project) throw new ClientError('That project is not yours.');
-    projectId = String((project as { id: string }).id);
+    const access = await projectAccess(accountId, String(input.projectId), supabase);
+    if (!access) throw new ClientError('That project is not yours.');
+    projectId = String(input.projectId);
   }
+
+  const xpReward = checkedXpReward(input.xpReward, projectId);
 
   await refuseBrandName(accountId, [title], supabase);
 
   const nowMs = Date.now();
-  const live = await countRows(
-    supabase
-      .from('tasks')
-      .select('id', { count: 'exact', head: true })
-      .eq('creator_account_id', accountId)
-      .eq('status', 'live')
-      .gt('ends_at', new Date(nowMs).toISOString())
-  );
-  if (live >= MAX_LIVE_TASKS_PER_ACCOUNT) {
-    throw new ClientError(`You can have ${MAX_LIVE_TASKS_PER_ACCOUNT} live tasks at once.`);
+  const nowIso = new Date(nowMs).toISOString();
+  if (projectId) {
+    const projectLive = await countRows(
+      supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .eq('status', 'live')
+        .gt('ends_at', nowIso)
+    );
+    if (projectLive >= MAX_LIVE_TASKS_PER_PROJECT) throw new ClientError(PROJECT_LIVE_CAP_ERROR);
+  } else {
+    const live = await countRows(
+      supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('creator_account_id', accountId)
+        .is('project_id', null)
+        .eq('status', 'live')
+        .gt('ends_at', nowIso)
+    );
+    if (live >= MAX_LIVE_TASKS_PER_ACCOUNT) {
+      throw new ClientError(`You can have ${MAX_LIVE_TASKS_PER_ACCOUNT} live tasks at once.`);
+    }
   }
   const lastDay = await countRows(
     supabase
@@ -630,10 +704,15 @@ export async function createTask(accountId: string, input: CreateTaskInput, clie
       distribution,
       ends_at: new Date(endsAtMs).toISOString(),
       status: 'live',
+      xp_reward: xpReward,
     })
     .select('id, ref')
     .single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    // tasks_project_live_cap is the authority on the per-project ceiling.
+    if (error.code === 'FZ102') throw new ClientError(PROJECT_LIVE_CAP_ERROR);
+    throw new Error(error.message);
+  }
   const task = data as { id: string; ref: number };
 
   /*
@@ -989,6 +1068,8 @@ export async function finalizeWinners(
         account_id: sub.account_id,
         place: Number(p.place),
         reward_note: String(p.rewardNote || '').trim(),
+        // Copied now, so editing the task later cannot change what was awarded.
+        xp: xpRewardOf(task) ?? 0,
       };
     })
   );
@@ -1070,11 +1151,15 @@ export type OwnedProject = {
   name: string;
   description: string;
   verified: boolean;
+  /** The picture as a data URL, or null for the letter mark. */
+  image: string | null;
 };
 
-/** An owned project plus how many of its tasks are still open. */
+/** A project the account owns or is a member of, with its task counts. */
 export type OwnedProjectListItem = OwnedProject & {
+  role: ProjectRole;
   activeTasks: number;
+  totalTasks: number;
 };
 
 export type ProjectHandleCheck =
@@ -1126,9 +1211,38 @@ function checkedProjectLinks(input: ProjectLink[] | undefined): ProjectLink[] {
   });
 }
 
+/** The same ceiling the projects_image_format constraint holds. */
+export const PROJECT_IMAGE_MAX_CHARS = 200000;
+const PROJECT_IMAGE_DATA_URL = /^data:image\/(webp|png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/;
+
+/** The first bytes each allowed format starts with, so a label cannot lie about the file. */
+function imageBytesMatch(kind: string, bytes: Uint8Array): boolean {
+  const starts = (sig: number[], at = 0) => sig.every((b, i) => bytes[at + i] === b);
+  if (kind === 'png') return starts([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (kind === 'jpeg') return starts([0xff, 0xd8, 0xff]);
+  // RIFF....WEBP
+  return starts([0x52, 0x49, 0x46, 0x46]) && starts([0x57, 0x45, 0x42, 0x50], 8);
+}
+
+/**
+ * A project picture: a PNG, JPEG or WebP data URL the browser has already
+ * shrunk. SVG is not accepted, since it can carry script. Undefined means
+ * "not given"; null or an empty string means "no picture".
+ */
+export function checkedProjectImage(raw: unknown): string | null {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const value = String(raw);
+  if (value.length > PROJECT_IMAGE_MAX_CHARS) throw new ClientError('That picture is too large.');
+  const m = PROJECT_IMAGE_DATA_URL.exec(value);
+  if (!m) throw new ClientError('Use a PNG, JPEG or WebP picture.');
+  const bytes = Buffer.from(m[2], 'base64');
+  if (bytes.length < 12 || !imageBytesMatch(m[1], bytes)) throw new ClientError('That file is not a picture.');
+  return value;
+}
+
 export async function createProject(
   accountId: string,
-  input: { handle: string; name: string; description?: string; links?: ProjectLink[] },
+  input: { handle: string; name: string; description?: string; links?: ProjectLink[]; image?: string | null },
   client?: Db
 ): Promise<OwnedProject> {
   const checked = validateUsername(input.handle);
@@ -1142,6 +1256,7 @@ export async function createProject(
   if (description.length > 800) throw new ClientError('Description is too long.');
 
   const links = checkedProjectLinks(input.links);
+  const image = checkedProjectImage(input.image);
 
   const supabase = db(client);
   if (await isProjectHandleReserved(handle, accountId, supabase)) throw new ClientError(USERNAME_UNAVAILABLE);
@@ -1169,8 +1284,8 @@ export async function createProject(
 
   const { data, error } = await supabase
     .from('projects')
-    .insert({ owner_account_id: accountId, handle, name, description, links })
-    .select('id, handle, name, description')
+    .insert({ owner_account_id: accountId, handle, name, description, links, image })
+    .select('id, handle, name, description, image')
     .single();
   if (error) {
     // The unique index and the username trigger (FZ101) are the authority;
@@ -1185,6 +1300,7 @@ export async function createProject(
     name: row.name,
     description: String(row.description || ''),
     verified: false,
+    image: row.image || null,
   };
 }
 
@@ -1249,8 +1365,23 @@ export async function projectHandleAvailable(
   return { available: true, handle };
 }
 
+type ProjectRecord = {
+  id: string;
+  handle: string;
+  name: string;
+  description: string | null;
+  links: unknown;
+  owner_account_id: string;
+  verified_at?: string | null;
+  image?: string | null;
+  created_at?: string;
+};
+
+const PROJECT_SELECT = 'id, handle, name, description, links, owner_account_id, verified_at, image, created_at';
+
 /**
- * The projects an account may publish as. The owner id is not returned.
+ * The projects an account may publish as: the ones it owns, then the ones it
+ * was added to. The owner id is not returned.
  *
  * activeTasks counts rows that are still open: status live, and a deadline
  * still ahead. That is the same answer deriveTaskState gives, because a
@@ -1261,26 +1392,49 @@ export async function listOwnProjects(accountId: string, client?: Db): Promise<O
   const supabase = db(client);
   const { data, error } = await supabase
     .from('projects')
-    .select('id, handle, name, description, verified_at')
+    .select(PROJECT_SELECT)
     .eq('owner_account_id', accountId)
     .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
-  const projects = (data || []) as Array<Omit<OwnedProject, 'verified'> & { verified_at?: string | null }>;
+  const owned = (data || []) as ProjectRecord[];
+
+  const { data: memberRows, error: memberErr } = await supabase
+    .from('project_members')
+    .select('project_id')
+    .eq('account_id', accountId)
+    .limit(MAX_PROJECTS_JOINED_PER_ACCOUNT);
+  if (memberErr) throw new Error(memberErr.message);
+  const memberIds = ((memberRows || []) as Array<{ project_id: string }>).map((r) => String(r.project_id));
+  let joined: ProjectRecord[] = [];
+  if (memberIds.length) {
+    const { data: rows, error: joinedErr } = await supabase.from('projects').select(PROJECT_SELECT).in('id', memberIds);
+    if (joinedErr) throw new Error(joinedErr.message);
+    joined = (rows || []) as ProjectRecord[];
+  }
+
+  const projects = [
+    ...owned.map((p) => ({ row: p, role: 'owner' as const })),
+    ...joined.filter((p) => !owned.some((o) => o.id === p.id)).map((p) => ({ row: p, role: 'member' as const })),
+  ];
   if (projects.length === 0) return [];
 
   const nowIso = new Date().toISOString();
-  let counts = new Map<string, number>();
+  let counts = new Map<string, { live: number; total: number }>();
   try {
     const pairs = await Promise.all(
-      projects.map(async (project) => {
-        const counted = await supabase
-          .from('tasks')
-          .select('id', { count: 'exact', head: true })
-          .eq('project_id', project.id)
-          .eq('status', 'live')
-          .gt('ends_at', nowIso);
-        if (counted.error) throw new Error(counted.error.message);
-        return [project.id, counted.count || 0] as const;
+      projects.map(async ({ row }) => {
+        const [live, total] = await Promise.all([
+          supabase
+            .from('tasks')
+            .select('id', { count: 'exact', head: true })
+            .eq('project_id', row.id)
+            .eq('status', 'live')
+            .gt('ends_at', nowIso),
+          supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('project_id', row.id),
+        ]);
+        if (live.error) throw new Error(live.error.message);
+        if (total.error) throw new Error(total.error.message);
+        return [row.id, { live: live.count || 0, total: total.count || 0 }] as const;
       })
     );
     counts = new Map(pairs);
@@ -1288,56 +1442,95 @@ export async function listOwnProjects(accountId: string, client?: Db): Promise<O
     counts = new Map();
   }
 
-  return projects.map((project) => ({
-    id: project.id,
-    handle: project.handle,
-    name: project.name,
-    description: String(project.description || ''),
-    verified: Boolean(project.verified_at),
-    activeTasks: counts.get(project.id) || 0,
+  return projects.map(({ row, role }) => ({
+    ...ownedProjectFrom(row),
+    role,
+    activeTasks: counts.get(row.id)?.live || 0,
+    totalTasks: counts.get(row.id)?.total || 0,
   }));
 }
 
+function ownedProjectFrom(row: ProjectRecord): OwnedProject {
+  return {
+    id: row.id,
+    handle: row.handle,
+    name: row.name,
+    description: String(row.description || ''),
+    verified: Boolean(row.verified_at),
+    image: row.image || null,
+  };
+}
+
 export type ProjectActivity = { at: string; label: string };
+
+export type LeaderboardEntry = { rank: number; username: string; xp: number; wins: number };
+
+/** totalXp and earners cover everyone, not only the entries returned. */
+export type ProjectLeaderboard = { entries: LeaderboardEntry[]; totalXp: number; earners: number };
 
 export type PublicProject = {
   handle: string;
   name: string;
   description: string;
   verified: boolean;
+  image: string | null;
   links: ProjectLink[];
   tasks: TaskListItem[];
   activity: ProjectActivity[];
+  leaderboard: ProjectLeaderboard;
+  /** The signed-in reader's standing, so the page can offer Manage. Null for everyone else. */
+  viewerRole: ProjectRole | null;
 };
+
+const LEADERBOARD_LIMIT = 50;
 
 /**
  * The public project page.
  *
- * owner_account_id is never selected. The account that manages the project is
- * an authorisation fact, not something the profile shows.
+ * owner_account_id is read only to answer viewerRole and is never returned.
+ * The account that manages the project is an authorisation fact, not something
+ * the profile shows. The leaderboard names winners by username, which the
+ * completed tasks' winner lists already show publicly.
  */
-export async function getPublicProject(handle: string, client?: Db): Promise<PublicProject | null> {
+export async function getPublicProject(
+  handle: string,
+  client?: Db,
+  opts: { viewerAccountId?: string | null } = {}
+): Promise<PublicProject | null> {
+  const supabase = db(client);
+  const project = await projectByHandle(handle, supabase);
+  if (!project) return null;
+
+  const rows = await tasksForProject(project.id, client);
+  const [tasks, leaderboard, viewerRole] = await Promise.all([
+    projectTaskItems(project, rows, client),
+    projectLeaderboard(project.id, LEADERBOARD_LIMIT, supabase),
+    opts.viewerAccountId ? projectAccess(opts.viewerAccountId, project.id, supabase) : Promise.resolve(null),
+  ]);
+
+  return {
+    handle: project.handle,
+    name: project.name,
+    description: String(project.description || ''),
+    verified: Boolean(project.verified_at),
+    image: project.image || null,
+    links: projectLinksFrom(project.links),
+    tasks,
+    activity: activityFrom(rows),
+    leaderboard,
+    viewerRole,
+  };
+}
+
+async function projectByHandle(handle: string, supabase: Db): Promise<ProjectRecord | null> {
   const checked = validateUsername(handle);
   if (!checked.ok) return null;
-
-  const supabase = db(client);
-  const { data, error } = await supabase
-    .from('projects')
-    .select('id, handle, name, description, links, verified_at')
-    .eq('handle', checked.username)
-    .maybeSingle();
+  const { data, error } = await supabase.from('projects').select(PROJECT_SELECT).eq('handle', checked.username).maybeSingle();
   if (error) throw new Error(error.message);
-  if (!data) return null;
+  return (data as ProjectRecord | null) || null;
+}
 
-  const project = data as {
-    id: string;
-    handle: string;
-    name: string;
-    description: string | null;
-    links: unknown;
-    verified_at?: string | null;
-  };
-  const rows = await tasksForProject(project.id, client);
+async function projectTaskItems(project: ProjectRecord, rows: TaskRow[], client?: Db): Promise<TaskListItem[]> {
   const now = Date.now();
   const [counts, creators] = rows.length
     ? await Promise.all([
@@ -1346,7 +1539,7 @@ export async function getPublicProject(handle: string, client?: Db): Promise<Pub
       ])
     : [new Map<string, number>(), new Map<string, TaskListItem['creator']>()];
 
-  const tasks = rows.map((r) => ({
+  return rows.map((r) => ({
     ref: r.ref,
     title: r.title,
     rewardDisplay: r.reward_display,
@@ -1354,6 +1547,7 @@ export async function getPublicProject(handle: string, client?: Db): Promise<Pub
     participants: counts.get(r.id) || 0,
     endsAt: r.ends_at,
     state: deriveTaskState(r, now),
+    xpReward: xpRewardOf(r),
     creator: creators.get(r.id) || {
       kind: 'project' as const,
       name: project.name,
@@ -1361,15 +1555,38 @@ export async function getPublicProject(handle: string, client?: Db): Promise<Pub
       verified: Boolean(project.verified_at),
     },
   }));
+}
+
+async function projectLeaderboard(projectId: string, limit: number, supabase: Db): Promise<ProjectLeaderboard> {
+  const { data, error } = await supabase.rpc('project_xp_leaderboard', { p_project_id: projectId, p_limit: limit });
+  if (error) throw new Error(error.message);
+  const rows = (data || []) as Array<{
+    account_id: string;
+    xp: number | string;
+    wins: number | string;
+    total_xp: number | string;
+    earners: number | string;
+  }>;
+  if (!rows.length) return { entries: [], totalXp: 0, earners: 0 };
+
+  const { data: accounts, error: accErr } = await supabase
+    .from('accounts')
+    .select('id, username')
+    .in('id', rows.map((r) => String(r.account_id)));
+  if (accErr) throw new Error(accErr.message);
+  const nameOf = new Map(
+    ((accounts || []) as Array<{ id: string; username: string | null }>).map((a) => [String(a.id), a.username || 'someone'])
+  );
 
   return {
-    handle: project.handle,
-    name: project.name,
-    description: String(project.description || ''),
-    verified: Boolean(project.verified_at),
-    links: projectLinksFrom(project.links),
-    tasks,
-    activity: activityFrom(rows),
+    entries: rows.map((r, i) => ({
+      rank: i + 1,
+      username: nameOf.get(String(r.account_id)) || 'someone',
+      xp: Number(r.xp) || 0,
+      wins: Number(r.wins) || 0,
+    })),
+    totalXp: Number(rows[0].total_xp) || 0,
+    earners: Number(rows[0].earners) || 0,
   };
 }
 
@@ -1404,6 +1621,206 @@ function activityFrom(rows: TaskRow[]): ProjectActivity[] {
     .filter((e) => e.at)
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
     .slice(0, 30);
+}
+
+export type ProjectMember = { username: string; role: ProjectRole };
+
+export type ProjectWorkspace = OwnedProject & {
+  role: ProjectRole;
+  links: ProjectLink[];
+  liveTasks: TaskListItem[];
+  endedTasks: TaskListItem[];
+  liveCap: number;
+  totalTasks: number;
+  leaderboard: ProjectLeaderboard;
+  members: ProjectMember[];
+};
+
+const PROJECT_NOT_FOUND = 'Project not found.';
+const OWNER_ONLY = 'Only the project owner can manage members.';
+
+/**
+ * The in-app workspace for one project, for its owner or a member.
+ *
+ * Anyone else gets null, the same answer as a handle that does not exist, so
+ * the route cannot be used to learn which accounts run which project.
+ */
+export async function getProjectWorkspace(
+  accountId: string,
+  handle: string,
+  client?: Db
+): Promise<ProjectWorkspace | null> {
+  const supabase = db(client);
+  const project = await projectByHandle(handle, supabase);
+  if (!project) return null;
+  const role = await projectAccess(accountId, project.id, supabase);
+  if (!role) return null;
+
+  const rows = await tasksForProject(project.id, client);
+  const [tasks, leaderboard, members, totalTasks] = await Promise.all([
+    projectTaskItems(project, rows, client),
+    projectLeaderboard(project.id, LEADERBOARD_LIMIT, supabase),
+    projectMembers(project, supabase),
+    countRows(supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('project_id', project.id)),
+  ]);
+
+  return {
+    ...ownedProjectFrom(project),
+    role,
+    links: projectLinksFrom(project.links),
+    liveTasks: tasks.filter((t) => t.state === 'live'),
+    endedTasks: tasks.filter((t) => t.state !== 'live'),
+    liveCap: MAX_LIVE_TASKS_PER_PROJECT,
+    totalTasks,
+    leaderboard,
+    members,
+  };
+}
+
+/** The owner first, then members in the order they were added. Usernames only. */
+async function projectMembers(project: ProjectRecord, supabase: Db): Promise<ProjectMember[]> {
+  const { data, error } = await supabase
+    .from('project_members')
+    .select('account_id, created_at')
+    .eq('project_id', project.id)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  const memberIds = ((data || []) as Array<{ account_id: string }>).map((r) => String(r.account_id));
+  const ids = [String(project.owner_account_id), ...memberIds];
+
+  const { data: accounts, error: accErr } = await supabase.from('accounts').select('id, username').in('id', ids);
+  if (accErr) throw new Error(accErr.message);
+  const nameOf = new Map(
+    ((accounts || []) as Array<{ id: string; username: string | null }>).map((a) => [String(a.id), a.username || 'someone'])
+  );
+  return ids.map((id, i) => ({ username: nameOf.get(id) || 'someone', role: i === 0 ? 'owner' : 'member' }));
+}
+
+export type ProjectPatch = {
+  name?: string;
+  description?: string;
+  links?: ProjectLink[];
+  /** A data URL to set, or null to remove the picture. Absent leaves it as it is. */
+  image?: string | null;
+};
+
+/**
+ * Edit a project's details. The owner or a member may. The handle is not
+ * editable: it is the address people have already shared.
+ */
+export async function updateProject(
+  accountId: string,
+  handle: string,
+  patch: ProjectPatch,
+  client?: Db
+): Promise<OwnedProject> {
+  const supabase = db(client);
+  const project = await projectByHandle(handle, supabase);
+  if (!project || !(await projectAccess(accountId, project.id, supabase))) throw new ClientError(PROJECT_NOT_FOUND);
+
+  const update: Record<string, unknown> = {};
+  if (patch.name !== undefined) {
+    const name = String(patch.name || '').trim();
+    if (name.length < 2 || name.length > 60) throw new ClientError('Project name must be 2 to 60 characters.');
+    // Only a new name is checked, so a member can still save other details on
+    // a project an admin named.
+    if (name !== project.name) await refuseBrandName(accountId, [name], supabase);
+    update.name = name;
+  }
+  if (patch.description !== undefined) {
+    const description = String(patch.description || '').trim();
+    if (description.length > 800) throw new ClientError('Description is too long.');
+    update.description = description;
+  }
+  if (patch.links !== undefined) update.links = checkedProjectLinks(patch.links);
+  if (patch.image !== undefined) update.image = checkedProjectImage(patch.image);
+  if (!Object.keys(update).length) return ownedProjectFrom(project);
+  update.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('projects')
+    .update(update)
+    .eq('id', project.id)
+    .select(PROJECT_SELECT)
+    .single();
+  if (error) throw new Error(error.message);
+  return ownedProjectFrom(data as ProjectRecord);
+}
+
+/** Loads a project for adding a member, refusing anyone but its owner. */
+async function requireProjectOwner(accountId: string, handle: string, supabase: Db): Promise<ProjectRecord> {
+  const project = await projectByHandle(handle, supabase);
+  const role = project ? await projectAccess(accountId, project.id, supabase) : null;
+  if (!project || !role) throw new ClientError(PROJECT_NOT_FOUND);
+  if (role !== 'owner') throw new ClientError(OWNER_ONLY);
+  return project;
+}
+
+async function accountIdForUsername(raw: string, supabase: Db): Promise<string> {
+  const checked = validateUsername(String(raw || '').replace(/^@/, ''));
+  if (!checked.ok) throw new ClientError(checked.error);
+  const { data, error } = await supabase.from('accounts').select('id').eq('username', checked.username).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new ClientError('No Flizy account has that username.');
+  return String((data as { id: string }).id);
+}
+
+export async function addProjectMember(
+  accountId: string,
+  handle: string,
+  username: string,
+  client?: Db
+): Promise<ProjectMember[]> {
+  const supabase = db(client);
+  const project = await requireProjectOwner(accountId, handle, supabase);
+  const memberId = await accountIdForUsername(username, supabase);
+  if (memberId === String(project.owner_account_id)) throw new ClientError('You already own this project.');
+
+  const count = await countRows(
+    supabase.from('project_members').select('id', { count: 'exact', head: true }).eq('project_id', project.id)
+  );
+  if (count >= MAX_MEMBERS_PER_PROJECT) {
+    throw new ClientError(`A project can have ${MAX_MEMBERS_PER_PROJECT} members.`);
+  }
+  // Nobody is asked before being added, so how many projects can be put on one
+  // account's list is bounded here, and that member can always leave.
+  const joined = await countRows(
+    supabase.from('project_members').select('id', { count: 'exact', head: true }).eq('account_id', memberId)
+  );
+  if (joined >= MAX_PROJECTS_JOINED_PER_ACCOUNT) {
+    throw new ClientError('That account is on too many projects.');
+  }
+
+  const { error } = await supabase
+    .from('project_members')
+    .insert({ project_id: project.id, account_id: memberId, added_by: accountId });
+  if (error) {
+    if (error.code === '23505') throw new ClientError('Already a member.');
+    throw new Error(error.message);
+  }
+  return projectMembers(project, supabase);
+}
+
+/** The owner removes anyone; a member may remove only themselves, which is leaving. */
+export async function removeProjectMember(
+  accountId: string,
+  handle: string,
+  username: string,
+  client?: Db
+): Promise<ProjectMember[]> {
+  const supabase = db(client);
+  const project = await projectByHandle(handle, supabase);
+  const role = project ? await projectAccess(accountId, project.id, supabase) : null;
+  if (!project || !role) throw new ClientError(PROJECT_NOT_FOUND);
+  const memberId = await accountIdForUsername(username, supabase);
+  if (role !== 'owner' && memberId !== accountId) throw new ClientError(OWNER_ONLY);
+  const { error } = await supabase
+    .from('project_members')
+    .delete()
+    .eq('project_id', project.id)
+    .eq('account_id', memberId);
+  if (error) throw new Error(error.message);
+  return projectMembers(project, supabase);
 }
 
 /**

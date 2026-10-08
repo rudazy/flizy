@@ -102,6 +102,8 @@ export default function NewTaskPage() {
   const [rewardText, setRewardText] = useState('');
   const [endsAt, setEndsAt] = useState(defaultDeadline);
   const [winnersCount, setWinnersCount] = useState('1');
+  /** XP each winner earns. Project tasks only; empty means none. */
+  const [xp, setXp] = useState('');
   const [links, setLinks] = useState<TaskLink[]>([]);
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -152,6 +154,7 @@ export default function NewTaskPage() {
       participants: 0,
       endsAt: Number.isFinite(ends) ? new Date(ends).toISOString() : new Date(Date.now() + 86400000).toISOString(),
       state: 'live',
+      xpReward: project && Number(xp) > 0 ? Number(xp) : null,
       creator: project
         ? { kind: 'project', name: project.name, handle: project.handle, verified: project.verified }
         : { kind: 'personal', name: username ? `@${username}` : 'You', handle: username || null },
@@ -174,6 +177,7 @@ export default function NewTaskPage() {
       title: 'Reward',
       rows: [
         ['Reward', rewardDisplay],
+        ...(createAs !== 'personal' && xp ? [['XP per winner', xp] as [string, string]] : []),
         ['Paid to', 'The winners you pick'],
       ],
     },
@@ -199,6 +203,10 @@ export default function NewTaskPage() {
         if (!/^\d+(\.\d+)?$/.test(amount.trim()) || !(value > 0)) return 'Enter the reward amount.';
       } else if (!rewardText.trim()) {
         return 'Say what the reward is.';
+      }
+      if (createAs !== 'personal' && xp) {
+        const value = Number(xp);
+        if (!Number.isInteger(value) || value < 1 || value > MAX_XP) return `XP must be from 1 to ${MAX_XP}.`;
       }
     }
     if (n === 3) {
@@ -257,6 +265,7 @@ export default function NewTaskPage() {
           // rather than sent as typed. The database stores an instant.
           endsAt: new Date(endsAt).toISOString(),
           projectId: createAs === 'personal' ? null : createAs,
+          xpReward: createAs !== 'personal' && xp ? Number(xp) : null,
           requirements: [
             { kind: requirementKind, label: requirementLabel.trim() || defaultLabel(requirementKind) },
           ],
@@ -515,6 +524,27 @@ export default function NewTaskPage() {
                 </p>
               </div>
             </div>
+            {createAs !== 'personal' ? (
+              <div className="mt-[7px] grid grid-cols-2 gap-x-[13px]">
+                <div>
+                  <FieldLabel htmlFor="t-xp">
+                    XP per winner <span className="font-normal text-[#8f8f8f]">(optional)</span>
+                  </FieldLabel>
+                  <input
+                    id="t-xp"
+                    className={INPUT}
+                    inputMode="numeric"
+                    placeholder="250"
+                    value={xp}
+                    maxLength={6}
+                    onChange={(e) => setXp(e.target.value.replace(/\D/g, ''))}
+                  />
+                </div>
+                <p className="m-0 self-end pb-[3px] font-sans text-[5.8px] leading-[8px] text-[#8f8f8f]">
+                  Each winner earns it on the project leaderboard when you publish the winners.
+                </p>
+              </div>
+            ) : null}
           </FormCard>
         ) : null}
 
@@ -646,6 +676,8 @@ const CARD = 'rounded-[5px] border border-[#1f1d19] bg-[#0f0f10] px-[8.7px] pb-[
 const FIELD =
   'block w-full rounded-[3.5px] border border-[#25272c] bg-[#0d0d0f] font-sans text-[#f0f0f0] outline-none placeholder:text-[#8a8a8f] focus:border-sun/60';
 const INPUT = `${FIELD} h-[22px] px-[8.7px] text-[8px]`;
+/** Mirrors MAX_TASK_XP in lib/tasks.ts. */
+const MAX_XP = 100000;
 
 function defaultLabel(kind: string): string {
   if (kind === 'x_post') return 'Submit the link to your post';

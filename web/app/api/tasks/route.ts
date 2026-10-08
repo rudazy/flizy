@@ -57,6 +57,7 @@ export async function POST(req: Request) {
       distribution: Array.isArray(body.distribution) ? body.distribution : [],
       endsAt: String(body.endsAt || ''),
       projectId: body.projectId ?? null,
+      xpReward: body.xpReward ?? null,
       requirements: Array.isArray(body.requirements) ? body.requirements : [],
       links: Array.isArray(body.links) ? body.links : [],
     });

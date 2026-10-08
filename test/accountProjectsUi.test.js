@@ -63,11 +63,11 @@ describe('account projects layout', () => {
 });
 
 describe('account projects honesty', () => {
-  it('posts only the columns a project has', () => {
+  it('posts only the columns a project has, the picture included', () => {
     const body = CODE.match(/body: JSON\.stringify\(\{([\s\S]*?)\}\),/);
     assert.ok(body, 'create body not found');
     const keys = [...body[1].matchAll(/^\s*([a-z]+):/gm)].map((m) => m[1]).sort();
-    assert.deepEqual(keys, ['description', 'handle', 'links', 'name']);
+    assert.deepEqual(keys, ['description', 'handle', 'image', 'links', 'name']);
   });
 
   it('keeps Verified unselected and says how verification happens', () => {
@@ -82,11 +82,11 @@ describe('account projects honesty', () => {
     assert.match(CODE, /stays open until the deadline on that task/);
   });
 
-  it('does not promise a featured slot, growth figures, or saved images', () => {
+  it('does not promise a featured slot, growth figures, or a saved banner', () => {
     assert.doesNotMatch(CODE, /get featured/i);
     assert.doesNotMatch(CODE, /Track growth/);
-    assert.match(CODE, /Shown on the preview, not saved yet\./);
-    assert.match(CODE, /are not saved on that page yet/);
+    assert.match(CODE, /The banner is shown on the preview, not saved yet\./);
+    assert.match(CODE, /A banner is not saved on that page yet\./);
   });
 
   it('marks the handle with a link, not the payment @', () => {

@@ -7,6 +7,8 @@ import { useDashboard } from './DashboardProvider';
 import { validateUsername } from '../lib/username';
 import { publicMail } from '../lib/publicMail';
 import { VerifiedBadge } from './VerifiedBadge';
+import { ProjectAvatar, projectLetters } from './ProjectAvatar';
+import { shrinkProjectImage } from '../lib/projectImage';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -26,15 +28,17 @@ import {
 /**
  * Projects on the account.
  *
- * The public page is a brand. This slide is the private workspace: the list,
- * then Create a Project in five steps, one step at a time at every width. The
- * form writes only the columns a project has: name, handle, description, and
- * https links.
+ * The public page is a brand. This slide is the private list: the projects
+ * this account owns or was added to, each opening its workspace at
+ * /dashboard/projects/<handle>, then Create a Project in five steps, one step
+ * at a time at every width. The form writes the columns a project has: name,
+ * handle, description, https links, and the picture.
  *
- * The screen shows team, standard, visibility, a picture, and a banner
- * because those are part of the layout. None of them is stored. A picture or
- * a banner is read into a data URL for the preview on this screen, because
- * the image policy allows `data:` and not `blob:`. Verified stays unselected:
+ * The picture is shrunk in the browser to a 256x256 data URL and saved with
+ * the project. Team, standard, visibility and the banner are part of the
+ * layout and are not stored; members are added from the workspace once the
+ * project exists. A banner is read into a data URL for the preview on this
+ * screen, because the image policy allows `data:` and not `blob:`. Verified stays unselected:
  * Flizy confirms a project after the owner writes to the contact mailbox. A
  * task goes live when it is published and stays open until the deadline on
  * that task. There is no participant cap.
@@ -48,7 +52,10 @@ type ProjectCard = {
   name: string;
   description: string;
   verified?: boolean;
+  image?: string | null;
+  role: 'owner' | 'member';
   activeTasks?: number;
+  totalTasks?: number;
 };
 
 type LinkDraft = { id: number; kind: string; url: string };
@@ -65,10 +72,10 @@ const NAME_MAX = 50;
 const DESCRIPTION_MAX = 300;
 /** Same ceiling the server enforces in MAX_PROJECTS_PER_ACCOUNT. */
 const PROJECT_CAP = 5;
-/** Largest picture or banner the preview reads. */
+/** Largest banner the preview reads. The picture has its own limit in lib/projectImage. */
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
-const LINK_KINDS: Array<[string, string]> = [
+export const LINK_KINDS: Array<[string, string]> = [
   ['website', 'Website'],
   ['x', 'X'],
   ['telegram', 'Telegram'],
@@ -77,7 +84,7 @@ const LINK_KINDS: Array<[string, string]> = [
   ['custom', 'Other'],
 ];
 
-const LINK_LABEL: Record<string, string> = {
+export const LINK_LABEL: Record<string, string> = {
   website: 'Website',
   x: 'X',
   telegram: 'Telegram',
@@ -118,22 +125,12 @@ const CREATE_ART =
 const EMPTY_ART =
   'pointer-events-none h-[150px] w-[240px] select-none [mask-image:radial-gradient(closest-side,#000_74%,transparent)]';
 
-function markLetters(name: string): string {
-  const words = name
-    .trim()
-    .split(/\s+/)
-    .filter((word) => /[a-z0-9]/i.test(word));
-  if (!words.length) return 'FZ';
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[1][0]).toUpperCase();
-}
-
-function activeLine(count: number | undefined): string | null {
+function activeLine(count: number | undefined, total?: number): string | null {
   if (typeof count !== 'number' || !Number.isFinite(count) || count < 0) return null;
   const n = Math.floor(count);
-  if (n === 0) return 'No active tasks';
-  if (n === 1) return '1 active task';
-  return `${n} active tasks`;
+  const live = n === 0 ? 'No active tasks' : n === 1 ? '1 active task' : `${n} active tasks`;
+  if (typeof total !== 'number' || !Number.isFinite(total) || total <= 0) return live;
+  return `${live} · ${total} ${total === 1 ? 'task' : 'tasks'} in all`;
 }
 
 function handleFormat(error: string): string {
@@ -179,7 +176,11 @@ function readProjects(body: unknown): { projects: ProjectCard[]; canCreate: bool
       handle?: unknown;
       name?: unknown;
       description?: unknown;
+      verified?: unknown;
+      image?: unknown;
+      role?: unknown;
       activeTasks?: unknown;
+      totalTasks?: unknown;
     };
     if (typeof item.id !== 'string' || typeof item.handle !== 'string' || typeof item.name !== 'string') {
       continue;
@@ -189,6 +190,10 @@ function readProjects(body: unknown): { projects: ProjectCard[]; canCreate: bool
       handle: item.handle,
       name: item.name,
       description: typeof item.description === 'string' ? item.description : '',
+      verified: item.verified === true,
+      image: typeof item.image === 'string' ? item.image : null,
+      role: item.role === 'member' ? 'member' : 'owner',
+      totalTasks: typeof item.totalTasks === 'number' && Number.isFinite(item.totalTasks) ? item.totalTasks : undefined,
       activeTasks:
         typeof item.activeTasks === 'number' && Number.isFinite(item.activeTasks)
           ? item.activeTasks
@@ -366,6 +371,20 @@ export function AccountProjects() {
     setPictureUrl('');
   }
 
+  /** The picture is saved, so it is shrunk to its stored size now, not at submit. */
+  async function onPickPicture(file: File | undefined) {
+    if (!file) return;
+    const draft = draftRef.current;
+    try {
+      const url = await shrinkProjectImage(file);
+      if (draft !== draftRef.current) return;
+      setError('');
+      setPictureUrl(url);
+    } catch (err) {
+      if (draft === draftRef.current) setError(err instanceof Error ? err.message : 'Could not read that image.');
+    }
+  }
+
   async function onPickImage(file: File | undefined, setUrl: (url: string) => void) {
     if (!file) return;
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
@@ -424,6 +443,7 @@ export function AccountProjects() {
           handle: handle.trim(),
           description: description.trim(),
           links: linksToSave(links),
+          image: isPreview(pictureUrl) ? pictureUrl : null,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -440,7 +460,10 @@ export function AccountProjects() {
         handle: typeof body.handle === 'string' ? body.handle : handle.trim(),
         name: name.trim(),
         description: description.trim(),
+        image: isPreview(pictureUrl) ? pictureUrl : null,
+        role: 'owner',
         activeTasks: 0,
+        totalTasks: 0,
       };
       setProjects((prev) => [...(prev ?? []), created]);
       close();
@@ -473,10 +496,11 @@ export function AccountProjects() {
   }
 
   if (!creating) {
-    const atCap = (projects?.length ?? 0) >= PROJECT_CAP;
+    const owned = projects === null ? null : projects.filter((p) => p.role === 'owner').length;
+    const atCap = (owned ?? 0) >= PROJECT_CAP;
     return (
       <div className="grid w-full gap-[13px]">
-        <WorkspaceHero count={projects === null ? null : projects.length} />
+        <WorkspaceHero count={owned} />
         {projects === null ? (
           <p className="m-0 px-[2px] font-sans text-[10px] text-[#8f8f8f]">Loading projects.</p>
         ) : loadError ? (
@@ -498,16 +522,14 @@ export function AccountProjects() {
           <section className={CARD}>
             <ul className="m-0 list-none p-0">
               {projects.map((project) => {
-                const line = activeLine(project.activeTasks);
+                const line = activeLine(project.activeTasks, project.totalTasks);
                 return (
                   <li key={project.id} className="border-b border-[#1f1f1f]">
                     <Link
-                      href={`/project/${encodeURIComponent(project.handle)}`}
+                      href={`/dashboard/projects/${encodeURIComponent(project.handle)}`}
                       className="flex items-center gap-[11px] px-[13px] pb-[6px] pt-[13px] no-underline"
                     >
-                      <span className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[6px] border border-[#262626] bg-[#131313] font-sans text-[13px] font-semibold text-sun">
-                        {markLetters(project.name)}
-                      </span>
+                      <ProjectAvatar name={project.name} image={project.image} size={42} />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-[5px]">
                           <span className="truncate font-sans text-[12px] font-semibold text-[#f5f5f5]">
@@ -523,7 +545,7 @@ export function AccountProjects() {
                         ) : null}
                       </span>
                       <span className="flex shrink-0 items-center gap-[8px]">
-                        <OwnerBadge />
+                        {project.role === 'owner' ? <OwnerBadge /> : <MemberBadge />}
                         <ChevronRightIcon size={13} className="text-[#6f6f6f]" />
                       </span>
                     </Link>
@@ -721,7 +743,7 @@ export function AccountProjects() {
             <SectionCard
               n={2}
               title="Picture and banner"
-              subtitle="Add a profile picture and banner. Shown on the preview, not saved yet."
+              subtitle="The picture is saved with the project. The banner is shown on the preview, not saved yet."
               tight
             >
               <div className="mt-[9.5px] grid gap-[6.5px] min-[420px]:grid-cols-[174.5fr_205fr]">
@@ -745,7 +767,7 @@ export function AccountProjects() {
                     </div>
                     <ImageDrop
                       title="Upload image"
-                      onFile={(file) => void onPickImage(file, setPictureUrl)}
+                      onFile={(file) => void onPickPicture(file)}
                     />
                   </div>
                 </div>
@@ -1318,6 +1340,14 @@ function OwnerBadge() {
   );
 }
 
+function MemberBadge() {
+  return (
+    <span className="rounded-[3px] border border-[#8a7128] px-[5px] py-[1px] font-sans text-[7.5px] font-semibold uppercase tracking-wide text-sun">
+      Member
+    </span>
+  );
+}
+
 function ImageDrop({ title, onFile }: { title: string; onFile: (file: File | undefined) => void }) {
   return (
     <label className="flex h-[76.5px] w-[77px] shrink-0 cursor-pointer flex-col items-center rounded-[6px] border border-dashed border-[#2e2e2e] bg-[#0d0d0d] px-[3px] pt-[11px] text-center transition-colors focus-within:border-sun/70 hover:border-[#4d4d4d]">
@@ -1426,7 +1456,7 @@ function LivePreview({
             {isPreview(pictureUrl) ? (
               <img src={pictureUrl} alt="" className="h-full w-full object-cover" />
             ) : (
-              markLetters(title)
+              projectLetters(title)
             )}
           </div>
           <p className={`m-0 mt-[8px] font-sans text-[14px] font-semibold ${title ? 'text-[#f5f5f5]' : 'text-[#8f8f8f]'}`}>
@@ -1461,7 +1491,7 @@ function LivePreview({
       </div>
       <p className="m-0 mt-[10px] font-sans text-[8.5px] leading-[12px] text-[#8f8f8f]">
         The page shows this name, the project link, the description, and any https links. It does not show your name.
-        A picture and a banner are not saved on that page yet. A verified badge appears once Flizy verifies the project.
+        The page shows the picture. A banner is not saved on that page yet. A verified badge appears once Flizy verifies the project.
       </p>
     </>
   );

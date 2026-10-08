@@ -2,15 +2,18 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPublicProject } from '../../../lib/tasks';
+import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { pageMetadata } from '../../../lib/seo';
 import { ProjectProfile } from '../../../components/ProjectProfile';
 import { VerifiedBadge } from '../../../components/VerifiedBadge';
+import { ProjectAvatar } from '../../../components/ProjectAvatar';
 
 /**
  * Public project profile.
  *
- * The managing account is not loaded. A reader of this page learns the project,
- * its links, and the tasks it published. Not who sits behind it.
+ * The managing account is not shown. A reader of this page learns the project,
+ * its links, the tasks it published and who earned XP from them. Not who sits
+ * behind it. A signed-in owner or member is offered the workspace.
  */
 
 export const dynamic = 'force-dynamic';
@@ -35,13 +38,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProjectPage({ params }: Props) {
-  const project = await getPublicProject(params.handle).catch(() => null);
+  const viewerAccountId = await getAccountIdFromCookie().catch(() => null);
+  const project = await getPublicProject(params.handle, undefined, { viewerAccountId }).catch(() => null);
   if (!project) notFound();
 
   return (
     <div className="mx-auto grid w-full max-w-lg gap-8">
       <header className="grid gap-4">
-        <ProjectMark name={project.name} />
+        <div className="flex items-start justify-between gap-4">
+          <ProjectAvatar name={project.name} image={project.image} size={72} />
+          {project.viewerRole ? (
+            <Link
+              href={`/dashboard/projects/${encodeURIComponent(project.handle)}`}
+              className="inline-flex h-10 items-center rounded-[6px] border border-border px-4 font-sans text-sm text-paper no-underline transition-colors hover:border-lime/60"
+            >
+              Manage
+            </Link>
+          ) : null}
+        </div>
         <div>
           <h1 className="m-0 flex items-center gap-2 font-sans text-3xl tracking-wide text-paper">
             <span className="min-w-0 break-words">{project.name}</span>
@@ -70,31 +84,11 @@ export default async function ProjectPage({ params }: Props) {
         ) : null}
       </header>
 
-      <ProjectProfile tasks={project.tasks} activity={project.activity} />
+      <ProjectProfile tasks={project.tasks} activity={project.activity} leaderboard={project.leaderboard} />
 
       <Link href="/" className="text-xs uppercase tracking-[0.18em] text-muted no-underline hover:text-paper">
         Flizy
       </Link>
-    </div>
-  );
-}
-
-function ProjectMark({ name }: { name: string }) {
-  const words = name
-    .trim()
-    .split(/\s+/)
-    .filter((w) => /[a-z0-9]/i.test(w));
-  const letters = !words.length
-    ? 'FZ'
-    : words.length === 1
-      ? words[0].slice(0, 2).toUpperCase()
-      : (words[0][0] + words[1][0]).toUpperCase();
-  return (
-    <div
-      className="flex h-16 w-16 items-center justify-center rounded-md border border-border bg-surface font-sans text-xl font-semibold tracking-wide text-paper"
-      aria-hidden
-    >
-      {letters}
     </div>
   );
 }

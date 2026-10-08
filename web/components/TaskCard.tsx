@@ -22,6 +22,8 @@ export type TaskCardData = {
   participants: number;
   endsAt: string;
   state: 'live' | 'review' | 'completed' | 'cancelled';
+  /** XP each winner earns, when the project set some. */
+  xpReward?: number | null;
   creator: { kind: 'project' | 'personal'; name: string; handle: string | null; verified?: boolean };
 };
 
@@ -35,7 +37,10 @@ export function TaskCard({ task, preview = false }: { task: TaskCardData; previe
       <TaskCardArt taskRef={task.ref} label={task.title} />
       <div className="grid gap-1.5 p-4">
         <h3 className="m-0 font-sans text-base tracking-wide text-paper">{task.title}</h3>
-        <p className="m-0 font-sans text-xl font-semibold text-lime">{task.rewardDisplay}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="m-0 font-sans text-xl font-semibold text-lime">{task.rewardDisplay}</p>
+          {task.xpReward ? <XpChip xp={task.xpReward} /> : null}
+        </div>
         <p className="m-0 text-sm text-paper">
           {task.winnersCount} {task.winnersCount === 1 ? 'Winner' : 'Winners'}
         </p>
@@ -60,5 +65,14 @@ export function TaskCard({ task, preview = false }: { task: TaskCardData; previe
     <Link href={`/tasks/${task.ref}`} className="card card-hover block overflow-hidden p-0 no-underline">
       {body}
     </Link>
+  );
+}
+
+/** The XP a winner earns on top of the reward. */
+export function XpChip({ xp }: { xp: number }) {
+  return (
+    <span className="inline-flex items-center rounded-[4px] border border-sun/40 bg-sun-wash px-1.5 py-0.5 font-mono text-[11px] font-semibold text-sun">
+      +{xp.toLocaleString('en-US')} XP
+    </span>
   );
 }

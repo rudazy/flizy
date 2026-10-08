@@ -9,6 +9,7 @@ import { TaskCardArt } from '../../../components/TaskCardArt';
 import { TaskSubmitForm } from '../../../components/TaskSubmitForm';
 import { LocalWhen } from '../../../components/LocalWhen';
 import { VerifiedBadge } from '../../../components/VerifiedBadge';
+import { XpChip } from '../../../components/TaskCard';
 
 /**
  * The public task page.
@@ -109,7 +110,10 @@ export default async function TaskPage({ params }: { params: { ref: string } }) 
 
       <section className="grid gap-2">
         <h2 className="m-0 text-xs uppercase tracking-[0.18em] text-gold">Reward</h2>
-        <p className="m-0 font-sans text-4xl font-semibold tracking-wide text-lime">{task.rewardDisplay}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="m-0 font-sans text-4xl font-semibold tracking-wide text-lime">{task.rewardDisplay}</p>
+          {task.xpReward ? <XpChip xp={task.xpReward} /> : null}
+        </div>
         <p className="m-0 text-sm text-paper">
           {task.winnersCount} {task.winnersCount === 1 ? 'winner' : 'winners'}
         </p>

@@ -409,6 +409,26 @@ function createFakeSupabase(seed = {}, opts = {}) {
         error: null,
       };
     },
+
+    /** 20261009120000_project_workspace.sql: awarded XP per account, highest first. */
+    project_xp_leaderboard({ p_project_id, p_limit }) {
+      const taskIds = new Set(
+        (db.tables.tasks || []).filter((t) => String(t.project_id) === String(p_project_id)).map((t) => String(t.id))
+      );
+      const totals = new Map();
+      for (const w of db.tables.task_winners || []) {
+        if (!taskIds.has(String(w.task_id)) || !(Number(w.xp) > 0)) continue;
+        const row = totals.get(String(w.account_id)) || { account_id: String(w.account_id), xp: 0, wins: 0 };
+        row.xp += Number(w.xp);
+        row.wins += 1;
+        totals.set(row.account_id, row);
+      }
+      const limit = Math.max(1, Math.min(Number(p_limit) || 50, 100));
+      const all = [...totals.values()].sort((a, b) => b.xp - a.xp || b.wins - a.wins);
+      const total_xp = all.reduce((sum, r) => sum + r.xp, 0);
+      const data = all.slice(0, limit).map((r) => ({ ...r, total_xp, earners: all.length }));
+      return { data, error: null };
+    },
   };
 
   return {

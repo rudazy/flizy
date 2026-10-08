@@ -436,6 +436,12 @@
     },
     {
       "kind": "check",
+      "name": "projects.projects_image_format",
+      "providedBy": "20261009120000_project_workspace.sql",
+      "requiredBy": "check on projects"
+    },
+    {
+      "kind": "check",
       "name": "projects.projects_links_is_array",
       "providedBy": "20260927120000_project_profiles.sql",
       "requiredBy": "check on projects"
@@ -538,6 +544,12 @@
     },
     {
       "kind": "check",
+      "name": "task_winners.task_winners_xp_check",
+      "providedBy": "20261009120000_project_workspace.sql",
+      "requiredBy": "check on task_winners"
+    },
+    {
+      "kind": "check",
       "name": "tasks.tasks_cancelled_at_check",
       "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "check on tasks"
@@ -582,6 +594,12 @@
       "kind": "check",
       "name": "tasks.tasks_winners_count_check",
       "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "check on tasks"
+    },
+    {
+      "kind": "check",
+      "name": "tasks.tasks_xp_reward_check",
+      "providedBy": "20261009120000_project_workspace.sql",
       "requiredBy": "check on tasks"
     },
     {
@@ -694,6 +712,12 @@
     },
     {
       "kind": "function",
+      "name": "project_xp_leaderboard",
+      "providedBy": "20261009120000_project_workspace.sql",
+      "requiredBy": "web/lib/tasks.ts"
+    },
+    {
+      "kind": "function",
       "name": "projects_handle_not_username",
       "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "executed by trigger projects_handle_not_username"
@@ -727,6 +751,12 @@
       "name": "task_submissions_window",
       "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "executed by trigger task_submissions_window_check"
+    },
+    {
+      "kind": "function",
+      "name": "tasks_project_live_cap",
+      "providedBy": "20261009120000_project_workspace.sql",
+      "requiredBy": "executed by trigger tasks_project_live_cap"
     },
     {
       "kind": "function",
@@ -898,6 +928,12 @@
     },
     {
       "kind": "table",
+      "name": "project_members",
+      "providedBy": "20261009120000_project_workspace.sql",
+      "requiredBy": "web/lib/tasks.ts"
+    },
+    {
+      "kind": "table",
       "name": "projects",
       "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "web/lib/tasks.ts"
@@ -1051,6 +1087,12 @@
       "name": "task_submissions_window_check",
       "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "trigger on task_submissions"
+    },
+    {
+      "kind": "trigger",
+      "name": "tasks_project_live_cap",
+      "providedBy": "20261009120000_project_workspace.sql",
+      "requiredBy": "trigger on tasks"
     },
     {
       "kind": "trigger",
