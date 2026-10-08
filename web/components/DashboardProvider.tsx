@@ -265,7 +265,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setMsg(
           'Unlock PIN saved. On WhatsApp: flizy lock (no password) · flizy unlock then reply with this PIN or your account password. Any unlock block from wrong attempts is cleared.'
         );
-        await load();
+        await loadAccount();
         return true;
       } catch (err) {
         setMsg(err instanceof Error ? err.message : 'Failed');
@@ -274,7 +274,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setBusy('');
       }
     },
-    [load]
+    [loadAccount]
   );
 
   const setDailyLimit = useCallback(
@@ -294,7 +294,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             ? 'Daily limit cleared (app default).'
             : `Daily ETH send limit set to ${limit} ETH (UTC day). It covers ETH sends from chat and the web.`
         );
-        await load();
+        await loadAccount();
         return true;
       } catch (err) {
         setMsg(err instanceof Error ? err.message : 'Failed');
@@ -303,7 +303,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setBusy('');
       }
     },
-    [load]
+    [loadAccount]
   );
 
   const setUsername = useCallback(

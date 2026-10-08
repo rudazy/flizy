@@ -66,7 +66,11 @@ describe('Trusted wallets', () => {
   });
 
   it('the sheet renders on the body, so the phone bottom nav cannot cover its buttons', () => {
-    assert.match(CONNECT, /function WalletPasswordSheet[\s\S]*?return createPortal\(/);
+    assert.match(CONNECT, /export function PasswordSheet[\s\S]*?return createPortal\(/);
+    assert.match(CONNECT, /function WalletPasswordSheet[\s\S]*?<PasswordSheet/);
+    // The password field takes focus unless the caller opts out (password change starts on New password).
+    assert.match(CONNECT, /focusPassword = true,/);
+    assert.match(CONNECT, /autoFocus=\{focusPassword\} \/>/);
     assert.match(CONNECT, /<\/div>,\s*document\.body\s*\);/);
   });
 });

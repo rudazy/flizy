@@ -18,6 +18,7 @@ import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { PayIdentity } from '../../../components/PayIdentity';
 import { CountryPanel, LanguagePanel } from '../../../components/AccountPrefs';
 import { ChatAppsPanel, TrustedPanel } from '../../../components/AccountConnections';
+import { LimitsPanel, PinPanel, SecurityPanel } from '../../../components/AccountSecurity';
 import { AccountProjects } from '../../../components/AccountProjects';
 import type { LocaleCode } from '../../../lib/locale';
 import { SITE_PHONE_COUNTRIES, countryByIso, countryFlag } from '../../../lib/phoneFormat';
@@ -76,10 +77,6 @@ export default function AccountPage() {
   /** Ticket code from a chat-started add, passed back so the add can spend it. */
   const [ticket, setTicket] = useState('');
   const [removing, setRemoving] = useState<string | null>(null);
-  const [pin, setPin] = useState('');
-  const [pinPassword, setPinPassword] = useState('');
-  const [dailyLimit, setDailyLimitInput] = useState('');
-  const [limitPassword, setLimitPassword] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [chatLinks, setChatLinks] = useState<
     Array<{ channel: string; phone: string | null; has_phone: boolean }>
@@ -366,28 +363,47 @@ export default function AccountPage() {
     else setSheetRefused(true);
   }
 
-  async function onPin(e: React.FormEvent) {
-    e.preventDefault();
-    const ok = await setUnlockPin(pin, pinPassword);
+  /**
+   * Change the password. Resolves to why it was refused, or null when it
+   * changed. The server signs every other device out and renews this one; if
+   * it could not renew this one, the next page load asks for a login.
+   */
+  async function onChangePassword(currentPassword: string, newPassword: string): Promise<string | null> {
+    setBusy('password');
+    setMsg('');
+    try {
+      const res = await fetch('/api/account/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return typeof json.error === 'string' ? json.error : 'Could not change the password.';
+      if (json.stillSignedIn === false) {
+        window.location.href = '/login';
+        return null;
+      }
+      setMsg(
+        json.signedOutElsewhere === false
+          ? 'Password changed. Other devices could not be signed out: sign out on them yourself.'
+          : 'Password changed. Other devices were signed out.'
+      );
+      return null;
+    } catch {
+      return 'Could not change the password. Try again.';
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function onPin(pin: string, password: string) {
+    const ok = await setUnlockPin(pin, password);
     if (ok) {
-      setPin('');
-      setPinPassword('');
       setMsg(
         'Unlock PIN saved. In chat: flizy lock or /lock, then flizy unlock or /unlock with your PIN.'
       );
     }
-  }
-
-  async function onDailyLimit(e: React.FormEvent) {
-    e.preventDefault();
-    const raw = dailyLimit.trim();
-    const limit = raw === '' ? null : Number(raw);
-    if (raw !== '' && (!Number.isFinite(limit) || (limit as number) < 0)) {
-      setMsg('Enter a number >= 0, or leave empty to clear.');
-      return;
-    }
-    const ok = await setDailyLimit(limit, limitPassword);
-    if (ok) setLimitPassword('');
+    return ok;
   }
 
   async function onUsername(e: React.FormEvent) {
@@ -969,117 +985,26 @@ export default function AccountPage() {
       ) : null}
 
       {slide === 'pin' ? (
-        <AppSection
-          title="Unlock PIN"
-          helper="For flizy lock / unlock in chat. Chat takes this PIN, never your password."
-          badge={data.account.has_pin ? 'Set' : 'Required'}
-          badgeTone={data.account.has_pin ? 'lime' : 'gold'}
-        >
-          <form onSubmit={onPin} className="grid gap-3">
-            <div>
-              <label className="label">New PIN</label>
-              <input
-                className="input"
-                type="password"
-                inputMode="numeric"
-                autoComplete="new-password"
-                minLength={4}
-                maxLength={12}
-                placeholder="4-12 digits"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Account password</label>
-              <input
-                className="input"
-                type="password"
-                placeholder="Confirm it is you"
-                value={pinPassword}
-                onChange={(e) => setPinPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-            </div>
-            <button className="btn btn-primary" type="submit" disabled={busy === 'pin'}>
-              {busy === 'pin' ? 'Saving...' : data.account.has_pin ? 'Update PIN' : 'Save PIN'}
-            </button>
-          </form>
-        </AppSection>
+        <PinPanel hasPin={Boolean(data.account.has_pin)} onSave={onPin} busy={busy === 'pin'} lastError={msg} />
       ) : null}
 
       {slide === 'limits' ? (
-        <AppSection
-          title="Daily ETH send limit"
-          helper={`Current: ${currentLimit}`}
-          badge="Policy"
-        >
-          <form onSubmit={onDailyLimit} className="grid gap-3">
-            <div>
-              <label className="label">Limit (ETH / day)</label>
-              <input
-                className="input"
-                inputMode="decimal"
-                placeholder="e.g. 0.05, leave empty for no limit"
-                value={dailyLimit}
-                onChange={(e) => setDailyLimitInput(e.target.value)}
-              />
-              <p className="mt-1 text-xs text-muted">0 blocks every ETH send.</p>
-            </div>
-            <div>
-              <label className="label">Account password</label>
-              <input
-                className="input"
-                type="password"
-                required
-                value={limitPassword}
-                onChange={(e) => setLimitPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
-            <button className="btn btn-primary" type="submit" disabled={busy === 'limit'}>
-              {busy === 'limit' ? 'Saving...' : 'Save daily limit'}
-            </button>
-          </form>
-        </AppSection>
+        <LimitsPanel current={currentLimit} onSave={setDailyLimit} busy={busy === 'limit'} lastError={msg} />
       ) : null}
 
       {slide === 'security' ? (
-        <AppSection
-          title="Security"
-          helper="Password is required to change trusted wallets and limits."
-        >
-          <p className="text-xs leading-relaxed text-muted">
-            Signed in as <span className="text-paper">{data.account.email}</span>.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <a href="/docs" className="btn btn-ghost text-sm no-underline">
-              Security docs
-            </a>
-            {/*
-              The signed-in app has no footer (AppChrome returns early for
-              /dashboard), so without these two the only copy of the agreement a
-              user accepted is unreachable from inside the product. This slide
-              already links out, so it is where they belong.
-            */}
-            <a href="/terms" className="btn btn-ghost text-sm no-underline">
-              Terms
-            </a>
-            <a href="/privacy" className="btn btn-ghost text-sm no-underline">
-              Privacy
-            </a>
-            <button
-              type="button"
-              className="btn btn-ghost text-sm"
-              onClick={() => void onSignOut()}
-              disabled={busy === 'logout'}
-            >
-              {busy === 'logout' ? 'Signing out…' : 'Sign out'}
-            </button>
-          </div>
-        </AppSection>
+        <SecurityPanel
+          email={data.account.email ?? null}
+          emailVerified={Boolean(data.account.email_verified)}
+          onChangeEmail={() => {
+            setSlide('profile');
+            setProfileEditor('email');
+          }}
+          onChangePassword={onChangePassword}
+          changingPassword={busy === 'password'}
+          onSignOut={() => void onSignOut()}
+          signingOut={busy === 'logout'}
+        />
       ) : null}
     </AppPage>
   );

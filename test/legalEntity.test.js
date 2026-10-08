@@ -151,8 +151,11 @@ describe('the documents stay reachable once signed in', () => {
   });
 
   it('account links to both documents', () => {
-    assert.match(ACCOUNT, /href="\/terms"/);
-    assert.match(ACCOUNT, /href="\/privacy"/);
+    // The links live in the Security slide's panel, which the account page renders.
+    const SECURITY = read('components', 'AccountSecurity.tsx');
+    assert.match(ACCOUNT, /<SecurityPanel/);
+    assert.match(SECURITY, /href="\/terms"/);
+    assert.match(SECURITY, /href="\/privacy"/);
   });
 });
 

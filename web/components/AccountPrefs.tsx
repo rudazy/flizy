@@ -23,6 +23,7 @@ export function PrefHero({
   text,
   art,
   corner,
+  icon,
 }: {
   eyebrow: string;
   title: string;
@@ -32,13 +33,22 @@ export function PrefHero({
   art?: ReactNode;
   /** Small mark in the top right, over the art. */
   corner?: ReactNode;
+  /** Gold-edged icon tile before the eyebrow. */
+  icon?: ReactNode;
 }) {
   return (
     <div className="relative min-h-[178px] px-5 pb-5 pt-6" style={{ background: HERO_BG }}>
       {art}
       {corner}
       <div className="relative max-w-[min(62%,420px)]">
-        <p className="m-0 font-mono text-[10.5px] font-medium uppercase tracking-[0.24em] text-sun">{eyebrow}</p>
+        <div className="flex items-center gap-3">
+          {icon ? (
+            <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] border border-[#5a4a1f] bg-[#1d1a10] text-sun" aria-hidden>
+              {icon}
+            </span>
+          ) : null}
+          <p className="m-0 font-mono text-[10.5px] font-medium uppercase tracking-[0.24em] text-sun">{eyebrow}</p>
+        </div>
         <h2 className="m-0 mt-2 font-sans text-[30px] font-bold leading-[1.1] tracking-[0.01em] text-white">
           {title}
           {accent ? <span className="text-sun"> {accent}</span> : null}

@@ -148,12 +148,17 @@ export function SecretInput({
   placeholder,
   autoFocus = false,
   id,
+  autoComplete = 'current-password',
+  label,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   autoFocus?: boolean;
   id?: string;
+  autoComplete?: 'current-password' | 'new-password';
+  /** Accessible name when no visible label points at the field. */
+  label?: string;
 }) {
   const [shown, setShown] = useState(false);
   return (
@@ -167,7 +172,8 @@ export function SecretInput({
         className={FIELD_INPUT}
         placeholder={placeholder}
         value={value}
-        autoComplete="current-password"
+        autoComplete={autoComplete}
+        aria-label={label}
         autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -184,7 +190,7 @@ export function SecretInput({
   );
 }
 
-function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
+export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
   return (
     <label htmlFor={htmlFor} className="font-mono text-[10.5px] font-medium uppercase tracking-[0.22em] text-[#d9d4ca]">
       {children}
@@ -655,10 +661,125 @@ export function TrustedPanel({
 }
 
 /**
- * The password step for saving or deleting a trusted wallet: which wallet,
- * then the account password, then Save or Delete. It holds its own password,
- * so nothing typed here outlives it.
+ * The account-password step for a sensitive change: what is about to happen,
+ * then the password, then the action. It holds its own password, so nothing
+ * typed here outlives it. Portalled to body: inside the page it would sit
+ * under the fixed bottom nav.
  */
+export function PasswordSheet({
+  tone,
+  icon,
+  title,
+  text,
+  children,
+  confirmLabel,
+  busyLabel,
+  busy,
+  error,
+  onCancel,
+  onConfirm,
+  passwordLabel = 'Account password',
+  passwordPlaceholder = 'Confirm it is you',
+  focusPassword = true,
+}: {
+  tone: 'gold' | 'danger';
+  icon: ReactNode;
+  title: string;
+  text: ReactNode;
+  /** What the change is about, shown above the password. */
+  children?: ReactNode;
+  confirmLabel: string;
+  busyLabel: string;
+  busy: boolean;
+  /** Why the last try was refused, if it was. */
+  error: string;
+  onCancel: () => void;
+  onConfirm: (password: string) => void;
+  passwordLabel?: string;
+  passwordPlaceholder?: string;
+  /** False when the content above has the field to start in. */
+  focusPassword?: boolean;
+}) {
+  const [password, setPassword] = useState('');
+  const titleId = useId();
+  const gold = tone === 'gold';
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) onCancel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onCancel]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 backdrop-blur-[2px] sm:items-center"
+      role="presentation"
+      onClick={() => !busy && onCancel()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[440px] rounded-t-[20px] border border-b-0 border-[#3a2a1c] bg-[#101011] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 shadow-[0_-20px_60px_rgba(0,0,0,0.6)] sm:rounded-[20px] sm:border-b"
+      >
+        <div className="mx-auto mb-4 h-[4px] w-[38px] rounded-full bg-[#2c2d33] sm:hidden" aria-hidden />
+        <div className="flex items-start gap-3.5">
+          <span
+            className={`flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border ${
+              gold ? 'border-[#5a4a1f] bg-[#2a2210] text-sun' : 'border-[#6b2430] bg-[#2a1216] text-[#f87171]'
+            }`}
+          >
+            {icon}
+          </span>
+          <div className="min-w-0">
+            <h2 id={titleId} className="m-0 font-sans text-[18px] font-bold text-white">
+              {title}
+            </h2>
+            <p className="m-0 mt-1 font-sans text-[13px] leading-[1.55] text-[#9a958c]">{text}</p>
+          </div>
+        </div>
+
+        {children ? <div className="mt-4 grid gap-3">{children}</div> : null}
+
+        <form
+          className="mt-4 grid gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (password && !busy) onConfirm(password);
+          }}
+        >
+          <FieldLabel>{passwordLabel}</FieldLabel>
+          <SecretInput value={password} onChange={setPassword} placeholder={passwordPlaceholder} label={passwordLabel} autoFocus={focusPassword} />
+          {error ? (
+            <p role="alert" className="m-0 rounded-[10px] border border-[#6b2430] bg-[#1a0f11] px-3 py-2 font-sans text-[13px] text-[#f87171]">
+              {error}
+            </p>
+          ) : null}
+          <div className="mt-1 grid grid-cols-2 gap-2.5">
+            <GhostButton onClick={onCancel} disabled={busy} className="h-[50px] w-full">
+              Cancel
+            </GhostButton>
+            <button
+              type="submit"
+              disabled={busy || !password}
+              className={`h-[50px] rounded-[12px] font-sans text-[15px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                gold ? 'btn-sun' : 'bg-[#dc2626] text-white hover:bg-[#ef4444]'
+              }`}
+            >
+              {busy ? busyLabel : confirmLabel}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/** Saving or deleting a trusted wallet: which wallet, then the password. */
 function WalletPasswordSheet({
   mode,
   wallet,
@@ -678,102 +799,34 @@ function WalletPasswordSheet({
   onConfirm: (password: string) => void;
 }) {
   const saving = mode === 'save';
-  const [password, setPassword] = useState('');
-  const titleId = useId();
-  const label = wallet.label || 'unnamed';
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onCancel();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onCancel]);
-
-  // Portalled to body: inside the page it would sit under the fixed bottom nav.
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 backdrop-blur-[2px] sm:items-center"
-      role="presentation"
-      onClick={() => !busy && onCancel()}
+  const label = <span className="font-semibold text-white">{wallet.label || 'unnamed'}</span>;
+  return (
+    <PasswordSheet
+      tone={saving ? 'gold' : 'danger'}
+      icon={saving ? <ShieldGlyph /> : <TrashGlyph />}
+      title={saving ? 'Save trusted wallet' : 'Delete trusted wallet'}
+      text={
+        saving ? (
+          <>Chat will be able to send to {label} at this address.</>
+        ) : (
+          <>Chat will no longer send to {label}. You can add it again later.</>
+        )
+      }
+      confirmLabel={saving ? 'Save' : 'Delete'}
+      busyLabel={saving ? 'Saving...' : 'Deleting...'}
+      busy={busy}
+      error={error}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[440px] rounded-t-[20px] border border-b-0 border-[#3a2a1c] bg-[#101011] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 shadow-[0_-20px_60px_rgba(0,0,0,0.6)] sm:rounded-[20px] sm:border-b"
-      >
-        <div className="mx-auto mb-4 h-[4px] w-[38px] rounded-full bg-[#2c2d33] sm:hidden" aria-hidden />
-        <div className="flex items-start gap-3.5">
-          <span
-            className={`flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border ${
-              saving ? 'border-[#5a4a1f] bg-[#2a2210] text-sun' : 'border-[#6b2430] bg-[#2a1216] text-[#f87171]'
-            }`}
-          >
-            {saving ? <ShieldGlyph /> : <TrashGlyph />}
-          </span>
-          <div className="min-w-0">
-            <h2 id={titleId} className="m-0 font-sans text-[18px] font-bold text-white">
-              {saving ? 'Save trusted wallet' : 'Delete trusted wallet'}
-            </h2>
-            <p className="m-0 mt-1 font-sans text-[13px] leading-[1.55] text-[#9a958c]">
-              {saving ? (
-                <>
-                  Chat will be able to send to <span className="font-semibold text-white">{label}</span> at this address.
-                </>
-              ) : (
-                <>
-                  Chat will no longer send to <span className="font-semibold text-white">{label}</span>. You can add it again later.
-                </>
-              )}
-            </p>
-          </div>
-        </div>
-
-        {saving && fromChat ? (
-          <div className="mt-4">
-            <InfoNote tone="gold">This address came from a request in your chat app. Check it matches who you meant to pay before saving.</InfoNote>
-          </div>
-        ) : null}
-
-        <div className="mt-4 rounded-[12px] border border-[#26262a] bg-[#0b0b0c] px-3.5 py-3">
-          <p className="m-0 font-mono text-[10.5px] font-medium uppercase tracking-[0.22em] text-[#9a958c]">Wallet</p>
-          <p className="m-0 mt-1 break-all font-mono text-[12.5px] leading-[1.5] text-[#e9e4da]">{wallet.address}</p>
-        </div>
-
-        <form
-          className="mt-4 grid gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (password && !busy) onConfirm(password);
-          }}
-        >
-          <FieldLabel>Account password</FieldLabel>
-          <SecretInput value={password} onChange={setPassword} placeholder="Confirm it is you" autoFocus />
-          {error ? (
-            <p role="alert" className="m-0 rounded-[10px] border border-[#6b2430] bg-[#1a0f11] px-3 py-2 font-sans text-[13px] text-[#f87171]">
-              {error}
-            </p>
-          ) : null}
-          <div className="mt-1 grid grid-cols-2 gap-2.5">
-            <GhostButton onClick={onCancel} disabled={busy} className="h-[50px] w-full">
-              Cancel
-            </GhostButton>
-            <button
-              type="submit"
-              disabled={busy || !password}
-              className={`h-[50px] rounded-[12px] font-sans text-[15px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                saving ? 'btn-sun' : 'bg-[#dc2626] text-white hover:bg-[#ef4444]'
-              }`}
-            >
-              {saving ? (busy ? 'Saving...' : 'Save') : busy ? 'Deleting...' : 'Delete'}
-            </button>
-          </div>
-        </form>
+      {saving && fromChat ? (
+        <InfoNote tone="gold">This address came from a request in your chat app. Check it matches who you meant to pay before saving.</InfoNote>
+      ) : null}
+      <div className="rounded-[12px] border border-[#26262a] bg-[#0b0b0c] px-3.5 py-3">
+        <p className="m-0 font-mono text-[10.5px] font-medium uppercase tracking-[0.22em] text-[#9a958c]">Wallet</p>
+        <p className="m-0 mt-1 break-all font-mono text-[12.5px] leading-[1.5] text-[#e9e4da]">{wallet.address}</p>
       </div>
-    </div>,
-    document.body
+    </PasswordSheet>
   );
 }
 
@@ -789,13 +842,13 @@ function svg(children: ReactNode, size = 20) {
   );
 }
 
-const LockGlyph = () => svg(<><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /><circle cx="12" cy="15.5" r="1" /></>);
-const PersonGlyph = () => svg(<><circle cx="12" cy="8" r="4" /><path d="M4.5 20.5c1-4 4-6 7.5-6s6.5 2 7.5 6" /></>);
+export const LockGlyph = () => svg(<><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /><circle cx="12" cy="15.5" r="1" /></>);
+export const PersonGlyph = () => svg(<><circle cx="12" cy="8" r="4" /><path d="M4.5 20.5c1-4 4-6 7.5-6s6.5 2 7.5 6" /></>);
 const LinkGlyph = () => svg(<><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" /></>);
 const CopyGlyph = () => svg(<><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5h10" /></>, 16);
 const TrashGlyph = () => svg(<><path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l1 13h9l1-13M9.5 7V4.5h5V7" /></>, 16);
-const ShieldGlyph = () => svg(<><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z" /><path d="M8.8 12.2l2.2 2.2 4.3-4.6" /></>);
-const ChevronGlyph = () => svg(<path d="M9 5.5l6.5 6.5L9 18.5" />, 22);
+export const ShieldGlyph = () => svg(<><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z" /><path d="M8.8 12.2l2.2 2.2 4.3-4.6" /></>);
+export const ChevronGlyph = () => svg(<path d="M9 5.5l6.5 6.5L9 18.5" />, 22);
 
 function EyeGlyph({ off }: { off: boolean }) {
   return svg(
