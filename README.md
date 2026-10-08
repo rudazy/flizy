@@ -6,8 +6,8 @@
 
 <p align="center">
   <strong>Send crypto the way you send a message.</strong><br />
-  WhatsApp or Telegram. Only to people you already approved.<br />
-  Raw wallet addresses only work once saved on the site with your password, and a new one waits 24 hours before it can receive.
+  Payments, NFTs and trading from WhatsApp, Telegram and the web,<br />
+  where money can only move to destinations you approved.
 </p>
 
 <p align="center">
@@ -25,64 +25,109 @@
 </p>
 
 <p align="center">
-  Live on <a href="https://flizy.app">flizy.app</a> · GIWA Sepolia · contracts source verified
+  Live at <a href="https://flizy.app">flizy.app</a> · GIWA Sepolia testnet · 9 contracts deployed and source verified
 </p>
 
 ---
 
 ## Contents
 
-- [What this is](#what-this-is)
+- [At a glance](#at-a-glance)
+- [The problem](#the-problem)
+- [The product](#the-product)
+- [What is live today](#what-is-live-today)
 - [How money moves](#how-money-moves)
-- [System](#system)
-- [Security](#security)
-- [Using it](#using-it)
-- [Commands](#commands)
+- [Business model](#business-model)
+- [Security model](#security-model)
+- [Architecture](#architecture)
+- [Engineering](#engineering)
 - [Contracts](#contracts)
-- [Repository](#repository)
+- [Using Flizy](#using-flizy)
 - [Roadmap](#roadmap)
+- [Repository](#repository)
 
 ---
 
-## What this is
+## At a glance
 
-Crypto payments assume a laptop, a browser extension, and a seed phrase. Most people who
-would actually use them have none of those. The ones who try get drained by one mistake:
-a wrong address in a chat, or a phone picked up while unlocked.
+| | |
+| --- | --- |
+| **What** | A crypto wallet you use from chat apps and the web, built so a single mistake cannot drain it |
+| **Who** | People who already pay each other in WhatsApp and Telegram, and the creators and projects they follow |
+| **How** | One policy engine behind every channel. Chat can spend inside your rules; only the website, behind your password, can change them |
+| **Where** | Live on [flizy.app](https://flizy.app), WhatsApp and Telegram, settling on GIWA Sepolia (testnet) |
+| **Earns from** | Swap protocol fee, NFT marketplace fee, paid-mint fee, collection generation fee |
+| **Built** | 85 API routes, 66 database migrations, 9 verified contracts, 2,391 automated tests passing |
 
-Flizy inverts that default.
+---
+
+## The problem
+
+Crypto payments still assume a laptop, a browser extension and a seed phrase. Most people
+who would use them have none of those, and the ones who try lose money to one slip: a wrong
+address pasted into a chat, an approval they did not read, a phone picked up while unlocked.
+
+Wallets answer this with more warnings. Flizy answers it with a different default.
 
 **Money can only move to a destination you approved earlier, from a device you already
-trust.** Approving a new destination requires the website and your account password. Chat
-can spend within those rules. It can never rewrite them.
+trust.** Approving a new destination takes the website and your account password, and a
+new destination cannot receive anything for its first 24 hours. Chat can spend inside
+those rules. It can never rewrite them.
 
-That is the product. Everything below serves it.
+---
 
-| | WhatsApp | Telegram |
+## The product
+
+One account, one balance, one approved list, one history, reachable from three places.
+
+| | WhatsApp | Telegram | flizy.app |
+| --- | --- | --- | --- |
+| Send to a saved name | `flizy send 0.01 to john` | `/send 0.01 to john` | Not on the site, by design |
+| Pay a Flizy account | `flizy pay 0.01 to @ludarep` | `/pay 0.01 to @ludarep` | Pay link or QR |
+| Send to a phone, email or handle | `flizy send 0.01 to +234...` | `/send 0.01 to @name on telegram` | Claim a hold sent to you |
+| Swap | `flizy swap 0.1 ETH for FLZ` | `/swap 0.1 ETH for FLZ` | Swap, liquidity, limit orders |
+| NFTs | `flizy send giwaforge to john` | `/send giwaforge to john` | Marketplace, mints, creator |
+| Confirm | reply `confirm` | tap Confirm | account password |
+| Lock this device | `flizy lock` | `/lock` | sign out |
+
+The site deliberately cannot send to an arbitrary address: funds leave only through a linked
+chat app to a trusted destination, through a payment to a Flizy account, or through a claim.
+A password alone never unlocks "any address".
+
+Chat apps are thin clients on one engine. A message becomes an intent, the engine decides
+whether money may move, and nothing executes without an explicit confirm. A new channel is
+another adapter, not a second product.
+
+---
+
+## What is live today
+
+| Area | What a person can do | Status |
 | --- | --- | --- |
-| Send to a saved name | `flizy send 0.01 to john` | `/send 0.01 to john` |
-| Pay a Flizy account | `flizy pay 0.01 to @ludarep` | `/pay 0.01 to @ludarep` |
-| Send an NFT you hold | `flizy send giwaforge to john` | `/send giwaforge to john` |
-| Send several at once | `flizy send 2 giwaforge to john` | `/send 2 giwaforge to john` |
-| Confirm | reply `confirm` | tap Confirm, or type it |
-| Receive to your number | automatic once linked | share your number once with `/phone` |
-| Lock this device | `flizy lock` | `/lock` |
-
-Same account, same balance, same approved list, same history. Link either chat, or both.
-Locking one leaves the other as it was.
-
-Both apps are thin clients on one engine. A message becomes an intent. The engine decides
-whether money is allowed to move. A third channel would be another adapter, not a second
-product.
+| **Chat payments** | Send ETH, listed tokens and NFTs from WhatsApp or Telegram, with a plan and a confirm for every move | Live |
+| **Pay by identity** | Pay a Flizy `@username`, a 9-digit Flizy number, or a scanned QR. First payments are flagged | Live |
+| **Escrow claims** | Send to a phone, email, GitHub, Discord or Telegram identity. Funds wait in escrow until the owner proves that identity; the sender can cancel until then | Live (X identities: linking paused) |
+| **Pay me** | A personal QR, Flizy number and pay link, printable | Live |
+| **Swap and liquidity** | Trade ETH and FLZ against the pool, add liquidity, with fees and slippage shown before confirm | Live |
+| **Limit orders** | Place a buy or sell at a price; a watcher fills it when the pool reaches it | Live |
+| **NFT marketplace** | Browse collections, list, buy, make and accept offers, with creator royalties up to 10% | Live |
+| **Mints** | Launch a drop with public and allowlist phases, prices, limits and schedule; bring an existing collection | Live |
+| **Collection creator** | Build a collection from artwork layers: traits, rarity weights, rules, unique combinations, standard metadata | Built: the creator runs today; launching switches on once the updated factory and storage are configured |
+| **Generate with AI** | Describe a collection; AI plans the traits and draws each layer, then the creator takes over | Built: switches on once AI and storage keys are configured |
+| **Scan** | A public ledger of Flizy activity. Recipients show as the payment rail, and each person chooses whether their username appears | Live |
+| **Tasks and projects** | Publish tasks with a declared reward; participants submit, the creator picks winners | Live (reward escrow comes later) |
+| **Copy trade** | Choose wallets to follow and set dollar rules | Settings only; nothing copies yet |
+| **Account and security** | Trusted wallets, unlock PIN, daily ETH limit, password change that signs out other devices, chat links, platform identities, privacy controls | Live |
 
 ---
 
 ## How money moves
 
-Every path through Flizy is the same six steps. Chat, the site, and a future channel all
-hit this spine. Nothing executes without an explicit confirm.
+Every path through Flizy is the same six steps. Chat, the site and any future channel all
+run through this spine.
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart LR
   A[Intent] --> B[Policy]
   B -->|denied| X[Reason, nothing moves]
@@ -92,54 +137,91 @@ flowchart LR
   E --> F[Receipt]
 ```
 
-From there the destination decides the settlement:
+The destination decides how it settles:
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
-  START["send / pay"] --> WHAT{Was an amount named?}
-  WHAT -->|yes| KIND{Who is the destination?}
-  WHAT -->|"no, just a ticker"| READ["Read the wallet:<br/>token or NFT, then which token id"]
-  READ --> KIND
-
-  KIND -->|"saved name"| TRUST["Trusted list<br/>password-gated on the site"]
-  KIND -->|"@username, Flizy number, or QR"| ID["Flizy account<br/>their wallet"]
-  KIND -->|"phone, email, or platform handle"| HOLD["Escrow hold<br/>they claim later"]
+  START["send / pay"] --> KIND{Who is the destination?}
+  KIND -->|"saved name"| TRUST["Trusted list<br/>password-gated on the site<br/>24 hours before it can receive"]
+  KIND -->|"@username, Flizy number or QR"| ID["Flizy account<br/>their wallet"]
+  KIND -->|"phone, email or platform handle"| HOLD["Escrow hold<br/>they claim later"]
 
   TRUST --> SPINE["Plan → Confirm → Sign → Receipt"]
   ID --> FIRST{Paid them before?}
   FIRST -->|no| WARN["First-payment warning"]
   FIRST -->|yes| SPINE
   WARN --> SPINE
-  SPINE --> SAVE["Offer to save as trusted"]
 
-  HOLD --> ON{Already on Flizy?}
-  ON -->|yes| NOTE["Notify them in chat"]
-  ON -->|no| LINK["Share flizy.app/claim/..."]
-  NOTE --> CLAIM["They prove identity and claim"]
-  LINK --> CLAIM
+  HOLD --> CLAIM["They prove the identity and claim"]
   CLAIM --> PAY["Escrow → their Flizy wallet"]
   HOLD -.->|before claim| CANCEL["Sender cancels, funds return"]
 ```
 
-A claim is not a bearer link. Payout requires the logged-in account to prove the identity
-the hold was addressed to (platform user id, verified phone, or verified email). A
+A claim is not a bearer link. Payout requires the signed-in account to prove the identity
+the hold was addressed to (platform user id, verified phone or verified email), so a
 lookalike handle cannot collect.
-
-Every account also has a **Pay me** card: QR plus `@username`. A scan opens
-[flizy.app/pay/username](https://flizy.app/pay/ludarep).
 
 ---
 
-## System
+## Business model
+
+Flizy earns a small, disclosed fee where value changes hands. Every fee is shown in the plan
+before the person confirms, and the on-chain fees are fixed in contract code.
+
+| Stream | Rate | Where it is enforced |
+| --- | --- | --- |
+| **Swap protocol fee** | 0.30% by default, capped at 1% | `FlizyFeeRouter`, on top of the pool fee |
+| **NFT marketplace** | 2% of each sale | `FlizyMarketplace` constant; the owner cannot raise it |
+| **Paid mints** | 2% of each paid mint; free mints pay nothing | `FlizyDrop` constant; the owner cannot raise it |
+| **Collection generation** | $2 per generated collection, paid in ETH at the current rate | Site, before storage and AI work starts |
+
+Creators keep their royalties (up to 10%) on secondary sales.
+
+---
+
+## Security model
+
+| Control | What it does |
+| --- | --- |
+| **Approved destinations** | Sends by name reach the trusted list only. The list is edited on the site behind the account password, never from chat, and a new entry waits 24 hours before it can receive |
+| **Plan, then confirm** | Every money action shows amount, destination, network and fees first. Nothing executes without a confirm |
+| **Password sheets** | Trusted wallets, the PIN, the daily limit and the password itself each ask for the account password in a confirmation sheet. Wrong guesses climb the same lockout as login |
+| **Per-channel lock** | Lock a chat app instantly. Unlocking takes the PIN; chat never takes the account password |
+| **Limits** | A daily ETH cap per account, counted the same way in chat and on the site |
+| **Sessions** | Server-side sessions that can be revoked. Changing the password signs out every other device |
+| **Privacy** | Scan never names who was paid, and each account decides whether its username shows there at all |
+| **Fixed fees** | Marketplace and mint fees are constants in verified contracts |
+| **Verified contracts** | Every deployed contract is source verified on the public explorer |
+
+### Where the product actually is
+
+Stated plainly, because it matters more than sounding finished.
+
+- Flizy runs on **GIWA Sepolia, a testnet**. Do not treat it as production custody.
+- Each account's wallet is a **smart account** (a MetaMask HybridDeleGator) that both the
+  chat engine and the site spend from. It is still owned by a key the server derives, so
+  **the current model is custodial**.
+- The path out of custody has been **proven on chain but not shipped**: a passkey added to
+  the account, a bounded delegation signed with it, and the server key renounced. See
+  [docs/DELEGATION-GIWA.md](docs/DELEGATION-GIWA.md) and
+  [docs/PASSKEY-P256-GIWA.md](docs/PASSKEY-P256-GIWA.md).
+- The approved-destination rule is enforced **in the policy layer** today. Moving it onto
+  the account itself is the next security milestone.
+
+---
+
+## Architecture
 
 Clients are adapters. Policy is the only money gate. The chain is infrastructure.
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
   subgraph clients["Clients"]
     WA["WhatsApp"]
     TG["Telegram"]
-    WEB["flizy.app<br/>dashboard · PIN · trusted · invite · pay QR"]
+    WEB["flizy.app<br/>wallet · swap · NFTs · mints · scan · account"]
   end
 
   subgraph engine["Engine"]
@@ -148,8 +230,8 @@ flowchart TB
     X["Plan · Confirm · Sign"]
   end
 
-  DB[("Supabase<br/>accounts · identities · claims")]
-  CH["GIWA Sepolia<br/>Flizy wallet · explorer receipt"]
+  DB[("Postgres<br/>accounts · identities · claims · sessions")]
+  CH["GIWA Sepolia<br/>smart-account wallets · DEX · marketplace · mints"]
 
   WA --> R
   TG --> R
@@ -162,178 +244,140 @@ flowchart TB
   CH --> clients
 ```
 
-```mermaid
-sequenceDiagram
-  participant U as You
-  participant Site as flizy.app
-  participant Chat as WhatsApp or Telegram
-  participant E as Engine
-  participant Chain as GIWA Sepolia
+| Layer | Technology |
+| --- | --- |
+| Web | Next.js (App Router), TypeScript, Tailwind CSS, on Vercel |
+| Chat | WhatsApp and Telegram clients on a shared Node.js engine |
+| Data | Supabase Postgres, schema in versioned SQL migrations, a build gate that refuses to deploy against a database missing any object the code needs |
+| Chain | Solidity 0.8.24, Foundry, ethers; Uniswap V2 port, ERC-721 marketplace and mints, MetaMask delegation framework accounts |
+| Storage and AI | IPFS pinning for generated collections; Anthropic for collection planning, an image model for trait art |
 
-  U->>Site: Sign up · verify email · set @username
-  U->>Site: Add trusted names · set PIN · get a link code
-  U->>Chat: link CODE
-  Note over E: Binds this chat id to the account
-  U->>Chat: send 0.01 to john
-  Chat->>E: Intent
-  E->>E: Policy then Plan
-  E-->>U: Amount, destination, network, fees
-  U->>Chat: confirm
-  E->>Chain: Sign from the Flizy wallet
-  E-->>U: Receipt + explorer link
+Implementation detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
+
+## Engineering
+
+Figures below are measured from this repository, not projected.
+
+**Where the code is** (lines of code by area, excluding generated files):
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'pie1': '#f5c842', 'pie2': '#c9a227', 'pie3': '#8a7128', 'pie4': '#5c4c1c', 'pie5': '#3a3a3e', 'pieTitleTextColor': '#888888', 'pieSectionTextColor': '#0a0a0a', 'pieLegendTextColor': '#888888', 'pieStrokeColor': '#0a0a0a'}}}%%
+pie showData
+  title Lines of code by area
+  "Web app" : 55348
+  "Automated tests" : 33682
+  "Chat engine" : 27322
+  "Database migrations" : 6630
+  "Smart contracts" : 2755
 ```
 
-**[flizy.app](https://flizy.app)** is where trust and PIN are managed. Chat is where you
-send within those rules. Implementation detail lives in
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+About one line of test for every 2.7 lines of product code.
 
----
+**Shipping momentum** (commits per week as bars, running total as the line):
 
-## Security
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'xyChart': {'backgroundColor': 'transparent', 'plotColorPalette': '#8a7128, #f5c842', 'titleColor': '#888888', 'xAxisLabelColor': '#888888', 'yAxisLabelColor': '#888888', 'xAxisTitleColor': '#888888', 'yAxisTitleColor': '#888888'}}}}%%
+xychart-beta
+  title "Commits since the first commit on 21 July 2026"
+  x-axis ["Jul 20", "Jul 27", "Aug 3", "Aug 10", "Aug 17", "Aug 24", "Aug 31", "Sep 7", "Sep 14", "Sep 21", "Sep 28", "Oct 5"]
+  y-axis "Commits" 0 --> 200
+  bar [26, 15, 29, 16, 3, 13, 24, 19, 2, 8, 18, 16]
+  line [26, 41, 70, 86, 89, 102, 126, 145, 147, 155, 173, 189]
+```
 
-| Control | What it does |
+| Quality measure | Today |
 | --- | --- |
-| **Approved destinations** | Named address sends reach your trusted list only. The list is managed on the site behind your password, never from chat |
-| **Pay by identity** | A Flizy `@username`, Flizy number, or scanned QR can be paid with confirm. First payment is flagged. After success you can save them |
-| **Plan then confirm** | Every money action shows amount, destination, network, and fees first. Nothing executes without confirm |
-| **Fees disclosed up front** | Swap plans show the protocol fee percentage, the fee amount, and slippage before you confirm |
-| **Per-channel lock** | Lock a chat app instantly. Unlocking needs your PIN; chat never takes the account password. Wrong attempts back off. A new PIN on the site, behind password, clears the block |
-| **Limits** | Per-transaction maximum and a daily cap, enforced centrally |
-| **Separated keys** | User funds, operational gas, and claim escrow use different keys |
-| **Verified contracts** | Every deployed contract is source verified on the public explorer |
-
-The rules live in one policy layer. A new chat app inherits them because it has no way
-around them. Allowlist detail: [docs/trusted-addresses.md](docs/trusted-addresses.md).
-
-### Where the product actually is
-
-Being precise about this matters more than sounding finished.
-
-- This is a **testnet product** on GIWA Sepolia. Do not treat it as production custody.
-- Agent wallets are currently **server-derived EOAs**. Keys are held server side, so the
-  current model is custodial. Do not read that as self-custody.
-- `contracts/src/FlizyWallet.sol` is scaffold, not deployed, and **not** the upgrade path.
-  Do not extend it. Kernel helpers in this repo are research smokes, not the live engine.
-- The approved-destination allowlist is enforced **at the policy layer today**, not yet on
-  chain. Moving that onto a smart account is the next security milestone.
-
----
-
-## Using it
-
-1. **Sign up on the site.** Email, password, then a one-time code to prove the inbox. Set a
-   Flizy `@username`. You get an account, a Flizy wallet, and a personal invite link.
-2. **Approve who you can pay.** Add a name and an address under trusted destinations. This
-   step needs your password, and it only happens on the site.
-3. **Link your chat app.** Generate a one-time code, open WhatsApp or Telegram from the
-   dashboard, send the code. Only a logged-in account holder can produce a code.
-   Telegram also asks you to share your number once.
-4. **Pay from chat.** `flizy send 0.01 to john` for a name you already saved, or
-   `flizy pay 0.01 to @ludarep` for a Flizy account. Flizy replies with a plan. Nothing
-   moves until you confirm.
-5. **Get a receipt** with an explorer link.
-
-You can also send to a **phone number, email, or platform handle** (GitHub, Discord, X,
-Telegram). Funds go into escrow. You can cancel until they are claimed. If that person is
-already on Flizy they are notified in chat. If not, you share a claim link. Money never
-lands in someone's wallet unannounced, and a number that is not on Flizy is never messaged
-out of the blue.
-
-**Naming an asset is enough.** `flizy send giwaforge to john` carries no amount and no
-token id, so Flizy reads your wallet and asks for whatever is missing: token or NFT if you
-hold both, then which token id if you hold several. One NFT and it goes straight to the
-plan. Nothing is picked for you, and the plan still names the exact id before you confirm.
-
-**A number in front means how many.** `flizy send 2 giwaforge to john` sends two of them.
-An ERC-721 moves one token id per transaction, so two NFTs is two transactions and two
-confirms: Flizy names the ids it is about to move, sends the first once you confirm, then
-comes straight back for the next. Hold more than you asked for and it lists them so you
-choose each one; hold exactly as many and there is nothing to choose. Ask for more than
-you have and it sends nothing at all. Name the ids yourself with
-`send 2 giwaforge 1123 1128 to john` or `nft send giwaforge 1123 1128 to john`.
-
-Home has an optional **Attach to claims I send** checkbox, off by default. When on, new
-holds carry your invite so someone who joins from that claim can count as a referred
-friend. How a count is earned: [docs on the site](https://flizy.app/docs#invites).
-
-Used-your-link moves when they sign up through your invite. Credit at the top is the
-verified count (phone + first confirmed tx). It is not spendable. One verified phone can
-only produce one credit, even after unlink.
-
----
-
-## Commands
-
-WhatsApp uses the `flizy` prefix. Telegram uses `/command` and also accepts the prefix.
-Bare `confirm` and `cancel` work on both.
-
-| Command | Purpose |
-|---------|---------|
-| `help` | Command list |
-| `link CODE` | Bind this chat to your account |
-| `me` · `balance` · `deposit` · `history` | Account and wallet |
-| `add wallet 0x…` | Start the approved-destination flow |
-| `send AMOUNT [FLZ] to name \| phone \| email \| @user on telegram` | Transfer, or hold a claim (ETH default; listed tokens too) |
-| `send TICKER to …` | No amount: Flizy reads your wallet and asks token or NFT, then which id. Add `nft` (`send giwaforge nft to …`) to skip straight to the collection |
-| `send N TICKER to …` | Send N NFTs from that collection, one confirm each |
-| `nft send TICKER ID [ID …] to …` | Send listed NFTs by token id |
-| `mint 1 giwaforge` | One test NFT per wallet |
-| `claim` · `cancel claims` | Receive or cancel holds |
-| `request` · `pay` · `requests` | Payment requests |
-| `buy AMOUNT FLZ` · `sell AMOUNT FLZ` | Trade against the pool |
-| `swap AMOUNT ETH for FLZ` · `price FLZ` | Explicit swap and spot price |
-| `confirm` · `cancel` | Execute or drop the pending plan |
-| `lock` · `unlock PIN` | Session control, per channel |
-| `/phone` | Telegram only: share your number so claims reach you |
-
-### On the site
-
-| Route | Purpose |
-|-------|---------|
-| [flizy.app](https://flizy.app/) | Product home |
-| [/how-it-works](https://flizy.app/how-it-works) · [/docs](https://flizy.app/docs) | Guides and security |
-| [/signup](https://flizy.app/signup) · [/login](https://flizy.app/login) | Account |
-| [/dashboard](https://flizy.app/dashboard) | Wallet, invite, history, trusted list, PIN, chat link codes |
-| [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap and liquidity |
-| `/i/[username]` | Personal invite. Sets attribution, then signup |
-| `/claim/[token]/[username]` | Public claim. Trailing username is the invite when the sender opted in |
-
-Swapping is available in chat and on the site. The protocol fee is **0.30%** by default
-with a hard maximum of 1%, on top of the standard pool fee, and it is shown in the plan
-before you confirm. Details: [docs/swap-fees.md](docs/swap-fees.md).
+| Automated tests | 2,235 Node tests and 156 Foundry contract tests, all passing |
+| Test files | 174 Node, 7 Foundry |
+| Production build | Type-checked, linted and schema-gated on every build |
+| Database | 66 idempotent migrations, each ending in a post-condition check that fails loudly |
+| API surface | 85 route handlers; every payment, trade and security setting re-checks the account password |
+| Contracts | 9 deployed on GIWA Sepolia, all source verified as a full match |
 
 ---
 
 ## Contracts
 
-**Network:** GIWA Sepolia · **Chain ID:** `91342`
-**Explorer:** [sepolia-explorer.giwa.io](https://sepolia-explorer.giwa.io)
+**Network:** GIWA Sepolia · **Chain ID:** `91342` ·
+**Explorer:** [sepolia-explorer.giwa.io](https://sepolia-explorer.giwa.io) ·
 **Addresses:** [`deployments/giwa-sepolia.json`](deployments/giwa-sepolia.json)
 
-| Contract | Address | Explorer | Source |
-|----------|---------|----------|--------|
-| **WETH9** | `0x3a13399f2741122B63c7710B2A85346B97C6BFDf` | [View](https://sepolia-explorer.giwa.io/address/0x3a13399f2741122B63c7710B2A85346B97C6BFDf) | Verified |
-| **FLZ** (test token, 100k supply, 18 decimals) | `0x308be8f71DA695f18E70D2243A446e1fD1566BA6` | [View](https://sepolia-explorer.giwa.io/address/0x308be8f71DA695f18E70D2243A446e1fD1566BA6) | Verified |
-| **UniswapV2Factory** | `0xBB1d2c582E455B448660A199097A54DF29162BbF` | [View](https://sepolia-explorer.giwa.io/address/0xBB1d2c582E455B448660A199097A54DF29162BbF) | Verified |
-| **UniswapV2Router02** | `0x4055413A4757e069bbCAc481639EF2814224Faa0` | [View](https://sepolia-explorer.giwa.io/address/0x4055413A4757e069bbCAc481639EF2814224Faa0) | Verified |
-| **FlizyFeeRouter** (protocol fee, default 30 bps, max 100 bps) | `0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC` | [View](https://sepolia-explorer.giwa.io/address/0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC) | Verified |
-| **FLZ / WETH pair** | `0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227` | [View](https://sepolia-explorer.giwa.io/address/0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227) | Verified |
+| Contract | Purpose | Address |
+| --- | --- | --- |
+| **FlizyMarketplace** | ERC-721 listings, offers and royalties; 2% fixed fee | [`0x7e81...F64a`](https://sepolia-explorer.giwa.io/address/0x7e817b6c42C14C0eC90be76030f808eFB20dF64a) |
+| **FlizyDrop** | Runs every Flizy-managed mint: phases, allowlist, limits; 2% fixed fee on paid mints | [`0x8E5f...56cA`](https://sepolia-explorer.giwa.io/address/0x8E5f6205EF8bd47AB17EC03D529a3456EA8a56cA) |
+| **FlizyCollectionFactory** | Creates Flizy-native collections owned by the creator | [`0xFF60...0746`](https://sepolia-explorer.giwa.io/address/0xFF6035Bb2ef88Ff5F158C411a2337FF767270746) |
+| **FlizyFeeRouter** | Swap protocol fee, 30 bps default, 100 bps maximum | [`0x6427...d9cC`](https://sepolia-explorer.giwa.io/address/0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC) |
+| **UniswapV2Router02** | Swaps and liquidity | [`0x4055...Faa0`](https://sepolia-explorer.giwa.io/address/0x4055413A4757e069bbCAc481639EF2814224Faa0) |
+| **UniswapV2Factory** | Pair registry | [`0xBB1d...2BbF`](https://sepolia-explorer.giwa.io/address/0xBB1d2c582E455B448660A199097A54DF29162BbF) |
+| **FLZ / WETH pair** | The ETH and FLZ pool | [`0xEC6E...8227`](https://sepolia-explorer.giwa.io/address/0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227) |
+| **FLZ** | Test token, 100,000 supply, 18 decimals | [`0x308b...6BA6`](https://sepolia-explorer.giwa.io/address/0x308be8f71DA695f18E70D2243a446e1fD1566BA6) |
+| **WETH9** | Wrapped ETH | [`0x3a13...6BDf`](https://sepolia-explorer.giwa.io/address/0x3a13399f2741122B63c7710B2A85346B97C6BFDf) |
 
-All six are source verified as a full match, built with `v0.8.24+commit.e11b9ed9`, optimizer
-on at 200 runs, EVM version cancun. This is a Solidity 0.8 port of Uniswap V2, so factory,
-pair and router build on one compiler rather than the canonical 0.5.16 / 0.6.6 split.
+The DEX contracts are a Solidity 0.8 port of Uniswap V2, built with
+`v0.8.24+commit.e11b9ed9`, optimizer on at 200 runs, EVM version cancun.
 
-**Treasury / fee destination:** [`0x042D82b3EaC96d9f5CddC52Fb80FE9d30f11A2a0`](https://sepolia-explorer.giwa.io/address/0x042D82b3EaC96d9f5CddC52Fb80FE9d30f11A2a0)
-**Seed liquidity:** 1.2 ETH and 60,000 FLZ, starting near 50,000 FLZ per ETH.
+Also in the repository and not yet deployed: `FlizyLayeredCollection` and the factory's
+`createWithMetadata`, which give every NFT of a generated collection its own metadata.
+`FlizyWallet.sol` is an early scaffold and not the custody path.
 
-Also in the repository, not live custody:
+---
 
-| Item | Path | Status |
-|------|------|--------|
-| FlizyWallet | `contracts/src/FlizyWallet.sol` | Scaffold. Not deployed. Do not extend |
-| FlizyWalletFactory | `contracts/src/FlizyWalletFactory.sol` | Same. Do not deploy for users |
-| Kernel v3.3 smoke | `lib/smartAccount.js`, `deployments/giwa-sepolia-kernel.json` | Research only. Not the live engine |
-| P-256 / WebAuthn on GIWA Sepolia | `docs/PASSKEY-P256-GIWA.md` | Measured. RIP-7212 at 0x100 is a real verifier |
+## Using Flizy
+
+1. **Sign up at [flizy.app](https://flizy.app).** Email, password, a one-time code, then a
+   Flizy `@username`. The account comes with a wallet, a Pay me card and an invite link.
+2. **Approve who you can pay.** Add a name and an address under Trusted wallets. It asks for
+   your password, and the new address can receive after 24 hours.
+3. **Link a chat app.** Generate a one-time code on the site and send it to Flizy on
+   WhatsApp or Telegram.
+4. **Pay from chat.** `flizy send 0.01 to john`. Flizy replies with a plan; nothing moves
+   until you confirm. You get a receipt with an explorer link.
+
+### Chat commands
+
+WhatsApp uses the `flizy` prefix. Telegram uses `/command` and also accepts the prefix.
+
+| Command | Purpose |
+| --- | --- |
+| `help` | Command list |
+| `link CODE` | Bind this chat to your account |
+| `me` · `balance` · `deposit` · `history` | Account and wallet |
+| `send AMOUNT [TOKEN] to name \| phone \| email \| @user on telegram` | Transfer, or hold a claim |
+| `send TICKER to ...` | No amount: Flizy reads your wallet and asks which token or NFT |
+| `send N TICKER to ...` · `nft send TICKER ID to ...` | Send NFTs, one confirm each |
+| `claim` · `cancel claims` | Receive or cancel holds |
+| `request` · `pay` · `requests` | Payment requests |
+| `swap AMOUNT ETH for FLZ` · `buy` · `sell` · `price FLZ` | Trading |
+| `confirm` · `cancel` | Execute or drop the pending plan |
+| `lock` · `unlock PIN` | Device control, per channel |
+
+### On the site
+
+| Route | Purpose |
+| --- | --- |
+| [/](https://flizy.app/) · [/how-it-works](https://flizy.app/how-it-works) · [/docs](https://flizy.app/docs) | Product, guides and security |
+| [/dashboard](https://flizy.app/dashboard) | Home and history |
+| [/dashboard/wallet](https://flizy.app/dashboard/wallet) | Balances, tokens, NFTs, offers and Scan |
+| [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap, liquidity and limit orders |
+| [/dashboard/explore](https://flizy.app/dashboard/explore) | Tokens, NFTs, mints and tasks |
+| [/dashboard/account](https://flizy.app/dashboard/account) | Profile, projects, Pay me, language, country, chat, platforms, trusted wallets, PIN, limits, security |
+| `/pay/[username]` · `/claim/[token]` · `/i/[username]` | Pay link, public claim, personal invite |
+
+Swap fee mechanics: [docs/swap-fees.md](docs/swap-fees.md). Trusted wallets in depth:
+[docs/trusted-addresses.md](docs/trusted-addresses.md).
+
+---
+
+## Roadmap
+
+| Horizon | Focus |
+| --- | --- |
+| **Now** | Chat payments, identity claims, swap and limit orders, NFT marketplace and mints, Scan with privacy controls, tasks, a full account and security center, all on GIWA Sepolia |
+| **Next** | Turn on generated collections (deploy the metadata factory, connect storage and AI). Ship the passkey custody transition so wallets stop being server-owned. Move the approved-destination rule onto the account |
+| **Then** | Copy trade execution and task reward escrow. More tokens through the pair registry, then more EVM chains through the chain registry, on the same policy path |
 
 ---
 
@@ -341,40 +385,32 @@ Also in the repository, not live custody:
 
 ```text
 index.js · telegram.js    chat clients (adapters)
-lib/                      router, policy, identity, claims, swap
-web/                      Next.js site and dashboard
-contracts/                Solidity sources and Foundry tests
+lib/                      engine: router, policy, identity, claims, swap, limit orders
+web/                      Next.js site, dashboard and API routes
+contracts/                Solidity sources, deploy scripts and Foundry tests
 supabase/migrations/      database schema
-deployments/              live addresses (DEX) and Kernel research pin
+deployments/              live contract addresses
 docs/                     architecture, operations, fee mechanics
+test/                     Node test suite
 ```
-
-Configuration is documented in [`.env.example`](.env.example).
 
 ### Quickstart
 
 ```bash
 npm install
-cp .env.example .env    # fill in your values
-npm start               # WhatsApp client
-npm run start:telegram  # Telegram client
-npm test
+cp .env.example .env      # fill in your values
+npm start                 # WhatsApp client
+npm run start:telegram    # Telegram client
+npm test                  # Node suite
+cd contracts && forge test
 ```
 
-Full setup, deployment and configuration: [docs/OPERATIONS.md](docs/OPERATIONS.md).
-
----
-
-## Roadmap
-
-| Horizon | Focus |
-|---------|-------|
-| **Now** | GIWA Sepolia: chat payments, identity claims (phone, email, GitHub, Discord, X, Telegram), identity send for listed tokens and NFTs on the same escrow, invites with a phone-permanence count, FLZ swap and liquidity, both chat apps on one engine |
-| **Next** | A smart-account path so testers move off derived EOAs, with the policy gate unchanged |
-| **Then** | More tokens through the pair registry, then more EVM chains through the chain registry. Same policy path, no new AMM |
+Configuration is documented in [`.env.example`](.env.example). Setup, deployment and
+operations: [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ---
 
 ## License and contact
 
-Private product repository. Live at [flizy.app](https://flizy.app). On X: [@Flizyapp](https://x.com/Flizyapp).
+Private product repository. Live at [flizy.app](https://flizy.app). On X:
+[@Flizyapp](https://x.com/Flizyapp).
