@@ -454,6 +454,12 @@
     },
     {
       "kind": "check",
+      "name": "projects.projects_banner_format",
+      "providedBy": "20261011120000_project_page.sql",
+      "requiredBy": "check on projects"
+    },
+    {
+      "kind": "check",
       "name": "projects.projects_description_len",
       "providedBy": "20260927120000_project_profiles.sql",
       "requiredBy": "check on projects"
@@ -586,6 +592,12 @@
     },
     {
       "kind": "check",
+      "name": "tasks.tasks_category_check",
+      "providedBy": "20261011120000_project_page.sql",
+      "requiredBy": "check on tasks"
+    },
+    {
+      "kind": "check",
       "name": "tasks.tasks_completed_at_check",
       "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "check on tasks"
@@ -594,6 +606,12 @@
       "kind": "check",
       "name": "tasks.tasks_description_len",
       "providedBy": "20260925010000_tasks.sql",
+      "requiredBy": "check on tasks"
+    },
+    {
+      "kind": "check",
+      "name": "tasks.tasks_level_check",
+      "providedBy": "20261011120000_project_page.sql",
       "requiredBy": "check on tasks"
     },
     {
@@ -739,6 +757,12 @@
       "name": "nft_favorites_before_insert",
       "providedBy": "20261002120000_nft_favorites.sql",
       "requiredBy": "executed by trigger nft_favorites_before_insert"
+    },
+    {
+      "kind": "function",
+      "name": "project_participant_stats",
+      "providedBy": "20261011120000_project_page.sql",
+      "requiredBy": "web/lib/tasks.ts"
     },
     {
       "kind": "function",

@@ -674,3 +674,75 @@ export function CloseIcon({ size, strokeWidth = 2, className }: IconProps) {
     </Svg>
   );
 }
+
+export function TrophyIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M8 4h8v5a4 4 0 0 1-8 0V4z" />
+        <path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4" />
+        <path d="M12 13v4M9 20h6M10 17h4" />
+      </g>
+    </Svg>
+  );
+}
+
+export function GiftIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <rect x="4" y="9" width="16" height="11" rx="1.5" />
+        <path d="M3 9h18M12 9v11" />
+        <path d="M12 9c-1.5-3-5-4-5.5-2s2.5 2 5.5 2zM12 9c1.5-3 5-4 5.5-2S15 9 12 9z" />
+      </g>
+    </Svg>
+  );
+}
+
+export function ShareIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="18" cy="5.5" r="2.5" />
+        <circle cx="6" cy="12" r="2.5" />
+        <circle cx="18" cy="18.5" r="2.5" />
+        <path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1" />
+      </g>
+    </Svg>
+  );
+}
+
+export function CrownIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M4 17h16l-1.5-9-4.5 4-2-6-2 6-4.5-4L4 17zM5 20h14" />
+    </Svg>
+  );
+}
+
+export function StarIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z" />
+    </Svg>
+  );
+}
+
+export function PaperPlaneIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M21 4 3.5 10.5l6.2 2.3L17 7.5l-5.2 7.1 2.2 6.1L21 4z" />
+    </Svg>
+  );
+}
+
+export function GithubIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path
+        strokeWidth={strokeWidth}
+        d="M9 19c-4 1.3-4-2-6-2.5M15 21v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"
+      />
+    </Svg>
+  );
+}

@@ -1,41 +1,24 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useDashboard } from './DashboardProvider';
 import type { ProjectLink, ProjectMember, ProjectWorkspace as Workspace } from '../lib/tasks';
-import { shrinkProjectImage } from '../lib/projectImage';
+import { shrinkProjectBanner, shrinkProjectImage } from '../lib/projectImage';
 import { ProjectAvatar } from './ProjectAvatar';
-import { VerifiedBadge } from './VerifiedBadge';
-import { TaskCard } from './TaskCard';
-import { Leaderboard } from './ProjectLeaderboard';
+import { ProjectPage } from './ProjectPage';
 import { LINK_KINDS, LINK_LABEL } from './AccountProjects';
-import {
-  ArrowLeftIcon,
-  CheckIcon,
-  CloseIcon,
-  CopyIcon,
-  ExternalLinkIcon,
-  PencilIcon,
-  PeopleIcon,
-  PlusIcon,
-  TasksIcon,
-  TrashIcon,
-  UserPlusIcon,
-} from './ExploreIcons';
+import { ArrowLeftIcon, CloseIcon, PeopleIcon, PlusIcon, TrashIcon, UserPlusIcon } from './ExploreIcons';
 
 /**
- * One project's workspace, inside the app: what it has published, who has
- * earned XP from it, and who runs it. The owner and members both land here;
- * only the owner sees the member controls. The public page stays at
- * /project/<handle> and is one tap away.
+ * One project's workspace, inside the app. It loads the project for its owner
+ * or a member and draws it with the same ProjectPage the public page uses, and
+ * adds what only the team has: the edit sheet and the team controls in About.
  */
 
-type Tab = 'live' | 'ended' | 'leaderboard' | 'members';
-
-const CARD = 'rounded-[12px] border border-[#232323] bg-[#101010]';
+const CARD = 'rounded-[14px] border border-[#232323] bg-[#101010]';
 /** Width is left to each use: a fixed-width control next to a full one cannot carry w-full too. */
 const FIELD_BOX =
   'rounded-[6px] border border-[#383838] bg-[#0d0d0d] px-3 font-sans text-sm text-[#f5f5f5] outline-none transition-colors placeholder:text-[#858585] focus:border-sun/70';
@@ -45,13 +28,8 @@ const GHOST_BUTTON =
 const PRIMARY_BUTTON =
   'hit-y-44 inline-flex h-10 items-center justify-center gap-2 rounded-[6px] bg-sun px-4 font-sans text-sm font-semibold text-sun-ink no-underline transition-opacity hover:opacity-90';
 
-/** Warm light behind the picture, the same glow the Projects slide uses. */
-const HERO_BG =
-  'radial-gradient(90% 120% at 0% 0%, rgba(70, 50, 16, 0.75) 0%, rgba(40, 30, 12, 0.35) 45%, rgba(11, 11, 11, 0) 80%), #0b0b0b';
-
 const NAME_MAX = 60;
 const DESCRIPTION_MAX = 300;
-
 
 export function ProjectWorkspace({ handle }: { handle: string }) {
   const router = useRouter();
@@ -61,9 +39,7 @@ export function ProjectWorkspace({ handle }: { handle: string }) {
   const [loadError, setLoadError] = useState('');
   const [missing, setMissing] = useState(false);
   const [reload, setReload] = useState(0);
-  const [tab, setTab] = useState<Tab>('live');
   const [editing, setEditing] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,17 +66,6 @@ export function ProjectWorkspace({ handle }: { handle: string }) {
       cancelled = true;
     };
   }, [handle, reload]);
-
-  async function copyLink() {
-    if (!project) return;
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/project/${project.handle}`);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      // Clipboard refused (insecure context or permissions): nothing to undo.
-    }
-  }
 
   const back = (
     <Link
@@ -144,167 +109,40 @@ export function ProjectWorkspace({ handle }: { handle: string }) {
     );
   }
 
-  const liveCount = project.liveTasks.length;
-  const atCap = liveCount >= project.liveCap;
-  const isOwner = project.role === 'owner';
-  // short is the label under 480px, where four full labels do not fit.
-  const tabs: Array<{ id: Tab; label: string; short?: string; count: number }> = [
-    { id: 'live', label: 'Live', count: liveCount },
-    { id: 'ended', label: 'Ended', count: project.endedTasks.length },
-    { id: 'leaderboard', label: 'Leaderboard', short: 'XP', count: project.leaderboard.earners },
-    { id: 'members', label: 'Members', short: 'Team', count: project.members.length },
-  ];
-
   return (
-    <div className="grid gap-4">
-      {back}
-
-      <section className={`${CARD} relative overflow-hidden p-5`} style={{ background: HERO_BG }}>
-        <div className="flex items-start gap-4">
-          <div className="rounded-[14px] p-[3px] shadow-[0_0_40px_rgba(247,208,71,0.18)] ring-1 ring-sun/30">
-            <ProjectAvatar name={project.name} image={project.image} size={76} className="rounded-[12px]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="m-0 min-w-0 break-words font-sans text-2xl font-semibold tracking-wide text-[#f5f5f5]">
-                {project.name}
-              </h1>
-              {project.verified ? <VerifiedBadge size={18} /> : null}
-            </div>
-            <button
-              type="button"
-              onClick={() => void copyLink()}
-              className="hit-y-44 mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-[#a9a9a9] transition-colors hover:text-[#f5f5f5]"
-              aria-label="Copy the project link"
-            >
-              project/{project.handle}
-              {copied ? <CheckIcon size={12} className="text-sun" /> : <CopyIcon size={12} />}
-            </button>
-            <p className="m-0 mt-2">
-              <span
-                className={`rounded-[4px] px-1.5 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-wide ${
-                  isOwner ? 'bg-sun text-sun-ink' : 'border border-sun/50 text-sun'
-                }`}
-              >
-                {isOwner ? 'Owner' : 'Member'}
-              </span>
-            </p>
-          </div>
-        </div>
-
-        {project.description ? (
-          <p className="m-0 mt-4 text-sm leading-relaxed text-[#bdbdbd]">{project.description}</p>
-        ) : null}
-        {project.links.length ? (
-          <ul className="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
-            {project.links.map((link) => (
-              <li key={link.url}>
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noreferrer noopener nofollow"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-[6px] border border-[#2e2e2e] bg-[#131313] px-2.5 font-sans text-xs text-[#e6e6e6] no-underline transition-colors hover:border-sun/50"
-                >
-                  {link.label}
-                  <ExternalLinkIcon size={11} className="text-[#8f8f8f]" />
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-
-      <section className="grid grid-cols-2 gap-2 min-[520px]:grid-cols-4">
-        <Stat label="Live now" value={`${liveCount}/${project.liveCap}`}>
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#222]" aria-hidden>
-            <div
-              className="h-full rounded-full bg-sun transition-[width]"
-              style={{ width: `${Math.min(100, (liveCount / project.liveCap) * 100)}%` }}
-            />
-          </div>
-        </Stat>
-        <Stat label="Tasks in all" value={project.totalTasks.toLocaleString('en-US')} />
-        <Stat label="XP awarded" value={project.leaderboard.totalXp.toLocaleString('en-US')} />
-        <Stat label="Team" value={String(project.members.length)} />
-      </section>
-
-      <section className="grid gap-2">
-        <div className="flex flex-wrap gap-2">
-          {atCap ? (
-            <span className={`${PRIMARY_BUTTON} cursor-not-allowed opacity-50`} aria-disabled="true">
-              <PlusIcon size={14} />
-              New task
-            </span>
-          ) : (
-            <Link href={`/dashboard/explore/new?project=${encodeURIComponent(project.id)}`} className={PRIMARY_BUTTON}>
-              <PlusIcon size={14} />
-              New task
-            </Link>
-          )}
-          <button type="button" className={GHOST_BUTTON} onClick={() => setEditing(true)}>
-            <PencilIcon size={14} />
-            Edit
-          </button>
-          <Link href={`/project/${encodeURIComponent(project.handle)}`} className={GHOST_BUTTON}>
-            <ExternalLinkIcon size={14} />
-            Public page
-          </Link>
-        </div>
-        {atCap ? (
-          <p className="m-0 text-xs text-muted">
-            {project.liveCap} tasks are live. A new one can be published when one ends.
-          </p>
-        ) : null}
-      </section>
-
-      <div role="tablist" aria-label="Project" className="grid grid-cols-4 gap-1 rounded-[8px] border border-[#232323] bg-[#0d0d0d] p-1">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className={`hit-y-44 flex h-9 min-w-0 items-center justify-center gap-1 rounded-[6px] px-1 font-sans text-[12px] transition-colors ${
-              tab === t.id ? 'bg-sun-wash text-sun ring-1 ring-sun/40' : 'text-[#a9a9a9] hover:text-[#f5f5f5]'
-            }`}
-          >
-            {t.short ? (
-              <>
-                <span className="truncate min-[480px]:hidden">{t.short}</span>
-                <span className="hidden truncate min-[480px]:inline">{t.label}</span>
-              </>
-            ) : (
-              <span className="truncate">{t.label}</span>
-            )}
-            <span className="font-mono text-[10px] opacity-70">{t.count}</span>
-          </button>
-        ))}
-      </div>
-
-      <div role="tabpanel">
-        {tab === 'live' ? (
-          <TaskGrid
-            tasks={project.liveTasks}
-            empty="No live tasks."
-            hint={atCap ? undefined : 'Publish one with New task. Tasks published here appear on Explore under this project.'}
-          />
-        ) : tab === 'ended' ? (
-          <TaskGrid tasks={project.endedTasks} empty="No ended tasks yet." />
-        ) : tab === 'leaderboard' ? (
-          <Leaderboard board={project.leaderboard} />
-        ) : (
+    <>
+      <ProjectPage
+        mode="workspace"
+        onEdit={() => setEditing(true)}
+        data={{
+          id: project.id,
+          handle: project.handle,
+          name: project.name,
+          description: project.description,
+          verified: project.verified,
+          image: project.image,
+          banner: project.banner,
+          createdAt: project.createdAt,
+          links: project.links,
+          role: project.role,
+          stats: project.stats,
+          tasks: [...project.liveTasks, ...project.endedTasks],
+          leaderboard: project.leaderboard,
+          recentRewards: project.recentRewards,
+          activity: project.activity,
+          liveCap: project.liveCap,
+        }}
+        teamSlot={
           <Members
             handle={project.handle}
             members={project.members}
-            isOwner={isOwner}
+            isOwner={project.role === 'owner'}
             self={self}
             onChange={(members) => setProject({ ...project, members })}
             onLeft={() => router.push('/dashboard/account?s=projects')}
           />
-        )}
-      </div>
-
+        }
+      />
       {editing ? (
         <EditSheet
           project={project}
@@ -315,36 +153,7 @@ export function ProjectWorkspace({ handle }: { handle: string }) {
           }}
         />
       ) : null}
-    </div>
-  );
-}
-
-function Stat({ label, value, children }: { label: string; value: string; children?: ReactNode }) {
-  return (
-    <div className={`${CARD} px-3.5 py-3`}>
-      <p className="m-0 font-sans text-[11px] uppercase tracking-[0.12em] text-[#8f8f8f]">{label}</p>
-      <p className="m-0 mt-1 font-sans text-2xl font-semibold tracking-wide text-[#f5f5f5]">{value}</p>
-      {children}
-    </div>
-  );
-}
-
-function TaskGrid({ tasks, empty, hint }: { tasks: Workspace['liveTasks']; empty: string; hint?: string }) {
-  if (!tasks.length) {
-    return (
-      <section className={`${CARD} grid justify-items-center gap-2 px-5 py-10 text-center`}>
-        <TasksIcon size={22} className="text-[#6f6f6f]" />
-        <p className="m-0 font-sans text-sm text-[#f5f5f5]">{empty}</p>
-        {hint ? <p className="m-0 max-w-[320px] text-xs text-muted">{hint}</p> : null}
-      </section>
-    );
-  }
-  return (
-    <div className="grid gap-3 min-[640px]:grid-cols-2">
-      {tasks.map((task) => (
-        <TaskCard key={task.ref} task={task} />
-      ))}
-    </div>
+    </>
   );
 }
 
@@ -398,6 +207,10 @@ function Members({
 
   return (
     <section className={CARD}>
+      <h3 className="m-0 flex items-center gap-2.5 border-b border-[#1c1c1c] px-4 py-3.5 font-sans text-base font-semibold text-[#f5f5f5]">
+        <PeopleIcon size={16} className="text-sun" />
+        Team
+      </h3>
       {isOwner ? (
         <form
           className="flex gap-2 border-b border-[#1c1c1c] p-4"
@@ -482,12 +295,20 @@ function EditSheet({
 }: {
   project: Workspace;
   onCancel: () => void;
-  onSaved: (saved: { name: string; description: string; links: ProjectLink[]; image: string | null }) => void;
+  onSaved: (saved: {
+    name: string;
+    description: string;
+    links: ProjectLink[];
+    image: string | null;
+    banner: string | null;
+  }) => void;
 }) {
   const titleId = useId();
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description);
   const [image, setImage] = useState<string | null>(project.image);
+  const [banner, setBanner] = useState<string | null>(project.banner);
+  const bannerRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<LinkRow[]>(() =>
     project.links.map((l, i) => ({ id: i + 1, kind: l.kind, url: l.url }))
   );
@@ -504,10 +325,11 @@ function EditSheet({
     return () => window.removeEventListener('keydown', onKey);
   }, [busy, onCancel]);
 
-  async function pick(file: File | undefined) {
+  async function pick(file: File | undefined, which: 'image' | 'banner') {
     if (!file) return;
     try {
-      setImage(await shrinkProjectImage(file));
+      if (which === 'banner') setBanner(await shrinkProjectBanner(file));
+      else setImage(await shrinkProjectImage(file));
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not read that image.');
@@ -542,9 +364,14 @@ function EditSheet({
       const res = await fetch(`/api/projects/workspace/${encodeURIComponent(project.handle)}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: trimmed, description: description.trim(), links, image }),
+        body: JSON.stringify({ name: trimmed, description: description.trim(), links, image, banner }),
       });
-      const body = (await res.json().catch(() => ({}))) as { error?: unknown; name?: unknown; image?: unknown };
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: unknown;
+        name?: unknown;
+        image?: unknown;
+        banner?: unknown;
+      };
       if (!res.ok) {
         setError(typeof body.error === 'string' ? body.error : 'Could not save the project.');
         return;
@@ -554,6 +381,7 @@ function EditSheet({
         description: description.trim(),
         links,
         image: typeof body.image === 'string' ? body.image : null,
+        banner: typeof body.banner === 'string' ? body.banner : null,
       });
     } catch {
       setError('Could not save the project.');
@@ -612,11 +440,41 @@ function EditSheet({
             accept="image/png,image/jpeg,image/webp"
             className="hidden"
             onChange={(e) => {
-              void pick(e.target.files?.[0]);
+              void pick(e.target.files?.[0], 'image');
               e.target.value = '';
             }}
           />
         </div>
+
+        <p className="m-0 mt-5 font-sans text-xs text-[#a9a9a9]">Banner</p>
+        <div className="mt-1.5 overflow-hidden rounded-[10px] border border-[#2e2e2e] bg-[#0d0d0d]">
+          {banner ? (
+            <img src={banner} alt="Project banner preview" className="aspect-[1200/630] w-full object-cover" />
+          ) : (
+            <div className="flex aspect-[1200/630] w-full items-center justify-center text-xs text-muted">No banner</div>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button type="button" className={GHOST_BUTTON} onClick={() => bannerRef.current?.click()} disabled={busy}>
+            {banner ? 'Change banner' : 'Add banner'}
+          </button>
+          {banner ? (
+            <button type="button" className={GHOST_BUTTON} onClick={() => setBanner(null)} disabled={busy}>
+              Remove
+            </button>
+          ) : null}
+          <span className="text-xs text-muted">Shown beside your project name. Cropped to 1200 by 630.</span>
+        </div>
+        <input
+          ref={bannerRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            void pick(e.target.files?.[0], 'banner');
+            e.target.value = '';
+          }}
+        />
 
         <label className="mt-5 block font-sans text-xs text-[#a9a9a9]" htmlFor="edit-project-name">
           Name

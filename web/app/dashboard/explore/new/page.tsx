@@ -23,6 +23,7 @@ import {
   PeopleIcon,
   PersonIcon,
   PlusIcon,
+  TagIcon,
   TasksIcon,
   TokensIcon,
   TrashIcon,
@@ -72,6 +73,19 @@ const REWARD_CHIPS = [
 /** Assets offered beside the amount of a crypto reward. */
 const REWARD_ASSETS = ['USDC', 'FLZ', 'USDT', 'ETH'] as const;
 
+/** Mirror TASK_CATEGORIES and TASK_LEVELS in lib/tasks.ts, which the server checks against. */
+const TASK_CATEGORY_CHOICES: Array<[string, string]> = [
+  ['social', 'Social'],
+  ['onchain', 'Onchain'],
+  ['community', 'Community'],
+  ['content', 'Content'],
+];
+const TASK_LEVEL_CHOICES: Array<[string, string]> = [
+  ['beginner', 'Beginner'],
+  ['intermediate', 'Intermediate'],
+  ['advanced', 'Advanced'],
+];
+
 const REWARD_PLACEHOLDERS: Record<string, string> = {
   wl: '50 whitelist spots',
   nft: '1 Genesis pass NFT',
@@ -95,6 +109,9 @@ export default function NewTaskPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [requirementKind, setRequirementKind] = useState<string>('x_post');
+  /** Shown as chips on the project page and used by its filter. */
+  const [category, setCategory] = useState('');
+  const [level, setLevel] = useState('');
   const [requirementLabel, setRequirementLabel] = useState('');
   const [rewardKind, setRewardKind] = useState<string>('crypto');
   const [rewardAsset, setRewardAsset] = useState<string>('USDC');
@@ -169,6 +186,8 @@ export default function NewTaskPage() {
       rows: [
         ['Title', title.trim()],
         ['Description', description.trim()],
+        ['Category', TASK_CATEGORY_CHOICES.find(([id]) => id === category)?.[1] || ''],
+        ['Level', TASK_LEVEL_CHOICES.find(([id]) => id === level)?.[1] || ''],
         ['Requirement', `${requirementName}: ${requirementLabel.trim() || defaultLabel(requirementKind)}`],
       ],
     },
@@ -196,6 +215,8 @@ export default function NewTaskPage() {
   function problemWith(n: number): string {
     if (n === 1) {
       if (title.trim().length < 3) return 'Give the task a title of at least 3 characters.';
+      if (!category) return 'Pick a category.';
+      if (!level) return 'Pick a level.';
     }
     if (n === 2) {
       if (crypto) {
@@ -266,6 +287,8 @@ export default function NewTaskPage() {
           endsAt: new Date(endsAt).toISOString(),
           projectId: createAs === 'personal' ? null : createAs,
           xpReward: createAs !== 'personal' && xp ? Number(xp) : null,
+          category,
+          level,
           requirements: [
             { kind: requirementKind, label: requirementLabel.trim() || defaultLabel(requirementKind) },
           ],
@@ -397,6 +420,27 @@ export default function NewTaskPage() {
                 <span className="pointer-events-none absolute bottom-[4px] right-[7px]">
                   <Counter value={description.length} max={DESCRIPTION_MAX} />
                 </span>
+              </div>
+            </FormCard>
+
+            <FormCard icon={<TagIcon size={12.5} />} title="Category and level" subtitle="Shown on the task so people can find the right one.">
+              <div className="grid grid-cols-2 gap-[6.5px]">
+                <SelectBox id="t-category" label="Category" value={category} onChange={setCategory}>
+                  <option value="">Pick a category</option>
+                  {TASK_CATEGORY_CHOICES.map(([id, label]) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </SelectBox>
+                <SelectBox id="t-level" label="Level" value={level} onChange={setLevel}>
+                  <option value="">Pick a level</option>
+                  {TASK_LEVEL_CHOICES.map(([id, label]) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </SelectBox>
               </div>
             </FormCard>
 

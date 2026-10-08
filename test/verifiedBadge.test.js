@@ -17,7 +17,9 @@ describe('verified badge', () => {
   it('renders behind the verified flag on every surface that shows it', () => {
     assert.match(read('web/components/TaskCard.tsx'), /\{task\.creator\.verified \? <VerifiedBadge/);
     assert.match(read('web/app/tasks/[ref]/page.tsx'), /\{task\.creator\.verified \? <VerifiedBadge/);
-    assert.match(read('web/app/project/[handle]/page.tsx'), /\{project\.verified \? <VerifiedBadge/);
+    // The public project page and the workspace both draw ProjectPage.
+    assert.match(read('web/components/ProjectPage.tsx'), /\{data\.verified \? <VerifiedBadge/);
+    assert.match(read('web/app/project/[handle]/page.tsx'), /<ProjectPage\s+mode="public"/);
     assert.match(read('web/components/AccountProjects.tsx'), /\{project\.verified \? <VerifiedBadge/);
   });
 

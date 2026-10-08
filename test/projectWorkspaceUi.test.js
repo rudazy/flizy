@@ -27,10 +27,12 @@ describe('project workspace screens', () => {
   });
 
   it('offers New task for this project, held back at the live cap', () => {
-    const ws = read('web/components/ProjectWorkspace.tsx');
-    assert.match(ws, /href=\{`\/dashboard\/explore\/new\?project=\$\{encodeURIComponent\(project\.id\)\}`\}/);
-    assert.match(ws, /const atCap = liveCount >= project\.liveCap;/);
-    assert.match(ws, /<Leaderboard board=\{project\.leaderboard\} \/>/);
+    // The page itself is ProjectPage, shared with the public page.
+    const page = read('web/components/ProjectPage.tsx');
+    assert.match(page, /href=\{`\/dashboard\/explore\/new\?project=\$\{encodeURIComponent\(data\.id\)\}`\}/);
+    assert.match(page, /const atCap = live\.length >= data\.liveCap;/);
+    assert.match(page, /<Leaderboard board=\{data\.leaderboard\} \/>/);
+    assert.match(read('web/components/ProjectWorkspace.tsx'), /<ProjectPage\s+mode="workspace"/);
   });
 
   it('shows member controls to the owner only', () => {

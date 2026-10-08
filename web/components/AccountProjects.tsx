@@ -8,7 +8,7 @@ import { validateUsername } from '../lib/username';
 import { publicMail } from '../lib/publicMail';
 import { VerifiedBadge } from './VerifiedBadge';
 import { ProjectAvatar, projectLetters } from './ProjectAvatar';
-import { shrinkProjectImage } from '../lib/projectImage';
+import { shrinkProjectBanner, shrinkProjectImage } from '../lib/projectImage';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -32,13 +32,13 @@ import {
  * this account owns or was added to, each opening its workspace at
  * /dashboard/projects/<handle>, then Create a Project in five steps, one step
  * at a time at every width. The form writes the columns a project has: name,
- * handle, description, https links, and the picture.
+ * handle, description, https links, the picture and the banner.
  *
- * The picture is shrunk in the browser to a 256x256 data URL and saved with
- * the project. Team, standard, visibility and the banner are part of the
- * layout and are not stored; members are added from the workspace once the
- * project exists. A banner is read into a data URL for the preview on this
- * screen, because the image policy allows `data:` and not `blob:`. Verified stays unselected:
+ * The picture (256x256) and the banner (1200x630) are shrunk in the browser
+ * to data URLs, because the image policy allows `data:` and not `blob:`, and
+ * saved with the project. Team, standard and visibility are part of the layout
+ * and are not stored; members are added from the workspace once the project
+ * exists. Verified stays unselected:
  * Flizy confirms a project after the owner writes to the contact mailbox. A
  * task goes live when it is published and stays open until the deadline on
  * that task. There is no participant cap.
@@ -72,8 +72,6 @@ const NAME_MAX = 50;
 const DESCRIPTION_MAX = 300;
 /** Same ceiling the server enforces in MAX_PROJECTS_PER_ACCOUNT. */
 const PROJECT_CAP = 5;
-/** Largest banner the preview reads. The picture has its own limit in lib/projectImage. */
-const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 export const LINK_KINDS: Array<[string, string]> = [
   ['website', 'Website'],
@@ -201,18 +199,6 @@ function readProjects(body: unknown): { projects: ProjectCard[]; canCreate: bool
     });
   }
   return { projects, canCreate: record.canCreate === true };
-}
-
-function readImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') resolve(reader.result);
-      else reject(new Error('Unreadable image'));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error('Unreadable image'));
-    reader.readAsDataURL(file);
-  });
 }
 
 function isPreview(url: string): boolean {
@@ -371,38 +357,18 @@ export function AccountProjects() {
     setPictureUrl('');
   }
 
-  /** The picture is saved, so it is shrunk to its stored size now, not at submit. */
-  async function onPickPicture(file: File | undefined) {
+  /** Both images are saved, so each is shrunk to its stored size now, not at submit. */
+  async function onPickImage(file: File | undefined, which: 'picture' | 'banner') {
     if (!file) return;
     const draft = draftRef.current;
     try {
-      const url = await shrinkProjectImage(file);
+      const url = which === 'banner' ? await shrinkProjectBanner(file) : await shrinkProjectImage(file);
       if (draft !== draftRef.current) return;
       setError('');
-      setPictureUrl(url);
+      if (which === 'banner') setBannerUrl(url);
+      else setPictureUrl(url);
     } catch (err) {
       if (draft === draftRef.current) setError(err instanceof Error ? err.message : 'Could not read that image.');
-    }
-  }
-
-  async function onPickImage(file: File | undefined, setUrl: (url: string) => void) {
-    if (!file) return;
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
-      setError('Use a PNG, JPG, or WebP image.');
-      return;
-    }
-    if (file.size > IMAGE_MAX_BYTES) {
-      setError('The image must be 2 MB or less.');
-      return;
-    }
-    const draft = draftRef.current;
-    try {
-      const url = await readImage(file);
-      if (draft !== draftRef.current) return;
-      setError('');
-      setUrl(url);
-    } catch {
-      if (draft === draftRef.current) setError('Could not read that image.');
     }
   }
 
@@ -444,6 +410,7 @@ export function AccountProjects() {
           description: description.trim(),
           links: linksToSave(links),
           image: isPreview(pictureUrl) ? pictureUrl : null,
+          banner: isPreview(bannerUrl) ? bannerUrl : null,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -743,7 +710,7 @@ export function AccountProjects() {
             <SectionCard
               n={2}
               title="Picture and banner"
-              subtitle="The picture is saved with the project. The banner is shown on the preview, not saved yet."
+              subtitle="Both are saved with the project and shown on its page."
               tight
             >
               <div className="mt-[9.5px] grid gap-[6.5px] min-[420px]:grid-cols-[174.5fr_205fr]">
@@ -767,13 +734,13 @@ export function AccountProjects() {
                     </div>
                     <ImageDrop
                       title="Upload image"
-                      onFile={(file) => void onPickPicture(file)}
+                      onFile={(file) => void onPickImage(file, 'picture')}
                     />
                   </div>
                 </div>
                 <div className={`${INSET} px-[10px] pb-[8.5px] pt-[9px]`}>
                   <p className="m-0 font-sans text-[9.5px] leading-[12px] text-[#f5f5f5]">Banner image</p>
-                  <p className="m-0 mt-[1.5px] font-sans text-[8.5px] leading-[11px] text-[#8f8f8f]">Recommended 16:9</p>
+                  <p className="m-0 mt-[1.5px] font-sans text-[8.5px] leading-[11px] text-[#8f8f8f]">Cropped to 1200 by 630</p>
                   <div className="mt-[5px] flex items-center gap-[5.5px]">
                     <div className="h-[72.5px] min-w-0 flex-1 overflow-hidden rounded-[5px] border border-[#3d3c3a] bg-[#14110b]">
                       {isPreview(bannerUrl) ? (
@@ -791,7 +758,7 @@ export function AccountProjects() {
                     </div>
                     <ImageDrop
                       title="Upload banner"
-                      onFile={(file) => void onPickImage(file, setBannerUrl)}
+                      onFile={(file) => void onPickImage(file, 'banner')}
                     />
                   </div>
                 </div>
@@ -1358,7 +1325,7 @@ function ImageDrop({ title, onFile }: { title: string; onFile: (file: File | und
       <span className="mt-[4.5px] font-sans text-[7px] leading-[9px] text-[#8f8f8f]">
         PNG, JPG or WebP
         <br />
-        Max 2 MB
+        Max 8 MB
       </span>
       <input
         type="file"
@@ -1491,7 +1458,7 @@ function LivePreview({
       </div>
       <p className="m-0 mt-[10px] font-sans text-[8.5px] leading-[12px] text-[#8f8f8f]">
         The page shows this name, the project link, the description, and any https links. It does not show your name.
-        The page shows the picture. A banner is not saved on that page yet. A verified badge appears once Flizy verifies the project.
+        The page shows the picture and the banner. A verified badge appears once Flizy verifies the project.
       </p>
     </>
   );

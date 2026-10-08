@@ -461,6 +461,17 @@ function createFakeSupabase(seed = {}, opts = {}) {
       return { data: null, error: null };
     },
 
+    /** 20261011120000_project_page.sql: distinct accounts that entered any task of the project. */
+    project_participant_stats({ p_project_id }) {
+      const taskIds = new Set(
+        (db.tables.tasks || []).filter((t) => String(t.project_id) === String(p_project_id)).map((t) => String(t.id))
+      );
+      const accounts = new Set(
+        (db.tables.task_submissions || []).filter((s) => taskIds.has(String(s.task_id))).map((s) => String(s.account_id))
+      );
+      return { data: [{ participants: accounts.size }], error: null };
+    },
+
     /** 20261009120000_project_workspace.sql: awarded XP per account, highest first. */
     project_xp_leaderboard({ p_project_id, p_limit }) {
       const taskIds = new Set(

@@ -56,6 +56,7 @@ export async function POST(req: Request) {
       description: String(body.description || ''),
       links: Array.isArray(body.links) ? body.links : [],
       image: typeof body.image === 'string' ? body.image : null,
+      banner: typeof body.banner === 'string' ? body.banner : null,
     });
     return NextResponse.json({ ok: true, ...project });
   } catch (err) {

@@ -55,6 +55,8 @@ export type TaskRow = {
   cancelled_at: string | null;
   created_at: string;
   xp_reward?: number | null;
+  category?: string | null;
+  level?: string | null;
 };
 
 /**
@@ -110,11 +112,23 @@ export function parseXPostUrl(raw: unknown): { handle: string; postId: string; c
 }
 
 const TASK_SELECT =
-  'id, ref, creator_account_id, project_id, title, description, reward_kind, reward_asset, reward_total, reward_display, winners_count, distribution, requires_x_identity, ends_at, status, completed_at, cancelled_at, created_at, xp_reward';
+  'id, ref, creator_account_id, project_id, title, description, reward_kind, reward_asset, reward_total, reward_display, winners_count, distribution, requires_x_identity, ends_at, status, completed_at, cancelled_at, created_at, xp_reward, category, level';
+
+export const TASK_CATEGORIES = ['social', 'onchain', 'community', 'content'] as const;
+export const TASK_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
+export type TaskCategory = (typeof TASK_CATEGORIES)[number];
+export type TaskLevel = (typeof TASK_LEVELS)[number];
+
+/** The longest description a list row carries; the task page has the full text. */
+const LIST_DESCRIPTION_MAX = 140;
 
 export type TaskListItem = {
   ref: number;
   title: string;
+  /** The start of the description, for one line on a list row. */
+  description: string;
+  category: TaskCategory | null;
+  level: TaskLevel | null;
   rewardDisplay: string;
   winnersCount: number;
   participants: number;
@@ -210,6 +224,7 @@ export async function listTasks(
   return picked.map((r) => ({
     ref: r.ref,
     title: r.title,
+    ...listLabelsOf(r),
     rewardDisplay: r.reward_display,
     winnersCount: r.winners_count,
     participants: counts.get(r.id) || 0,
@@ -221,6 +236,13 @@ export async function listTasks(
 }
 
 const LIST_LIMIT = 60;
+
+/** The label fields a list row shows. An unknown stored value is dropped rather than shown. */
+function listLabelsOf(row: TaskRow): Pick<TaskListItem, 'description' | 'category' | 'level'> {
+  const category = TASK_CATEGORIES.find((c) => c === row.category) ?? null;
+  const level = TASK_LEVELS.find((l) => l === row.level) ?? null;
+  return { description: String(row.description || '').slice(0, LIST_DESCRIPTION_MAX), category, level };
+}
 
 function xpRewardOf(row: Pick<TaskRow, 'xp_reward'>): number | null {
   const xp = Number(row.xp_reward);
@@ -449,6 +471,8 @@ export type CreateTaskInput = {
   projectId?: string | null;
   /** XP each winner earns. Only on a project task. */
   xpReward?: number | null;
+  category?: string | null;
+  level?: string | null;
   requirements: Array<{ kind: string; label: string }>;
   links?: Array<{ kind: string; label: string; url: string }>;
 };
@@ -553,6 +577,14 @@ async function projectAccess(accountId: string, projectId: string, supabase: Db)
   return member ? 'member' : null;
 }
 
+/** A label is optional; when given it must be one of the listed values. */
+function checkedLabel<T extends string>(raw: unknown, allowed: readonly T[], message: string): T | null {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const value = allowed.find((a) => a === String(raw));
+  if (!value) throw new ClientError(message);
+  return value;
+}
+
 /** XP is a whole number, set only on a project task. Absent or empty means none. */
 function checkedXpReward(raw: unknown, projectId: string | null): number | null {
   if (raw === undefined || raw === null || raw === '') return null;
@@ -649,6 +681,8 @@ export async function createTask(accountId: string, input: CreateTaskInput, clie
   }
 
   const xpReward = checkedXpReward(input.xpReward, projectId);
+  const category = checkedLabel(input.category, TASK_CATEGORIES, 'Pick a category from the list.');
+  const level = checkedLabel(input.level, TASK_LEVELS, 'Pick a level from the list.');
 
   await refuseBrandName(accountId, [title], supabase);
 
@@ -705,6 +739,8 @@ export async function createTask(accountId: string, input: CreateTaskInput, clie
       ends_at: new Date(endsAtMs).toISOString(),
       status: 'live',
       xp_reward: xpReward,
+      category,
+      level,
     })
     .select('id, ref')
     .single();
@@ -1211,8 +1247,9 @@ function checkedProjectLinks(input: ProjectLink[] | undefined): ProjectLink[] {
   });
 }
 
-/** The same ceiling the projects_image_format constraint holds. */
+/** The same ceilings the projects_image_format and projects_banner_format constraints hold. */
 export const PROJECT_IMAGE_MAX_CHARS = 200000;
+export const PROJECT_BANNER_MAX_CHARS = 300000;
 const PROJECT_IMAGE_DATA_URL = /^data:image\/(webp|png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/;
 
 /** The first bytes each allowed format starts with, so a label cannot lie about the file. */
@@ -1230,9 +1267,18 @@ function imageBytesMatch(kind: string, bytes: Uint8Array): boolean {
  * "not given"; null or an empty string means "no picture".
  */
 export function checkedProjectImage(raw: unknown): string | null {
+  return checkedImageDataUrl(raw, PROJECT_IMAGE_MAX_CHARS);
+}
+
+/** The hero banner: the same checks as the picture, with room for a wide image. */
+export function checkedProjectBanner(raw: unknown): string | null {
+  return checkedImageDataUrl(raw, PROJECT_BANNER_MAX_CHARS);
+}
+
+function checkedImageDataUrl(raw: unknown, maxChars: number): string | null {
   if (raw === undefined || raw === null || raw === '') return null;
   const value = String(raw);
-  if (value.length > PROJECT_IMAGE_MAX_CHARS) throw new ClientError('That picture is too large.');
+  if (value.length > maxChars) throw new ClientError('That picture is too large.');
   const m = PROJECT_IMAGE_DATA_URL.exec(value);
   if (!m) throw new ClientError('Use a PNG, JPEG or WebP picture.');
   const bytes = Buffer.from(m[2], 'base64');
@@ -1242,7 +1288,14 @@ export function checkedProjectImage(raw: unknown): string | null {
 
 export async function createProject(
   accountId: string,
-  input: { handle: string; name: string; description?: string; links?: ProjectLink[]; image?: string | null },
+  input: {
+    handle: string;
+    name: string;
+    description?: string;
+    links?: ProjectLink[];
+    image?: string | null;
+    banner?: string | null;
+  },
   client?: Db
 ): Promise<OwnedProject> {
   const checked = validateUsername(input.handle);
@@ -1257,6 +1310,7 @@ export async function createProject(
 
   const links = checkedProjectLinks(input.links);
   const image = checkedProjectImage(input.image);
+  const banner = checkedProjectBanner(input.banner);
 
   const supabase = db(client);
   if (await isProjectHandleReserved(handle, accountId, supabase)) throw new ClientError(USERNAME_UNAVAILABLE);
@@ -1284,7 +1338,7 @@ export async function createProject(
 
   const { data, error } = await supabase
     .from('projects')
-    .insert({ owner_account_id: accountId, handle, name, description, links, image })
+    .insert({ owner_account_id: accountId, handle, name, description, links, image, banner })
     .select('id, handle, name, description, image')
     .single();
   if (error) {
@@ -1374,10 +1428,13 @@ type ProjectRecord = {
   owner_account_id: string;
   verified_at?: string | null;
   image?: string | null;
+  banner?: string | null;
   created_at?: string;
 };
 
 const PROJECT_SELECT = 'id, handle, name, description, links, owner_account_id, verified_at, image, created_at';
+/** The page also needs the banner, which the project list leaves out to stay small. */
+const PROJECT_PAGE_SELECT = `${PROJECT_SELECT}, banner`;
 
 /**
  * The projects an account may publish as: the ones it owns, then the ones it
@@ -1468,12 +1525,36 @@ export type LeaderboardEntry = { rank: number; username: string; xp: number; win
 /** totalXp and earners cover everyone, not only the entries returned. */
 export type ProjectLeaderboard = { entries: LeaderboardEntry[]; totalXp: number; earners: number };
 
+/**
+ * The four figures at the top of a project page. Participants are distinct
+ * accounts across every task of the project; recentInitials are only the first
+ * letters of the latest entrants, enough for an avatar stack and no more.
+ */
+export type ProjectStats = {
+  participants: number;
+  recentInitials: string[];
+  liveTasks: number;
+  endedTasks: number;
+  totalTasks: number;
+  xpTotal: number;
+  xpEarners: number;
+  /** Rewards paid out on chain, per asset. Empty until task rewards are locked and paid by Flizy. */
+  rewardsPaid: Array<{ asset: string; amount: string }>;
+};
+
+/** One reward paid to a winner, for the Recent rewards list. */
+export type RecentReward = { username: string; amount: string; asset: string; at: string; txUrl: string | null };
+
 export type PublicProject = {
   handle: string;
   name: string;
   description: string;
   verified: boolean;
   image: string | null;
+  banner: string | null;
+  createdAt: string | null;
+  stats: ProjectStats;
+  recentRewards: RecentReward[];
   links: ProjectLink[];
   tasks: TaskListItem[];
   activity: ProjectActivity[];
@@ -1507,6 +1588,7 @@ export async function getPublicProject(
     projectLeaderboard(project.id, LEADERBOARD_LIMIT, supabase),
     opts.viewerAccountId ? projectAccess(opts.viewerAccountId, project.id, supabase) : Promise.resolve(null),
   ]);
+  const stats = await projectStats(project.id, leaderboard, supabase);
 
   return {
     handle: project.handle,
@@ -1514,6 +1596,10 @@ export async function getPublicProject(
     description: String(project.description || ''),
     verified: Boolean(project.verified_at),
     image: project.image || null,
+    banner: project.banner || null,
+    createdAt: project.created_at || null,
+    stats,
+    recentRewards: [],
     links: projectLinksFrom(project.links),
     tasks,
     activity: activityFrom(rows),
@@ -1525,7 +1611,7 @@ export async function getPublicProject(
 async function projectByHandle(handle: string, supabase: Db): Promise<ProjectRecord | null> {
   const checked = validateUsername(handle);
   if (!checked.ok) return null;
-  const { data, error } = await supabase.from('projects').select(PROJECT_SELECT).eq('handle', checked.username).maybeSingle();
+  const { data, error } = await supabase.from('projects').select(PROJECT_PAGE_SELECT).eq('handle', checked.username).maybeSingle();
   if (error) throw new Error(error.message);
   return (data as ProjectRecord | null) || null;
 }
@@ -1542,6 +1628,7 @@ async function projectTaskItems(project: ProjectRecord, rows: TaskRow[], client?
   return rows.map((r) => ({
     ref: r.ref,
     title: r.title,
+    ...listLabelsOf(r),
     rewardDisplay: r.reward_display,
     winnersCount: r.winners_count,
     participants: counts.get(r.id) || 0,
@@ -1555,6 +1642,79 @@ async function projectTaskItems(project: ProjectRecord, rows: TaskRow[], client?
       verified: Boolean(project.verified_at),
     },
   }));
+}
+
+/** How many entrant letters the avatar stack shows. */
+const RECENT_INITIALS = 3;
+
+async function projectStats(projectId: string, leaderboard: ProjectLeaderboard, supabase: Db): Promise<ProjectStats> {
+  const nowIso = new Date().toISOString();
+  const [participantRows, liveTasks, totalTasks, recentInitials] = await Promise.all([
+    supabase.rpc('project_participant_stats', { p_project_id: projectId }),
+    countRows(
+      supabase
+        .from('tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .eq('status', 'live')
+        .gt('ends_at', nowIso)
+    ),
+    countRows(supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('project_id', projectId)),
+    recentEntrantInitials(projectId, supabase),
+  ]);
+  if (participantRows.error) throw new Error(participantRows.error.message);
+  const first = (Array.isArray(participantRows.data) ? participantRows.data[0] : participantRows.data) as
+    | { participants?: number | string }
+    | null;
+
+  return {
+    participants: Number(first?.participants) || 0,
+    recentInitials,
+    liveTasks,
+    endedTasks: Math.max(0, totalTasks - liveTasks),
+    totalTasks,
+    xpTotal: leaderboard.totalXp,
+    xpEarners: leaderboard.earners,
+    rewardsPaid: [],
+  };
+}
+
+/** First letters of the latest distinct entrants, newest first. Nothing else about them leaves. */
+async function recentEntrantInitials(projectId: string, supabase: Db): Promise<string[]> {
+  const { data: taskRows, error: taskErr } = await supabase
+    .from('tasks')
+    .select('id')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+    .limit(LIST_LIMIT);
+  if (taskErr) throw new Error(taskErr.message);
+  const taskIds = ((taskRows || []) as Array<{ id: string }>).map((t) => String(t.id));
+  if (!taskIds.length) return [];
+
+  const { data: subs, error: subErr } = await supabase
+    .from('task_submissions')
+    .select('account_id, created_at')
+    .in('task_id', taskIds)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (subErr) throw new Error(subErr.message);
+  const ids: string[] = [];
+  for (const row of (subs || []) as Array<{ account_id: string }>) {
+    const id = String(row.account_id);
+    if (!ids.includes(id)) ids.push(id);
+    if (ids.length >= RECENT_INITIALS) break;
+  }
+  if (!ids.length) return [];
+
+  const { data: accounts, error: accErr } = await supabase.from('accounts').select('id, username').in('id', ids);
+  if (accErr) throw new Error(accErr.message);
+  const letterOf = new Map(
+    ((accounts || []) as Array<{ id: string; username: string | null }>).map((a) => [
+      String(a.id),
+      (a.username || '?').slice(0, 1).toUpperCase(),
+    ])
+  );
+  return ids.map((id) => letterOf.get(id) || '?');
 }
 
 async function projectLeaderboard(projectId: string, limit: number, supabase: Db): Promise<ProjectLeaderboard> {
@@ -1627,6 +1787,11 @@ export type ProjectMember = { username: string; role: ProjectRole };
 
 export type ProjectWorkspace = OwnedProject & {
   role: ProjectRole;
+  banner: string | null;
+  createdAt: string | null;
+  stats: ProjectStats;
+  recentRewards: RecentReward[];
+  activity: ProjectActivity[];
   links: ProjectLink[];
   liveTasks: TaskListItem[];
   endedTasks: TaskListItem[];
@@ -1657,21 +1822,26 @@ export async function getProjectWorkspace(
   if (!role) return null;
 
   const rows = await tasksForProject(project.id, client);
-  const [tasks, leaderboard, members, totalTasks] = await Promise.all([
+  const [tasks, leaderboard, members] = await Promise.all([
     projectTaskItems(project, rows, client),
     projectLeaderboard(project.id, LEADERBOARD_LIMIT, supabase),
     projectMembers(project, supabase),
-    countRows(supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('project_id', project.id)),
   ]);
+  const stats = await projectStats(project.id, leaderboard, supabase);
 
   return {
     ...ownedProjectFrom(project),
     role,
+    banner: project.banner || null,
+    createdAt: project.created_at || null,
+    stats,
+    recentRewards: [],
+    activity: activityFrom(rows),
     links: projectLinksFrom(project.links),
     liveTasks: tasks.filter((t) => t.state === 'live'),
     endedTasks: tasks.filter((t) => t.state !== 'live'),
     liveCap: MAX_LIVE_TASKS_PER_PROJECT,
-    totalTasks,
+    totalTasks: stats.totalTasks,
     leaderboard,
     members,
   };
@@ -1702,6 +1872,8 @@ export type ProjectPatch = {
   links?: ProjectLink[];
   /** A data URL to set, or null to remove the picture. Absent leaves it as it is. */
   image?: string | null;
+  /** The same for the hero banner. */
+  banner?: string | null;
 };
 
 /**
@@ -1713,7 +1885,7 @@ export async function updateProject(
   handle: string,
   patch: ProjectPatch,
   client?: Db
-): Promise<OwnedProject> {
+): Promise<OwnedProject & { banner: string | null }> {
   const supabase = db(client);
   const project = await projectByHandle(handle, supabase);
   if (!project || !(await projectAccess(accountId, project.id, supabase))) throw new ClientError(PROJECT_NOT_FOUND);
@@ -1734,17 +1906,19 @@ export async function updateProject(
   }
   if (patch.links !== undefined) update.links = checkedProjectLinks(patch.links);
   if (patch.image !== undefined) update.image = checkedProjectImage(patch.image);
-  if (!Object.keys(update).length) return ownedProjectFrom(project);
+  if (patch.banner !== undefined) update.banner = checkedProjectBanner(patch.banner);
+  if (!Object.keys(update).length) return { ...ownedProjectFrom(project), banner: project.banner || null };
   update.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
     .from('projects')
     .update(update)
     .eq('id', project.id)
-    .select(PROJECT_SELECT)
+    .select(PROJECT_PAGE_SELECT)
     .single();
   if (error) throw new Error(error.message);
-  return ownedProjectFrom(data as ProjectRecord);
+  const saved = data as ProjectRecord;
+  return { ...ownedProjectFrom(saved), banner: saved.banner || null };
 }
 
 /** Loads a project for adding a member, refusing anyone but its owner. */

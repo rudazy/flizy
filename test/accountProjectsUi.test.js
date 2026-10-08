@@ -39,11 +39,11 @@ describe('account projects layout', () => {
       'Profile picture',
       'Square image (1:1)',
       'Banner image',
-      'Recommended 16:9',
+      'Cropped to 1200 by 630',
       'Upload image',
       'Upload banner',
       'PNG, JPG or WebP',
-      'Max 2 MB',
+      'Max 8 MB',
       'Continue',
       'Cancel',
     ]) {
@@ -63,11 +63,11 @@ describe('account projects layout', () => {
 });
 
 describe('account projects honesty', () => {
-  it('posts only the columns a project has, the picture included', () => {
+  it('posts only the columns a project has, the picture and banner included', () => {
     const body = CODE.match(/body: JSON\.stringify\(\{([\s\S]*?)\}\),/);
     assert.ok(body, 'create body not found');
     const keys = [...body[1].matchAll(/^\s*([a-z]+):/gm)].map((m) => m[1]).sort();
-    assert.deepEqual(keys, ['description', 'handle', 'image', 'links', 'name']);
+    assert.deepEqual(keys, ['banner', 'description', 'handle', 'image', 'links', 'name']);
   });
 
   it('keeps Verified unselected and says how verification happens', () => {
@@ -82,11 +82,11 @@ describe('account projects honesty', () => {
     assert.match(CODE, /stays open until the deadline on that task/);
   });
 
-  it('does not promise a featured slot, growth figures, or a saved banner', () => {
+  it('does not promise a featured slot or growth figures, and says both images are saved', () => {
     assert.doesNotMatch(CODE, /get featured/i);
     assert.doesNotMatch(CODE, /Track growth/);
-    assert.match(CODE, /The banner is shown on the preview, not saved yet\./);
-    assert.match(CODE, /A banner is not saved on that page yet\./);
+    assert.match(CODE, /Both are saved with the project and shown on its page\./);
+    assert.match(CODE, /The page shows the picture and the banner\./);
   });
 
   it('marks the handle with a link, not the payment @', () => {
@@ -96,9 +96,12 @@ describe('account projects honesty', () => {
 });
 
 describe('image previews under the content security policy', () => {
-  it('reads a picked image into a data URL, which img-src allows', () => {
+  it('turns a picked image into a data URL, which img-src allows', () => {
     assert.match(imgSrc(), /(^|\s)data:(\s|$)/);
-    assert.match(CODE, /readAsDataURL\(file\)/);
+    // Both images are shrunk on a canvas, which hands back a data URL.
+    assert.match(CODE, /shrinkProjectBanner\(file\)/);
+    assert.match(CODE, /shrinkProjectImage\(file\)/);
+    assert.match(fs.readFileSync(path.join(ROOT, 'web/lib/projectImage.ts'), 'utf8'), /canvas\.toDataURL\(/);
     assert.match(CODE, /url\.startsWith\('data:image\/'\)/);
   });
 

@@ -29,7 +29,7 @@ export async function GET(_req: Request, { params }: Params) {
   }
 }
 
-/** Edit name, description, links or picture. Fields left out are not changed. */
+/** Edit name, description, links, picture or banner. Fields left out are not changed. */
 export async function PATCH(req: Request, { params }: Params) {
   try {
     const denied = rejectIfCrossOrigin(req);
@@ -46,6 +46,7 @@ export async function PATCH(req: Request, { params }: Params) {
       description: typeof body.description === 'string' ? body.description : undefined,
       links: Array.isArray(body.links) ? body.links : undefined,
       image: body.image === null || typeof body.image === 'string' ? body.image : undefined,
+      banner: body.banner === null || typeof body.banner === 'string' ? body.banner : undefined,
     });
     return NextResponse.json({ ok: true, ...project });
   } catch (err) {
