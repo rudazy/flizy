@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { GIWA_FAUCET_URL } from '../lib/botPublic';
 
 const COUNTRY_CODES = [
   { code: '+44', label: 'United Kingdom' },
@@ -173,37 +172,24 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
           Fund your Flizy wallet
         </h3>
         <p className="mt-2 text-sm text-muted">
-          Open the official GIWA faucet, paste your Flizy wallet address from the dashboard (Wallet
-          tab), and request test ETH. No bridge. No MetaMask required for the faucet.
+          Claim 0.02 test ETH in one tap. It goes straight into your Flizy wallet, once every 72
+          hours. No address to copy and no other site.
         </p>
         <ol className="mt-4 space-y-2 text-xs leading-relaxed text-muted sm:text-sm">
           <li>
-            <span className="text-paper">1.</span> Copy your Flizy wallet address from Wallet → Fund
+            <span className="text-paper">1.</span> Verify your email and choose a username
           </li>
           <li>
-            <span className="text-paper">2.</span> Open{' '}
-            <a
-              href={GIWA_FAUCET_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="text-lime no-underline hover:text-gold"
-            >
-              faucet.giwa.io
-            </a>
+            <span className="text-paper">2.</span> Open Wallet, then Fund
           </li>
           <li>
-            <span className="text-paper">3.</span> Paste that address and request funds
+            <span className="text-paper">3.</span> Tap Claim
           </li>
         </ol>
         <div className="mt-4">
-          <a
-            href={GIWA_FAUCET_URL}
-            className="btn btn-primary w-full justify-center sm:w-auto"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open GIWA faucet
-          </a>
+          <Link href="/dashboard/wallet?s=fund" className="btn btn-primary w-full justify-center sm:w-auto">
+            Claim test ETH
+          </Link>
         </div>
       </div>
 

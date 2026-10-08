@@ -410,6 +410,57 @@ function createFakeSupabase(seed = {}, opts = {}) {
       };
     },
 
+    /**
+     * 20261010120000_faucet_claims.sql: reserve a claim, or say when the next
+     * one opens. Failed claims and pending ones abandoned for five minutes do
+     * not count. Synchronous, so two calls cannot interleave, as under the
+     * advisory lock.
+     */
+    try_faucet_claim({ p_account_id, p_to, p_amount_wei, p_cooldown_hours }) {
+      const now = Date.now();
+      const windowMs = Number(p_cooldown_hours) * 3600e3;
+      db.tables.faucet_claims = db.tables.faucet_claims || [];
+      const counting = db.tables.faucet_claims.filter((c) => {
+        const at = new Date(c.created_at).getTime();
+        if (String(c.account_id) !== String(p_account_id) || at <= now - windowMs) return false;
+        if (c.status === 'failed') return false;
+        return !(c.status === 'pending' && !c.tx_hash && at < now - 5 * 60e3);
+      });
+      if (counting.length) {
+        const last = Math.max(...counting.map((c) => new Date(c.created_at).getTime()));
+        return { data: [{ claim_id: null, next_claim_at: new Date(last + windowMs).toISOString() }], error: null };
+      }
+      const row = {
+        id: `fc-${db.tables.faucet_claims.length + 1}`,
+        account_id: p_account_id,
+        to_address: p_to,
+        amount_wei: String(p_amount_wei),
+        status: 'pending',
+        tx_hash: null,
+        error: null,
+        created_at: new Date(now).toISOString(),
+        sent_at: null,
+      };
+      db.tables.faucet_claims.push(row);
+      return { data: [{ claim_id: row.id, next_claim_at: new Date(now + windowMs).toISOString() }], error: null };
+    },
+
+    /** One holder at a time; a lock older than two minutes is cleared first. */
+    try_faucet_signer_lock({ p_holder }) {
+      if (!p_holder) return { data: false, error: null };
+      db.tables.faucet_signer_lock = (db.tables.faucet_signer_lock || []).filter(
+        (l) => new Date(l.created_at).getTime() >= Date.now() - 120e3
+      );
+      if (db.tables.faucet_signer_lock.length) return { data: false, error: null };
+      db.tables.faucet_signer_lock.push({ id: 1, holder: p_holder, created_at: new Date().toISOString() });
+      return { data: true, error: null };
+    },
+
+    release_faucet_signer_lock({ p_holder }) {
+      db.tables.faucet_signer_lock = (db.tables.faucet_signer_lock || []).filter((l) => l.holder !== p_holder);
+      return { data: null, error: null };
+    },
+
     /** 20261009120000_project_workspace.sql: awarded XP per account, highest first. */
     project_xp_leaderboard({ p_project_id, p_limit }) {
       const taskIds = new Set(

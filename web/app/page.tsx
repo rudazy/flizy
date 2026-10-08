@@ -46,21 +46,21 @@ const WHY = [
 const FUND_STEPS = [
   {
     n: '01',
-    t: 'Copy your Flizy wallet address',
-    d: 'Sign up, open Wallet, then Fund, and copy your address.',
+    t: 'Create your account',
+    d: 'Sign up and verify your email.',
     href: '/signup',
   },
   {
     n: '02',
-    t: 'Open the GIWA faucet',
-    d: 'Visit the official faucet for GIWA testnet.',
-    href: 'https://faucet.giwa.io',
+    t: 'Choose a username',
+    d: 'Your @username is how people pay you.',
+    href: '/dashboard/account',
   },
   {
     n: '03',
-    t: 'Paste and request',
-    d: 'Paste your Flizy wallet address and request test ETH.',
-    href: 'https://faucet.giwa.io',
+    t: 'Claim in one tap',
+    d: 'Open Wallet, then Fund, and tap Claim. 0.02 test ETH, once every 72 hours.',
+    href: '/dashboard/wallet?s=fund',
   },
 ];
 
@@ -201,8 +201,8 @@ export default function HomePage() {
           <p className="text-xs uppercase tracking-[0.18em] text-gold">Get test ETH (GIWA)</p>
           <h2 className="mt-2 font-sans text-2xl tracking-wide text-paper">Fund your Flizy wallet</h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-            Use the official GIWA faucet. Copy your Flizy wallet address, open faucet.giwa.io, paste
-            that address, and request test ETH.
+            One tap puts 0.02 GIWA test ETH straight into your Flizy wallet. No address to copy and
+            no other site.
           </p>
         </div>
         <ol className="grid gap-3 sm:grid-cols-3">
@@ -222,14 +222,9 @@ export default function HomePage() {
             </li>
           ))}
         </ol>
-        <a
-          href="https://faucet.giwa.io"
-          className="btn btn-primary min-h-[44px] w-full no-underline sm:w-auto"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open GIWA faucet
-        </a>
+        <Link href="/dashboard/wallet?s=fund" className="btn btn-primary min-h-[44px] w-full no-underline sm:w-auto">
+          Claim test ETH
+        </Link>
       </section>
 
       <section className="card p-6 md:p-10">

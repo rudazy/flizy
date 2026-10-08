@@ -42,7 +42,7 @@ export const FLIZY_FAQ: Array<{ question: string; answer: string }> = [
   {
     question: 'How do I get test ETH for Flizy?',
     answer:
-      'Copy your Flizy wallet address from the dashboard (Wallet → Fund), open the official GIWA faucet at https://faucet.giwa.io, paste that address, and request funds. No bridge or separate MetaMask step is required for the faucet.',
+      'Open Wallet, then Fund, and tap Claim. 0.02 GIWA Sepolia test ETH goes straight into your Flizy wallet, once every 72 hours. You need a verified email and a username. No address to copy and no other site.',
   },
   {
     question: 'Is Flizy free to start?',

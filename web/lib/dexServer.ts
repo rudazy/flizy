@@ -6,6 +6,9 @@
 
 import { ethers } from 'ethers';
 import { executeGatorCall } from './gatorExecute.ts';
+import { getWebChain, type WebChain } from './webChain.ts';
+
+export { getWebChain, type WebChain };
 
 const FEE_ROUTER_ABI = [
   'function feeBps() view returns (uint16)',
@@ -35,30 +38,6 @@ const PAIR_ABI = [
 const V2_ROUTER_ABI = [
   'function removeLiquidityETH(address token, uint liquidity, uint amountTokenMin, uint amountETHMin, address to, uint deadline) returns (uint amountToken, uint amountETH)',
 ];
-
-export type WebChain = {
-  id: string;
-  name: string;
-  chainId: number;
-  rpcUrl: string;
-  explorerBaseUrl: string;
-  nativeSymbol: string;
-};
-
-export function getWebChain(): WebChain {
-  return {
-    id: 'giwa_sepolia',
-    name: 'GIWA Sepolia',
-    chainId: Number(process.env.GIWA_CHAIN_ID || 91342),
-    rpcUrl: process.env.GIWA_RPC || process.env.CHAIN_GIWA_SEPOLIA_RPC || 'https://sepolia-rpc.giwa.io',
-    explorerBaseUrl: (
-      process.env.GIWA_EXPLORER ||
-      process.env.CHAIN_GIWA_SEPOLIA_EXPLORER ||
-      'https://sepolia-explorer.giwa.io'
-    ).replace(/\/$/, ''),
-    nativeSymbol: 'ETH',
-  };
-}
 
 export function getDexAddresses() {
   return {
