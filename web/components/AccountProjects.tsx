@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useDashboard } from './DashboardProvider';
 import { validateUsername } from '../lib/username';
 import { publicMail } from '../lib/publicMail';
+import { VerifiedBadge } from './VerifiedBadge';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -46,6 +47,7 @@ type ProjectCard = {
   handle: string;
   name: string;
   description: string;
+  verified?: boolean;
   activeTasks?: number;
 };
 
@@ -507,8 +509,11 @@ export function AccountProjects() {
                         {markLetters(project.name)}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-sans text-[12px] font-semibold text-[#f5f5f5]">
-                          {project.name}
+                        <span className="flex items-center gap-[5px]">
+                          <span className="truncate font-sans text-[12px] font-semibold text-[#f5f5f5]">
+                            {project.name}
+                          </span>
+                          {project.verified ? <VerifiedBadge size={12} /> : null}
                         </span>
                         <span className="mt-[2px] block truncate font-mono text-[9.5px] text-[#8f8f8f]">
                           project/{project.handle}
@@ -1456,7 +1461,7 @@ function LivePreview({
       </div>
       <p className="m-0 mt-[10px] font-sans text-[8.5px] leading-[12px] text-[#8f8f8f]">
         The page shows this name, the project link, the description, and any https links. It does not show your name.
-        A picture, a banner, and a verified badge are not saved on that page yet.
+        A picture and a banner are not saved on that page yet. A verified badge appears once Flizy verifies the project.
       </p>
     </>
   );

@@ -128,6 +128,67 @@ describe('project handle availability', () => {
   });
 });
 
+describe('verified projects', () => {
+  beforeEach(seed);
+
+  function addProjects() {
+    fake.db.tables.projects.push(
+      { id: 'p-v', owner_account_id: ADMIN, handle: 'flizy', name: 'Flizy', description: '', links: [], verified_at: '2026-10-08T00:00:00.000Z' },
+      { id: 'p-s', owner_account_id: ALICE, handle: 'renault', name: 'Renault', description: '', links: [], verified_at: null }
+    );
+    fake.db.tables.tasks.push(
+      { id: 't-v', ref: 101, creator_account_id: ADMIN, project_id: 'p-v', title: 'First task', reward_display: '1 ETH', winners_count: 1, status: 'live', ends_at: future(), created_at: '2026-10-08T00:00:00.000Z' },
+      { id: 't-s', ref: 102, creator_account_id: ALICE, project_id: 'p-s', title: 'Other task', reward_display: '1 ETH', winners_count: 1, status: 'live', ends_at: future(), created_at: '2026-10-08T00:00:00.000Z' }
+    );
+  }
+
+  it('marks a project verified only while verified_at is set, on the page and its task cards', async () => {
+    addProjects();
+    const verified = await T.getPublicProject('flizy', c());
+    const standard = await T.getPublicProject('renault', c());
+    assert.equal(verified.verified, true);
+    assert.equal(standard.verified, false);
+    assert.equal(verified.tasks[0].creator.verified, true);
+    assert.equal(standard.tasks[0].creator.verified, false);
+  });
+
+  it('shows the owner which of their projects are verified', async () => {
+    addProjects();
+    const [admin] = await T.listOwnProjects(ADMIN, c());
+    const [alice] = await T.listOwnProjects(ALICE, c());
+    assert.equal(admin.verified, true);
+    assert.equal(alice.verified, false);
+  });
+
+  it('never creates a project verified, whatever the request carries', async () => {
+    const made = await T.createProject(ADMIN, { name: 'Flizy', handle: 'flizyhq', verified_at: new Date().toISOString() }, c());
+    assert.equal(made.verified, false);
+    assert.equal(fake.db.tables.projects[0].verified_at ?? null, null);
+  });
+
+  it('fails rather than label a project task with the account behind it', async () => {
+    addProjects();
+    const base = fake.client;
+    const client = {
+      rpc: base.rpc.bind(base),
+      from(table) {
+        if (table !== 'projects') return base.from(table);
+        return { select: () => ({ in: async () => ({ data: null, error: { message: 'lookup refused' } }) }) };
+      },
+    };
+    await assert.rejects(() => T.listTasks({}, client), { message: 'lookup refused' });
+  });
+
+  it('never marks a personal creator verified', async () => {
+    fake.db.tables.tasks.push(
+      { id: 't-p', ref: 103, creator_account_id: BOB, project_id: null, title: 'Personal task', reward_display: '1 ETH', winners_count: 1, status: 'live', ends_at: future(), created_at: '2026-10-08T00:00:00.000Z' }
+    );
+    const [task] = await T.listTasks({}, c());
+    assert.equal(task.creator.kind, 'personal');
+    assert.equal(task.creator.verified, false);
+  });
+});
+
 describe('active tasks on the owned list', () => {
   beforeEach(seed);
 

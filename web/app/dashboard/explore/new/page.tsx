@@ -41,7 +41,7 @@ import {
  * than presenting a form that cannot be submitted.
  */
 
-type Project = { id: string; handle: string; name: string };
+type Project = { id: string; handle: string; name: string; verified?: boolean };
 type TaskLink = { kind: string; label: string; url: string };
 
 /** Tighter than the server's own limits (140 and 8000), never looser. */
@@ -153,7 +153,7 @@ export default function NewTaskPage() {
       endsAt: Number.isFinite(ends) ? new Date(ends).toISOString() : new Date(Date.now() + 86400000).toISOString(),
       state: 'live',
       creator: project
-        ? { kind: 'project', name: project.name, handle: project.handle }
+        ? { kind: 'project', name: project.name, handle: project.handle, verified: project.verified }
         : { kind: 'personal', name: username ? `@${username}` : 'You', handle: username || null },
     };
   }

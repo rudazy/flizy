@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { formatCardEnds } from '../lib/taskTime';
 import { TaskCardArt } from './TaskCardArt';
+import { VerifiedBadge } from './VerifiedBadge';
 
 /**
  * One task on the discovery list.
@@ -21,7 +22,7 @@ export type TaskCardData = {
   participants: number;
   endsAt: string;
   state: 'live' | 'review' | 'completed' | 'cancelled';
-  creator: { kind: 'project' | 'personal'; name: string; handle: string | null };
+  creator: { kind: 'project' | 'personal'; name: string; handle: string | null; verified?: boolean };
 };
 
 /**
@@ -41,8 +42,9 @@ export function TaskCard({ task, preview = false }: { task: TaskCardData; previe
         <p className="m-0 text-sm text-muted">{task.participants} participating</p>
         <p className="m-0 text-sm text-muted">{formatCardEnds(task.endsAt, task.state, Date.now())}</p>
         <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-3">
-          <span className="min-w-0 truncate font-sans text-sm tracking-wide text-paper">
-            {task.creator.name}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate font-sans text-sm tracking-wide text-paper">{task.creator.name}</span>
+            {task.creator.verified ? <VerifiedBadge size={13} /> : null}
           </span>
           <span className="font-mono text-xs text-muted">{preview ? 'Preview' : `#${task.ref}`}</span>
         </div>

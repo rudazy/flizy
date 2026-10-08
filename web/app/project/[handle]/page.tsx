@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getPublicProject } from '../../../lib/tasks';
 import { pageMetadata } from '../../../lib/seo';
 import { ProjectProfile } from '../../../components/ProjectProfile';
+import { VerifiedBadge } from '../../../components/VerifiedBadge';
 
 /**
  * Public project profile.
@@ -42,7 +43,10 @@ export default async function ProjectPage({ params }: Props) {
       <header className="grid gap-4">
         <ProjectMark name={project.name} />
         <div>
-          <h1 className="m-0 font-sans text-3xl tracking-wide text-paper">{project.name}</h1>
+          <h1 className="m-0 flex items-center gap-2 font-sans text-3xl tracking-wide text-paper">
+            <span className="min-w-0 break-words">{project.name}</span>
+            {project.verified ? <VerifiedBadge size={22} /> : null}
+          </h1>
           <p className="m-0 mt-1 font-mono text-sm text-muted">project/{project.handle}</p>
         </div>
         {project.description ? (

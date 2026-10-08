@@ -119,7 +119,8 @@ export type TaskListItem = {
   participants: number;
   endsAt: string;
   state: TaskState;
-  creator: { kind: 'project' | 'personal'; name: string; handle: string | null };
+  /** verified: a project Flizy has verified. Always false for a personal creator. */
+  creator: { kind: 'project' | 'personal'; name: string; handle: string | null; verified: boolean };
 };
 
 /**
@@ -211,7 +212,7 @@ export async function listTasks(
     participants: counts.get(r.id) || 0,
     endsAt: r.ends_at,
     state: deriveTaskState(r, now),
-    creator: creators.get(r.id) || { kind: 'personal', name: 'Flizy', handle: null },
+    creator: creators.get(r.id) || { kind: 'personal', name: 'Flizy', handle: null, verified: false },
   }));
 }
 
@@ -249,12 +250,18 @@ async function creatorLabels(
   const projectIds = [...new Set(rows.map((r) => r.project_id).filter(Boolean))] as string[];
   const accountIds = [...new Set(rows.filter((r) => !r.project_id).map((r) => r.creator_account_id))];
 
-  const projects = new Map<string, { name: string; handle: string }>();
+  const projects = new Map<string, { name: string; handle: string; verified: boolean }>();
   if (projectIds.length) {
-    const { data } = await supabase.from('projects').select('id, name, handle').in('id', projectIds);
+    // A failed lookup must not fall through to the personal branch below: that
+    // would label a project's task with the @username of the account behind it.
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, name, handle, verified_at')
+      .in('id', projectIds);
+    if (error) throw new Error(error.message);
     for (const p of data || []) {
-      const row = p as { id: string; name: string; handle: string };
-      projects.set(row.id, { name: row.name, handle: row.handle });
+      const row = p as { id: string; name: string; handle: string; verified_at?: string | null };
+      projects.set(row.id, { name: row.name, handle: row.handle, verified: Boolean(row.verified_at) });
     }
   }
 
@@ -270,10 +277,10 @@ async function creatorLabels(
   for (const r of rows) {
     if (r.project_id && projects.has(r.project_id)) {
       const p = projects.get(r.project_id)!;
-      out.set(r.id, { kind: 'project', name: p.name, handle: p.handle });
+      out.set(r.id, { kind: 'project', name: p.name, handle: p.handle, verified: p.verified });
     } else {
       const username = accounts.get(r.creator_account_id) || 'someone';
-      out.set(r.id, { kind: 'personal', name: `@${username}`, handle: username });
+      out.set(r.id, { kind: 'personal', name: `@${username}`, handle: username, verified: false });
     }
   }
   return out;
@@ -361,7 +368,7 @@ export async function getTaskByRef(
     endsAt: task.ends_at,
     state,
     requiresXIdentity: task.requires_x_identity,
-    creator: creators.get(task.id) || { kind: 'personal', name: 'Flizy', handle: null },
+    creator: creators.get(task.id) || { kind: 'personal', name: 'Flizy', handle: null, verified: false },
     isCreator: Boolean(viewer && viewer === task.creator_account_id),
     requirements: ((reqs as { data: unknown[] }).data || []) as TaskDetail['requirements'],
     links: ((links as { data: unknown[] }).data || []) as TaskDetail['links'],
@@ -1062,6 +1069,7 @@ export type OwnedProject = {
   handle: string;
   name: string;
   description: string;
+  verified: boolean;
 };
 
 /** An owned project plus how many of its tasks are still open. */
@@ -1176,6 +1184,7 @@ export async function createProject(
     handle: row.handle,
     name: row.name,
     description: String(row.description || ''),
+    verified: false,
   };
 }
 
@@ -1252,11 +1261,11 @@ export async function listOwnProjects(accountId: string, client?: Db): Promise<O
   const supabase = db(client);
   const { data, error } = await supabase
     .from('projects')
-    .select('id, handle, name, description')
+    .select('id, handle, name, description, verified_at')
     .eq('owner_account_id', accountId)
     .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
-  const projects = (data || []) as OwnedProject[];
+  const projects = (data || []) as Array<Omit<OwnedProject, 'verified'> & { verified_at?: string | null }>;
   if (projects.length === 0) return [];
 
   const nowIso = new Date().toISOString();
@@ -1284,6 +1293,7 @@ export async function listOwnProjects(accountId: string, client?: Db): Promise<O
     handle: project.handle,
     name: project.name,
     description: String(project.description || ''),
+    verified: Boolean(project.verified_at),
     activeTasks: counts.get(project.id) || 0,
   }));
 }
@@ -1294,6 +1304,7 @@ export type PublicProject = {
   handle: string;
   name: string;
   description: string;
+  verified: boolean;
   links: ProjectLink[];
   tasks: TaskListItem[];
   activity: ProjectActivity[];
@@ -1312,7 +1323,7 @@ export async function getPublicProject(handle: string, client?: Db): Promise<Pub
   const supabase = db(client);
   const { data, error } = await supabase
     .from('projects')
-    .select('id, handle, name, description, links')
+    .select('id, handle, name, description, links, verified_at')
     .eq('handle', checked.username)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -1324,6 +1335,7 @@ export async function getPublicProject(handle: string, client?: Db): Promise<Pub
     name: string;
     description: string | null;
     links: unknown;
+    verified_at?: string | null;
   };
   const rows = await tasksForProject(project.id, client);
   const now = Date.now();
@@ -1342,13 +1354,19 @@ export async function getPublicProject(handle: string, client?: Db): Promise<Pub
     participants: counts.get(r.id) || 0,
     endsAt: r.ends_at,
     state: deriveTaskState(r, now),
-    creator: creators.get(r.id) || { kind: 'project' as const, name: project.name, handle: project.handle },
+    creator: creators.get(r.id) || {
+      kind: 'project' as const,
+      name: project.name,
+      handle: project.handle,
+      verified: Boolean(project.verified_at),
+    },
   }));
 
   return {
     handle: project.handle,
     name: project.name,
     description: String(project.description || ''),
+    verified: Boolean(project.verified_at),
     links: projectLinksFrom(project.links),
     tasks,
     activity: activityFrom(rows),

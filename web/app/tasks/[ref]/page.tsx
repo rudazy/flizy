@@ -8,6 +8,7 @@ import { getSiteConfig } from '../../../lib/supabase';
 import { TaskCardArt } from '../../../components/TaskCardArt';
 import { TaskSubmitForm } from '../../../components/TaskSubmitForm';
 import { LocalWhen } from '../../../components/LocalWhen';
+import { VerifiedBadge } from '../../../components/VerifiedBadge';
 
 /**
  * The public task page.
@@ -90,7 +91,10 @@ export default async function TaskPage({ params }: { params: { ref: string } }) 
         </Link>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="m-0 font-sans text-sm tracking-wide text-paper">{task.creator.name}</p>
+            <p className="m-0 flex items-center gap-1.5 font-sans text-sm tracking-wide text-paper">
+              <span className="min-w-0 truncate">{task.creator.name}</span>
+              {task.creator.verified ? <VerifiedBadge size={13} /> : null}
+            </p>
             {task.creator.kind === 'project' && task.creator.handle ? (
               <p className="m-0 font-mono text-xs text-muted">project/{task.creator.handle}</p>
             ) : null}
