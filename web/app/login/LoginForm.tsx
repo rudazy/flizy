@@ -18,6 +18,8 @@ export function LoginForm() {
   const [needsCode, setNeedsCode] = useState(false);
   const [devCode, setDevCode] = useState('');
   const [error, setError] = useState('');
+  /** Said after a resend, because the new code silently replaces the old one. */
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [accountNote, setAccountNote] = useState('');
 
@@ -53,6 +55,10 @@ export function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setNotice('');
+    // Once the page is on its way to the dashboard the button stays busy, so it
+    // never flips back to "Log in" and looks like the attempt failed.
+    let leaving = false;
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -75,11 +81,12 @@ export function LoginForm() {
         return;
       }
       track('login_completed');
+      leaving = true;
       router.push(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
-      setLoading(false);
+      if (!leaving) setLoading(false);
     }
   }
 
@@ -154,7 +161,11 @@ export function LoginForm() {
               maxLength={6}
               placeholder="6-digit code"
               value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                // A new attempt: the last "Incorrect code" no longer applies.
+                if (error) setError('');
+              }}
               required
             />
             {devCode ? (
@@ -163,9 +174,14 @@ export function LoginForm() {
               </p>
             ) : null}
             <p className="mt-1.5 text-xs text-muted">
-              We emailed a code because this is a new browser or it has been a while. It expires
-              in 15 minutes.
+              We emailed a code because this browser is new to this account, you signed out here,
+              or it has been 30 days. It expires in 15 minutes. Only the newest code works.
             </p>
+          </div>
+        ) : null}
+        {notice ? (
+          <div className="alert alert-ok text-sm" role="status">
+            {notice}
           </div>
         ) : null}
         {error ? <div className="alert alert-error">{error}</div> : null}
@@ -188,6 +204,7 @@ export function LoginForm() {
             onClick={async () => {
               setLoading(true);
               setError('');
+              setNotice('');
               try {
                 const res = await fetch('/api/auth/login', {
                   method: 'POST',
@@ -197,6 +214,8 @@ export function LoginForm() {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Could not send code');
                 setCode('');
+                setDevCode(typeof data.devCode === 'string' ? data.devCode : '');
+                setNotice(`New code sent to ${email}. Earlier codes no longer work.`);
               } catch (err) {
                 setError(err instanceof Error ? err.message : 'Could not send code');
               } finally {

@@ -129,3 +129,182 @@ describe('no blue', () => {
     assert.match(read('web/app/globals.css'), /\.btn-sun:disabled \{\s*opacity: 0\.45;/);
   });
 });
+
+describe('history after a transaction', () => {
+  it('selects the sender id, so a received payment can be named', () => {
+    // The fake database returns whole rows whatever is selected, so only the
+    // select itself can prove the column is asked for.
+    const src = read('lib/history.js');
+    for (const name of ['TRANSFER_SELECT_FULL', 'TRANSFER_SELECT_CORE']) {
+      const at = src.indexOf(`const ${name} =`);
+      assert.ok(at >= 0, name);
+      assert.match(src.slice(at, at + 200), /'id, account_id, amount_eth,/, name);
+    }
+  });
+
+  it('shows no amount for a row that moved no money', () => {
+    assert.match(read('web/app/dashboard/page.tsx'), /\{Number\(row\.amount\) > 0 \? \(/);
+    assert.match(read('web/components/ActivityPanels.tsx'), /const hasAmount = Number\(row\.amount\) > 0;/);
+  });
+
+  it('refreshes balances and history after every money path on the site', () => {
+    const provider = read('web/components/DashboardProvider.tsx');
+    assert.match(provider, /window\.addEventListener\(TX_EVENT, onTx\)/);
+    for (const file of [
+      'web/components/FaucetPanel.tsx',
+      'web/components/HeldToken.tsx',
+      'web/components/TokenTradeSheet.tsx',
+      'web/app/dashboard/swap/page.tsx',
+      'web/app/dashboard/page.tsx',
+    ]) {
+      assert.match(read(file), /announceTx\(\);/, file);
+    }
+  });
+
+  it('shows a placeholder, not a zero, while the wallet loads', () => {
+    const wallet = read('web/components/WalletBalances.tsx');
+    assert.doesNotMatch(wallet, /: '0\.000000'\}/);
+    assert.match(wallet, /aria-label="Loading balance"/);
+  });
+});
+
+describe('figures that read "-"', () => {
+  let summarizeAccountStats;
+  let scan;
+  before(async () => {
+    ({ summarizeAccountStats } = await import('../web/lib/accountStats.ts'));
+    scan = await import('../web/lib/walletScan.ts');
+  });
+
+  it('counts confirmed swaps and the ETH they and sends moved', () => {
+    const stats = summarizeAccountStats([
+      { kind: 'swap', status: 'confirmed', asset: 'ETH', amount_eth: '0.01', amount_secondary: '3.4', asset_secondary: 'FLZ' },
+      { kind: 'swap', status: 'confirmed', asset: 'FLZ', amount_eth: '5', amount_secondary: '0.002', asset_secondary: 'ETH' },
+      { kind: 'swap', status: 'failed', asset: 'ETH', amount_eth: '9' },
+      { kind: null, status: 'confirmed', asset: null, amount_eth: '0.003' },
+      { kind: 'transfer', status: 'confirmed', asset: 'FLZ', amount_eth: '100' },
+      { kind: 'nft_market', status: 'confirmed', asset: 'ETH', amount_eth: '0' },
+    ]);
+    assert.equal(stats.swaps, 2);
+    assert.ok(Math.abs(stats.volumeEth - 0.015) < 1e-12, String(stats.volumeEth));
+  });
+
+  it('prices a token-for-ETH swap on Scan by the ETH it received', () => {
+    const NOW = Date.parse('2026-10-09T12:00:00Z');
+    const base = { type: 'swap', direction: 'out', status: 'confirmed', createdAt: new Date(NOW - 3600e3).toISOString(), label: 'x', category: 'swap' };
+    const rows = [
+      { ...base, id: 'a', amount: '1', asset: 'ETH' },
+      { ...base, id: 'b', amount: '10', asset: 'FLZ', amountSecondary: '0.5', assetSecondary: 'ETH' },
+    ];
+    assert.equal(scan.scanStats(rows, '24h', NOW, 2000).volumeUsd, 3000);
+  });
+
+  it('writes the token list unit as text, and keeps blue out of ETH marks', () => {
+    const tokens = read('web/components/ExploreTokens.tsx');
+    assert.doesNotMatch(tokens, /8c8fe8/i);
+    assert.match(tokens, /return <>\{figure\.unit \? `\$\{figure\.value\} \$\{figure\.unit\}` : figure\.value\}<\/>;/);
+    for (const file of ['web/components/WalletBalances.tsx', 'web/components/ExploreNfts.tsx']) {
+      assert.doesNotMatch(read(file), /8c8fe8/i, file);
+    }
+  });
+
+  it('has no unread dot on a bell with nothing to read', () => {
+    assert.doesNotMatch(read('web/components/AppTopBar.tsx'), /rounded-full bg-sun"\s*\n\s*aria-hidden/);
+  });
+});
+
+describe('first steps on Home', () => {
+  let summarizeAccountStats;
+  before(async () => {
+    ({ summarizeAccountStats } = await import('../web/lib/accountStats.ts'));
+  });
+  const steps = read('web/components/FirstSteps.tsx');
+
+  it('counts a confirmed send, in any asset, as a first payment', () => {
+    const s = summarizeAccountStats([
+      { kind: 'transfer', status: 'confirmed', asset: 'FLZ', amount_eth: '10' },
+      { kind: 'transfer', status: 'failed', asset: 'ETH', amount_eth: '1' },
+    ]);
+    assert.equal(s.sends, 1);
+    assert.equal(s.volumeEth, 0);
+  });
+
+  it('ticks each step from the account own data, and counts held claims as sends', () => {
+    // A claim is 'sent' until its receipt lands, then 'confirmed'; both count.
+    assert.match(steps, /lastClaim\?\.status === 'sent' \|\| faucet\?\.lastClaim\?\.status === 'confirmed'/);
+    assert.match(read('web/app/api/history/route.ts'), /\.in\('status', \['sent', 'confirmed'\]\)/);
+    assert.match(steps, /swapped: stats\.swaps > 0/);
+    assert.match(steps, /sent: stats\.sends > 0/);
+    assert.match(read('web/app/api/account/stats/route.ts'), /\.eq\('from_account_id', accountId\)\s*\.neq\('status', 'cancelled'\)/);
+  });
+
+  it('shows only to a ready account, hides when done or hidden, and follows transactions', () => {
+    assert.match(steps, /if \(!ready \|\| hidden \|\| !progress\) return null;/);
+    assert.match(steps, /if \(doneCount === steps\.length\) return null;/);
+    assert.match(steps, /window\.addEventListener\(TX_EVENT, onTx\)/);
+    assert.match(read('web/app/dashboard/page.tsx'), /<FirstSteps \/>/);
+  });
+
+  it('links each step to a real place', () => {
+    for (const href of ['/dashboard/wallet?s=fund', '/dashboard/swap', '/dashboard/account?s=chat']) {
+      assert.ok(steps.includes(`href: '${href}'`), href);
+    }
+    assert.match(read('web/app/dashboard/account/page.tsx'), /id: 'chat'/);
+  });
+});
+
+describe('sign-in and sign-up', () => {
+  const login = read('web/app/login/LoginForm.tsx');
+  const signup = read('web/app/signup/SignupForm.tsx');
+  const gate = read('web/components/EmailVerifyGate.tsx');
+
+  it('sends a signed-in visitor on instead of showing the login form', () => {
+    const page = read('web/app/login/page.tsx');
+    assert.match(page, /if \(await getAccountIdFromCookie\(\)\) redirect\(safeNext\(searchParams\?\.next\)\);/);
+  });
+
+  it('says a resent code replaces the old one, and clears a stale error on typing', () => {
+    assert.match(login, /New code sent to \$\{email\}\. Earlier codes no longer work\./);
+    assert.match(login, /if \(error\) setError\(''\);/);
+    assert.match(login, /you signed out here,\s*or it has been 30 days/);
+  });
+
+  it('keeps the button busy once the next page is on its way', () => {
+    for (const [name, src] of [['login', login], ['signup', signup]]) {
+      assert.match(src, /leaving = true;\s*\n\s*router\.push/, name);
+      assert.match(src, /if \(!leaving\) setLoading\(false\);/, name);
+    }
+  });
+
+  it('asks for the code sign-up already sent, and offers a new one second', () => {
+    assert.match(gate, /We sent a 6-digit code to/);
+    assert.doesNotMatch(gate, /Send verification code/);
+    assert.ok(gate.indexOf('</form>') < gate.indexOf("'Send a new code'"));
+    assert.doesNotMatch(gate, /\u2014/);
+  });
+
+  it('calls the PIN recommended and says what it is for', () => {
+    const home = read('web/app/dashboard/page.tsx');
+    assert.match(home, /action=\{<Badge>Recommended<\/Badge>\}/);
+    assert.doesNotMatch(home, /subtitle="Required\. After flizy lock/);
+  });
+
+  it('offers Sign out from the profile menu as well as Security', () => {
+    assert.match(read('web/components/AccountProfile.tsx'), /onSignOut\(\);\s*\n\s*\}\}[\s\S]{0,300}Sign out/);
+    assert.match(read('web/app/dashboard/account/page.tsx'), /onSignOut=\{\(\) => void onSignOut\(\)\}/);
+  });
+});
+
+describe('account ids stay on the server', () => {
+  it('drops account_id from the legacy transfers rows History returns', () => {
+    const route = read('web/app/api/history/route.ts');
+    assert.match(route, /const \{ account_id: _accountId, \.\.\.rest \} = e\.row;/);
+    assert.match(route, /transfers: transferRows\.slice\(0, 30\)/);
+  });
+
+  it('returns only figures from the stats route', () => {
+    const route = read('web/app/api/account/stats/route.ts');
+    assert.match(route, /\.eq\('account_id', accountId\)/);
+    assert.match(route, /return NextResponse\.json\(stats\);/);
+  });
+});

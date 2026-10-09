@@ -6,6 +6,7 @@ import { AppTopBar } from '../../../components/AppTopBar';
 import { AppPage } from '../../../components/AppSection';
 import { formatAmount } from '../../../lib/amountDisplay';
 import { pairFromQuery } from '../../../lib/swapPair';
+import { announceTx } from '../../../lib/txSignal';
 import {
   ArrowRightIcon,
   ChartLineIcon,
@@ -334,6 +335,7 @@ export default function SwapPage() {
       loadPrice();
       loadQuote();
       loadBalances();
+      announceTx();
     } catch {
       setError('Swap failed');
     } finally {
@@ -402,6 +404,7 @@ export default function SwapPage() {
       loadPrice();
       loadLpPosition();
       loadBalances();
+      announceTx();
     } catch {
       setError(failed);
     } finally {

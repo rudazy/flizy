@@ -43,6 +43,8 @@ type Props = {
   onSoon: (what: string) => void;
   onOpen: (id: string) => void;
   onDelete: () => void;
+  /** Same sign-out as Security, also offered from More so it is easy to find. */
+  onSignOut: () => void;
 };
 
 const TAGS = ['Wallet', 'Social', 'Payments', 'Onchain', 'Global'];
@@ -253,7 +255,9 @@ export function AccountProfile({
   onSoon,
   onOpen,
   onDelete,
+  onSignOut,
 }: Props) {
+  const stats = useAccountStats();
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
   const silkId = useId().replace(/:/g, '');
@@ -407,14 +411,24 @@ export function AccountProfile({
                   {label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setMore(false);
+                  onSignOut();
+                }}
+                className="mt-1 flex min-h-[44px] w-full items-center rounded-[8px] border-t border-[#3a3424] px-3 text-left font-sans text-[13px] text-[#f0a3a3] hover:bg-[#241f16]"
+              >
+                Sign out
+              </button>
             </div>
           ) : null}
         </div>
       </section>
 
       <section className="grid grid-cols-4 divide-x divide-[#2a2b30] rounded-[14px] border border-[#2a2b30] bg-[#101012] px-1 py-2.5">
-        <Stat icon={<ChartLineIcon size={14} />} value="-" label="Total volume" />
-        <Stat icon={<SwapGlyph />} value="-" label="Swaps" />
+        <Stat icon={<ChartLineIcon size={14} />} value={stats ? volumeText(stats.volumeEth) : '-'} label="Total volume" />
+        <Stat icon={<SwapGlyph />} value={stats ? String(stats.swaps) : '-'} label="Swaps" />
         <Stat icon={<PeopleIcon size={14} />} value="0" label="Followers" />
         <Stat
           icon={<StarGlyph />}
@@ -535,6 +549,31 @@ export function AccountProfile({
       </button>
     </div>
   );
+}
+
+/** ETH moved, short enough for a stat tile. */
+function volumeText(eth: number): string {
+  if (!(eth > 0)) return '0';
+  if (eth < 0.001) return '<0.001';
+  return eth.toLocaleString('en-US', { maximumFractionDigits: eth < 1 ? 3 : 2 });
+}
+
+/** Swaps and ETH volume from /api/account/stats; null until read, and on failure. */
+function useAccountStats(): { swaps: number; volumeEth: number } | null {
+  const [stats, setStats] = useState<{ swaps: number; volumeEth: number } | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch('/api/account/stats')
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (live && res.ok && typeof body.swaps === 'number' && typeof body.volumeEth === 'number') setStats(body);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return stats;
 }
 
 function Stat({

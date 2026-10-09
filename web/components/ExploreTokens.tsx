@@ -415,16 +415,8 @@ function TokenRow({ rank, row }: { rank: number; row: Row }) {
   );
 }
 
+/** The unit is written out: an 8px diamond read as a currency sign, not as ETH. */
 function FigureText({ figure }: { figure: Figure }) {
-  if (figure.unit === 'ETH') {
-    return (
-      <span className="inline-flex items-center gap-[2px]">
-        <EthDiamondIcon size={8} className="shrink-0 text-[#8c8fe8]" />
-        <span className="sr-only">ETH </span>
-        {figure.value}
-      </span>
-    );
-  }
   return <>{figure.unit ? `${figure.value} ${figure.unit}` : figure.value}</>;
 }
 

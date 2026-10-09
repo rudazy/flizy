@@ -35,7 +35,7 @@ describe('no invented figures', () => {
 
 describe('the eye covers every amount', () => {
   it('covers the total, token amounts, values, changes and NFT counts', () => {
-    assert.match(BALANCES, /\{hidden \? HIDDEN : native \? formatAmount\(native\.balance\)/);
+    assert.match(BALANCES, /\{hidden \? \(\s*HIDDEN\s*\) : native \? \(\s*formatAmount\(native\.balance\)/);
     assert.match(BALANCES, /amount=\{hidden \? HIDDEN : formatAmount\(native\.balance\)\}/);
     assert.match(BALANCES, /amount=\{hidden \? HIDDEN : t\.balance == null/);
     assert.match(BALANCES, /value=\{value != null && !hidden \?/);

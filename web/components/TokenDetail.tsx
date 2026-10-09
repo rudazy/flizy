@@ -4,7 +4,6 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { AppPage } from './AppSection';
-import { useDashboard } from './DashboardProvider';
 import { useComingSoon } from './ComingSoon';
 import { SearchButton } from './SiteSearch';
 import { formatEthDisplay, formatPct } from '../lib/tokenFormat';
@@ -130,7 +129,6 @@ function Letter({ name, className = '' }: { name: string; className?: string }) 
 
 export function TokenDetail({ symbol }: { symbol: string }) {
   const listed = symbol.toLowerCase() === 'flz';
-  const { refreshAll } = useDashboard();
   const [comingSoon, comingSoonNote] = useComingSoon();
 
   const [range, setRange] = useState<ChartRange>('1d');
@@ -658,10 +656,8 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           side={tradeSide}
           onSide={setTradeSide}
           onClose={() => setTradeSide(null)}
-          onTraded={() => {
-            void loadMarket(range);
-            refreshAll();
-          }}
+          // Balances and history follow the sheet's announceTx; only the market is this page's.
+          onTraded={() => void loadMarket(range)}
           symbol={market?.symbol || 'FLZ'}
           logo={profile?.logo ?? null}
           priceEth={market?.priceEth == null ? null : Number(market.priceEth)}

@@ -35,7 +35,9 @@ describe('account profile layout', () => {
     assert.match(PAGE, /invites=\{data\.invite\?\.attributed \?\? 0\}/);
     assert.match(PAGE, /credits=\{data\.invite\?\.credits \?\? 0\}/);
     assert.doesNotMatch(PROFILE, /24\.8K|386|1,284|42\.6K|ludaluda/);
-    assert.match(PROFILE, /value="-" label="Total volume"/);
+    // Volume and swaps are the account's own confirmed rows; blank until read.
+    assert.match(PROFILE, /value=\{stats \? volumeText\(stats\.volumeEth\) : '-'\} label="Total volume"/);
+    assert.match(PROFILE, /value=\{stats \? String\(stats\.swaps\) : '-'\} label="Swaps"/);
     assert.match(PROFILE, /value="0" label="Followers"/);
   });
 

@@ -583,6 +583,7 @@ export default function AccountPage() {
           onSoon={comingSoon}
           onOpen={setSlide}
           onDelete={() => setClosureOpen(true)}
+          onSignOut={() => void onSignOut()}
           emailPanel={
             profileEditor === 'email' ? (
           <div className="space-y-3">

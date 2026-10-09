@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { formatEther } from 'ethers';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getSupabase } from '../../../lib/supabase';
 import { apiErrorBody } from '../../../lib/apiError';
@@ -118,6 +119,36 @@ function mapTransferRow(
   };
 }
 
+/** Newest faucet claims merged into History. */
+const FAUCET_ROWS = 20;
+
+/** A sent faucet claim as a received row, or null when its amount is unreadable. */
+function mapFaucetRow(row: Record<string, unknown>): ActivityItem | null {
+  let amount: string;
+  try {
+    amount = formatEther(BigInt(String(row.amount_wei ?? '')));
+  } catch {
+    return null;
+  }
+  return {
+    id: `faucet-${String(row.id)}`,
+    type: 'receive',
+    direction: 'in',
+    amount,
+    asset: 'ETH',
+    amountSecondary: null,
+    assetSecondary: null,
+    counterparty: null,
+    status: 'confirmed',
+    txHash: row.tx_hash ? String(row.tx_hash) : null,
+    createdAt: String(row.sent_at || row.created_at),
+    note: null,
+    label: `Received ${amount} ETH from the Flizy faucet`,
+    category: 'receive',
+    channel: null,
+  };
+}
+
 function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityItem {
   const status = String(row.status || 'pending');
   const amount = row.amount_eth as string | number;
@@ -205,9 +236,33 @@ export async function GET() {
         : mapTransferRow(entry.row, Boolean(entry.received), entry.fromLabel ?? null)
     );
 
+    // Faucet claims live in their own table, so History would never show the
+    // first ETH most people receive. Only sent or confirmed claims: a pending or
+    // failed one moved nothing. A read failure leaves History as it was.
+    const faucet = await supabase
+      .from('faucet_claims')
+      .select('id, amount_wei, status, tx_hash, created_at, sent_at')
+      .eq('account_id', accountId)
+      .in('status', ['sent', 'confirmed'])
+      .order('created_at', { ascending: false })
+      .limit(FAUCET_ROWS);
+    if (!faucet.error) {
+      for (const row of faucet.data || []) {
+        const item = mapFaucetRow(row);
+        if (item) items.push(item);
+      }
+      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
+    // The rows carry account_id so a received payment can be named; that id is
+    // another account's on a received row, so it never leaves the server.
     const transferRows = settled.items
       .filter((e: HistoryEntry) => e.source === 'transfer')
-      .map((e: HistoryEntry) => e.row);
+      .map((e: HistoryEntry) => {
+        const { account_id: _accountId, ...rest } = e.row;
+        void _accountId;
+        return rest;
+      });
 
     // Money already sent to this user and not yet collected. Kept out of the
     // settled list on purpose: it is not something that happened, it is

@@ -210,11 +210,21 @@ export function explorerTxUrl(base: string | null | undefined, hash: string | nu
   return `${root}/tx/${hash}`;
 }
 
+/**
+ * The ETH a settled row moved. A token-for-ETH swap moved the ETH it received,
+ * so its other leg counts; a row with no ETH side at all cannot be priced.
+ */
 function settledAmount(row: ActivityItem): number | null {
   if (statusPill(row.status).tone === 'bad') return 0;
-  if (String(row.asset || '').toUpperCase() !== 'ETH') return null;
-  if (typeof row.amount === 'string' && row.amount.trim() === '') return null;
-  const n = Number(row.amount);
+  const ethLeg =
+    String(row.asset || '').toUpperCase() === 'ETH'
+      ? row.amount
+      : String(row.assetSecondary || '').toUpperCase() === 'ETH'
+        ? row.amountSecondary
+        : null;
+  if (ethLeg == null) return null;
+  if (typeof ethLeg === 'string' && ethLeg.trim() === '') return null;
+  const n = Number(ethLeg);
   if (!Number.isFinite(n)) return null;
   return Math.abs(n);
 }

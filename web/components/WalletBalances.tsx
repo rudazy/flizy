@@ -185,7 +185,16 @@ export function WalletBalances() {
           </div>
           <div className="mt-[7px] flex items-center gap-[13px]">
             <span className="font-sans text-[28.5px] font-semibold leading-[34px] tracking-[-0.01em] text-white">
-              {hidden ? HIDDEN : native ? formatAmount(native.balance) : '0.000000'}
+              {hidden ? (
+                HIDDEN
+              ) : native ? (
+                formatAmount(native.balance)
+              ) : holdings ? (
+                '0'
+              ) : (
+                // Still loading: a placeholder, never a zero that looks like an empty wallet.
+                <span className="inline-block h-[26px] w-[150px] animate-pulse rounded-[5px] bg-[#1a1a1d] align-middle" aria-label="Loading balance" />
+              )}
             </span>
             <button
               type="button"
@@ -193,7 +202,7 @@ export function WalletBalances() {
               aria-label="Show the total in another asset, coming soon"
               className="flex items-center gap-[8px] text-[#ececec] hover:text-white"
             >
-              <EthDiamondIcon size={14} className="text-[#8c8fe8]" />
+              <EthDiamondIcon size={14} className="text-[#cfcfcf]" />
               <span className="font-mono text-[12.5px] tracking-[0.04em]">{native?.symbol || 'ETH'}</span>
               <ChevronDownIcon size={11} className="text-[#d9d9d9]" />
             </button>
@@ -338,7 +347,7 @@ export function WalletBalances() {
           })}
           {!native && !tokens.length ? (
             <li className="rounded-[5px] border border-[#1f1f22] bg-[#0d0d0e] px-[10px] py-[12px] font-sans text-[9px] text-[#a9a9a9]">
-              {holdings?.holdings?.note || 'Tokens appear here once you hold some.'}
+              {!holdings ? 'Loading balances...' : holdings.holdings?.note || 'Tokens appear here once you hold some.'}
             </li>
           ) : null}
         </ul>

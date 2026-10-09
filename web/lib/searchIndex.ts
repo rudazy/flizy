@@ -52,7 +52,7 @@ export const PLACES: Place[] = [
   { title: 'Trusted', subtitle: 'Addresses you can send to', href: '/dashboard/account?s=trusted', keywords: ['trusted', 'addresses', 'contacts', 'whitelist', 'saved', 'send to'] },
   { title: 'PIN', subtitle: 'The PIN that unlocks chat', href: '/dashboard/account?s=pin', keywords: ['pin', 'unlock', 'code', 'lock'] },
   { title: 'Limits', subtitle: 'Your daily send limit', href: '/dashboard/account?s=limits', keywords: ['limits', 'limit', 'daily limit', 'cap', 'spending'] },
-  { title: 'Security', subtitle: 'Password and sessions', href: '/dashboard/account?s=security', keywords: ['security', 'password', 'change password', 'sessions', 'sign out', 'logout'] },
+  { title: 'Security', subtitle: 'Password and sessions', href: '/dashboard/account?s=security', keywords: ['security', 'password', 'change password', 'sessions', 'sign out', 'logout', 'log out'] },
 
   { title: 'How Flizy works', subtitle: 'The guide and answers', href: '/how-it-works', keywords: ['help', 'guide', 'how', 'faq', 'support', 'docs'] },
 ];

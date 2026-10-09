@@ -7,6 +7,7 @@ import { AppPage } from './AppSection';
 import { AppTopBar } from './AppTopBar';
 import { useDashboard } from './DashboardProvider';
 import { maxSpend } from '../lib/tokenFormat';
+import { announceTx } from '../lib/txSignal';
 import { PasswordField } from './PasswordField';
 
 type Held = {
@@ -44,7 +45,7 @@ function sameAmount(left: string, right: string): boolean {
  */
 export function HeldToken({ address }: { address: string }) {
   const router = useRouter();
-  const { holdings, refreshAll } = useDashboard();
+  const { holdings } = useDashboard();
   const [held, setHeld] = useState<Held | null>(null);
   const [loadError, setLoadError] = useState('');
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
@@ -164,7 +165,7 @@ export function HeldToken({ address }: { address: string }) {
       setAmount('');
       setQuote(null);
       load();
-      refreshAll();
+      announceTx();
     } catch {
       setTradeError('The trade did not go through.');
     } finally {

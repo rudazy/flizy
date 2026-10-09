@@ -6,6 +6,7 @@ import { useDashboard } from './DashboardProvider';
 import { CopyButton } from './CopyButton';
 import { CheckIcon, ChevronDownIcon, ExternalLinkIcon } from './ExploreIcons';
 import type { FaucetStatus } from '../lib/faucet';
+import { announceTx } from '../lib/txSignal';
 
 /**
  * Wallet → Fund. One button that puts test ETH in the signed-in account's own
@@ -37,7 +38,7 @@ export function untilText(iso: string | null, now: number): string | null {
 }
 
 export function FaucetPanel() {
-  const { data, refreshAll } = useDashboard();
+  const { data } = useDashboard();
   const [status, setStatus] = useState<FaucetStatus | null>(null);
   const [loadError, setLoadError] = useState('');
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -84,7 +85,7 @@ export function FaucetPanel() {
       }
       setReceipt(body as Receipt);
       setNow(Date.now());
-      void refreshAll().catch(() => undefined);
+      announceTx();
     } catch {
       setError('Could not claim. Try again.');
     } finally {

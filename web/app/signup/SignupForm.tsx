@@ -70,6 +70,9 @@ export function SignupForm() {
     }
 
     setLoading(true);
+    // The dashboard can take seconds to open; the button stays busy until it
+    // does, rather than flipping back to "Continue" as if signing up failed.
+    let leaving = false;
     try {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
@@ -87,11 +90,12 @@ export function SignupForm() {
       if (!res.ok) throw new Error(data.error || 'Signup failed');
       track('signup_completed', { locale });
       // Always land on dashboard: email gate then profile gate.
+      leaving = true;
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
-      setLoading(false);
+      if (!leaving) setLoading(false);
     }
   }
 

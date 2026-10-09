@@ -84,11 +84,8 @@ export function AppTopBar({
               className={ICON_BUTTON}
               aria-label="Notifications, coming soon"
             >
+              {/* No unread dot: there is nothing to read until notifications exist. */}
               <BellIcon size={17} />
-              <span
-                className="absolute right-[5px] top-[6px] h-[6px] w-[6px] rounded-full bg-sun"
-                aria-hidden
-              />
             </button>
           </div>
         </div>

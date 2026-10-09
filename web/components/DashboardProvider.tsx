@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { track } from '../lib/analytics';
+import { TX_EVENT, TX_REFRESH_DELAYS_MS } from '../lib/txSignal';
 import type {
   ActivityItem,
   DashboardData,
@@ -146,6 +147,24 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  /**
+   * After a transaction anywhere in the app, read balances and history again,
+   * now and twice more, so they move without a Refresh. A newer transaction
+   * restarts the schedule rather than stacking a second one.
+   */
+  useEffect(() => {
+    let timers: number[] = [];
+    const onTx = () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      timers = TX_REFRESH_DELAYS_MS.map((ms) => window.setTimeout(() => void load().catch(() => {}), ms));
+    };
+    window.addEventListener(TX_EVENT, onTx);
+    return () => {
+      window.removeEventListener(TX_EVENT, onTx);
+      timers.forEach((t) => window.clearTimeout(t));
+    };
   }, [load]);
 
   /**

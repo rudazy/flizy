@@ -13,6 +13,8 @@ import { shortAddr } from '../../lib/dashboardTypes';
 import { CopyButton } from '../../components/CopyButton';
 import { EyeMark } from '../../components/BalanceEye';
 import { formatClaimAmount } from '../../lib/claimAmount.ts';
+import { announceTx } from '../../lib/txSignal';
+import { FirstSteps } from '../../components/FirstSteps';
 import { formatAmount } from '../../../lib/amountDisplay';
 import {
   AlertCircleIcon,
@@ -208,7 +210,7 @@ export default function DashboardHomePage() {
         return;
       }
       setClaimMsg('Claim received. Funds are in your wallet.');
-      await refreshAll();
+      announceTx();
       setSlide('claims');
     } catch {
       setClaimMsg('Could not claim. Try again.');
@@ -309,6 +311,8 @@ export default function DashboardHomePage() {
           </div>
         </section>
 
+        <FirstSteps />
+
         <div className="grid grid-cols-3 gap-[6px]">
           <StatTile
             href="/dashboard/account?s=trusted"
@@ -395,8 +399,8 @@ export default function DashboardHomePage() {
               <AppCardHeader
                 icon={<AlertCircleIcon size={15} />}
                 title="Set unlock PIN"
-                subtitle="Required. After flizy lock, unlock with this PIN."
-                action={<Badge>Required</Badge>}
+                subtitle="Chat asks for it to unlock after flizy lock, to trade tokens Flizy has not verified, and to accept NFT offers."
+                action={<Badge>Recommended</Badge>}
               />
               <form onSubmit={onQuickPin} className="mt-[11px] grid grid-cols-2 gap-[7px]">
                 <input
@@ -682,14 +686,17 @@ export default function DashboardHomePage() {
                     <span className="block truncate font-sans text-[10.5px] text-white">{row.label}</span>
                     <span className="block font-mono text-[8px] uppercase text-[#a9a9a9]">{row.status}</span>
                   </span>
-                  <span
-                    className={`shrink-0 font-sans text-[10.5px] font-semibold ${
-                      row.direction === 'in' ? 'text-sun' : 'text-white'
-                    }`}
-                  >
-                    {row.direction === 'in' ? '+' : '-'}
-                    {formatAmount(row.amount)} {row.asset}
-                  </span>
+                  {/* A listing or a cancel moves no money; it shows no amount rather than -0. */}
+                  {Number(row.amount) > 0 ? (
+                    <span
+                      className={`shrink-0 font-sans text-[10.5px] font-semibold ${
+                        row.direction === 'in' ? 'text-sun' : 'text-white'
+                      }`}
+                    >
+                      {row.direction === 'in' ? '+' : '-'}
+                      {formatAmount(row.amount)} {row.asset}
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>

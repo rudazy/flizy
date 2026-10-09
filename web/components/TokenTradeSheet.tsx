@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useDashboard } from './DashboardProvider';
 import { PasswordField } from './PasswordField';
 import { formatEthDisplay, maxSpend } from '../lib/tokenFormat';
+import { announceTx } from '../lib/txSignal';
 import {
   ArrowRightIcon,
   CartIcon,
@@ -230,6 +231,7 @@ export function TokenTradeSheet({
       setExplorerUrl(typeof body.explorerUrl === 'string' ? body.explorerUrl : null);
       setPassword('');
       setStage('done');
+      announceTx();
       onTraded();
     } catch {
       setError('The trade did not go through.');

@@ -930,7 +930,7 @@
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "web/app/api/scan/route.ts, web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts"
+      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/scan/route.ts, web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts"
     },
     {
       "kind": "table",
@@ -954,7 +954,7 @@
       "kind": "table",
       "name": "faucet_claims",
       "providedBy": "20261010120000_faucet_claims.sql",
-      "requiredBy": "web/lib/faucet.ts"
+      "requiredBy": "web/app/api/history/route.ts, web/lib/faucet.ts"
     },
     {
       "kind": "table",
@@ -1140,7 +1140,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
+      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
     },
     {
       "kind": "table",

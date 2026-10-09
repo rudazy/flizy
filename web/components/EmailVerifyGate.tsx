@@ -2,6 +2,10 @@
 
 /**
  * Full-screen gate: no dashboard features until registration email is verified.
+ *
+ * Sign-up already emails the first code, so the screen asks for it straight
+ * away. Sending again is the secondary action, and says that it replaces the
+ * code already sent, because only the newest code works.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -37,7 +41,7 @@ export function EmailVerifyGate() {
       setLocalOk(
         body.devCode
           ? `Code sent (dev): ${body.devCode}`
-          : 'Code sent. Check your inbox — and Spam / Junk / Promotions if you do not see it.'
+          : `New code sent to ${email || 'your email'}. Earlier codes no longer work. Check Spam, Junk and Promotions too.`
       );
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Could not send code');
@@ -100,9 +104,9 @@ export function EmailVerifyGate() {
         <p className="text-xs uppercase tracking-[0.18em] text-gold">Required</p>
         <h1 className="mt-2 font-sans text-3xl tracking-wide text-paper">Verify your email</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted">
-          Enter the 6-digit code we send to{' '}
-          <span className="font-mono text-paper">{email || 'your email'}</span> before you can use
-          Flizy. This proves you control the inbox so only you can receive payments sent to that
+          We sent a 6-digit code to{' '}
+          <span className="font-mono text-paper">{email || 'your email'}</span>. Enter it to start
+          using Flizy. This proves you control the inbox so only you can receive payments sent to that
           address.
         </p>
         {IS_DEV_BUILD ? (
@@ -130,15 +134,6 @@ export function EmailVerifyGate() {
             {localOk}
           </div>
         ) : null}
-
-        <button
-          type="button"
-          className="btn btn-ghost w-full py-3 text-sm font-semibold"
-          disabled={busy === 'send'}
-          onClick={() => void sendCode()}
-        >
-          {busy === 'send' ? 'Sending…' : 'Send verification code'}
-        </button>
 
         <form onSubmit={(e) => void verify(e)} className="space-y-3">
           <div>
@@ -180,10 +175,19 @@ export function EmailVerifyGate() {
           </button>
         </form>
 
+        <button
+          type="button"
+          className="btn btn-ghost w-full py-3 text-sm"
+          disabled={busy === 'send'}
+          onClick={() => void sendCode()}
+        >
+          {busy === 'send' ? 'Sending…' : 'Send a new code'}
+        </button>
+
         <p className="font-mono text-[11px] leading-relaxed text-muted">
           Did not get the code? Check <span className="text-paper">Spam</span>,{' '}
           <span className="text-paper">Junk</span>, and <span className="text-paper">Promotions</span>
-          . Wait about a minute, then tap Send again.
+          . Wait about a minute, then send a new code.
         </p>
       </div>
     </div>

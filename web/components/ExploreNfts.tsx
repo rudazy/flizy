@@ -375,7 +375,7 @@ function CollectionCard({
             value={
               collection.freeMint ? (
                 <span className="flex items-center gap-[3px]">
-                  <EthDiamondIcon size={10} className="text-[#8c8fe8]" />
+                  <EthDiamondIcon size={10} className="text-[#cfcfcf]" />
                   Free
                 </span>
               ) : (
