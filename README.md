@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  Live at <a href="https://flizy.app">flizy.app</a> · GIWA Sepolia testnet · 9 contracts deployed and source verified
+  Live at <a href="https://flizy.app">flizy.app</a> · GIWA Sepolia testnet · 14 contracts deployed and source verified
 </p>
 
 ---
@@ -57,7 +57,7 @@
 | **How** | One policy engine behind every channel. Chat can spend inside your rules; only the website, behind your password, can change them |
 | **Where** | Live on [flizy.app](https://flizy.app), WhatsApp and Telegram, settling on GIWA Sepolia (testnet) |
 | **Earns from** | Swap protocol fee, NFT marketplace fee, paid-mint fee, collection generation fee |
-| **Built** | 85 API routes, 66 database migrations, 9 verified contracts, 2,391 automated tests passing |
+| **Built** | 98 API routes, 72 database migrations, 14 verified contracts, 2,577 automated tests passing |
 
 ---
 
@@ -104,12 +104,13 @@ another adapter, not a second product.
 
 | Area | What a person can do | Status |
 | --- | --- | --- |
-| **Chat payments** | Send ETH, listed tokens and NFTs from WhatsApp or Telegram, with a plan and a confirm for every move | Live |
+| **Chat payments** | Send ETH, FLZ and NFTs from WhatsApp or Telegram, with a plan and a confirm for every move | Live |
 | **Pay by identity** | Pay a Flizy `@username`, a 9-digit Flizy number, or a scanned QR. First payments are flagged | Live |
 | **Escrow claims** | Send to a phone, email, GitHub, Discord or Telegram identity. Funds wait in escrow until the owner proves that identity; the sender can cancel until then | Live (X identities: linking paused) |
 | **Pay me** | A personal QR, Flizy number and pay link, printable | Live |
-| **Swap and liquidity** | Trade ETH and FLZ against the pool, add liquidity, with fees and slippage shown before confirm | Live |
-| **Limit orders** | Place a buy or sell at a price; a watcher fills it when the pool reaches it | Live |
+| **Swap and liquidity** | Trade ETH against FLZ, IZY, MAKI or DCAT, add liquidity to the FLZ pool, with fees and slippage shown before confirm | Live |
+| **Listed tokens** | FLZ, IZY and MAKI are verified; DCAT is listed. Each trades against an ETH pool Flizy seeded and shows in Explore, Home and the wallet. Only ETH and FLZ can be sent on socials | Live |
+| **Limit orders** | Place an FLZ buy or sell at a price; a watcher fills it when the pool reaches it | Live |
 | **NFT marketplace** | Browse collections, list, buy, make and accept offers, with creator royalties up to 10% | Live |
 | **Mints** | Launch a drop with public and allowlist phases, prices, limits and schedule; bring an existing collection | Live |
 | **Collection creator** | Build a collection from artwork layers: traits, rarity weights, rules, unique combinations, standard metadata | Built: the creator runs today; launching switches on once the updated factory and storage are configured |
@@ -260,7 +261,7 @@ Implementation detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 Figures below are measured from this repository, not projected.
 
-**Where the code is** (lines of code by area, excluding generated files):
+**Where the code is** (lines of code by area, excluding generated files, measured 8 October 2026):
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'pie1': '#f5c842', 'pie2': '#c9a227', 'pie3': '#8a7128', 'pie4': '#5c4c1c', 'pie5': '#3a3a3e', 'pieTitleTextColor': '#888888', 'pieSectionTextColor': '#0a0a0a', 'pieLegendTextColor': '#888888', 'pieStrokeColor': '#0a0a0a'}}}%%
@@ -275,7 +276,7 @@ pie showData
 
 About one line of test for every 2.7 lines of product code.
 
-**Shipping momentum** (commits per week as bars, running total as the line):
+**Shipping momentum** (commits per week as bars, running total as the line, to 8 October 2026):
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'xyChart': {'backgroundColor': 'transparent', 'plotColorPalette': '#8a7128, #f5c842', 'titleColor': '#888888', 'xAxisLabelColor': '#888888', 'yAxisLabelColor': '#888888', 'xAxisTitleColor': '#888888', 'yAxisTitleColor': '#888888'}}}}%%
@@ -289,12 +290,12 @@ xychart-beta
 
 | Quality measure | Today |
 | --- | --- |
-| Automated tests | 2,235 Node tests and 156 Foundry contract tests, all passing |
-| Test files | 174 Node, 7 Foundry |
+| Automated tests | 2,408 Node tests and 169 Foundry contract tests, all passing |
+| Test files | 183 Node, 8 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
-| Database | 66 idempotent migrations, each ending in a post-condition check that fails loudly |
-| API surface | 85 route handlers; every payment, trade and security setting re-checks the account password |
-| Contracts | 9 deployed on GIWA Sepolia, all source verified as a full match |
+| Database | 72 idempotent migrations, each ending in a post-condition check that fails loudly |
+| API surface | 98 route handlers; every payment, trade and security setting re-checks the account password |
+| Contracts | 14 deployed on GIWA Sepolia, all source verified as a full match |
 
 ---
 
@@ -314,7 +315,16 @@ xychart-beta
 | **UniswapV2Factory** | Pair registry | [`0xBB1d...2BbF`](https://sepolia-explorer.giwa.io/address/0xBB1d2c582E455B448660A199097A54DF29162BbF) |
 | **FLZ / WETH pair** | The ETH and FLZ pool | [`0xEC6E...8227`](https://sepolia-explorer.giwa.io/address/0xEC6Ebf4A7a3088EB22535C9F767B9Ab5845D8227) |
 | **FLZ** | Test token, 100,000 supply, 18 decimals | [`0x308b...6BA6`](https://sepolia-explorer.giwa.io/address/0x308be8f71DA695f18E70D2243a446e1fD1566BA6) |
+| **IZY** | Verified listed token (`FlizyToken`), 1,000,000 fixed supply, no owner | [`0x8CA7...4473`](https://sepolia-explorer.giwa.io/address/0x8CA7A8F78abC8dA471df82BE4F374e1661e34473) |
+| **MAKI** | Verified listed token (`FlizyToken`), 1,000,000 fixed supply, no owner | [`0xd08d...693d`](https://sepolia-explorer.giwa.io/address/0xd08d83cdf19Db8CCd53Ed462034c8631De5F693d) |
+| **IZY / WETH pair** | The ETH and IZY pool | [`0x2fC4...29Da`](https://sepolia-explorer.giwa.io/address/0x2fC40Df0c997310E07370cE547c56A0014B029Da) |
+| **MAKI / WETH pair** | The ETH and MAKI pool | [`0xf9A9...33c5`](https://sepolia-explorer.giwa.io/address/0xf9A9FCF725bE455E9523a4846C649BC86d6533c5) |
+| **DCAT / WETH pair** | The ETH and DCAT pool | [`0x3083...1797`](https://sepolia-explorer.giwa.io/address/0x3083C7Aa86Bc20256439c102156E7fCbe7b91797) |
 | **WETH9** | Wrapped ETH | [`0x3a13...6BDf`](https://sepolia-explorer.giwa.io/address/0x3a13399f2741122B63c7710B2A85346B97C6BFDf) |
+
+DCAT ([`0x58fB...Ffd1`](https://sepolia-explorer.giwa.io/address/0x58fB4D3DA82F5d610ad36E6e39e674C17B32Ffd1)) is a third-party
+token and not counted above; Flizy lists it with a pool it seeded. Seed amounts and
+transactions are under `listings` in the deployments file.
 
 The DEX contracts are a Solidity 0.8 port of Uniswap V2, built with
 `v0.8.24+commit.e11b9ed9`, optimizer on at 200 runs, EVM version cancun.
@@ -350,7 +360,7 @@ WhatsApp uses the `flizy` prefix. Telegram uses `/command` and also accepts the 
 | `send N TICKER to ...` · `nft send TICKER ID to ...` | Send NFTs, one confirm each |
 | `claim` · `cancel claims` | Receive or cancel holds |
 | `request` · `pay` · `requests` | Payment requests |
-| `swap AMOUNT ETH for FLZ` · `buy` · `sell` · `price FLZ` | Trading |
+| `swap AMOUNT ETH for FLZ` · `buy 100 IZY` · `sell 10 MAKI` · `price FLZ` | Trading FLZ and the listed tokens against ETH |
 | `confirm` · `cancel` | Execute or drop the pending plan |
 | `lock` · `unlock PIN` | Device control, per channel |
 
@@ -361,7 +371,7 @@ WhatsApp uses the `flizy` prefix. Telegram uses `/command` and also accepts the 
 | [/](https://flizy.app/) · [/how-it-works](https://flizy.app/how-it-works) · [/docs](https://flizy.app/docs) | Product, guides and security |
 | [/dashboard](https://flizy.app/dashboard) | Home and history |
 | [/dashboard/wallet](https://flizy.app/dashboard/wallet) | Balances, tokens, NFTs, offers and Scan |
-| [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap, liquidity and limit orders |
+| [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap any listed token against ETH; FLZ liquidity and limit orders |
 | [/dashboard/explore](https://flizy.app/dashboard/explore) | Tokens, NFTs, mints and tasks |
 | [/dashboard/account](https://flizy.app/dashboard/account) | Profile, projects, Pay me, language, country, chat, platforms, trusted wallets, PIN, limits, security |
 | `/pay/[username]` · `/claim/[token]` · `/i/[username]` | Pay link, public claim, personal invite |
@@ -375,9 +385,9 @@ Swap fee mechanics: [docs/swap-fees.md](docs/swap-fees.md). Trusted wallets in d
 
 | Horizon | Focus |
 | --- | --- |
-| **Now** | Chat payments, identity claims, swap and limit orders, NFT marketplace and mints, Scan with privacy controls, tasks, a full account and security center, all on GIWA Sepolia |
+| **Now** | Chat payments, identity claims, swap with FLZ, IZY, MAKI and DCAT, limit orders, NFT marketplace and mints, Scan with privacy controls, tasks, a full account and security center, all on GIWA Sepolia |
 | **Next** | Turn on generated collections (deploy the metadata factory, connect storage and AI). Ship the passkey custody transition so wallets stop being server-owned. Move the approved-destination rule onto the account |
-| **Then** | Copy trade execution and task reward escrow. More tokens through the pair registry, then more EVM chains through the chain registry, on the same policy path |
+| **Then** | Copy trade execution and task reward escrow. Token-to-token pools and limit orders for listed tokens, then more EVM chains through the chain registry, on the same policy path |
 
 ---
 

@@ -417,3 +417,23 @@ Policy, Plan and Execute path does not change.
 Contract addresses and the verification record live in
 [`deployments/giwa-sepolia.json`](../deployments/giwa-sepolia.json). Fee mechanics are in
 [swap-fees.md](swap-fees.md).
+
+### Listed tokens
+
+Besides FLZ, Flizy lists tokens that trade against an ETH pool Flizy seeded and holds the
+liquidity of: IZY, MAKI and DCAT today. The list exists twice, `lib/listedTokens.js` for
+chat and `web/lib/listedTokens.ts` for the site (web cannot import root `lib/` on Vercel),
+and `test/listedTokensDrift.test.js` keeps both equal to each other and to `listings` in
+the deployments file.
+
+A listed token:
+
+- appears in Explore, Home trending and site search, is read for every wallet (shown
+  once held), and opens its token page by contract without being imported;
+- trades on the Swap screen and in chat (`buy 100 IZY`), resolved by symbol;
+- trades without the unverified-token step (the chat PIN, the site warning), because the
+  pool belongs to Flizy (`isUnverifiedSwap` in `lib/dex.js` and `web/lib/swapGate.ts`).
+
+`verified` on a listed token (IZY and MAKI, not DCAT) is display only: it draws the mark.
+Sending on socials is a separate fixed list, ETH and FLZ, in `listedSendSymbols` and
+`web/lib/payAsset.ts`. Limit orders and site liquidity remain FLZ only.

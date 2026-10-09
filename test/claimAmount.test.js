@@ -73,13 +73,12 @@ describe('listed send assets', () => {
   });
 
   it('rejects unknown symbols and raw 0x paste', () => {
-    const refused = /Only verified tokens can be sent on socials/;
+    const refused = /Only ETH and FLZ can be sent on socials/;
     assert.throws(() => resolveListedSendAsset('USDC'), refused);
     const raw = '0x308be8f71DA695f18E70D2243A446e1fD1566BA6';
     assert.throws(() => resolveListedSendAsset(raw), (err) => {
       assert.match(err.message, refused);
-      assert.match(err.message, /Verified: FLZ/);
-      assert.match(err.message, /ETH still sends/);
+      assert.match(err.message, /Other tokens can be traded on the site./);
       assert.doesNotMatch(err.message, /308be8/i);
       return true;
     });

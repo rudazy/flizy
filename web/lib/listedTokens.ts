@@ -6,7 +6,7 @@
  *
  * IZY and MAKI are Flizy's own tokens and carry the verified mark; DCAT is a
  * third-party token and does not. Either way only ETH and FLZ can be sent on
- * socials; a listed token is traded, held and sent from the wallet.
+ * socials; a listed token is traded and held.
  *
  * Mirror of lib/listedTokens.js, which the chat bot reads. web/ cannot import
  * root lib/ on Vercel, so test/listedTokensDrift.test.js keeps the two equal.

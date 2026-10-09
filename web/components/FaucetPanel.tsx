@@ -188,8 +188,8 @@ export function FaucetPanel() {
             <CopyButton value={address} label="Copy address" />
           </div>
           <p className="m-0 mt-3 text-xs leading-relaxed text-muted">
-            Any token sent to this address is a deposit. Add its contract on Balances so it shows in the wallet. Only a
-            verified token can be sent on socials. Any token in the wallet can be traded.
+            Any token sent to this address is a deposit. Add its contract on Balances so it shows in the wallet. Only ETH
+            and FLZ can be sent on socials. Any token in the wallet can be traded.
           </p>
         </details>
       ) : null}

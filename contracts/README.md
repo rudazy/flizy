@@ -3,6 +3,10 @@
 DEX (Uniswap V2 port + FlizyFeeRouter) is live on GIWA Sepolia. Addresses:
 `deployments/giwa-sepolia.json`.
 
+`src/dex/FlizyToken.sol` backs IZY and MAKI: fixed supply minted once, no owner, no mint,
+no fee. `script/DeployListings.s.sol` deployed both and seeded the DCAT, IZY and MAKI
+WETH pools (recorded under `listings`).
+
 Test NFT collection (identity send only): `deployments/giwa-sepolia-nfts.json`.
 Ticker `giwaforge`, cap 500, address `0xa613FcF6FE09442391b07F87b82c24a539bCCB2A`.
 Public claim is one NFT per wallet (`claim` / chat `mint 1 giwaforge`).

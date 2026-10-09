@@ -1,6 +1,6 @@
 /**
- * The verification badge. Blue, because a verified token can be sent on
- * socials. This is the one blue mark in the product.
+ * The verification badge, in the accent colour: Flizy verified the token.
+ * Which tokens can be sent on socials is a separate, fixed list (ETH and FLZ).
  */
 export function VerifiedMark() {
   return (

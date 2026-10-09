@@ -98,6 +98,21 @@ forge verify-contract <address> src/dex/<File>.sol:<Contract> \
 No API key is required. Constructor arguments per contract are recorded in
 `deployments/giwa-sepolia.json` under `verification.constructorArgs`.
 
+### Listing a token
+
+`script/DeployListings.s.sol` deployed IZY and MAKI and seeded the DCAT, IZY and MAKI
+pools. It is a record of that run, not a reusable tool: it refuses to seed a pool that
+already exists. To list another token:
+
+1. Seed its WETH pool through the V2 router at the price of any other market it has, or
+   arbitrage drains the gap. Rehearse the broadcast on an anvil fork first.
+2. The deployer key also submits live user operations, so a broadcast can lose a nonce
+   to it. After any failure, read the nonce, receipts and pair reserves before resending.
+3. Record the token under `listings` in `deployments/giwa-sepolia.json`, add it to both
+   `lib/listedTokens.js` and `web/lib/listedTokens.ts`, and run
+   `node --test test/listedTokensDrift.test.js`.
+4. Pull and restart the chat services so chat resolves the new symbol.
+
 ---
 
 ## Deployment (systemd)
@@ -243,7 +258,7 @@ These are enforced in code review and by tests:
 | `lib/` | Identity, claims, phone, engine, dex, chains, agent wallet, escrow |
 | `lib/engine/` | Intent, Policy, Plan, Execute, Receipt |
 | `web/` | Next.js site and swap API |
-| `contracts/src/dex/` | WETH, FLZ, V2 factory/pair/router, fee router |
+| `contracts/src/dex/` | WETH, FLZ, FlizyToken (IZY, MAKI), V2 factory/pair/router, fee router |
 | `contracts/src/` | FlizyWallet and factory |
 | `deployments/` | Live addresses and verification record (GIWA Sepolia) |
 | `supabase/migrations/` | Schema, applied in timestamp order |
@@ -267,11 +282,12 @@ These are enforced in code review and by tests:
 | Phone claims, escrow, cancel | Live |
 | Payment requests | Live |
 | Phone join key for LID-only WhatsApp sessions | Live |
-| DEX, FLZ, fee router | Live and verified on GIWA Sepolia |
-| Site swap and liquidity add/remove | Live |
+| DEX, FLZ, IZY, MAKI, fee router | Live and verified on GIWA Sepolia |
+| Site swap (FLZ, IZY, MAKI, DCAT) and FLZ liquidity add/remove | Live |
 | Chat buy / sell / swap / price | Live |
 | Smart wallet deploy | Contracts in repo, not required for current agent EOAs |
-| More tokens and more EVM chains | Registry ready, FLZ is the first listed asset |
+| Listed tokens | IZY and MAKI (verified) and DCAT, from `lib/listedTokens.js` |
+| More EVM chains | Chain registry ready |
 
 ---
 
