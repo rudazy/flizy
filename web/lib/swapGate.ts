@@ -2,11 +2,12 @@
  * Site swaps: which tokens are unverified, and the floor a swap may fill at.
  *
  * A swap's output always lands in the caller's own wallet, but that alone does
- * not keep value on the account. Flizy controls only the FLZ/WETH pool. Any
- * other token trades against a pool that whoever deployed the token can seed and
- * then drain: a stolen session could buy that token with the whole ETH balance,
- * and the pool owner removes liquidity and keeps the ETH. Selling a thin token
- * into a pool someone else controls leaks the same way in reverse.
+ * not keep value on the account. Flizy controls the FLZ/WETH pool and the pools
+ * of the tokens it lists (listedTokens.ts). Any other token trades against a
+ * pool that whoever deployed the token can seed and then drain: a stolen session
+ * could buy that token with the whole ETH balance, and the pool owner removes
+ * liquidity and keeps the ETH. Selling a thin token into a pool someone else
+ * controls leaks the same way in reverse.
  *
  * Every site swap takes the account password. This decides whether the prompt
  * warns that the token is one Flizy has not verified. Mirror of isUnverifiedSwap
@@ -14,10 +15,12 @@
  * keeps the two verified sets identical.
  */
 
+import { listedByAddress } from './listedTokens.ts';
+
 export type VerifiedSwapTokens = { wrappedNative: string; flz: string };
 
 /**
- * True when either side is a token other than native, WETH or FLZ.
+ * True when either side is a token other than native, WETH, FLZ or a listed token.
  * @param sides resolved token addresses; null is native ETH
  */
 export function isUnverifiedSwap(
@@ -25,7 +28,7 @@ export function isUnverifiedSwap(
   verified: VerifiedSwapTokens
 ): boolean {
   const ok = new Set([verified.wrappedNative.toLowerCase(), verified.flz.toLowerCase()]);
-  return sides.some((side) => side !== null && !ok.has(side.toLowerCase()));
+  return sides.some((side) => side !== null && !ok.has(side.toLowerCase()) && !listedByAddress(side));
 }
 
 /**

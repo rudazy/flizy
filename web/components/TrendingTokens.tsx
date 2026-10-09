@@ -10,8 +10,9 @@ import type { DiscoveryToken } from '../lib/tokenDiscovery';
  * Trending tokens on Home: the listed tokens and their last-hour move, read
  * from the same /api/tokens the Explore token list uses.
  *
- * Only tokens Flizy lists are shown. ETH is priced in FLZ from the same pool,
- * because in ETH it would always read 1; its move is the inverse of FLZ's.
+ * Only tokens Flizy lists are shown; a listed token opens by its contract.
+ * ETH is priced in FLZ from the same pool, because in ETH it would always
+ * read 1; its move is the inverse of FLZ's.
  */
 
 type Chip = { symbol: string; price: string; unit: string; change: number | null; href: string };
@@ -26,7 +27,7 @@ function chipsFrom(tokens: DiscoveryToken[]): Chip[] {
       price: price ?? '-',
       unit: price ? 'ETH' : '',
       change: t.change1hPct,
-      href: `/dashboard/explore/tokens/${t.symbol.toLowerCase()}`,
+      href: `/dashboard/explore/tokens/${t.address || t.symbol.toLowerCase()}`,
     });
     if (t === flz) {
       const per = Number(flz.flzPerEth);

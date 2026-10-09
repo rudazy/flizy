@@ -126,5 +126,55 @@
       "Web reads CHAIN_GIWA_SEPOLIA_DROP, CHAIN_GIWA_SEPOLIA_DROP_FROM_BLOCK (drop deployBlock) and CHAIN_GIWA_SEPOLIA_COLLECTION_FACTORY.",
       "The verified FlizyCollection source on the explorer (part of the factory's verification) has one NatSpec comment that the repo has since dropped, on MAX_SUPPLY_CAP. Code is identical; only the solc metadata hash differs."
     ]
+  },
+  "listings": {
+    "seededAt": "2026-10-09",
+    "script": "contracts/script/DeployListings.s.sol",
+    "lpHolder": "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B",
+    "tokens": {
+      "DCAT": {
+        "name": "deus cat",
+        "address": "0x58fB4D3DA82F5d610ad36E6e39e674C17B32Ffd1",
+        "decimals": 18,
+        "pairWeth": "0x3083C7Aa86Bc20256439c102156E7fCbe7b91797",
+        "seed": { "token": "230000", "eth": "0.278" },
+        "seedTx": "0x8533078f423ce18d7b70f5cf19327f3b51fa80737babd04648cc93b5f8e71f79",
+        "seedBlock": 38217900
+      },
+      "IZY": {
+        "name": "Izy",
+        "address": "0x8CA7A8F78abC8dA471df82BE4F374e1661e34473",
+        "decimals": 18,
+        "supply": "1000000",
+        "deployTx": "0x650760746e27486d542bd43164c0c3be5bcc3b8756df767d9445aa59d0935fa6",
+        "deployBlock": 38217881,
+        "constructorArgs": ["Izy", "IZY", "1000000000000000000000000", "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B"],
+        "pairWeth": "0x2fC40Df0c997310E07370cE547c56A0014B029Da",
+        "seed": { "token": "600000", "eth": "1" },
+        "seedTx": "0xba391f1fdccaec82b95039300e3b9e211786fe5a26ed17c01f9f4cfe0cfdab89",
+        "seedBlock": 38218023
+      },
+      "MAKI": {
+        "name": "Maki",
+        "address": "0xd08d83cdf19Db8CCd53Ed462034c8631De5F693d",
+        "decimals": 18,
+        "supply": "1000000",
+        "deployTx": "0x4cc414abbce98d0bf9f67cf5b75521d09eb6437496b8bd84206b4a01f76475e4",
+        "deployBlock": 38217888,
+        "constructorArgs": ["Maki", "MAKI", "1000000000000000000000000", "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B"],
+        "pairWeth": "0xf9A9FCF725bE455E9523a4846C649BC86d6533c5",
+        "seed": { "token": "600000", "eth": "1" },
+        "seedTx": "0xcff5e94b4e995b3f962c3b013d8d928b9617614f3146e372f27c2b8e2224bf5f",
+        "seedBlock": 38218044
+      }
+    },
+    "verified": true,
+    "notes": [
+      "IZY and MAKI are contracts/src/dex/FlizyToken.sol: fixed supply minted once, no owner, no mint, no fee, no pause. The deployer keeps the 400000 of each not seeded.",
+      "DCAT is a third-party launchpad token (launchFactory 0xb3B575A35844CB4Ad77beB243f6daadC9Ad42e0e), not source verified. Its bytecode has no mint, owner or blacklist function; its launch transfer limits ended at block 37462734. It has no transfer tax: a fork buy returned exactly the router quote.",
+      "DCAT was seeded at about 827700 DCAT per ETH, the price of its Uniswap V3 pool 0x3be84d789357ff44FFC8301A76585b6556660E24 at the time, so the two pools opened without an arbitrage gap.",
+      "The deployer key also submits live handleOps, so a script run can lose a nonce to it. The script stopped after the DCAT pool for that reason; the IZY and MAKI approve and addLiquidityETH calls were then sent one at a time with the same amounts.",
+      "All three pairs and both tokens are source verified on the explorer (full match). The app lists these tokens from web/lib/listedTokens.ts and lib/listedTokens.js."
+    ]
   }
 }

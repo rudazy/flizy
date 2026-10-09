@@ -130,8 +130,8 @@ function Letter({ name, className = '' }: { name: string; className?: string }) 
   );
 }
 
-/** An imported token as the token route describes it. */
-type HeldInfo = { address: string; symbol: string; decimals: number; balance: string | null; chainName: string; explorerBaseUrl: string };
+/** A token opened by its contract, as the token route describes it. */
+type HeldInfo = { address: string; symbol: string; decimals: number; balance: string | null; listed?: boolean; chainName: string; explorerBaseUrl: string };
 
 export function TokenDetail({ symbol }: { symbol: string }) {
   const router = useRouter();
@@ -300,6 +300,8 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const contract = market?.address || held?.address || (imported ? symbol : null);
   /** Trading needs a pool the page has read; an imported token waits for its own. */
   const canTrade = listed || (imported && market != null);
+  /** Opened by its contract but listed by Flizy, with a pool Flizy seeded: no unverified warning. */
+  const seeded = imported && held?.listed === true;
   const explorerBase = market?.explorerBaseUrl || held?.explorerBaseUrl || null;
 
   async function toggleWatch() {
@@ -364,6 +366,10 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                 {listed ? (
                   <span className="scale-[1.15] sm:scale-[1.45]">
                     <VerifiedMark />
+                  </span>
+                ) : seeded ? (
+                  <span className="shrink-0 rounded-[6px] border border-sun/40 px-1.5 py-0.5 font-sans text-[11px] font-semibold text-sun">
+                    Listed
                   </span>
                 ) : (
                   <span className="shrink-0 rounded-[6px] border border-[#e0a85a]/50 px-1.5 py-0.5 font-sans text-[11px] font-semibold text-[#e0b070]">
@@ -439,7 +445,12 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           </div>
         </div>
 
-        {imported ? (
+        {seeded ? (
+          <p className="m-0 rounded-[12px] bg-[#111111] px-3.5 py-3 text-[13px] leading-relaxed text-[#a9a9a9]">
+            Listed on Flizy. It trades against a pool Flizy seeded and holds. It is not verified, so it cannot be
+            sent on socials.
+          </p>
+        ) : imported ? (
           <p className="m-0 rounded-[12px] border border-[#e0a85a]/40 bg-[#e0a85a]/10 px-3.5 py-3 text-[13px] leading-relaxed text-[#e0b070]">
             Not verified by Flizy, so it cannot be sent on socials. Anyone can create a token and its pool, and
             pull the pool later. Only trade tokens you know.
@@ -673,7 +684,13 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                   </>
                 ) : null}
                 {profile?.creatorUsername ? <AboutRow label="Creator">@{profile.creatorUsername}</AboutRow> : null}
-                <AboutRow label="Status">{listed ? 'Verified. It can be sent on socials.' : 'Not verified. It cannot be sent on socials.'}</AboutRow>
+                <AboutRow label="Status">
+                  {listed
+                    ? 'Verified. It can be sent on socials.'
+                    : seeded
+                      ? 'Listed on Flizy. It cannot be sent on socials.'
+                      : 'Not verified. It cannot be sent on socials.'}
+                </AboutRow>
               </dl>
             </section>
           )}
@@ -716,6 +733,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           changeUp={changeUp}
           usdPerEth={usdPerEth}
           tokenAddress={imported ? contract : null}
+          listed={seeded}
         />
       ) : null}
 

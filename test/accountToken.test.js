@@ -137,6 +137,24 @@ describe('saved tokens', () => {
     assert.equal(saved.held.verified, false);
     assert.equal(saved.held.balance, '0');
   });
+
+  it('opens a listed token for anyone, named by the listing, still not verified', async () => {
+    const IZY = '0x8ca7a8f78abc8da471df82be4f374e1661e34473';
+    const listed = await store.describeHeldToken('acct-1', IZY, {
+      ...deps(),
+      // The contract read must not be what names a listed token.
+      chain: chainFor({ symbol: 'FAKE', decimals: 6 }, '0'),
+    });
+    assert.equal(listed.held.address, ethers.getAddress(IZY));
+    assert.equal(listed.held.symbol, 'IZY');
+    assert.equal(listed.held.decimals, 18);
+    assert.equal(listed.held.listed, true);
+    assert.equal(listed.held.verified, false);
+    assert.equal((fake.db.tables.account_tokens || []).length, 0);
+
+    const held = await store.describeHeldToken('acct-1', TOKEN, { ...deps(), chain: chainFor({ symbol: 'RAW', decimals: 18 }, '2') });
+    assert.equal(held.held.listed, false);
+  });
 });
 
 describe('account token migration', () => {

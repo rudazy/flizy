@@ -10,7 +10,7 @@ import { describeHeldToken } from '../../../../lib/accountTokens';
 const ROUTE = 'GET /api/tokens/[symbol]';
 
 
-/** FLZ is the verified market. A contract address is a wallet token: its own pool, traded without a listing. */
+/** FLZ is the verified market. A contract address is a listed or wallet token, read from its own pool. */
 export async function GET(req: Request, { params }: { params: { symbol: string } }) {
   try {
     const accountId = await getAccountIdFromCookie();

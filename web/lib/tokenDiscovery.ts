@@ -39,6 +39,8 @@ export type DiscoveryToken = {
   liquidityEth: string | null;
   /** Flizy attestation. This is what may be sent on socials. */
   verified: boolean;
+  /** A token Flizy lists with a pool it seeded. Its page opens by this contract. */
+  address?: string;
   /** Pool figures for the Explore row, all in ETH. Absent from older responses. */
   flzPerEth?: string | null;
   marketCapEth?: string | null;

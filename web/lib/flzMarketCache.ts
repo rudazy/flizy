@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { findEthPair, loadFlzDay, loadTokenDay, type TokenDay } from './tokenMarketServer';
+import { listedByAddress } from './listedTokens';
 
 /**
  * The FLZ pool's last 24 hours, shared by every viewer and every range for 20
@@ -21,5 +22,19 @@ export const cachedTokenDay = unstable_cache(
     return loadTokenDay({ token: address, pair, symbol, decimals });
   },
   ['token-day'],
+  { revalidate: 20 }
+);
+
+/**
+ * The same day for a listed token, read from the pool Flizy seeded and cached
+ * per token for 20 seconds. Null for an address that is not listed.
+ */
+export const cachedListedDay = unstable_cache(
+  async (address: string): Promise<TokenDay | null> => {
+    const listed = listedByAddress(address);
+    if (!listed) return null;
+    return loadTokenDay({ token: listed.address, pair: listed.pair, symbol: listed.symbol, decimals: listed.decimals });
+  },
+  ['listed-day'],
   { revalidate: 20 }
 );

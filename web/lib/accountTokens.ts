@@ -15,6 +15,7 @@ import {
   tokenDecimalsFromChain,
   tokenSymbolFromChain,
 } from './accountToken.ts';
+import { listedByAddress } from './listedTokens.ts';
 
 /** Same fallback the swap config uses when the chain env is unset. */
 const FLZ_FALLBACK = '0x308be8f71da695f18e70d2243a446e1fd1566ba6';
@@ -42,6 +43,8 @@ export type HeldToken = {
   decimals: number;
   balance: string | null;
   verified: false;
+  /** A token Flizy lists with a pool it seeded (listedTokens.ts). Still not verified. */
+  listed: boolean;
   chainName: string;
   explorerBaseUrl: string;
 };
@@ -217,17 +220,19 @@ export async function describeHeldToken(
     throw err;
   }
   if (address === flzAddress(deps)) return { listedSymbol: 'flz' };
+  const listed = listedByAddress(address);
   const supabase = db(deps.client);
   const saved = (await listAccountTokens(accountId, supabase)).find((row) => row.address === address);
   const chain = deps.chain || (await defaultChain());
   const wallet = await walletOf(accountId, supabase);
   const balance = wallet ? await chain.balance(address, wallet) : null;
   const holdsSome = balance != null && Number(balance) > 0;
-  if (!saved && !holdsSome) return { missing: NOT_IN_WALLET };
+  // A listed token opens for anyone, so it can be bought before it is held.
+  if (!listed && !saved && !holdsSome) return { missing: NOT_IN_WALLET };
 
-  let symbol = saved?.symbol;
-  let decimals = saved?.decimals;
-  if (!saved) {
+  let symbol = listed?.symbol ?? saved?.symbol;
+  let decimals = listed?.decimals ?? saved?.decimals;
+  if (!listed && !saved) {
     const meta = await chain.meta(address);
     symbol = meta.symbol;
     decimals = meta.decimals;
@@ -244,6 +249,7 @@ export async function describeHeldToken(
       decimals: decimals ?? 18,
       balance,
       verified: false,
+      listed: listed != null,
       chainName: 'GIWA Sepolia',
       explorerBaseUrl: explorer,
     },

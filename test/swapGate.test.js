@@ -26,6 +26,12 @@ describe('isUnverifiedSwap', () => {
     assert.equal(gate.isUnverifiedSwap([null, DEX.wrappedNative], DEX), false);
   });
 
+  it('treats a listed token as verified for swaps, in any casing', () => {
+    assert.equal(gate.isUnverifiedSwap([null, '0x8ca7a8f78abc8da471df82be4f374e1661e34473'], DEX), false);
+    assert.equal(gate.isUnverifiedSwap(['0xd08d83cdf19Db8CCd53Ed462034c8631De5F693d', null], DEX), false);
+    assert.equal(gate.isUnverifiedSwap(['0x58fB4D3DA82F5d610ad36E6e39e674C17B32Ffd1', OTHER], DEX), true);
+  });
+
   it('flags any other token on either side', () => {
     assert.equal(gate.isUnverifiedSwap([null, OTHER], DEX), true);
     assert.equal(gate.isUnverifiedSwap([OTHER, null], DEX), true);

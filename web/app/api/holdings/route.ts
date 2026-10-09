@@ -5,6 +5,7 @@ import { getDexAddresses } from '../../../lib/dexServer';
 import { apiErrorBody } from '../../../lib/apiError';
 import { loadNftHoldings } from '../../../lib/listedNfts.ts';
 import { listAccountTokens } from '../../../lib/accountTokens';
+import { LISTED_TOKENS } from '../../../lib/listedTokens';
 
 const ROUTE = 'GET /api/holdings';
 
@@ -74,7 +75,12 @@ export async function GET() {
         decimals: number | null;
         verified?: boolean;
         added?: boolean;
-      }> = [{ address: dex.flz, symbol: 'FLZ', decimals: 18, verified: true }];
+      }> = [
+        { address: dex.flz, symbol: 'FLZ', decimals: 18, verified: true },
+        // Listed tokens are read for every wallet, so one bought on Flizy shows
+        // without being added by hand.
+        ...LISTED_TOKENS.map((t) => ({ address: t.address, symbol: t.symbol, decimals: t.decimals, verified: false })),
+      ];
       const raw = process.env.TRACKED_TOKENS || '';
       for (const part of raw
         .split(',')

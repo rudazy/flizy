@@ -7,8 +7,12 @@
 import { ethers } from 'ethers';
 import { executeGatorCall } from './gatorExecute.ts';
 import { getWebChain, type WebChain } from './webChain.ts';
+import { LISTED_TOKENS, listedByAddress, listedBySymbol } from './listedTokens.ts';
 
 export { getWebChain, type WebChain };
+
+/** For error text: the symbols resolveToken accepts besides ETH and FLZ. */
+const LISTED_SYMBOLS = LISTED_TOKENS.map((token) => token.symbol).join(', ');
 
 const FEE_ROUTER_ABI = [
   'function feeBps() view returns (uint16)',
@@ -68,7 +72,7 @@ export function isAllowedSwapRouter(address: string): boolean {
   return a === d.feeRouter.toLowerCase() || a === d.dexRouter.toLowerCase();
 }
 
-/** Native ETH is 18. FLZ and WETH are 18. Anything else is read from the contract. */
+/** Native ETH is 18. FLZ, WETH and listed tokens are known. Anything else is read from the contract. */
 export async function readErc20Decimals(
   provider: ethers.Provider,
   address: string | null
@@ -77,6 +81,8 @@ export async function readErc20Decimals(
   const known = getDexAddresses();
   const lower = address.toLowerCase();
   if (lower === known.flz.toLowerCase() || lower === known.wrappedNative.toLowerCase()) return 18;
+  const listed = listedByAddress(address);
+  if (listed) return listed.decimals;
   const contract = new ethers.Contract(address, ['function decimals() view returns (uint8)'], provider);
   try {
     const n = Number(await contract.decimals());
@@ -99,7 +105,9 @@ export function resolveToken(symbolOrAddress: string): string | null {
   if (s === 'ETH' || s === 'NATIVE') return null;
   if (s === 'WETH') return getDexAddresses().wrappedNative;
   if (s === 'FLZ' || s === 'FLIZY') return getDexAddresses().flz;
-  throw new Error(`Unknown token: ${raw}. Use ETH, FLZ, or a 0x address.`);
+  const listed = listedBySymbol(s);
+  if (listed) return ethers.getAddress(listed.address);
+  throw new Error(`Unknown token: ${raw}. Use ETH, FLZ, ${LISTED_SYMBOLS}, or a 0x address.`);
 }
 
 export function tokenLabel(symbolOrAddress: string | null): string {
@@ -113,6 +121,8 @@ export function tokenLabel(symbolOrAddress: string | null): string {
     const addr = ethers.getAddress(raw);
     if (addr === d.flz) return 'FLZ';
     if (addr === d.wrappedNative) return 'WETH';
+    const listed = listedByAddress(addr);
+    if (listed) return listed.symbol;
     return `${raw.slice(0, 6)}...${raw.slice(-4)}`;
   }
   return String(raw).toUpperCase();

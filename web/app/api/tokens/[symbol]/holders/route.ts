@@ -22,7 +22,7 @@ const cachedTokenHolders = unstable_cache(
 );
 
 /**
- * Top holders of FLZ, or of a token this account imported or holds. Addresses
+ * Top holders of FLZ, a listed token, or a token this account imported or holds. Addresses
  * come from the explorer, amounts from the chain.
  */
 export async function GET(_req: Request, { params }: { params: { symbol: string } }) {

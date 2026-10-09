@@ -93,6 +93,15 @@ function flzRow(t: DiscoveryToken): Row {
 }
 
 /**
+ * A listed token opens by its contract, and trades from its own page: the swap
+ * screen only has the ETH/FLZ pair.
+ */
+function listedRow(t: DiscoveryToken, address: string): Row {
+  const href = `/dashboard/explore/tokens/${address}`;
+  return { ...flzRow(t), href, trade: href };
+}
+
+/**
  * ETH priced against FLZ from the same pool: its move is the inverse of FLZ's,
  * and its sparkline is the same candles turned over.
  */
@@ -170,7 +179,7 @@ export function ExploreTokens() {
     if (tab === 'copy') return [];
     const list = tokens || [];
     const base = tab === 'discover' ? list.filter((t) => t.priceEth != null) : tokensForFilter(tab, list).tokens;
-    const out = base.map(flzRow);
+    const out = base.map((t) => (t.address ? listedRow(t, t.address) : flzRow(t)));
     const flz = list.find((t) => t.symbol === 'FLZ');
     if (tab === 'discover' && flz && flz.flzPerEth) out.push(ethRow(flz));
     const q = query.trim().toLowerCase();

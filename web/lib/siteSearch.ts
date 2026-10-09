@@ -1,6 +1,7 @@
 import { getSupabase } from './supabase.ts';
 import { validateUsername } from './username.ts';
 import type { SearchResult } from './searchIndex.ts';
+import { LISTED_TOKENS as POOL_LISTED } from './listedTokens.ts';
 
 /**
  * The live half of site search: what only the server knows. Places and help
@@ -63,7 +64,11 @@ async function settle<T>(work: Promise<T[]>): Promise<T[]> {
   }
 }
 
-const LISTED_TOKENS = [{ symbol: 'FLZ', name: 'Flizy', key: 'flz' }];
+// FLZ opens by name; every other listed token opens by its contract.
+const LISTED_TOKENS = [
+  { symbol: 'FLZ', name: 'Flizy', key: 'flz' },
+  ...POOL_LISTED.map((t) => ({ symbol: t.symbol, name: t.name, key: t.address })),
+];
 
 function tokens(q: string): SearchResult[] {
   const needle = q.toLowerCase().replace(/^\$/, '');

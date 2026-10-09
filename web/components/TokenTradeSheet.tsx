@@ -82,6 +82,7 @@ export function TokenTradeSheet({
   changeUp,
   usdPerEth,
   tokenAddress = null,
+  listed = false,
 }: {
   side: 'buy' | 'sell';
   onSide: (side: 'buy' | 'sell') => void;
@@ -99,6 +100,8 @@ export function TokenTradeSheet({
    * swap routes know by name.
    */
   tokenAddress?: string | null;
+  /** A token Flizy lists with a pool it seeded: traded by contract, without the unverified warning. */
+  listed?: boolean;
 }) {
   const titleId = useId();
   const tradeId = tokenAddress || symbol;
@@ -327,7 +330,7 @@ export function TokenTradeSheet({
               <p className="m-0 mt-3 text-[13px] text-[#a9a9a9]">
                 {buying ? `Swap ETH for ${symbol}` : `Swap ${symbol} for ETH`} from your Flizy wallet, priced from the GIWA pool.
               </p>
-              {tokenAddress ? (
+              {tokenAddress && !listed ? (
                 <p className="m-0 mt-2 rounded-[10px] border border-[#e0a85a]/40 bg-[#e0a85a]/10 px-3 py-2 text-[12px] leading-relaxed text-[#e0b070]">
                   Flizy has not verified {symbol}. Anyone can create a token and its pool, and pull the pool later.
                 </p>

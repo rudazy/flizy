@@ -46,6 +46,8 @@ registerHooks({
 
 const ENV_NAMES = ['CHAIN_GIWA_SEPOLIA_WETH', 'CHAIN_GIWA_SEPOLIA_FLZ'];
 const OTHER = '0x2222222222222222222222222222222222222222';
+const IZY = '0x8CA7A8F78abC8dA471df82BE4F374e1661e34473';
+const DCAT = '0x58fb4d3da82f5d610ad36e6e39e674c17b32ffd1';
 
 let chat;
 let site;
@@ -85,6 +87,9 @@ describe('verified swap tokens, chat and site', () => {
       [null, siteDex.flz.toLowerCase()],
       [null, OTHER],
       [OTHER, null],
+      [null, IZY],
+      [DCAT, null],
+      [IZY, OTHER],
     ];
     for (const sides of trades) {
       assert.equal(
