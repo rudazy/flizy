@@ -1,5 +1,5 @@
 /**
- * Top FLZ holders.
+ * Top holders of FLZ, or of a token the account imported.
  *
  * The explorer lists addresses. Each balance and the supply are read from
  * the token before anything is shown. GIWA caps eth_getLogs, so this does
@@ -28,10 +28,16 @@ async function readJson(url: string): Promise<unknown> {
 }
 
 export async function loadFlzHolders(): Promise<FlzHolders> {
-  const chain = getWebChain();
   const dex = getDexAddresses();
+  return loadTokenHolders(dex.flz, dex.pair, 18);
+}
+
+/** The same list for any token; pair labels its pool, null when it has none. */
+export async function loadTokenHolders(tokenAddress: string, pair: string | null, decimals: number): Promise<FlzHolders> {
+  const chain = getWebChain();
+  const address = ethers.getAddress(tokenAddress);
   if (!chain.explorerBaseUrl.startsWith('https://')) throw new Error('holders unavailable');
-  const base = `${chain.explorerBaseUrl.replace(/\/$/, '')}/api/v2/tokens/${dex.flz}`;
+  const base = `${chain.explorerBaseUrl.replace(/\/$/, '')}/api/v2/tokens/${address}`;
   const [holdersBody, tokenBody] = await Promise.all([
     readJson(`${base}/holders`),
     readJson(base).catch(() => null),
@@ -42,7 +48,7 @@ export async function loadFlzHolders(): Promise<FlzHolders> {
   }
 
   const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
-  const token = new ethers.Contract(dex.flz, ABI, provider);
+  const token = new ethers.Contract(address, ABI, provider);
   const supply = BigInt(await token.totalSupply());
   const read = (
     await Promise.all(
@@ -57,6 +63,6 @@ export async function loadFlzHolders(): Promise<FlzHolders> {
   ).filter((row): row is HolderBalance => row != null);
   if (read.length === 0) throw new Error('holders unavailable');
 
-  const presented = presentHolders(read, supply, dex.pair);
+  const presented = presentHolders(read, supply, pair, decimals);
   return { ...presented, count: holderCount(tokenBody) };
 }

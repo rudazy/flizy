@@ -79,10 +79,17 @@ export function holderCount(body: unknown): number | null {
   return count;
 }
 
+/** A balance in the token's own decimals, restated in 18 for formatTokenAmount. */
+function toEighteen(value: bigint, decimals: number): bigint {
+  if (decimals === 18) return value;
+  return decimals < 18 ? value * 10n ** BigInt(18 - decimals) : value / 10n ** BigInt(decimals - 18);
+}
+
 export function presentHolders(
   rows: HolderBalance[],
   supply: bigint,
-  pair: string | null
+  pair: string | null,
+  decimals = 18
 ): { holders: HolderView[]; topShare: string | null } {
   const pairKey = pair ? pair.toLowerCase() : '';
   const ranked = rows
@@ -94,7 +101,7 @@ export function presentHolders(
     holders: ranked.map((row) => ({
       address: row.address,
       label: pairKey && row.address.toLowerCase() === pairKey ? 'Pool' : null,
-      amount: formatTokenAmount(row.balance),
+      amount: formatTokenAmount(toEighteen(row.balance, decimals)),
     })),
     topShare: percentOf(held, supply),
   };

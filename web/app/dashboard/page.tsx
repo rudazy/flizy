@@ -15,6 +15,7 @@ import { EyeMark } from '../../components/BalanceEye';
 import { formatClaimAmount } from '../../lib/claimAmount.ts';
 import { announceTx } from '../../lib/txSignal';
 import { FirstSteps } from '../../components/FirstSteps';
+import { TrendingTokens } from '../../components/TrendingTokens';
 import { formatAmount } from '../../../lib/amountDisplay';
 import {
   AlertCircleIcon,
@@ -152,7 +153,6 @@ export default function DashboardHomePage() {
 
   const nativeBal = holdings?.holdings?.native;
   const chainName = holdings?.holdings?.chain?.name || 'GIWA Sepolia';
-  const inviteCredit = data.invite?.credits ?? 0;
   const openSetup = checklist.filter((c) => !c.done);
   const recent = (activity || []).slice(0, 5);
   const walletAddress = data.account.agent_wallet_address || '';
@@ -255,7 +255,7 @@ export default function DashboardHomePage() {
         </div>
       ) : null}
 
-      <div className="!-mt-[14.5px] grid gap-[8.8px]">
+      <div className="!-mt-[14.5px] grid min-w-0 gap-[8.8px] [&>*]:min-w-0">
         {/*
           The balance starts covered. Each tap of the eye switches between the
           figure and the mask. formatAmount rather than toFixed so this figure
@@ -311,33 +311,15 @@ export default function DashboardHomePage() {
           </div>
         </section>
 
-        <FirstSteps />
-
-        <div className="grid grid-cols-3 gap-[6px]">
-          <StatTile
-            href="/dashboard/account?s=trusted"
-            icon={<PeopleIcon size={13} />}
-            label="Trusted users"
-            value={String(data.trusted.length)}
-          />
-          {/*
-            Invites, not credit: data.invite.credits is earned invite credit,
-            which CREDITS_SPENDABLE deliberately keeps unspendable. It must not
-            read like money.
-          */}
-          <StatTile
-            href="/dashboard/account?s=profile"
-            icon={<UserPlusIcon size={13} />}
-            label="Invites"
-            value={String(inviteCredit)}
-          />
+        <div className="grid min-w-0 grid-cols-3 gap-[6px]">
+          <TrendingTokens />
           <button
             type="button"
             onClick={onWalletTap}
             aria-label={`Wallet address: ${walletValue}. ${
               walletFlash === 'copied' ? 'Wallet address copied.' : 'Tap to copy it. Double tap opens the wallet.'
             }`}
-            className="flex h-[75px] touch-manipulation select-none flex-col rounded-[6px] border border-[#1f1f22] bg-[#0c0c0d] px-[9px] pt-[8px] text-left"
+            className="flex min-h-[75px] touch-manipulation select-none flex-col rounded-[6px] border border-[#1f1f22] bg-[#0c0c0d] px-[9px] pt-[8px] text-left"
           >
             <TileIcon>
               <WalletIcon size={13} />
@@ -351,6 +333,8 @@ export default function DashboardHomePage() {
             </span>
           </button>
         </div>
+
+        <FirstSteps />
       </div>
 
       <div className="!mt-[14px]">
@@ -390,7 +374,7 @@ export default function DashboardHomePage() {
               ))}
             </div>
             <div className="mt-[11px] flex justify-end">
-              <CardLink href="/dashboard/explore">View all</CardLink>
+              <CardLink href="/dashboard/explore?s=tasks">View all</CardLink>
             </div>
           </AppCollapsibleCard>
 
@@ -519,7 +503,7 @@ export default function DashboardHomePage() {
               <AppCardHeader
                 icon={<UserPlusIcon size={15} />}
                 title="Invite"
-                subtitle="Share your link. Invites you earn show above."
+                subtitle="Share your link. Your invite count is on Account."
                 action={<CopyButton value={data.invite.url} label="Copy link" className="!min-h-0 !px-[10px] !py-[6px] !font-sans !text-[9.6px]" />}
               />
               <p className="m-0 mt-[11px] break-all rounded-[4px] border border-[#2a2b30] bg-[#0b0b0c] px-[10px] py-[8px] font-mono text-[9px] text-[#e6e6e6]">
@@ -716,22 +700,6 @@ function TileIcon({ children }: { children: ReactNode }) {
     <span className="flex h-[22px] w-[22px] items-center justify-center rounded-[4px] border border-[#3a3017] bg-[#1c180c] text-sun">
       {children}
     </span>
-  );
-}
-
-function StatTile({ href, icon, label, value }: { href: string; icon: ReactNode; label: string; value: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex h-[75px] flex-col rounded-[6px] border border-[#1f1f22] bg-[#0c0c0d] px-[9px] pt-[8px] no-underline"
-    >
-      <TileIcon>{icon}</TileIcon>
-      <span className="mt-[7px] font-mono text-[7.6px] uppercase tracking-[0.1em] text-[#d0d0d0]">{label}</span>
-      <span className="mt-[3px] flex items-center justify-between">
-        <span className="font-sans text-[13px] font-semibold text-white">{value}</span>
-        <ChevronRightIcon size={11} className="text-[#d9d9d9]" />
-      </span>
-    </Link>
   );
 }
 

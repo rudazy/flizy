@@ -152,7 +152,6 @@ describe('history after a transaction', () => {
     assert.match(provider, /window\.addEventListener\(TX_EVENT, onTx\)/);
     for (const file of [
       'web/components/FaucetPanel.tsx',
-      'web/components/HeldToken.tsx',
       'web/components/TokenTradeSheet.tsx',
       'web/app/dashboard/swap/page.tsx',
       'web/app/dashboard/page.tsx',
@@ -306,5 +305,91 @@ describe('account ids stay on the server', () => {
     const route = read('web/app/api/account/stats/route.ts');
     assert.match(route, /\.eq\('account_id', accountId\)/);
     assert.match(route, /return NextResponse\.json\(stats\);/);
+  });
+});
+
+describe('Explore order and Trending tokens', () => {
+  it('opens Explore on Tokens, then Tasks, then NFTs', () => {
+    const explore = read('web/app/dashboard/explore/page.tsx');
+    assert.match(explore, /const SLIDES = \['tokens', 'tasks', 'nfts'\] as const;/);
+    assert.match(explore, /useSlide\(SLIDES, 'tokens'\)/);
+    const tabs = explore.slice(explore.indexOf('items={['));
+    assert.ok(tabs.indexOf("id: 'tokens'") < tabs.indexOf("id: 'tasks'"));
+    assert.ok(tabs.indexOf("id: 'tasks'") < tabs.indexOf("id: 'nfts'"));
+  });
+
+  it('sends task links to the Tasks slide now that Tokens opens first', () => {
+    assert.match(read('web/app/dashboard/page.tsx'), /<CardLink href="\/dashboard\/explore\?s=tasks">View all<\/CardLink>/);
+    assert.doesNotMatch(read('web/app/tasks/[ref]/page.tsx'), /['"]\/dashboard\/explore['"]/);
+    assert.match(read('web/lib/searchIndex.ts'), /title: 'Explore tasks'[^\n]*href: '\/dashboard\/explore\?s=tasks'/);
+  });
+
+  it('lists only Flizy-listed tokens, from the Explore source, with ETH priced in FLZ', () => {
+    const card = read('web/components/TrendingTokens.tsx');
+    assert.match(card, /fetch\('\/api\/tokens'\)/);
+    assert.doesNotMatch(card, /PEPE|SHIB/);
+    assert.match(card, /unit: Number\.isFinite\(per\) && per > 0 \? 'FLZ' : ''/);
+    assert.doesNotMatch(card, /border-red|#ff0000|outline-red/i);
+  });
+});
+
+describe('any token opens like FLZ', () => {
+  let market;
+  let holders;
+  before(async () => {
+    market = await import('../web/lib/tokenMarket.ts');
+    holders = await import('../web/lib/tokenHolders.ts');
+  });
+
+  it('prices a 6-decimal token in whole tokens, not raw units', () => {
+    // 1 ETH bought 2,000 whole tokens of a 6-decimal token: 0.0005 ETH each.
+    const print = market.printFromSwap({
+      flzIsToken0: true,
+      amount0In: 0n,
+      amount1In: 10n ** 18n,
+      amount0Out: 2000n * 10n ** 6n,
+      amount1Out: 0n,
+      time: 1,
+      tokenDecimals: 6,
+    });
+    assert.ok(Math.abs(print.priceEth - 0.0005) < 1e-12, String(print.priceEth));
+    assert.equal(print.flzAmount, 2000);
+    assert.equal(print.side, 'buy');
+  });
+
+  it('shows holder amounts in the token own decimals', () => {
+    const view = holders.presentHolders(
+      [{ address: '0x' + '1'.repeat(40), balance: 1500n * 10n ** 6n }],
+      3000n * 10n ** 6n,
+      null,
+      6
+    );
+    assert.equal(view.holders[0].amount, '1,500');
+    assert.equal(view.topShare, '50.0%');
+  });
+
+  it('routes every token address to the full page, reading its own pool', () => {
+    const page = read('web/app/dashboard/explore/tokens/[symbol]/page.tsx');
+    assert.match(page, /return <TokenDetail symbol=\{params\.symbol \|\| ''\} \/>;/);
+    assert.ok(!fs.existsSync(path.join(ROOT, 'web/components/HeldToken.tsx')));
+    const detail = read('web/components/TokenDetail.tsx');
+    assert.match(detail, /fetch\(`\/api\/tokens\/\$\{tokenRef\}\?range=\$\{which\}`\)/);
+    assert.match(detail, /Not verified by Flizy, so it cannot be sent on socials\./);
+    // Trading waits for the token's own pool, and never falls back to FLZ.
+    assert.match(detail, /const canTrade = listed \|\| \(imported && market != null\);/);
+    assert.match(detail, /const contract = market\?\.address \|\| held\?\.address \|\| \(imported \? symbol : null\);/);
+    assert.match(detail, /\(listed \? 'FLZ' : 'Token'\)/);
+    assert.equal((detail.match(/disabled=\{!canTrade\}/g) || []).length, 2);
+    assert.match(detail, /tokenAddress=\{imported \? contract : null\}/);
+    assert.match(detail, /\.filter\(\(\[id\]\) => listed \|\| id !== 'thesis'\)/);
+    const route = read('web/app/api/tokens/[symbol]/route.ts');
+    assert.match(route, /const described = await describeHeldToken\(accountId, raw\);/);
+    assert.match(route, /cachedTokenDay\(held\.address, held\.symbol, held\.decimals\)/);
+  });
+
+  it('finds the pool through the swap router own factory', () => {
+    const server = read('web/lib/tokenMarketServer.ts');
+    assert.match(server, /new ethers\.Contract\(dex\.dexRouter, ROUTER_ABI, provider\)\.factory\(\)/);
+    assert.match(server, /getPair\(token, dex\.wrappedNative\)/);
   });
 });

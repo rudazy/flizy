@@ -46,8 +46,10 @@ describe('figures', () => {
     assert.match(HOME, /\{taskCounts \? taskCounts\[key\] : '-'\}/);
   });
 
-  it('shows invite credit as Invites, not as money', () => {
-    assert.match(HOME, /label="Invites"\s+value=\{String\(inviteCredit\)\}/);
+  it('does not show invite credit on Home, where it could read as money', () => {
+    // The Invites tile made way for Trending tokens; the count lives on Account.
+    assert.doesNotMatch(HOME, /invite\?\.credits/);
+    assert.match(HOME, /<TrendingTokens \/>/);
   });
 });
 

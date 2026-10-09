@@ -46,6 +46,8 @@ export function printFromSwap(args: {
   amount0Out: bigint;
   amount1Out: bigint;
   time: number;
+  /** The token's decimals; ETH is always 18. FLZ is 18, other tokens may not be. */
+  tokenDecimals?: number;
 }): Print | null {
   const flzIn = args.flzIsToken0 ? args.amount0In : args.amount1In;
   const flzOut = args.flzIsToken0 ? args.amount0Out : args.amount1Out;
@@ -55,13 +57,15 @@ export function printFromSwap(args: {
   const eth = ethIn > 0n ? ethIn : ethOut;
   if (flz <= 0n || eth <= 0n) return null;
   if (!Number.isFinite(args.time)) return null;
-  const priceEth = Number(ethers.formatEther(eth)) / Number(ethers.formatEther(flz));
+  const decimals = args.tokenDecimals ?? 18;
+  const tokenAmount = Number(ethers.formatUnits(flz, decimals));
+  const priceEth = Number(ethers.formatEther(eth)) / tokenAmount;
   const volumeEth = Number(ethers.formatEther(eth));
   if (!Number.isFinite(priceEth) || priceEth <= 0) return null;
   if (!Number.isFinite(volumeEth) || volumeEth < 0) return null;
   // FLZ leaving the pool is somebody buying it.
   const side = flzOut > 0n && flzIn === 0n ? 'buy' : 'sell';
-  return { time: args.time, priceEth, volumeEth, side, flzAmount: Number(ethers.formatEther(flz)) };
+  return { time: args.time, priceEth, volumeEth, side, flzAmount: tokenAmount };
 }
 
 export function buildCandles(prints: Print[], bucketSec: number): Candle[] {

@@ -1,9 +1,11 @@
 /**
- * Spot price and swap prints for the one token Flizy lists.
+ * Spot price and swap prints for a token against ETH.
  *
- * FLZ against ETH on the Flizy pool. No other symbol is accepted by the
- * route that calls this, so the handler cannot be aimed at an arbitrary
- * contract. Dollar marks are not computed here.
+ * FLZ reads the Flizy pool. Any other token reads the pool the swap router's
+ * own factory holds for it and WETH, which is the pool a trade on Flizy goes
+ * through, and only for a token the account has imported (the route checks).
+ * Field names say "flz" because FLZ came first; for another token they mean
+ * that token. Dollar marks are not computed here.
  *
  * One read covers the last 24 hours, and every range the page offers is cut
  * from it: the chart, the 24-hour figures and the recent trades all describe
@@ -63,7 +65,7 @@ export type ActivityRow = {
 };
 
 export type TokenSnapshot = {
-  symbol: 'FLZ';
+  symbol: string;
   name: string;
   address: string;
   pair: string;
@@ -95,7 +97,7 @@ export type TokenSnapshot = {
 };
 
 /** Everything one read of the pool learned, before a range is chosen. */
-export type FlzDay = {
+export type TokenDay = {
   pool: Omit<
     TokenSnapshot,
     | 'change1hPct'
@@ -115,6 +117,28 @@ export type FlzDay = {
   now: number;
   chartError: boolean;
 };
+
+/** Kept for the FLZ callers; the shape is the same for every token. */
+export type FlzDay = TokenDay;
+
+/** Which token, which pool, and how many decimals its amounts carry. */
+export type TokenPool = { token: string; pair: string; symbol: string; decimals: number };
+
+const FACTORY_ABI = ['function getPair(address, address) view returns (address)'];
+const ROUTER_ABI = ['function factory() view returns (address)'];
+
+/**
+ * The token's ETH pool as the swap router sees it, or null when there is none.
+ * The router names its own factory, so this is the pool a Flizy trade uses.
+ */
+export async function findEthPair(token: string): Promise<string | null> {
+  const chain = getWebChain();
+  const dex = getDexAddresses();
+  const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
+  const factory = String(await new ethers.Contract(dex.dexRouter, ROUTER_ABI, provider).factory());
+  const pair = String(await new ethers.Contract(factory, FACTORY_ABI, provider).getPair(token, dex.wrappedNative));
+  return ethers.isAddress(pair) && pair !== ethers.ZeroAddress ? ethers.getAddress(pair) : null;
+}
 
 async function inBatches<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = [];
@@ -140,15 +164,22 @@ async function swapLogs(provider: ethers.JsonRpcProvider, pair: string, from: nu
 }
 
 export async function loadFlzDay(): Promise<FlzDay> {
+  const dex = getDexAddresses();
+  return loadTokenDay({ token: dex.flz, pair: dex.pair, symbol: 'FLZ', decimals: 18 });
+}
+
+export async function loadTokenDay(target: TokenPool): Promise<TokenDay> {
   const chain = getWebChain();
   const dex = getDexAddresses();
   const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
-  const day: FlzDay = {
+  const token = ethers.getAddress(target.token);
+  const unit = 10n ** BigInt(target.decimals);
+  const day: TokenDay = {
     pool: {
-      symbol: 'FLZ',
-      name: 'FLZ',
-      address: dex.flz,
-      pair: dex.pair,
+      symbol: target.symbol,
+      name: target.symbol,
+      address: token,
+      pair: target.pair,
       chainName: chain.name,
       explorerBaseUrl: chain.explorerBaseUrl,
       priceEth: null,
@@ -164,25 +195,26 @@ export async function loadFlzDay(): Promise<FlzDay> {
     chartError: false,
   };
 
-  const pair = new ethers.Contract(dex.pair, SWAP_ABI, provider);
+  const pair = new ethers.Contract(target.pair, SWAP_ABI, provider);
   let flzIs0: boolean;
   try {
     const [reserves, token0, supply, tokenName] = await Promise.all([
       pair.getReserves() as Promise<[bigint, bigint, number]>,
       pair.token0() as Promise<string>,
-      new ethers.Contract(dex.flz, ERC20_ABI, provider).totalSupply() as Promise<bigint>,
-      new ethers.Contract(dex.flz, ERC20_ABI, provider).name().catch(() => 'FLZ') as Promise<string>,
+      new ethers.Contract(token, ERC20_ABI, provider).totalSupply() as Promise<bigint>,
+      new ethers.Contract(token, ERC20_ABI, provider).name().catch(() => target.symbol) as Promise<string>,
     ]);
-    flzIs0 = ethers.getAddress(String(token0)) === dex.flz;
+    flzIs0 = ethers.getAddress(String(token0)) === token;
     const reserveFlz = flzIs0 ? reserves[0] : reserves[1];
     const reserveEth = flzIs0 ? reserves[1] : reserves[0];
-    day.pool.name = tokenName || 'FLZ';
-    day.pool.reserveFlz = ethers.formatEther(reserveFlz);
+    day.pool.name = tokenName || target.symbol;
+    day.pool.reserveFlz = ethers.formatUnits(reserveFlz, target.decimals);
     day.pool.reserveEth = ethers.formatEther(reserveEth);
     if (reserveEth > 0n && reserveFlz > 0n) {
       const one = ethers.parseEther('1');
-      day.pool.priceEth = ethers.formatEther((reserveEth * one) / reserveFlz);
-      day.pool.flzPerEth = ethers.formatEther((reserveFlz * one) / reserveEth);
+      // ETH per one whole token, and whole tokens per one ETH.
+      day.pool.priceEth = ethers.formatEther((reserveEth * unit) / reserveFlz);
+      day.pool.flzPerEth = ethers.formatUnits((reserveFlz * one) / reserveEth, target.decimals);
       day.pool.liquidityEth = ethers.formatEther(reserveEth);
       if (supply > 0n) day.pool.marketCapEth = ethers.formatEther((reserveEth * supply) / reserveFlz);
     }
@@ -204,7 +236,7 @@ export async function loadFlzDay(): Promise<FlzDay> {
     const timeOf = (blockNumber: number) => Math.round(head.timestamp - (headNumber - blockNumber) * secondsPerBlock);
     day.now = head.timestamp;
 
-    const logs = await swapLogs(provider, dex.pair, fromNumber, headNumber);
+    const logs = await swapLogs(provider, target.pair, fromNumber, headNumber);
     const withPrints: Array<{ log: ethers.Log; print: Print }> = [];
     for (const log of logs) {
       let parsed: ethers.LogDescription | null = null;
@@ -221,13 +253,14 @@ export async function loadFlzDay(): Promise<FlzDay> {
         amount0Out: parsed.args.amount0Out as bigint,
         amount1Out: parsed.args.amount1Out as bigint,
         time: timeOf(log.blockNumber),
+        tokenDecimals: target.decimals,
       });
       if (print) withPrints.push({ log, print });
     }
     day.prints = withPrints.map((w) => w.print);
 
     // Who traded, for the newest trades only: one receipt each.
-    const plumbing = [dex.pair, dex.dexRouter, dex.feeRouter, dex.wrappedNative];
+    const plumbing = [target.pair, dex.dexRouter, dex.feeRouter, dex.wrappedNative];
     const transferTopic = erc20.getEvent('Transfer')!.topicHash;
     const latest = withPrints.slice(-ACTIVITY_ROWS).reverse();
     day.activity = await inBatches(latest, 5, async ({ log, print }) => {
@@ -235,7 +268,7 @@ export async function loadFlzDay(): Promise<FlzDay> {
       try {
         const receipt = await provider.getTransactionReceipt(log.transactionHash);
         const transfers = (receipt?.logs || [])
-          .filter((l) => ethers.getAddress(l.address) === dex.flz && l.topics[0] === transferTopic)
+          .filter((l) => ethers.getAddress(l.address) === token && l.topics[0] === transferTopic)
           .map((l) => {
             const t = erc20.parseLog(l);
             return { from: String(t?.args.from || ''), to: String(t?.args.to || '') };

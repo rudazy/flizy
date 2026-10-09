@@ -111,7 +111,7 @@ export function FirstSteps() {
           Hide
         </button>
       </div>
-      <ol className="m-0 mt-[8px] grid list-none gap-[4px] p-0">
+      <ol className="m-0 mt-[8px] grid list-none grid-cols-[minmax(0,1fr)] gap-[4px] p-0">
         {steps.map((step, i) => (
           <li key={step.title}>
             <Link

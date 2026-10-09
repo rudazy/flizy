@@ -34,7 +34,7 @@ export const PLACES: Place[] = [
   { title: 'Scan', subtitle: 'Every Flizy payment, public ledger', href: '/dashboard/wallet?s=scan', keywords: ['scan', 'ledger', 'explorer', 'payments', 'public'] },
   { title: 'Swap', subtitle: 'Trade ETH and tokens', href: '/dashboard/swap', keywords: ['swap', 'trade', 'exchange', 'buy', 'sell', 'convert'] },
 
-  { title: 'Explore tasks', subtitle: 'Live tasks you can enter', href: '/dashboard/explore', keywords: ['explore', 'tasks', 'quests', 'bounties', 'earn', 'rewards', 'xp'] },
+  { title: 'Explore tasks', subtitle: 'Live tasks you can enter', href: '/dashboard/explore?s=tasks', keywords: ['explore', 'tasks', 'quests', 'bounties', 'earn', 'rewards', 'xp'] },
   { title: 'Create a task', subtitle: 'Publish a task for your community', href: '/dashboard/explore/new', keywords: ['create task', 'new task', 'publish', 'bounty', 'campaign'] },
   { title: 'Tokens', subtitle: 'Listed tokens, prices and copy trade', href: '/dashboard/explore?s=tokens', keywords: ['tokens', 'coins', 'market', 'prices', 'flz', 'copy trade', 'watchlist'] },
   { title: 'NFTs', subtitle: 'Collections, listings and mints', href: '/dashboard/explore?s=nfts', keywords: ['nft', 'nfts', 'collections', 'art', 'marketplace'] },
@@ -58,7 +58,7 @@ export const PLACES: Place[] = [
 ];
 
 /** The places shown before anything is typed. */
-export const POPULAR_PLACES: SearchResult[] = ['/dashboard/wallet?s=fund', '/dashboard/account?s=pay', '/dashboard/swap', '/dashboard/explore', '/dashboard/account?s=chat']
+export const POPULAR_PLACES: SearchResult[] = ['/dashboard/wallet?s=fund', '/dashboard/account?s=pay', '/dashboard/swap', '/dashboard/explore?s=tasks', '/dashboard/account?s=chat']
   .map((href) => PLACES.find((p) => p.href === href))
   .filter((p): p is Place => p != null)
   .map((p) => ({ kind: 'place', title: p.title, subtitle: p.subtitle, href: p.href }));

@@ -26,15 +26,15 @@ import {
 } from '../../../components/ExploreIcons';
 
 /**
- * Explore: tasks to do, tokens to look at and trade, collections to compare.
+ * Explore: tokens to look at and trade, tasks to do, collections to compare.
  *
- * Tasks stays the open slide. Tokens is discovery, a token page, and copy
- * trade. NFTs is the listed set plus copy mint.
+ * Tokens is the open slide: discovery, a token page, and copy trade. Tasks
+ * comes second. NFTs is last: the listed set plus copy mint.
  */
-const SLIDES = ['tasks', 'tokens', 'nfts'] as const;
+const SLIDES = ['tokens', 'tasks', 'nfts'] as const;
 
 export default function ExplorePage() {
-  const [slide, setSlide] = useSlide(SLIDES, 'tasks');
+  const [slide, setSlide] = useSlide(SLIDES, 'tokens');
 
   return (
     <AppPage>
@@ -45,8 +45,8 @@ export default function ExplorePage() {
         <AppSlideNav
           variant="tabs"
           items={[
-            { id: 'tasks', label: 'Tasks', icon: <TasksIcon size={17} /> },
             { id: 'tokens', label: 'Tokens', icon: <TokensIcon size={17} /> },
+            { id: 'tasks', label: 'Tasks', icon: <TasksIcon size={17} /> },
             { id: 'nfts', label: 'NFTs', icon: <NftsIcon size={17} /> },
           ]}
           activeId={slide}

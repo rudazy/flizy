@@ -81,6 +81,7 @@ export function TokenTradeSheet({
   change24,
   changeUp,
   usdPerEth,
+  tokenAddress = null,
 }: {
   side: 'buy' | 'sell';
   onSide: (side: 'buy' | 'sell') => void;
@@ -92,8 +93,15 @@ export function TokenTradeSheet({
   change24: string | null;
   changeUp: boolean;
   usdPerEth: number | null;
+  /**
+   * An imported token's contract. Quotes and the trade name the token by it,
+   * because a symbol is whatever its creator typed; null for FLZ, which the
+   * swap routes know by name.
+   */
+  tokenAddress?: string | null;
 }) {
   const titleId = useId();
+  const tradeId = tokenAddress || symbol;
   const { holdings } = useDashboard();
   const [amount, setAmount] = useState('');
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -109,7 +117,11 @@ export function TokenTradeSheet({
   const payAsset = buying ? 'ETH' : symbol;
   const getAsset = buying ? symbol : 'ETH';
   const ethBalance = holdings?.holdings?.native?.balance ?? null;
-  const tokenRow = (holdings?.holdings?.tokens || []).find((t) => String(t.symbol || '').toUpperCase() === symbol.toUpperCase());
+  const tokenRow = (holdings?.holdings?.tokens || []).find((t) =>
+    tokenAddress
+      ? String(t.address || '').toLowerCase() === tokenAddress.toLowerCase()
+      : String(t.symbol || '').toUpperCase() === symbol.toUpperCase()
+  );
   const balance = buying ? ethBalance : tokenRow?.balance ?? null;
   const spendMax = maxSpend(balance, buying);
   const maxNum = num(spendMax) ?? 0;
@@ -149,8 +161,8 @@ export function TokenTradeSheet({
       setError('');
       try {
         const params = new URLSearchParams({ side, amount });
-        if (buying) params.set('tokenOut', symbol);
-        else params.set('tokenIn', symbol);
+        if (buying) params.set('tokenOut', tradeId);
+        else params.set('tokenIn', tradeId);
         const res = await fetch(`/api/swap/quote?${params.toString()}`);
         const body = await res.json().catch(() => ({}));
         if (cancelled) return;
@@ -171,7 +183,7 @@ export function TokenTradeSheet({
       // A cancelled request never reaches its finally, so clear the flag here.
       setQuoting(false);
     };
-  }, [side, amount, symbol, buying, stage, tick]);
+  }, [side, amount, tradeId, buying, stage, tick]);
 
   useEffect(() => {
     if (stage !== 'edit' || !amount) return;
@@ -217,8 +229,8 @@ export function TokenTradeSheet({
         body: JSON.stringify({
           side,
           amount,
-          tokenIn: buying ? 'ETH' : symbol,
-          tokenOut: buying ? symbol : 'ETH',
+          tokenIn: buying ? 'ETH' : tradeId,
+          tokenOut: buying ? tradeId : 'ETH',
           minOut: quote?.amountOutMin,
           password,
         }),
@@ -315,6 +327,11 @@ export function TokenTradeSheet({
               <p className="m-0 mt-3 text-[13px] text-[#a9a9a9]">
                 {buying ? `Swap ETH for ${symbol}` : `Swap ${symbol} for ETH`} from your Flizy wallet, priced from the GIWA pool.
               </p>
+              {tokenAddress ? (
+                <p className="m-0 mt-2 rounded-[10px] border border-[#e0a85a]/40 bg-[#e0a85a]/10 px-3 py-2 text-[12px] leading-relaxed text-[#e0b070]">
+                  Flizy has not verified {symbol}. Anyone can create a token and its pool, and pull the pool later.
+                </p>
+              ) : null}
 
               {/* Buy / Sell */}
               <div className="mt-4 grid grid-cols-2 gap-1 rounded-[14px] border border-[#262626] bg-[#111] p-1" role="tablist" aria-label="Buy or sell">

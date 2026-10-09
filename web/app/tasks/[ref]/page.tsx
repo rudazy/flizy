@@ -85,7 +85,7 @@ export default async function TaskPage({ params }: { params: { ref: string } }) 
     <div className="mx-auto grid w-full max-w-lg gap-8">
       <header className="grid gap-3">
         <Link
-          href={viewerAccountId ? '/dashboard/explore' : '/'}
+          href={viewerAccountId ? '/dashboard/explore?s=tasks' : '/'}
           className="text-xs uppercase tracking-[0.18em] text-muted no-underline hover:text-paper"
         >
           {viewerAccountId ? 'Explore' : 'Home'}
@@ -250,7 +250,7 @@ function TaskFooter({
 
   if (task.state === 'completed') {
     return (
-      <Link href="/dashboard/explore" className="btn btn-ghost no-underline">
+      <Link href="/dashboard/explore?s=tasks" className="btn btn-ghost no-underline">
         See other tasks
       </Link>
     );

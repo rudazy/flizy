@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AppPage } from './AppSection';
 import { useComingSoon } from './ComingSoon';
 import { SearchButton } from './SiteSearch';
@@ -49,8 +50,10 @@ import {
 } from './ExploreIcons';
 
 /**
- * One listed token's page: profile, price, chart, trade, the pool's figures,
- * recent trades, holders and the community's theses.
+ * A token's page: price, chart, trade, the pool's figures, recent trades and
+ * holders. FLZ, the listed token, also has its profile, watchlist and theses.
+ * An imported token opens the same page by its contract, read from its own ETH
+ * pool, marked as not verified, and without the FLZ-only parts.
  *
  * Every figure is the pool's own, read from the chain in the last 24 hours
  * (lib/tokenMarketServer.ts). Dollar amounts are marked ≈ and come from one
@@ -127,8 +130,15 @@ function Letter({ name, className = '' }: { name: string; className?: string }) 
   );
 }
 
+/** An imported token as the token route describes it. */
+type HeldInfo = { address: string; symbol: string; decimals: number; balance: string | null; chainName: string; explorerBaseUrl: string };
+
 export function TokenDetail({ symbol }: { symbol: string }) {
+  const router = useRouter();
   const listed = symbol.toLowerCase() === 'flz';
+  /** A token opened by its contract: the same page, its own pool, no listing. */
+  const imported = /^0x[0-9a-fA-F]{40}$/.test(symbol);
+  const tokenRef = listed ? 'flz' : symbol;
   const [comingSoon, comingSoonNote] = useComingSoon();
 
   const [range, setRange] = useState<ChartRange>('1d');
@@ -139,6 +149,9 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const [market, setMarket] = useState<TokenSnapshot | null>(null);
   const [usdPerEth, setUsdPerEth] = useState<number | null>(null);
   const [marketError, setMarketError] = useState('');
+  const [held, setHeld] = useState<HeldInfo | null>(null);
+  /** An imported token the swap router has no ETH pool for: no price, no trade. */
+  const [noPool, setNoPool] = useState(false);
 
   const [profile, setProfile] = useState<TokenProfile | null>(null);
   const [watched, setWatched] = useState(false);
@@ -169,18 +182,24 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const loadMarket = useCallback(async (which: ChartRange) => {
     setMarketError('');
     try {
-      const res = await fetch(`/api/tokens/flz?range=${which}`);
+      const res = await fetch(`/api/tokens/${tokenRef}?range=${which}`);
       const body = await res.json().catch(() => ({}));
+      if (body.listedSymbol === 'flz') {
+        router.replace('/dashboard/explore/tokens/flz');
+        return;
+      }
       if (!res.ok) {
         setMarketError(body.error || 'Could not load this token.');
         return;
       }
-      setMarket(body.market as TokenSnapshot);
+      if (body.held) setHeld(body.held as HeldInfo);
+      setNoPool(imported && !body.market);
+      setMarket((body.market ?? null) as TokenSnapshot | null);
       setUsdPerEth(typeof body.usdPerEth === 'number' ? body.usdPerEth : null);
     } catch {
       setMarketError('Could not load this token.');
     }
-  }, []);
+  }, [tokenRef, imported, router]);
 
   const loadTheses = useCallback(async () => {
     try {
@@ -195,9 +214,9 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   }, []);
 
   useEffect(() => {
-    if (!listed) return;
+    if (!listed && !imported) return;
     void loadMarket(range);
-  }, [listed, range, loadMarket]);
+  }, [listed, imported, range, loadMarket]);
 
   useEffect(() => {
     const query = window.matchMedia('(max-width: 639px)');
@@ -208,8 +227,8 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   }, []);
 
   useEffect(() => {
-    if (!listed) return;
-    void (async () => {
+    if (!listed && !imported) return;
+    if (listed) void (async () => {
       try {
         const res = await fetch('/api/tokens/flz/profile');
         const body = await res.json().catch(() => ({}));
@@ -223,7 +242,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
     })();
     void (async () => {
       try {
-        const res = await fetch('/api/tokens/flz/holders');
+        const res = await fetch(`/api/tokens/${tokenRef}/holders`);
         const body = await res.json().catch(() => ({}));
         if (!res.ok || !body.holders) {
           setHolderError('Holders could not be read.');
@@ -245,8 +264,8 @@ export function TokenDetail({ symbol }: { symbol: string }) {
         setHolderError('Holders could not be read.');
       }
     })();
-    void loadTheses();
-  }, [listed, loadTheses]);
+    if (listed) void loadTheses();
+  }, [listed, imported, tokenRef, loadTheses]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -257,7 +276,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
     return () => document.removeEventListener('mousedown', close);
   }, [menuOpen]);
 
-  if (!listed) {
+  if (!listed && !imported) {
     return (
       <AppPage>
         <div className="grid w-full gap-3">
@@ -274,6 +293,14 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const change24 = formatPct(day?.changePct ?? null);
   const changeUp = (day?.changePct ?? 0) >= 0;
   const activity = market?.activity ?? [];
+  const name = listed ? (market?.name && market.name !== 'FLZ' ? market.name : 'Flizy') : market?.name || held?.symbol || 'Token';
+  // An imported token is named by its own contract from the first render, so a
+  // trade can never fall back to FLZ while the page is still loading.
+  const ticker = market?.symbol || held?.symbol || (listed ? 'FLZ' : 'Token');
+  const contract = market?.address || held?.address || (imported ? symbol : null);
+  /** Trading needs a pool the page has read; an imported token waits for its own. */
+  const canTrade = listed || (imported && market != null);
+  const explorerBase = market?.explorerBaseUrl || held?.explorerBaseUrl || null;
 
   async function toggleWatch() {
     const next = !watched;
@@ -287,9 +314,9 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   }
 
   async function copyContract() {
-    if (!market) return;
+    if (!contract) return;
     try {
-      await navigator.clipboard.writeText(market.address);
+      await navigator.clipboard.writeText(contract);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -297,7 +324,6 @@ export function TokenDetail({ symbol }: { symbol: string }) {
     }
   }
 
-  const name = market?.name && market.name !== 'FLZ' ? market.name : 'Flizy';
   const chart = market ? (
     <TokenChart
       candles={market.candles}
@@ -308,6 +334,10 @@ export function TokenDetail({ symbol }: { symbol: string }) {
       mode={chartMode}
       height={fullscreen ? 460 : phone ? 200 : 280}
     />
+  ) : noPool ? (
+    <div className="flex h-[200px] items-center justify-center rounded-[10px] bg-[#141414] px-6 text-center text-sm text-muted sm:h-[280px]">
+      The swap has no ETH pool for this token on GIWA, so there is no price, chart or trade.
+    </div>
   ) : (
     <div className="h-[200px] animate-pulse sm:h-[280px] rounded-[10px] bg-[#141414]" aria-label="Loading the chart" />
   );
@@ -331,12 +361,18 @@ export function TokenDetail({ symbol }: { symbol: string }) {
             <div className="min-w-0">
               <p className="m-0 flex items-center gap-1.5 font-sans text-[22px] font-bold leading-tight text-[#f5f5f5] sm:gap-2 sm:text-[28px]">
                 <span className="truncate">{name}</span>
-                <span className="scale-[1.15] sm:scale-[1.45]">
-                  <VerifiedMark />
-                </span>
+                {listed ? (
+                  <span className="scale-[1.15] sm:scale-[1.45]">
+                    <VerifiedMark />
+                  </span>
+                ) : (
+                  <span className="shrink-0 rounded-[6px] border border-[#e0a85a]/50 px-1.5 py-0.5 font-sans text-[11px] font-semibold text-[#e0b070]">
+                    Not verified
+                  </span>
+                )}
               </p>
               <p className="m-0 mt-0.5 flex flex-wrap gap-x-2.5 font-sans text-[13px] text-[#a9a9a9] sm:gap-x-3 sm:text-base">
-                <span>{market?.symbol || 'FLZ'}</span>
+                <span>{ticker}</span>
                 {profile?.creatorUsername ? <span>@{profile.creatorUsername}</span> : null}
               </p>
               <p className="m-0 mt-1 flex items-center gap-2 sm:mt-1.5">
@@ -352,15 +388,17 @@ export function TokenDetail({ symbol }: { symbol: string }) {
             <button type="button" className={`${SQUARE_BUTTON} relative`} aria-label="Notifications" onClick={() => comingSoon('Notifications')}>
               <BellIcon size={18} />
             </button>
-            <button
-              type="button"
-              className={`${SQUARE_BUTTON} ${watched ? 'border-sun/60 text-sun' : 'text-sun'}`}
-              aria-label={watched ? 'Remove from watchlist' : 'Add to watchlist'}
-              aria-pressed={watched}
-              onClick={() => void toggleWatch()}
-            >
-              <StarIcon size={18} className={watched ? 'fill-current' : ''} />
-            </button>
+            {listed ? (
+              <button
+                type="button"
+                className={`${SQUARE_BUTTON} ${watched ? 'border-sun/60 text-sun' : 'text-sun'}`}
+                aria-label={watched ? 'Remove from watchlist' : 'Add to watchlist'}
+                aria-pressed={watched}
+                onClick={() => void toggleWatch()}
+              >
+                <StarIcon size={18} className={watched ? 'fill-current' : ''} />
+              </button>
+            ) : null}
             <div className="relative" ref={menuRef}>
               <button type="button" className={SQUARE_BUTTON} aria-label="More" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
                 <MoreVerticalIcon size={18} />
@@ -375,9 +413,9 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                   >
                     <CopyIcon size={14} /> Copy contract
                   </MenuButton>
-                  {market ? (
+                  {contract && explorerBase ? (
                     <a
-                      href={`${market.explorerBaseUrl}/address/${market.address}`}
+                      href={`${explorerBase}/address/${contract}`}
                       target="_blank"
                       rel="noreferrer noopener"
                       className="flex h-10 items-center gap-2.5 rounded-[7px] px-3 font-sans text-sm text-[#e6e6e6] no-underline hover:bg-[#1c1c1c]"
@@ -400,6 +438,13 @@ export function TokenDetail({ symbol }: { symbol: string }) {
             </div>
           </div>
         </div>
+
+        {imported ? (
+          <p className="m-0 rounded-[12px] border border-[#e0a85a]/40 bg-[#e0a85a]/10 px-3.5 py-3 text-[13px] leading-relaxed text-[#e0b070]">
+            Not verified by Flizy, so it cannot be sent on socials. Anyone can create a token and its pool, and
+            pull the pool later. Only trade tokens you know.
+          </p>
+        ) : null}
 
         {profile?.description ? <p className="m-0 max-w-[640px] text-[13px] leading-relaxed text-[#d6d6d6] sm:text-[15px]">{profile.description}</p> : null}
         {profile?.links.length ? (
@@ -497,16 +542,18 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           <button
             type="button"
             onClick={() => setTradeSide('buy')}
-            className="hit-y-44 flex h-12 items-center justify-center gap-2 rounded-[12px] border border-[#2fd27a]/60 bg-[#2fd27a]/10 font-sans text-base font-semibold sm:h-14 sm:gap-2.5 sm:text-lg text-[#2fd27a] transition-colors hover:bg-[#2fd27a]/15"
+            disabled={!canTrade}
+            className="hit-y-44 flex h-12 items-center justify-center gap-2 rounded-[12px] border border-[#2fd27a]/60 bg-[#2fd27a]/10 font-sans text-base font-semibold sm:h-14 sm:gap-2.5 sm:text-lg text-[#2fd27a] transition-colors hover:bg-[#2fd27a]/15 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <CartIcon size={20} /> Buy {market?.symbol || 'FLZ'}
+            <CartIcon size={20} /> Buy {ticker}
           </button>
           <button
             type="button"
             onClick={() => setTradeSide('sell')}
-            className="hit-y-44 flex h-12 items-center justify-center gap-2 rounded-[12px] border border-[#f05252]/60 bg-[#f05252]/10 font-sans text-base font-semibold sm:h-14 sm:gap-2.5 sm:text-lg text-[#f05252] transition-colors hover:bg-[#f05252]/15"
+            disabled={!canTrade}
+            className="hit-y-44 flex h-12 items-center justify-center gap-2 rounded-[12px] border border-[#f05252]/60 bg-[#f05252]/10 font-sans text-base font-semibold sm:h-14 sm:gap-2.5 sm:text-lg text-[#f05252] transition-colors hover:bg-[#f05252]/15 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <SwapArrowsIcon size={20} /> Sell {market?.symbol || 'FLZ'}
+            <SwapArrowsIcon size={20} /> Sell {ticker}
           </button>
         </div>
 
@@ -541,7 +588,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
         </section>
 
         {/* Tabs */}
-        <div role="tablist" aria-label="Token" className="grid grid-cols-4 border-b border-[#232323]">
+        <div role="tablist" aria-label="Token" className={`grid border-b border-[#232323] ${listed ? 'grid-cols-4' : 'grid-cols-3'}`}>
           {(
             [
               ['activity', 'Activity'],
@@ -549,7 +596,9 @@ export function TokenDetail({ symbol }: { symbol: string }) {
               ['thesis', 'Thesis'],
               ['about', 'About'],
             ] as const
-          ).map(([id, label]) => (
+          )
+            .filter(([id]) => listed || id !== 'thesis')
+            .map(([id, label]) => (
             <button
               key={id}
               type="button"
@@ -585,14 +634,14 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                       <li key={row.address} className="flex items-center gap-3 border-b border-[#1c1c1c] py-2.5 last:border-0">
                         <span className="w-6 font-mono text-xs text-[#8f8f8f]">{index + 1}</span>
                         <a
-                          href={market ? `${market.explorerBaseUrl}/address/${row.address}` : undefined}
+                          href={explorerBase ? `${explorerBase}/address/${row.address}` : undefined}
                           target="_blank"
                           rel="noreferrer noopener"
                           className="min-w-0 flex-1 truncate font-mono text-sm text-sun no-underline"
                         >
                           {row.label ? `${row.label} ${shortAddress(row.address)}` : shortAddress(row.address)}
                         </a>
-                        <span className="font-mono text-sm text-[#e6e6e6]">{row.amount} FLZ</span>
+                        <span className="font-mono text-sm text-[#e6e6e6]">{row.amount} {ticker}</span>
                       </li>
                     ))}
                   </ol>
@@ -606,13 +655,15 @@ export function TokenDetail({ symbol }: { symbol: string }) {
               <h2 className="m-0 font-sans text-lg font-semibold text-[#f5f5f5]">About {name}</h2>
               {profile?.description ? <p className="m-0 mt-2 text-sm leading-relaxed text-[#d0d0d0]">{profile.description}</p> : null}
               <dl className="m-0 mt-4 grid gap-2.5 text-sm">
+                {contract && explorerBase ? (
+                  <AboutRow label="Contract">
+                    <a href={`${explorerBase}/address/${contract}`} target="_blank" rel="noreferrer noopener" className="text-sun no-underline">
+                      {shortAddress(contract)}
+                    </a>
+                  </AboutRow>
+                ) : null}
                 {market ? (
                   <>
-                    <AboutRow label="Contract">
-                      <a href={`${market.explorerBaseUrl}/address/${market.address}`} target="_blank" rel="noreferrer noopener" className="text-sun no-underline">
-                        {shortAddress(market.address)}
-                      </a>
-                    </AboutRow>
                     <AboutRow label="Pool">
                       <a href={`${market.explorerBaseUrl}/address/${market.pair}`} target="_blank" rel="noreferrer noopener" className="text-sun no-underline">
                         {shortAddress(market.pair)}
@@ -622,13 +673,13 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                   </>
                 ) : null}
                 {profile?.creatorUsername ? <AboutRow label="Creator">@{profile.creatorUsername}</AboutRow> : null}
-                <AboutRow label="Status">Verified. It can be sent on socials.</AboutRow>
+                <AboutRow label="Status">{listed ? 'Verified. It can be sent on socials.' : 'Not verified. It cannot be sent on socials.'}</AboutRow>
               </dl>
             </section>
           )}
         </div>
 
-        {tab !== 'thesis' ? (
+        {listed && tab !== 'thesis' ? (
           <ThesisCard theses={theses ? theses.slice(0, 2) : null} total={thesisTotal} onWrite={() => setWriting(true)} onChanged={() => void loadTheses()} />
         ) : null}
       </div>
@@ -658,12 +709,13 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           onClose={() => setTradeSide(null)}
           // Balances and history follow the sheet's announceTx; only the market is this page's.
           onTraded={() => void loadMarket(range)}
-          symbol={market?.symbol || 'FLZ'}
+          symbol={ticker}
           logo={profile?.logo ?? null}
           priceEth={market?.priceEth == null ? null : Number(market.priceEth)}
           change24={change24}
           changeUp={changeUp}
           usdPerEth={usdPerEth}
+          tokenAddress={imported ? contract : null}
         />
       ) : null}
 
