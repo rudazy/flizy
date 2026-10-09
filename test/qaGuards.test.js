@@ -374,7 +374,9 @@ describe('any token opens like FLZ', () => {
     assert.ok(!fs.existsSync(path.join(ROOT, 'web/components/HeldToken.tsx')));
     const detail = read('web/components/TokenDetail.tsx');
     assert.match(detail, /fetch\(`\/api\/tokens\/\$\{tokenRef\}\?range=\$\{which\}`\)/);
-    assert.match(detail, /Not verified by Flizy, so it cannot be sent on socials\./);
+    // A token Flizy does not list gets one small tag, not a warning block.
+    assert.match(detail, />\s*Not listed\s*<\/span>/);
+    assert.doesNotMatch(detail, /Not verified by Flizy/);
     // Trading waits for the token's own pool, and never falls back to FLZ.
     assert.match(detail, /const canTrade = listed \|\| \(imported && market != null\);/);
     assert.match(detail, /const contract = market\?\.address \|\| held\?\.address \|\| \(imported \? symbol : null\);/);

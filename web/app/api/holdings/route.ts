@@ -79,7 +79,7 @@ export async function GET() {
         { address: dex.flz, symbol: 'FLZ', decimals: 18, verified: true },
         // Listed tokens are read for every wallet, so one bought on Flizy shows
         // without being added by hand.
-        ...LISTED_TOKENS.map((t) => ({ address: t.address, symbol: t.symbol, decimals: t.decimals, verified: false })),
+        ...LISTED_TOKENS.map((t) => ({ address: t.address, symbol: t.symbol, decimals: t.decimals, verified: t.verified })),
       ];
       const raw = process.env.TRACKED_TOKENS || '';
       for (const part of raw

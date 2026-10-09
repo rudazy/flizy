@@ -1,14 +1,24 @@
-/** The two sides of the one pool the swap screen trades. */
-export type SwapToken = 'ETH' | 'FLZ';
+import { LISTED_TOKENS } from './listedTokens.ts';
+
+/** ETH, and every token the swap screen trades against it. */
+export const SWAP_ASSETS = ['FLZ', ...LISTED_TOKENS.map((token) => token.symbol)] as const;
+
+/** One side of a swap: ETH, or a token with an ETH pool Flizy seeded. */
+export type SwapToken = string;
+
+function isAsset(symbol: string): boolean {
+  return (SWAP_ASSETS as readonly string[]).includes(symbol);
+}
 
 /**
- * The pair a link asked for, as in /dashboard/swap?from=FLZ&to=ETH, or ETH to
- * FLZ when it asked for anything else. Only the ETH/FLZ pair exists, so the
- * only other valid answer is the same pair the other way round.
+ * The pair a link asked for, as in /dashboard/swap?from=FLZ&to=ETH or
+ * ?from=ETH&to=IZY, or ETH to FLZ when it asked for anything else. Every pool
+ * is against ETH, so one side is always ETH.
  */
 export function pairFromQuery(from: string | null, to: string | null): { tokenIn: SwapToken; tokenOut: SwapToken } {
   const f = String(from || '').toUpperCase();
   const t = String(to || '').toUpperCase();
-  if (f === 'FLZ' && (t === 'ETH' || t === '')) return { tokenIn: 'FLZ', tokenOut: 'ETH' };
+  if (isAsset(f) && (t === 'ETH' || t === '')) return { tokenIn: f, tokenOut: 'ETH' };
+  if (isAsset(t) && (f === 'ETH' || f === '')) return { tokenIn: 'ETH', tokenOut: t };
   return { tokenIn: 'ETH', tokenOut: 'FLZ' };
 }

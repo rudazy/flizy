@@ -92,13 +92,13 @@ function flzRow(t: DiscoveryToken): Row {
   };
 }
 
-/**
- * A listed token opens by its contract, and trades from its own page: the swap
- * screen only has the ETH/FLZ pair.
- */
+/** A listed token opens by its contract, and Trade opens the swap on its ETH pair. */
 function listedRow(t: DiscoveryToken, address: string): Row {
-  const href = `/dashboard/explore/tokens/${address}`;
-  return { ...flzRow(t), href, trade: href };
+  return {
+    ...flzRow(t),
+    href: `/dashboard/explore/tokens/${address}`,
+    trade: `/dashboard/swap?from=ETH&to=${encodeURIComponent(t.symbol)}`,
+  };
 }
 
 /**

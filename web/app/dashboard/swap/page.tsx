@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { AppTopBar } from '../../../components/AppTopBar';
 import { AppPage } from '../../../components/AppSection';
 import { formatAmount } from '../../../lib/amountDisplay';
-import { pairFromQuery } from '../../../lib/swapPair';
+import { pairFromQuery, SWAP_ASSETS, type SwapToken } from '../../../lib/swapPair';
+import { LISTED_TOKENS, listedBySymbol } from '../../../lib/listedTokens';
 import { announceTx } from '../../../lib/txSignal';
 import {
   ArrowRightIcon,
@@ -23,7 +24,7 @@ import {
   SwapVerticalIcon,
 } from '../../../components/ExploreIcons';
 
-type Token = 'ETH' | 'FLZ';
+type Token = SwapToken;
 type Mode = 'swap' | 'limit' | 'liquidity';
 
 type Quote = {
@@ -35,10 +36,12 @@ type Quote = {
   tokenOut: string;
 };
 
+/** One ETH pool's spot price, for the token named by symbol. */
 type PriceInfo = {
-  flzPerEth: string;
-  ethPerFlz: string;
-  reserveFlz: string;
+  symbol: string;
+  tokenPerEth: string;
+  ethPerToken: string;
+  reserveToken: string;
   reserveWeth: string;
 };
 
@@ -54,7 +57,15 @@ type LimitOrder = {
   error: string | null;
 };
 
-type Balances = { eth: string; flz: string };
+/** Wallet balances by symbol: ETH, FLZ and each listed token. */
+type Balances = Record<string, string>;
+
+/** The name under a symbol in the token picker. */
+function tokenName(token: Token): string {
+  if (token === 'ETH') return 'Ethereum';
+  if (token === 'FLZ') return 'Flizy';
+  return listedBySymbol(token)?.name ?? token;
+}
 
 /** Characters kept out of the source as literals; see the ASCII rule for this repo. */
 const APPROX = String.fromCharCode(0x2248);
@@ -89,16 +100,16 @@ function plain(n: number, digits = 6): string {
 
 export default function SwapPage() {
   const [mode, setMode] = useState<Mode>('swap');
-  // A Trade button elsewhere opens this screen on its pair: ?from=FLZ&to=ETH.
-  // Anything that is not the ETH/FLZ pair one way round falls back to buying FLZ.
+  // A Trade button elsewhere opens this screen on its pair: ?from=FLZ&to=ETH or
+  // ?from=ETH&to=IZY. Anything else falls back to buying FLZ.
   const search = useSearchParams();
   const linked = pairFromQuery(search.get('from'), search.get('to'));
   const [tokenIn, setTokenIn] = useState<Token>(linked.tokenIn);
   const [tokenOut, setTokenOut] = useState<Token>(linked.tokenOut);
   const [amountIn, setAmountIn] = useState('0.01');
   const [quoted, setQuote] = useState<(Quote & { inputs: string }) | null>(null);
-  const [price, setPrice] = useState<PriceInfo | null>(null);
-  const [balances, setBalances] = useState<Balances>({ eth: '0', flz: '0' });
+  const [priceInfo, setPrice] = useState<PriceInfo | null>(null);
+  const [balances, setBalances] = useState<Balances>({});
   const [slippagePct, setSlippagePct] = useState('1.00');
   const [editingSlippage, setEditingSlippage] = useState(false);
   const [limitPrice, setLimitPrice] = useState('');
@@ -123,6 +134,10 @@ export default function SwapPage() {
   } | null>(null);
 
   const side = tokenIn === 'ETH' ? 'buy' : 'sell';
+  /** Every pool is against ETH: the other side is the token being traded. */
+  const asset = tokenIn === 'ETH' ? tokenOut : tokenIn;
+  // A price read for another token is not this pair's price.
+  const price = priceInfo && priceInfo.symbol === asset ? priceInfo : null;
   const slippageBps = Math.round(Number(slippagePct) * 100);
 
   // A quote request that has been overtaken must not overwrite a newer one.
@@ -139,11 +154,17 @@ export default function SwapPage() {
       const res = await fetch('/api/holdings');
       const data = await res.json();
       if (!res.ok) return;
-      const eth = data?.holdings?.native?.balance || '0';
-      const flzTok = (data?.holdings?.tokens || []).find(
-        (t: { symbol?: string }) => String(t.symbol || '').toUpperCase() === 'FLZ'
-      );
-      setBalances({ eth: String(eth), flz: flzTok?.balance != null ? String(flzTok.balance) : '0' });
+      const rows: Array<{ symbol?: string; address?: string | null; balance?: string | null }> = data?.holdings?.tokens || [];
+      const next: Balances = { ETH: String(data?.holdings?.native?.balance || '0') };
+      const flzTok = rows.find((t) => String(t.symbol || '').toUpperCase() === 'FLZ');
+      next.FLZ = flzTok?.balance != null ? String(flzTok.balance) : '0';
+      // Listed tokens are matched by contract, so a look-alike symbol someone
+      // added by hand cannot stand in for one.
+      for (const listed of LISTED_TOKENS) {
+        const row = rows.find((t) => String(t.address || '').toLowerCase() === listed.address.toLowerCase());
+        next[listed.symbol] = row?.balance != null ? String(row.balance) : '0';
+      }
+      setBalances(next);
     } catch {
       /* balances stay as they were */
     }
@@ -151,13 +172,13 @@ export default function SwapPage() {
 
   const loadPrice = useCallback(async () => {
     try {
-      const res = await fetch('/api/swap/quote?price=1');
+      const res = await fetch(`/api/swap/quote?price=1&token=${encodeURIComponent(asset)}`);
       const data = await res.json();
       if (data.price) setPrice(data.price);
     } catch {
       /* the rate row waits for the next refresh */
     }
-  }, []);
+  }, [asset]);
 
   const loadQuote = useCallback(async () => {
     const seq = ++quoteSeq.current;
@@ -257,7 +278,7 @@ export default function SwapPage() {
   /** One whole in-token buys this many out-tokens at the pool's spot price. */
   const marketRate = useMemo(() => {
     if (!price) return null;
-    const r = Number(tokenIn === 'ETH' ? price.flzPerEth : price.ethPerFlz);
+    const r = Number(tokenIn === 'ETH' ? price.tokenPerEth : price.ethPerToken);
     return Number.isFinite(r) && r > 0 ? r : null;
   }, [price, tokenIn]);
 
@@ -267,7 +288,7 @@ export default function SwapPage() {
     if (mode === 'limit' && marketRate && !limitPrice) setLimitPrice(plain(marketRate, 8));
   }, [mode, marketRate, limitPrice]);
 
-  const balanceFor = (token: Token) => (token === 'ETH' ? balances.eth : balances.flz);
+  const balanceFor = (token: Token) => balances[token] ?? '0';
 
   function setMaxIn() {
     let n = Number(balanceFor(tokenIn));
@@ -292,7 +313,37 @@ export default function SwapPage() {
   }
 
   function chooseToken(which: 'in' | 'out', token: Token) {
-    if ((which === 'in' ? tokenIn : tokenOut) !== token) flipTokens();
+    const current = which === 'in' ? tokenIn : tokenOut;
+    const other = which === 'in' ? tokenOut : tokenIn;
+    if (token === current) return;
+    // ETH, or the token already on the other side, turns the pair round.
+    if (token === 'ETH' || token === other) {
+      flipTokens();
+      return;
+    }
+    // Another token takes this side, and the other side is always ETH.
+    if (which === 'in') {
+      setTokenIn(token);
+      setTokenOut('ETH');
+    } else {
+      setTokenOut(token);
+      setTokenIn('ETH');
+    }
+    setQuote(null);
+    setLimitPrice('');
+    setResult(null);
+    setError('');
+  }
+
+  /** Limit orders and liquidity are for the FLZ pool only, so those modes trade FLZ. */
+  function changeMode(next: Mode) {
+    if (next !== 'swap' && asset !== 'FLZ') {
+      if (tokenIn === 'ETH') setTokenOut('FLZ');
+      else setTokenIn('FLZ');
+      setQuote(null);
+      setLimitPrice('');
+    }
+    setMode(next);
   }
 
   function commitSlippage(raw: string) {
@@ -422,10 +473,10 @@ export default function SwapPage() {
     return (got / ideal - 1) * 100;
   }, [quote, marketRate, amountIn]);
 
-  /** An FLZ figure's worth in ETH at spot, for the line under it. */
+  /** A token figure's worth in ETH at spot, for the line under it. */
   function ethValueOf(token: Token, amount: number): string | null {
-    if (token !== 'FLZ' || !price || !(amount > 0)) return null;
-    return `${APPROX} ${fmt(amount * Number(price.ethPerFlz), 6)} ETH`;
+    if (token === 'ETH' || !price || !(amount > 0)) return null;
+    return `${APPROX} ${fmt(amount * Number(price.ethPerToken), 6)} ETH`;
   }
 
   const limitOut = useMemo(() => {
@@ -445,6 +496,8 @@ export default function SwapPage() {
         : `Swap ${tokenIn} for ${tokenOut}`;
 
   const tradeTitle = mode === 'limit' ? 'Limit order' : 'Trade';
+  /** The tokens either picker offers: every pool on Swap, the FLZ pool on Limit. */
+  const pickable: Token[] = mode === 'swap' ? ['ETH', ...SWAP_ASSETS] : ['ETH', 'FLZ'];
 
   return (
     <AppPage>
@@ -452,12 +505,12 @@ export default function SwapPage() {
 
       <div className="!-mt-[17px] flex items-stretch gap-[10.5px]">
         <div className="flex h-[36px] flex-1 rounded-[5px] border border-chrome-line bg-[#0e0f11]" role="tablist" aria-label="Trade type">
-          <ModeTab active={mode === 'swap'} onClick={() => setMode('swap')} icon={<SwapArrowsIcon size={15} />} label="Swap" />
-          <ModeTab active={mode === 'limit'} onClick={() => setMode('limit')} icon={<ChartLineIcon size={15} />} label="Limit" />
+          <ModeTab active={mode === 'swap'} onClick={() => changeMode('swap')} icon={<SwapArrowsIcon size={15} />} label="Swap" />
+          <ModeTab active={mode === 'limit'} onClick={() => changeMode('limit')} icon={<ChartLineIcon size={15} />} label="Limit" />
         </div>
         <button
           type="button"
-          onClick={() => setMode(mode === 'liquidity' ? 'swap' : 'liquidity')}
+          onClick={() => changeMode(mode === 'liquidity' ? 'swap' : 'liquidity')}
           aria-pressed={mode === 'liquidity'}
           className={`hit-y-44 flex h-[33px] w-[104px] shrink-0 items-center justify-center gap-[9px] self-center rounded-[5px] border border-sun font-sans text-[9.8px] font-medium text-sun ${
             mode === 'liquidity' ? 'bg-sun-wash' : 'bg-transparent'
@@ -478,7 +531,7 @@ export default function SwapPage() {
               <div>
                 <h2 className="m-0 font-sans text-[13.5px] font-semibold leading-[17px] text-white">{tradeTitle}</h2>
                 <p className="m-0 mt-[1px] font-sans text-[10px] text-[#9d9d9d]">
-                  GIWA Sepolia {DOT} ETH / FLZ
+                  GIWA Sepolia {DOT} ETH / {asset}
                 </p>
               </div>
               {mode === 'swap' ? (
@@ -499,6 +552,7 @@ export default function SwapPage() {
               token={tokenIn}
               balance={balanceFor(tokenIn)}
               onMax={setMaxIn}
+              options={pickable}
               onToken={(t) => chooseToken('in', t)}
               amount={
                 <input
@@ -531,6 +585,7 @@ export default function SwapPage() {
               label="To"
               token={tokenOut}
               balance={balanceFor(tokenOut)}
+              options={pickable}
               onToken={(t) => chooseToken('out', t)}
               amount={
                 <span className={`block truncate text-right font-sans text-[20px] font-semibold ${quote || mode === 'limit' ? 'text-white' : 'text-[#5c5c60]'}`}>
@@ -838,7 +893,7 @@ function TokenLogo({ token, size = 36 }: { token: Token; size?: number }) {
       className="flex shrink-0 items-center justify-center rounded-full border-[1.5px] border-sun bg-[#0a0a0a] font-sans font-bold text-sun"
       style={{ width: size, height: size, fontSize: Math.round(size * 0.52) }}
     >
-      F
+      {token.slice(0, 1)}
     </span>
   );
 }
@@ -848,6 +903,7 @@ function TokenPanel({
   token,
   balance,
   onMax,
+  options,
   onToken,
   amount,
   sub,
@@ -856,6 +912,7 @@ function TokenPanel({
   token: Token;
   balance: string;
   onMax?: () => void;
+  options: Token[];
   onToken: (t: Token) => void;
   amount: ReactNode;
   sub?: ReactNode;
@@ -884,17 +941,20 @@ function TokenPanel({
           <TokenLogo token={token} />
           <span className="min-w-0 flex-1">
             <span className="block font-sans text-[11.5px] font-semibold text-white">{token}</span>
-            <span className="block font-sans text-[9.2px] text-[#a9a9a9]">{token === 'ETH' ? 'Ethereum' : 'Flizy'}</span>
+            <span className="block truncate font-sans text-[9.2px] text-[#a9a9a9]">{tokenName(token)}</span>
           </span>
           <ChevronDownIcon size={11} className="shrink-0 text-[#d9d9d9]" />
           <select
             aria-label={`${label} token`}
             value={token}
-            onChange={(e) => onToken(e.target.value as Token)}
+            onChange={(e) => onToken(e.target.value)}
             className="absolute inset-0 cursor-pointer opacity-0"
           >
-            <option value="ETH">ETH</option>
-            <option value="FLZ">FLZ</option>
+            {options.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
           </select>
         </label>
         <div className="flex min-w-0 flex-1 flex-col justify-center pl-[10px] pr-[11px]">
@@ -1033,7 +1093,7 @@ function LiquidityPanel({
   setLpPercent: (n: number) => void;
   lpPosition: { lpBalanceFormatted: string; ethShare: string; flzShare: string; poolShareBps: number } | null;
 }) {
-  const flzPerEth = Number(price?.flzPerEth || 0);
+  const flzPerEth = Number(price?.tokenPerEth || 0);
   const lp = Number(lpPosition?.lpBalanceFormatted || 0);
   const frac = Math.min(100, Math.max(1, lpPercent)) / 100;
   const field =
@@ -1048,7 +1108,7 @@ function LiquidityPanel({
         <h2 className="m-0 font-sans text-[13.5px] font-semibold text-white">Liquidity</h2>
         <p className="m-0 mt-[4px] font-sans text-[10px] text-[#9d9d9d]">
           {price
-            ? `Pool ${fmt(price.reserveWeth, 4)} ETH / ${fmt(price.reserveFlz, 0)} FLZ`
+            ? `Pool ${fmt(price.reserveWeth, 4)} ETH / ${fmt(price.reserveToken, 0)} FLZ`
             : `GIWA Sepolia ${DOT} ETH / FLZ`}
         </p>
       </div>

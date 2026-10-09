@@ -37,7 +37,7 @@ export type DiscoveryToken = {
   priceEth: string | null;
   change1hPct: number | null;
   liquidityEth: string | null;
-  /** Flizy attestation. This is what may be sent on socials. */
+  /** Flizy attestation. Display only: only ETH and FLZ can be sent on socials. */
   verified: boolean;
   /** A token Flizy lists with a pool it seeded. Its page opens by this contract. */
   address?: string;
@@ -111,7 +111,7 @@ export function filterHelper(filter: TokenFilterId): string {
     case 'held':
       return 'Most held needs a holder count. That count is not read yet.';
     case 'verified':
-      return 'A verified token can be sent on socials. Any token in your wallet can still be traded.';
+      return 'Tokens Flizy verified. Only ETH and FLZ can be sent on socials; any token in your wallet can still be traded.';
     case 'gainers':
       return 'Listed tokens whose pool price is up over the last hour.';
     case 'watchlist':

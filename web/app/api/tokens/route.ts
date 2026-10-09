@@ -45,7 +45,7 @@ export async function GET() {
     const listed = LISTED_TOKENS.flatMap((token, i) => {
       const listedDay = listedDays[i];
       if (!listedDay) return [];
-      return [{ ...row(listedDay), symbol: token.symbol, name: token.name, address: token.address, verified: false }];
+      return [{ ...row(listedDay), symbol: token.symbol, name: token.name, address: token.address, verified: token.verified }];
     });
     return NextResponse.json({
       tokens: [

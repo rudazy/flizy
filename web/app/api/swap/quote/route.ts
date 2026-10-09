@@ -7,12 +7,13 @@ import {
   resolveToken,
   tokenLabel,
   quoteSwap,
-  getFlzPrice,
+  getPoolPrice,
   readErc20Decimals,
 } from '../../../../lib/dexServer';
 import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
 import { asSwapQuoteError } from '../../../../lib/swapQuoteError';
 import { parseSlippageBps } from '../../../../lib/swapGate.ts';
+import { listedBySymbol } from '../../../../lib/listedTokens.ts';
 
 const ROUTE = 'GET /api/swap/quote';
 
@@ -39,7 +40,11 @@ export async function GET(req: Request) {
     const dex = getDexAddresses();
 
     if (side === 'price' || url.searchParams.get('price') === '1') {
-      const px = await getFlzPrice(provider);
+      const priceSymbol = (url.searchParams.get('token') || 'FLZ').trim().toUpperCase();
+      if (priceSymbol !== 'FLZ' && !listedBySymbol(priceSymbol)) {
+        return NextResponse.json({ error: 'No Flizy pool for that token.' }, { status: 400 });
+      }
+      const px = await getPoolPrice(provider, priceSymbol);
       return NextResponse.json({
         feeBps: dex.feeBpsDefault,
         price: px,

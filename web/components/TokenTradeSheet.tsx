@@ -332,7 +332,7 @@ export function TokenTradeSheet({
               </p>
               {tokenAddress && !listed ? (
                 <p className="m-0 mt-2 rounded-[10px] border border-[#e0a85a]/40 bg-[#e0a85a]/10 px-3 py-2 text-[12px] leading-relaxed text-[#e0b070]">
-                  Flizy has not verified {symbol}. Anyone can create a token and its pool, and pull the pool later.
+                  {symbol} is not listed on Flizy. Anyone can create a token and its pool, and pull the pool later.
                 </p>
               ) : null}
 

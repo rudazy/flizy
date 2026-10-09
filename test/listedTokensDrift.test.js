@@ -112,33 +112,84 @@ describe('listed tokens resolve by symbol and print by symbol', () => {
   });
 });
 
+describe('verified listed tokens', () => {
+  it('verify IZY and MAKI, Flizy tokens, and not DCAT, a third-party token', () => {
+    const verified = Object.fromEntries(chat.LISTED_TOKENS.map((t) => [t.symbol, t.verified]));
+    assert.deepEqual(verified, { DCAT: false, IZY: true, MAKI: true });
+  });
+
+  it('never put a listed token on the social send list', () => {
+    const dex = require('../lib/dex');
+    assert.deepEqual(dex.listedSendSymbols(), ['ETH', 'FLZ']);
+    assert.match(read('web/lib/payAsset.ts'), /export const PAY_ASSETS = \['ETH', 'FLZ'\] as const;/);
+  });
+});
+
 describe('listed tokens on the site', () => {
-  it('are listed by /api/tokens from their own pools, after FLZ', () => {
+  it('are listed by /api/tokens from their own pools, with their verified flag', () => {
     const route = read('web/app/api/tokens/route.ts');
     assert.match(route, /LISTED_TOKENS\.map\(\(token\) => cachedListedDay\(token\.address\)\.catch\(\(\) => null\)\)/);
-    assert.match(route, /address: token\.address, verified: false \}/);
+    assert.match(route, /address: token\.address, verified: token\.verified \}/);
     const cache = read('web/lib/flzMarketCache.ts');
     assert.match(cache, /loadTokenDay\(\{ token: listed\.address, pair: listed\.pair/);
   });
 
-  it('open by contract from Explore, Home and search, and trade from their page', () => {
+  it('open by contract from Explore, Home and search, and Trade opens the swap', () => {
     const explore = read('web/components/ExploreTokens.tsx');
-    assert.match(explore, /const href = `\/dashboard\/explore\/tokens\/\$\{address\}`;\n  return \{ \.\.\.flzRow\(t\), href, trade: href \};/);
+    assert.match(explore, /href: `\/dashboard\/explore\/tokens\/\$\{address\}`,\n    trade: `\/dashboard\/swap\?from=ETH&to=\$\{encodeURIComponent\(t\.symbol\)\}`,/);
     assert.match(explore, /base\.map\(\(t\) => \(t\.address \? listedRow\(t, t\.address\) : flzRow\(t\)\)\)/);
     assert.match(read('web/components/TrendingTokens.tsx'), /href: `\/dashboard\/explore\/tokens\/\$\{t\.address \|\| t\.symbol\.toLowerCase\(\)\}`/);
     assert.match(read('web/lib/siteSearch.ts'), /POOL_LISTED\.map\(\(t\) => \(\{ symbol: t\.symbol, name: t\.name, key: t\.address \}\)\)/);
   });
 
-  it('show as Listed, not as unverified, on the token page and in the trade sheet', () => {
+  it('show the verified mark, nothing, or a small Not listed tag on the token page', () => {
     const detail = read('web/components/TokenDetail.tsx');
-    assert.match(detail, /const seeded = imported && held\?\.listed === true;/);
+    assert.match(detail, /const verifiedMark = listed \|\| \(seeded && held\?\.verified === true\);/);
+    assert.match(detail, /const notListed = imported && held != null && held\.listed !== true;/);
+    assert.match(detail, /\{verifiedMark \? \([\s\S]*?<VerifiedMark \/>[\s\S]*?\) : notListed \? \([\s\S]*?Not listed[\s\S]*?\) : null\}/);
     assert.match(detail, /listed=\{seeded\}/);
-    assert.match(detail, /It is not verified, so it cannot be\s+sent on socials\./);
-    assert.match(read('web/components/TokenTradeSheet.tsx'), /\{tokenAddress && !listed \? \(/);
+    const sheet = read('web/components/TokenTradeSheet.tsx');
+    assert.match(sheet, /\{tokenAddress && !listed \? \(/);
+    assert.match(sheet, /\{symbol\} is not listed on Flizy\./);
   });
 
-  it('are read for every wallet, so a bought token shows without adding it', () => {
+  it('are read for every wallet with their verified flag, so a bought token shows', () => {
     const holdings = read('web/app/api/holdings/route.ts');
-    assert.match(holdings, /\.\.\.LISTED_TOKENS\.map\(\(t\) => \(\{ address: t\.address, symbol: t\.symbol, decimals: t\.decimals, verified: false \}\)\)/);
+    assert.match(holdings, /\.\.\.LISTED_TOKENS\.map\(\(t\) => \(\{ address: t\.address, symbol: t\.symbol, decimals: t\.decimals, verified: t\.verified \}\)\)/);
+  });
+});
+
+describe('listed tokens on the swap screen', () => {
+  let pair;
+  before(async () => {
+    pair = await import('../web/lib/swapPair.ts');
+  });
+
+  it('offers FLZ and every listed token against ETH', () => {
+    assert.deepEqual([...pair.SWAP_ASSETS], ['FLZ', ...chat.LISTED_TOKENS.map((t) => t.symbol)]);
+  });
+
+  it('opens a link on a listed pair either way round, and falls back to ETH to FLZ', () => {
+    assert.deepEqual(pair.pairFromQuery('eth', 'izy'), { tokenIn: 'ETH', tokenOut: 'IZY' });
+    assert.deepEqual(pair.pairFromQuery('MAKI', 'ETH'), { tokenIn: 'MAKI', tokenOut: 'ETH' });
+    assert.deepEqual(pair.pairFromQuery(null, 'DCAT'), { tokenIn: 'ETH', tokenOut: 'DCAT' });
+    for (const [from, to] of [['IZY', 'MAKI'], ['IZY', 'IZY'], ['NOPE', 'ETH'], ['ETH', 'ETH']]) {
+      assert.deepEqual(pair.pairFromQuery(from, to), { tokenIn: 'ETH', tokenOut: 'FLZ' }, `${from} ${to}`);
+    }
+  });
+
+  it('prices the pair being traded, and keeps Limit and Liquidity on FLZ', () => {
+    const page = read('web/app/dashboard/swap/page.tsx');
+    assert.match(page, /fetch\(`\/api\/swap\/quote\?price=1&token=\$\{encodeURIComponent\(asset\)\}`\)/);
+    assert.match(page, /const price = priceInfo && priceInfo\.symbol === asset \? priceInfo : null;/);
+    assert.match(page, /const pickable: Token\[\] = mode === 'swap' \? \['ETH', \.\.\.SWAP_ASSETS\] : \['ETH', 'FLZ'\];/);
+    assert.match(page, /if \(next !== 'swap' && asset !== 'FLZ'\) \{/);
+    // Listed balances are matched by contract, never by a symbol someone typed.
+    assert.match(page, /String\(t\.address \|\| ''\)\.toLowerCase\(\) === listed\.address\.toLowerCase\(\)/);
+  });
+
+  it('refuses a price for a token with no Flizy pool, before reading the chain', () => {
+    const route = read('web/app/api/swap/quote/route.ts');
+    assert.match(route, /if \(priceSymbol !== 'FLZ' && !listedBySymbol\(priceSymbol\)\) \{\n\s*return NextResponse\.json\(\{ error: 'No Flizy pool for that token\.' \}, \{ status: 400 \}\);/);
   });
 });

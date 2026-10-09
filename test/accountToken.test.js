@@ -138,7 +138,7 @@ describe('saved tokens', () => {
     assert.equal(saved.held.balance, '0');
   });
 
-  it('opens a listed token for anyone, named by the listing, still not verified', async () => {
+  it('opens a listed token for anyone, named and verified by the listing alone', async () => {
     const IZY = '0x8ca7a8f78abc8da471df82be4f374e1661e34473';
     const listed = await store.describeHeldToken('acct-1', IZY, {
       ...deps(),
@@ -149,11 +149,16 @@ describe('saved tokens', () => {
     assert.equal(listed.held.symbol, 'IZY');
     assert.equal(listed.held.decimals, 18);
     assert.equal(listed.held.listed, true);
-    assert.equal(listed.held.verified, false);
+    assert.equal(listed.held.verified, true);
     assert.equal((fake.db.tables.account_tokens || []).length, 0);
+
+    const dcat = await store.describeHeldToken('acct-1', '0x58fB4D3DA82F5d610ad36E6e39e674C17B32Ffd1', deps());
+    assert.equal(dcat.held.listed, true);
+    assert.equal(dcat.held.verified, false);
 
     const held = await store.describeHeldToken('acct-1', TOKEN, { ...deps(), chain: chainFor({ symbol: 'RAW', decimals: 18 }, '2') });
     assert.equal(held.held.listed, false);
+    assert.equal(held.held.verified, false);
   });
 });
 

@@ -155,24 +155,35 @@ export async function readFeeBps(provider: ethers.Provider): Promise<number> {
   }
 }
 
-export async function getFlzPrice(provider: ethers.Provider) {
+/**
+ * Spot price of an ETH pool the swap screen trades: FLZ, or a listed token by
+ * symbol, in whole tokens.
+ */
+export async function getPoolPrice(provider: ethers.Provider, symbol: string) {
   const d = getDexAddresses();
-  const pair = new ethers.Contract(d.pair, PAIR_ABI, provider);
+  const listed = listedBySymbol(symbol);
+  if (!listed && symbol.trim().toUpperCase() !== 'FLZ') throw new Error('No Flizy pool for that token.');
+  const token = listed ? ethers.getAddress(listed.address) : d.flz;
+  const pairAddress = listed ? listed.pair : d.pair;
+  const decimals = listed ? listed.decimals : 18;
+  const unit = 10n ** BigInt(decimals);
+  const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
   const [r0, r1] = await pair.getReserves();
   const t0 = await pair.token0();
-  const flzIs0 = ethers.getAddress(t0) === d.flz;
-  const reserveFlz = flzIs0 ? r0 : r1;
-  const reserveWeth = flzIs0 ? r1 : r0;
-  if (reserveWeth === 0n) throw new Error('Empty pool');
-  const flzPerEth = (reserveFlz * ethers.parseEther('1')) / reserveWeth;
-  const ethPerFlz = (reserveWeth * ethers.parseEther('1')) / reserveFlz;
+  const tokenIs0 = ethers.getAddress(t0) === token;
+  const reserveToken = tokenIs0 ? r0 : r1;
+  const reserveWeth = tokenIs0 ? r1 : r0;
+  if (reserveWeth === 0n || reserveToken === 0n) throw new Error('Empty pool');
+  const tokenPerEth = (reserveToken * ethers.parseEther('1')) / reserveWeth;
+  const ethPerToken = (reserveWeth * unit) / reserveToken;
   return {
-    flzPerEth: ethers.formatEther(flzPerEth),
-    ethPerFlz: ethers.formatEther(ethPerFlz),
-    reserveFlz: ethers.formatEther(reserveFlz),
+    symbol: listed ? listed.symbol : 'FLZ',
+    tokenPerEth: ethers.formatUnits(tokenPerEth, decimals),
+    ethPerToken: ethers.formatEther(ethPerToken),
+    reserveToken: ethers.formatUnits(reserveToken, decimals),
     reserveWeth: ethers.formatEther(reserveWeth),
-    pair: d.pair,
-    flz: d.flz,
+    pair: pairAddress,
+    token,
   };
 }
 

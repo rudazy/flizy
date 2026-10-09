@@ -42,8 +42,9 @@ export type HeldToken = {
   symbol: string;
   decimals: number;
   balance: string | null;
-  verified: false;
-  /** A token Flizy lists with a pool it seeded (listedTokens.ts). Still not verified. */
+  /** Only a listed token Flizy verified (listedTokens.ts); never a token typed in by hand. */
+  verified: boolean;
+  /** A token Flizy lists with a pool it seeded (listedTokens.ts). */
   listed: boolean;
   chainName: string;
   explorerBaseUrl: string;
@@ -248,7 +249,7 @@ export async function describeHeldToken(
       symbol: symbol || tokenSymbolFromChain('', address),
       decimals: decimals ?? 18,
       balance,
-      verified: false,
+      verified: listed?.verified === true,
       listed: listed != null,
       chainName: 'GIWA Sepolia',
       explorerBaseUrl: explorer,
