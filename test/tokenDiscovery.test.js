@@ -21,7 +21,7 @@ describe('token discovery filters', () => {
   it('keeps create and bonding out of the filter set', () => {
     const ids = discovery.TOKEN_FILTERS.map((filter) => filter.id);
     const labels = discovery.TOKEN_FILTERS.map((filter) => filter.label).join(' ');
-    assert.deepEqual(ids, ['trending', 'new', 'held', 'verified', 'gainers']);
+    assert.deepEqual(ids, ['trending', 'new', 'held', 'verified', 'gainers', 'watchlist']);
     assert.doesNotMatch(labels, /bond|create/i);
     assert.deepEqual(
       discovery.TOKEN_VIEWS.map((view) => view.id),
@@ -98,5 +98,17 @@ describe('token discovery filters', () => {
     assert.doesNotMatch(filters, /community/i);
     assert.doesNotMatch(filters, /graduated/i);
     assert.doesNotMatch(filters, /bonding/i);
+  });
+});
+
+describe('watchlist filter', () => {
+  it('shows only the tokens this account starred', async () => {
+    const discovery = await import('../web/lib/tokenDiscovery.ts');
+    const tokens = [
+      { symbol: 'FLZ', name: 'FLZ', priceEth: '0.001', change1hPct: null, liquidityEth: '1', verified: true, watched: true },
+      { symbol: 'ABC', name: 'ABC', priceEth: '0.002', change1hPct: null, liquidityEth: '1', verified: false },
+    ];
+    assert.deepEqual(discovery.tokensForFilter('watchlist', tokens).tokens.map((t) => t.symbol), ['FLZ']);
+    assert.match(discovery.tokensForFilter('watchlist', []).empty, /Star a token/);
   });
 });

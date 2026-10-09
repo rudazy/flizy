@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { AppDesktopTabs } from './AppBottomNav';
 import { useDashboard } from './DashboardProvider';
 import { useComingSoon } from './ComingSoon';
-import { BellIcon, RefreshIcon, SearchIcon } from './ExploreIcons';
+import { BellIcon, RefreshIcon } from './ExploreIcons';
+import { SearchButton } from './SiteSearch';
 
 type AppTopBarProps = {
   title: string;
@@ -76,14 +77,7 @@ export function AppTopBar({
                 {actionLabel}
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={() => comingSoon('Search')}
-              className={ICON_BUTTON}
-              aria-label="Search, coming soon"
-            >
-              <SearchIcon size={17} />
-            </button>
+            <SearchButton className={ICON_BUTTON} />
             <button
               type="button"
               onClick={() => comingSoon('Notifications')}

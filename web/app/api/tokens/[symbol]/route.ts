@@ -1,19 +1,14 @@
 import { NextResponse } from 'next/server';
-import { unstable_cache } from 'next/cache';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { ClientError, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
-import { isChartRange, type ChartRange } from '../../../../lib/tokenMarket';
-import { loadFlzMarket } from '../../../../lib/tokenMarketServer';
+import { isChartRange } from '../../../../lib/tokenMarket';
+import { snapshotFor } from '../../../../lib/tokenMarketServer';
+import { cachedFlzDay } from '../../../../lib/flzMarketCache';
+import { ethUsd } from '../../../../lib/ethUsd';
 import { describeHeldToken } from '../../../../lib/accountTokens';
 
 const ROUTE = 'GET /api/tokens/[symbol]';
 
-// The FLZ market is the same for every viewer. Shared for 20 seconds per range
-// so a caller looping this route cannot turn each request into dozens of RPC
-// calls (logs, blocks, reserves).
-const cachedFlzMarket = unstable_cache((range: ChartRange) => loadFlzMarket(range), ['flz-market'], {
-  revalidate: 20,
-});
 
 /** FLZ is the verified market. A contract address is a wallet token, traded without a listing. */
 export async function GET(req: Request, { params }: { params: { symbol: string } }) {
@@ -40,8 +35,9 @@ export async function GET(req: Request, { params }: { params: { symbol: string }
 
     const requested = new URL(req.url).searchParams.get('range') || '1h';
     const range = isChartRange(requested) ? requested : '1h';
-    const market = await cachedFlzMarket(range);
-    return NextResponse.json({ market });
+    const [day, usdPerEth] = await Promise.all([cachedFlzDay(), ethUsd()]);
+    // usdPerEth is for the ≈ dollar figures only; null when the price source is down.
+    return NextResponse.json({ market: snapshotFor(day, range), usdPerEth });
   } catch (err) {
     const status = err instanceof ClientError ? 400 : 500;
     return NextResponse.json(apiErrorBodyAllowingClientError(ROUTE, err), { status });

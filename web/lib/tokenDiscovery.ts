@@ -12,6 +12,7 @@ export const TOKEN_FILTERS = [
   { id: 'held', label: 'Most held' },
   { id: 'verified', label: 'Verified' },
   { id: 'gainers', label: 'Gainers' },
+  { id: 'watchlist', label: 'Watchlist' },
 ] as const;
 
 export type TokenFilterId = (typeof TOKEN_FILTERS)[number]['id'];
@@ -43,6 +44,8 @@ export type DiscoveryToken = {
   marketCapEth?: string | null;
   /** Closing prices of recent candles, oldest first, for the sparkline. */
   spark?: number[];
+  /** This account starred it. */
+  watched?: boolean;
 };
 
 const EMPTY: Record<TokenFilterId, string> = {
@@ -51,6 +54,7 @@ const EMPTY: Record<TokenFilterId, string> = {
   held: 'Holder counts are not read yet. This list stays empty.',
   verified: 'No verified token is listed.',
   gainers: 'No listed token is up over the last hour.',
+  watchlist: 'Star a token on its page to keep it here.',
 };
 
 export function isTokenFilter(id: string): id is TokenFilterId {
@@ -91,6 +95,8 @@ export function tokensForFilter(
       };
     case 'held':
       return { tokens: [], empty: EMPTY.held };
+    case 'watchlist':
+      return { tokens: tokens.filter((token) => token.watched === true), empty: EMPTY.watchlist };
   }
 }
 
@@ -106,5 +112,7 @@ export function filterHelper(filter: TokenFilterId): string {
       return 'A verified token can be sent on socials. Any token in your wallet can still be traded.';
     case 'gainers':
       return 'Listed tokens whose pool price is up over the last hour.';
+    case 'watchlist':
+      return 'Tokens you starred. Tap the star on a token page to add one.';
   }
 }

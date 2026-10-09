@@ -746,3 +746,77 @@ export function GithubIcon({ size, strokeWidth = 1.7, className }: IconProps) {
     </Svg>
   );
 }
+
+export function ExpandIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
+    </Svg>
+  );
+}
+
+export function CandlesIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M7 3v4M7 15v6M17 3v6M17 17v4" />
+        <rect x="5" y="7" width="4" height="8" rx="1" />
+        <rect x="15" y="9" width="4" height="8" rx="1" />
+      </g>
+    </Svg>
+  );
+}
+
+export function DropletIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M12 3.5c3.3 4.2 6 7.6 6 10.7A6 6 0 0 1 6 14.2c0-3.1 2.7-6.5 6-10.7z" />
+    </Svg>
+  );
+}
+
+export function BarChartIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M4 20h16M6.5 17V11M10.5 17V6M14.5 17v-8M18.5 17v-4" />
+    </Svg>
+  );
+}
+
+export function CoinsIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 7.5v9M14.5 9.3c-.5-.8-1.4-1.3-2.5-1.3-1.5 0-2.5.8-2.5 1.9 0 2.6 5 1.4 5 4.1 0 1.1-1 1.9-2.5 1.9-1.1 0-2-.5-2.5-1.3" />
+      </g>
+    </Svg>
+  );
+}
+
+export function ChatBubblesIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M4 5h11a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+        <path d="M16 9h4a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-1v3l-4-3h-4a1 1 0 0 1-1-1v-1" />
+      </g>
+    </Svg>
+  );
+}
+
+export function CommentIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-9l-5 4v-4H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+    </Svg>
+  );
+}
+
+export function TrendUpIcon({ size, strokeWidth = 1.9, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path strokeWidth={strokeWidth} d="M3 17l6-6 4 4 8-8M15 7h6v6" />
+    </Svg>
+  );
+}

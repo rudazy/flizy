@@ -509,6 +509,8 @@ export default function DashboardHomePage() {
           </AppCollapsibleCard>
 
           {data.invite ? (
+            // id: site search opens /dashboard#invite straight onto this card.
+            <div id="invite" className="scroll-mt-24">
             <AppCard className="px-[12px] pb-[12px] pt-[12.5px]">
               <AppCardHeader
                 icon={<UserPlusIcon size={15} />}
@@ -531,6 +533,7 @@ export default function DashboardHomePage() {
                 Attach to claims I send
               </label>
             </AppCard>
+            </div>
           ) : null}
         </div>
       ) : null}

@@ -1232,7 +1232,7 @@ function projectLinksFrom(value: unknown): ProjectLink[] {
   return out;
 }
 
-function checkedProjectLinks(input: ProjectLink[] | undefined): ProjectLink[] {
+export function checkedProjectLinks(input: ProjectLink[] | undefined): ProjectLink[] {
   const links = (input || []).filter((l) => l && l.url);
   if (links.length > 20) throw new ClientError('That is too many links.');
   return links.map((l) => {

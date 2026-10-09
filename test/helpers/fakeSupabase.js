@@ -83,9 +83,25 @@ class Query {
     return this;
   }
 
+  /**
+   * Postgres ILIKE: % is any run, _ any one character, a backslash makes the
+   * next character literal, case is ignored. A value with no wildcard is an
+   * exact, case-blind match, as before.
+   */
   ilike(col, value) {
-    const needle = String(value ?? '').toLowerCase();
-    this.filters.push((r) => String(r[col] ?? '').toLowerCase() === needle);
+    const pattern = String(value ?? '');
+    let source = '';
+    for (let i = 0; i < pattern.length; i += 1) {
+      const ch = pattern[i];
+      if (ch === '\\' && i + 1 < pattern.length) {
+        i += 1;
+        source += pattern[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      } else if (ch === '%') source += '[\\s\\S]*';
+      else if (ch === '_') source += '[\\s\\S]';
+      else source += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    const re = new RegExp(`^${source}$`, 'i');
+    this.filters.push((r) => re.test(String(r[col] ?? '')));
     return this;
   }
 
@@ -198,7 +214,8 @@ class Query {
     if (this.op === 'insert') {
       const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
       const created = rows.map((row) => {
-        const made = { id: newId(this.table), ...row };
+        // created_at as `default now()` fills it, which almost every table has.
+        const made = { id: newId(this.table), created_at: new Date().toISOString(), ...row };
         // Fill a sequence column the database would have filled.
         const col = this.db.sequences[this.table];
         if (col && made[col] == null) {
@@ -459,6 +476,19 @@ function createFakeSupabase(seed = {}, opts = {}) {
     release_faucet_signer_lock({ p_holder }) {
       db.tables.faucet_signer_lock = (db.tables.faucet_signer_lock || []).filter((l) => l.holder !== p_holder);
       return { data: null, error: null };
+    },
+
+    /** 20261012120000_token_social.sql: likes and live comments per thesis. */
+    token_thesis_counts({ p_ids }) {
+      const ids = (p_ids || []).map(String);
+      return {
+        data: ids.map((id) => ({
+          thesis_id: id,
+          likes: (db.tables.token_thesis_likes || []).filter((l) => String(l.thesis_id) === id).length,
+          comments: (db.tables.token_thesis_comments || []).filter((c) => String(c.thesis_id) === id && !c.deleted_at).length,
+        })),
+        error: null,
+      };
     },
 
     /** 20261011120000_project_page.sql: distinct accounts that entered any task of the project. */

@@ -652,6 +652,48 @@
     },
     {
       "kind": "check",
+      "name": "token_profiles.token_profiles_description_len",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "check on token_profiles"
+    },
+    {
+      "kind": "check",
+      "name": "token_profiles.token_profiles_key_format",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "check on token_profiles"
+    },
+    {
+      "kind": "check",
+      "name": "token_profiles.token_profiles_links_is_array",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "check on token_profiles"
+    },
+    {
+      "kind": "check",
+      "name": "token_profiles.token_profiles_logo_format",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "check on token_profiles"
+    },
+    {
+      "kind": "check",
+      "name": "token_theses.token_theses_body_len",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "check on token_theses"
+    },
+    {
+      "kind": "check",
+      "name": "token_theses.token_theses_sentiment_check",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "check on token_theses"
+    },
+    {
+      "kind": "check",
+      "name": "token_thesis_comments.token_thesis_comments_body_len",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "check on token_thesis_comments"
+    },
+    {
+      "kind": "check",
       "name": "transfers.transfers_amount_eth_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on transfers"
@@ -820,6 +862,12 @@
     },
     {
       "kind": "function",
+      "name": "token_thesis_counts",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "web/lib/tokenSocial.ts"
+    },
+    {
+      "kind": "function",
       "name": "trusted_addresses_apply_hold",
       "providedBy": "20260923000000_trusted_destination_hold.sql",
       "requiredBy": "executed by trigger trusted_addresses_hold"
@@ -870,7 +918,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/invite.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/saleNotice.ts, web/lib/tasks.ts"
+      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/invite.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/saleNotice.ts, web/lib/siteSearch.ts, web/lib/tasks.ts, web/lib/tokenSocial.ts"
     },
     {
       "kind": "table",
@@ -1014,7 +1062,7 @@
       "kind": "table",
       "name": "projects",
       "providedBy": "20260925010000_tasks.sql",
-      "requiredBy": "web/lib/tasks.ts"
+      "requiredBy": "web/lib/siteSearch.ts, web/lib/tasks.ts"
     },
     {
       "kind": "table",
@@ -1056,7 +1104,37 @@
       "kind": "table",
       "name": "tasks",
       "providedBy": "20260925010000_tasks.sql",
-      "requiredBy": "web/lib/tasks.ts"
+      "requiredBy": "web/lib/siteSearch.ts, web/lib/tasks.ts"
+    },
+    {
+      "kind": "table",
+      "name": "token_profiles",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "web/lib/tokenSocial.ts"
+    },
+    {
+      "kind": "table",
+      "name": "token_theses",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "web/lib/tokenSocial.ts"
+    },
+    {
+      "kind": "table",
+      "name": "token_thesis_comments",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "web/lib/tokenSocial.ts"
+    },
+    {
+      "kind": "table",
+      "name": "token_thesis_likes",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "web/lib/tokenSocial.ts"
+    },
+    {
+      "kind": "table",
+      "name": "token_watchlist",
+      "providedBy": "20261012120000_token_social.sql",
+      "requiredBy": "web/lib/tokenSocial.ts"
     },
     {
       "kind": "table",

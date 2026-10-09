@@ -6,7 +6,7 @@ import {
   breadcrumbJsonLd,
   faqJsonLd,
 } from '../../components/StructuredData';
-import { FLIZY_FAQ } from '../../lib/flizyFaq';
+import { FLIZY_FAQ, faqAnchor } from '../../lib/flizyFaq';
 import { pageMetadata } from '../../lib/seo';
 import { siteOrigin } from '../../lib/siteOrigin';
 
@@ -65,10 +65,11 @@ export default function HowItWorksPage() {
           </h2>
         </div>
         <dl className="space-y-3">
-          {FLIZY_FAQ.map((item) => (
+          {FLIZY_FAQ.map((item, index) => (
             <div
               key={item.question}
-              className="rounded-md border border-border bg-ink/40 px-4 py-3"
+              id={faqAnchor(index)}
+              className="scroll-mt-24 rounded-md border border-border bg-ink/40 px-4 py-3"
             >
               <dt className="font-sans text-sm tracking-wide text-paper">{item.question}</dt>
               <dd className="mt-2 text-xs leading-relaxed text-muted sm:text-sm">{item.answer}</dd>

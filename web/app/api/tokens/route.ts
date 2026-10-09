@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { apiErrorBody } from '../../../lib/apiError';
-import { loadFlzMarket } from '../../../lib/tokenMarketServer';
+import { snapshotFor } from '../../../lib/tokenMarketServer';
+import { cachedFlzDay } from '../../../lib/flzMarketCache';
+import { listWatched } from '../../../lib/tokenSocial';
 
 const ROUTE = 'GET /api/tokens';
 
@@ -14,7 +16,8 @@ export async function GET() {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
-    const market = await loadFlzMarket('1h');
+    const [day, watched] = await Promise.all([cachedFlzDay(), listWatched(accountId)]);
+    const market = snapshotFor(day, '1h');
     return NextResponse.json({
       tokens: [
         {
@@ -24,6 +27,8 @@ export async function GET() {
           change1hPct: market.change1hPct,
           liquidityEth: market.liquidityEth,
           verified: true,
+          // Starred by this account, for the Watchlist filter.
+          watched: watched.includes('flz'),
           // For the Explore row: the pool's own figures, all in ETH, and the
           // closing prices of the last hour's candles for its sparkline.
           flzPerEth: market.flzPerEth,

@@ -50,3 +50,8 @@ export const FLIZY_FAQ: Array<{ question: string; answer: string }> = [
       'Creating an account is free. You need gas and balance on the supported chain to send. Trading FLZ on the built-in DEX may include protocol fees shown in the quote before you confirm.',
   },
 ];
+
+/** The anchor of one answer on /how-it-works, so search can open it directly. */
+export function faqAnchor(index: number): string {
+  return `faq-${index + 1}`;
+}
