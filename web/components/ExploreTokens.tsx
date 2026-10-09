@@ -17,6 +17,7 @@ import { formatEthDisplay } from '../lib/tokenFormat';
 import { useComingSoon } from './ComingSoon';
 import { CopyTradePanel } from './CopyTradePanel';
 import { VerifiedMark } from './VerifiedMark';
+import { tokenLogo } from '../lib/tokenLogos';
 import {
   ArrowRightIcon,
   ChevronDownIcon,
@@ -350,6 +351,10 @@ function Hero({ slide, setSlide }: { slide: number; setSlide: (n: number) => voi
 }
 
 function TokenLogo({ symbol }: { symbol: string }) {
+  const src = tokenLogo(symbol);
+  if (src) {
+    return <img src={src} alt="" width={25} height={25} className="h-[25px] w-[25px] shrink-0 rounded-full object-cover" />;
+  }
   if (symbol === 'ETH') {
     return (
       <span className="flex h-[25px] w-[25px] shrink-0 items-center justify-center rounded-full border border-[#2e2e2e] bg-[#161616] text-[#e6e6e6]">

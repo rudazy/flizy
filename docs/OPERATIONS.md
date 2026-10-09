@@ -109,8 +109,8 @@ already exists. To list another token:
 2. The deployer key also submits live user operations, so a broadcast can lose a nonce
    to it. After any failure, read the nonce, receipts and pair reserves before resending.
 3. Record the token under `listings` in `deployments/giwa-sepolia.json`, add it to both
-   `lib/listedTokens.js` and `web/lib/listedTokens.ts`, and run
-   `node --test test/listedTokensDrift.test.js`.
+   `lib/listedTokens.js` and `web/lib/listedTokens.ts` with a logo in `web/public/tokens/`
+   (the token's own art, or a mark drawn in the palette), and run `node --test test/listedTokensDrift.test.js test/tokenLogos.test.js`.
 4. Pull and restart the chat services so chat resolves the new symbol.
 
 ---
@@ -283,7 +283,7 @@ These are enforced in code review and by tests:
 | Payment requests | Live |
 | Phone join key for LID-only WhatsApp sessions | Live |
 | DEX, FLZ, IZY, MAKI, fee router | Live and verified on GIWA Sepolia |
-| Site swap (FLZ, IZY, MAKI, DCAT) and FLZ liquidity add/remove | Live |
+| Site swap and liquidity add/remove (FLZ, IZY, MAKI, DCAT) | Live |
 | Chat buy / sell / swap / price | Live |
 | Smart wallet deploy | Contracts in repo, not required for current agent EOAs |
 | Listed tokens | IZY and MAKI (verified) and DCAT, from `lib/listedTokens.js` |

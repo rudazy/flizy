@@ -5,8 +5,7 @@ import { requirePassword } from '../../../../lib/passwordGate.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import {
   getWebChain,
-  getDexAddresses,
-  resolveToken,
+  liquidityPool,
   addLiquidityEth,
   addLiquidityEthViaGator,
   removeLiquidityEth,
@@ -25,11 +24,17 @@ import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 const ROUTE_GET = 'GET /api/swap/liquidity';
 const ROUTE_POST = 'POST /api/swap/liquidity';
 
-/** Site-only: current LP position for the logged-in agent wallet. */
-export async function GET() {
+/** Refused before anything is read: liquidity is only for pools Flizy seeded. */
+const NOT_A_POOL = 'Liquidity is for FLZ and the listed tokens only.';
+
+/** Site-only: current LP position in one pool (?token=FLZ by default) for the logged-in agent wallet. */
+export async function GET(req: Request) {
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+
+    const pool = liquidityPool(new URL(req.url).searchParams.get('token'));
+    if (!pool) return NextResponse.json({ error: NOT_A_POOL }, { status: 400 });
 
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
@@ -42,17 +47,17 @@ export async function GET() {
     const walletAddr = pointerIsGator(accountId, acct?.agent_wallet_address)
       ? predictGatorAddress(accountId)
       : deriveAgentWallet(accountId).address;
-    const position = await getLpPosition(provider, walletAddr);
-    const dex = getDexAddresses();
+    const position = await getLpPosition(provider, walletAddr, pool);
 
     return NextResponse.json({
       agentWallet: walletAddr,
-      pair: dex.pair,
-      flz: dex.flz,
+      symbol: pool.symbol,
+      pair: pool.pair,
+      token: pool.token,
       lpBalanceFormatted: position.lpBalanceFormatted,
       totalSupply: position.totalSupply,
       ethShare: position.ethShare,
-      flzShare: position.flzShare,
+      tokenShare: position.tokenShare,
       poolShareBps: position.poolShareBps,
       hasPosition: position.lpBalance > 0n,
     });
@@ -62,7 +67,7 @@ export async function GET() {
 }
 
 /**
- * Site-only liquidity mutations.
+ * Site-only liquidity mutations, in one pool named by body.token (FLZ by default).
  * body.action: "add" (default) | "remove"
  * remove: percent 1-100 or liquidity amount (LP token units as decimal string)
  */
@@ -76,6 +81,8 @@ export async function POST(req: Request) {
 
     const supabase = getSupabase();
     const body = await req.json();
+    const pool = liquidityPool(body.token == null ? null : String(body.token));
+    if (!pool) return NextResponse.json({ error: NOT_A_POOL }, { status: 400 });
     const auth = await requirePassword(
       supabase,
       accountId,
@@ -95,7 +102,6 @@ export async function POST(req: Request) {
     const action = String(body.action || 'add').toLowerCase();
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
-    const dex = getDexAddresses();
     const signer = deriveAgentWallet(accountId).connect(provider);
     const { data: acct } = await supabase
       .from('accounts')
@@ -106,7 +112,7 @@ export async function POST(req: Request) {
     const walletAddr = viaGator ? predictGatorAddress(accountId) : signer.address;
 
     if (action === 'remove') {
-      const position = await getLpPosition(provider, walletAddr);
+      const position = await getLpPosition(provider, walletAddr, pool);
       if (position.lpBalance <= 0n) {
         return NextResponse.json({ error: 'No LP tokens to remove' }, { status: 400 });
       }
@@ -132,7 +138,7 @@ export async function POST(req: Request) {
       let tokenMin = 0n;
       if (position.lpBalance > 0n) {
         ethMin = (position.ethShareWei * liquidityWei * 98n) / (position.lpBalance * 100n);
-        tokenMin = (position.flzShareWei * liquidityWei * 98n) / (position.lpBalance * 100n);
+        tokenMin = (position.tokenShareWei * liquidityWei * 98n) / (position.lpBalance * 100n);
       }
 
       const result = viaGator
@@ -140,6 +146,7 @@ export async function POST(req: Request) {
             accountId,
             provider,
             chainId: chain.chainId,
+            pool,
             liquidityWei,
             amountTokenMin: tokenMin,
             amountEthMin: ethMin,
@@ -147,6 +154,7 @@ export async function POST(req: Request) {
           })
         : await removeLiquidityEth({
             signer,
+            pool,
             liquidityWei,
             amountTokenMin: tokenMin,
             amountEthMin: ethMin,
@@ -173,22 +181,24 @@ export async function POST(req: Request) {
         txHash: result.txHash,
         explorerUrl: explorerTxUrl(chain, result.txHash),
         liquidityBurned: ethers.formatEther(liquidityWei),
-        pair: dex.pair,
-        note: 'Liquidity removed. ETH and FLZ returned to your Flizy wallet.',
+        pair: pool.pair,
+        note: `Liquidity removed. ETH and ${pool.symbol} returned to your Flizy wallet.`,
       });
     }
 
     // add (default)
     const amountEth = String(body.amountEth || '');
     const amountToken = String(body.amountToken || body.amountFlz || '');
-    const tokenRaw = String(body.token || 'FLZ');
-    const tokenAddress = resolveToken(tokenRaw);
-    if (!tokenAddress) {
-      return NextResponse.json({ error: 'Token required (e.g. FLZ)' }, { status: 400 });
-    }
+    const tokenAddress = pool.token;
 
-    const ethWei = ethers.parseEther(amountEth);
-    const tokenWei = ethers.parseEther(amountToken);
+    let ethWei: bigint;
+    let tokenWei: bigint;
+    try {
+      ethWei = ethers.parseEther(amountEth);
+      tokenWei = ethers.parseUnits(amountToken, pool.decimals);
+    } catch {
+      return NextResponse.json({ error: 'Invalid amounts' }, { status: 400 });
+    }
     if (ethWei <= 0n || tokenWei <= 0n) {
       return NextResponse.json({ error: 'Invalid amounts' }, { status: 400 });
     }
@@ -237,7 +247,7 @@ export async function POST(req: Request) {
       action: 'add',
       txHash: result.txHash,
       explorerUrl: explorerTxUrl(chain, result.txHash),
-      pair: dex.pair,
+      pair: pool.pair,
       note: 'Liquidity added. LP tokens are in your Flizy wallet.',
     });
     } finally {

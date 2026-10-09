@@ -9,6 +9,7 @@ import { useComingSoon } from './ComingSoon';
 import { SearchButton } from './SiteSearch';
 import { formatEthDisplay, formatPct } from '../lib/tokenFormat';
 import { VerifiedMark } from './VerifiedMark';
+import { tokenLogo } from '../lib/tokenLogos';
 import { TokenChart } from './TokenChart';
 import { TokenTradeSheet } from './TokenTradeSheet';
 import { LINK_KINDS, LINK_LABEL } from './AccountProjects';
@@ -308,6 +309,8 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const verifiedMark = listed || (seeded && held?.verified === true);
   /** Opened by its contract and not listed: the one case that gets a tag. */
   const notListed = imported && held != null && held.listed !== true;
+  /** A logo the token profile set, else the built-in one for FLZ or a listed token (by contract). */
+  const logoSrc = profile?.logo || (listed ? tokenLogo('FLZ') : contract ? tokenLogo(null, contract) : null);
   const explorerBase = market?.explorerBaseUrl || held?.explorerBaseUrl || null;
 
   async function toggleWatch() {
@@ -361,6 +364,8 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:gap-3.5">
             {profile?.logo ? (
               <img src={profile.logo} alt={`${name} logo`} className="h-14 w-14 shrink-0 rounded-[12px] border border-sun/40 object-cover sm:h-[76px] sm:w-[76px] sm:rounded-[16px]" />
+            ) : logoSrc ? (
+              <img src={logoSrc} alt={`${name} logo`} className="h-14 w-14 shrink-0 rounded-full object-cover sm:h-[76px] sm:w-[76px]" />
             ) : (
               <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] border border-sun/40 bg-[#0b0b0b] font-sans text-2xl font-bold text-sun sm:h-[76px] sm:w-[76px] sm:rounded-[16px] sm:text-3xl" aria-hidden>
                 {name.slice(0, 1).toUpperCase()}.
@@ -719,7 +724,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           // Balances and history follow the sheet's announceTx; only the market is this page's.
           onTraded={() => void loadMarket(range)}
           symbol={ticker}
-          logo={profile?.logo ?? null}
+          logo={logoSrc}
           priceEth={market?.priceEth == null ? null : Number(market.priceEth)}
           change24={change24}
           changeUp={changeUp}

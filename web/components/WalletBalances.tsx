@@ -7,6 +7,7 @@ import { useComingSoon } from './ComingSoon';
 import { useTapGesture } from './AppSection';
 import { isHeld } from '../lib/dashboardTypes';
 import { VerifiedMark } from './VerifiedMark';
+import { tokenLogo } from '../lib/tokenLogos';
 import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
 import { WalletNfts } from './WalletNfts';
 import { WalletOffers } from './WalletOffers';
@@ -313,6 +314,7 @@ export function WalletBalances() {
           ) : null}
           {tokens.map((t) => {
             const isFlz = t.verified && t.symbol.toUpperCase() === 'FLZ';
+            const logoSrc = tokenLogo(t.symbol, t.address);
             const balance = t.balance == null ? null : Number(t.balance);
             const value = isFlz && market && balance != null ? balance * market.priceEth : null;
             return (
@@ -320,9 +322,13 @@ export function WalletBalances() {
                 key={t.address || t.symbol}
                 href={addingToken ? null : tokenHref(t)}
                 logo={
-                  <span className="flex h-[37px] w-[37px] items-center justify-center rounded-full border-[1.5px] border-[#5a5a5a] bg-[#0a0a0a] font-sans text-[19px] font-bold text-sun">
-                    {t.symbol.slice(0, 1).toUpperCase()}
-                  </span>
+                  logoSrc ? (
+                    <img src={logoSrc} alt="" width={37} height={37} className="h-[37px] w-[37px] rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-[37px] w-[37px] items-center justify-center rounded-full border-[1.5px] border-[#5a5a5a] bg-[#0a0a0a] font-sans text-[19px] font-bold text-sun">
+                      {t.symbol.slice(0, 1).toUpperCase()}
+                    </span>
+                  )
                 }
                 symbol={t.symbol}
                 tag={t.verified ? <VerifiedMark /> : null}

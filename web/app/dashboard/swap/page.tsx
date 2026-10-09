@@ -7,6 +7,7 @@ import { AppPage } from '../../../components/AppSection';
 import { formatAmount } from '../../../lib/amountDisplay';
 import { pairFromQuery, SWAP_ASSETS, type SwapToken } from '../../../lib/swapPair';
 import { LISTED_TOKENS, listedBySymbol } from '../../../lib/listedTokens';
+import { tokenLogo } from '../../../lib/tokenLogos';
 import { announceTx } from '../../../lib/txSignal';
 import {
   ArrowRightIcon,
@@ -124,12 +125,13 @@ export default function SwapPage() {
 
   const [lpMode, setLpMode] = useState<'add' | 'remove'>('add');
   const [lpEth, setLpEth] = useState('0.05');
-  const [lpFlz, setLpFlz] = useState('2500');
+  const [lpToken, setLpToken] = useState('');
   const [lpPercent, setLpPercent] = useState(100);
   const [lpPosition, setLpPosition] = useState<{
     lpBalanceFormatted: string;
     ethShare: string;
-    flzShare: string;
+    symbol: string;
+    tokenShare: string;
     poolShareBps: number;
   } | null>(null);
 
@@ -221,7 +223,7 @@ export default function SwapPage() {
 
   const loadLpPosition = useCallback(async () => {
     try {
-      const res = await fetch('/api/swap/liquidity');
+      const res = await fetch(`/api/swap/liquidity?token=${encodeURIComponent(asset)}`);
       const data = await res.json();
       if (!res.ok) {
         setLpPosition(null);
@@ -230,13 +232,27 @@ export default function SwapPage() {
       setLpPosition({
         lpBalanceFormatted: data.lpBalanceFormatted || '0',
         ethShare: data.ethShare || '0',
-        flzShare: data.flzShare || '0',
+        symbol: String(data.symbol || ''),
+        tokenShare: data.tokenShare || '0',
         poolShareBps: data.poolShareBps || 0,
       });
     } catch {
       setLpPosition(null);
     }
-  }, []);
+  }, [asset]);
+
+  // A position read for another pool is not this pool's position.
+  const position = lpPosition && lpPosition.symbol === asset ? lpPosition : null;
+
+  // When the pool changes, the token amount restarts from the ETH amount at that
+  // pool's price, once the price has arrived.
+  const lpFilledFor = useRef('');
+  useEffect(() => {
+    if (mode !== 'liquidity' || !price || lpFilledFor.current === asset) return;
+    lpFilledFor.current = asset;
+    const per = Number(price.tokenPerEth);
+    setLpToken(per > 0 && Number(lpEth) > 0 ? String(Number((Number(lpEth) * per).toFixed(4))) : '');
+  }, [mode, price, asset, lpEth]);
 
   useEffect(() => {
     loadPrice();
@@ -335,15 +351,26 @@ export default function SwapPage() {
     setError('');
   }
 
-  /** Limit orders and liquidity are for the FLZ pool only, so those modes trade FLZ. */
+  /** Limit orders are for the FLZ pool only, so that mode trades FLZ. */
   function changeMode(next: Mode) {
-    if (next !== 'swap' && asset !== 'FLZ') {
+    if (next === 'limit' && asset !== 'FLZ') {
       if (tokenIn === 'ETH') setTokenOut('FLZ');
       else setTokenIn('FLZ');
       setQuote(null);
       setLimitPrice('');
     }
     setMode(next);
+  }
+
+  /** The pool the Liquidity panel works on: the token opposite ETH. */
+  function chooseAsset(next: Token) {
+    if (next === asset) return;
+    if (tokenIn === 'ETH') setTokenOut(next);
+    else setTokenIn(next);
+    setQuote(null);
+    setLimitPrice('');
+    setResult(null);
+    setError('');
   }
 
   function commitSlippage(raw: string) {
@@ -738,6 +765,9 @@ export default function SwapPage() {
         </>
       ) : (
         <LiquidityPanel
+          asset={asset}
+          assets={[...SWAP_ASSETS]}
+          onAsset={chooseAsset}
           price={price}
           lpMode={lpMode}
           setLpMode={(m) => {
@@ -745,12 +775,12 @@ export default function SwapPage() {
             if (m === 'remove') loadLpPosition();
           }}
           lpEth={lpEth}
-          lpFlz={lpFlz}
+          lpToken={lpToken}
           setLpEth={setLpEth}
-          setLpFlz={setLpFlz}
+          setLpToken={setLpToken}
           lpPercent={lpPercent}
           setLpPercent={setLpPercent}
-          lpPosition={lpPosition}
+          lpPosition={position}
         />
       )}
 
@@ -803,17 +833,17 @@ export default function SwapPage() {
         </CtaButton>
       ) : lpMode === 'add' ? (
         <CtaButton
-          disabled={busy || !password || !(Number(lpEth) > 0) || !(Number(lpFlz) > 0)}
+          disabled={busy || !password || !(Number(lpEth) > 0) || !(Number(lpToken) > 0)}
           onClick={() =>
-            runLiquidity({ action: 'add', amountEth: lpEth, amountToken: lpFlz, token: 'FLZ' }, 'Liquidity failed')
+            runLiquidity({ action: 'add', amountEth: lpEth, amountToken: lpToken, token: asset }, 'Liquidity failed')
           }
         >
           {busy ? 'Adding...' : 'Supply liquidity'}
         </CtaButton>
       ) : (
         <CtaButton
-          disabled={busy || !password || !lpPosition || !(Number(lpPosition.lpBalanceFormatted) > 0)}
-          onClick={() => runLiquidity({ action: 'remove', percent: lpPercent }, 'Remove liquidity failed')}
+          disabled={busy || !password || !position || !(Number(position.lpBalanceFormatted) > 0)}
+          onClick={() => runLiquidity({ action: 'remove', percent: lpPercent, token: asset }, 'Remove liquidity failed')}
         >
           {busy ? 'Removing...' : `Remove ${lpPercent}% liquidity`}
         </CtaButton>
@@ -881,6 +911,10 @@ function ModeTab({ active, onClick, icon, label }: { active: boolean; onClick: (
 }
 
 function TokenLogo({ token, size = 36 }: { token: Token; size?: number }) {
+  const src = tokenLogo(token);
+  if (src) {
+    return <img src={src} alt="" width={size} height={size} className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />;
+  }
   if (token === 'ETH') {
     return (
       <span className="flex shrink-0 items-center justify-center rounded-full border border-[#2e2e2e] bg-[#161616] text-[#e6e6e6]" style={{ width: size, height: size }}>
@@ -1071,29 +1105,35 @@ function CtaButton({ disabled, onClick, children }: { disabled: boolean; onClick
 }
 
 function LiquidityPanel({
+  asset,
+  assets,
+  onAsset,
   price,
   lpMode,
   setLpMode,
   lpEth,
-  lpFlz,
+  lpToken,
   setLpEth,
-  setLpFlz,
+  setLpToken,
   lpPercent,
   setLpPercent,
   lpPosition,
 }: {
+  asset: Token;
+  assets: Token[];
+  onAsset: (t: Token) => void;
   price: PriceInfo | null;
   lpMode: 'add' | 'remove';
   setLpMode: (m: 'add' | 'remove') => void;
   lpEth: string;
-  lpFlz: string;
+  lpToken: string;
   setLpEth: (v: string) => void;
-  setLpFlz: (v: string) => void;
+  setLpToken: (v: string) => void;
   lpPercent: number;
   setLpPercent: (n: number) => void;
-  lpPosition: { lpBalanceFormatted: string; ethShare: string; flzShare: string; poolShareBps: number } | null;
+  lpPosition: { lpBalanceFormatted: string; ethShare: string; tokenShare: string; poolShareBps: number } | null;
 }) {
-  const flzPerEth = Number(price?.tokenPerEth || 0);
+  const tokenPerEth = Number(price?.tokenPerEth || 0);
   const lp = Number(lpPosition?.lpBalanceFormatted || 0);
   const frac = Math.min(100, Math.max(1, lpPercent)) / 100;
   const field =
@@ -1108,9 +1148,26 @@ function LiquidityPanel({
         <h2 className="m-0 font-sans text-[13.5px] font-semibold text-white">Liquidity</h2>
         <p className="m-0 mt-[4px] font-sans text-[10px] text-[#9d9d9d]">
           {price
-            ? `Pool ${fmt(price.reserveWeth, 4)} ETH / ${fmt(price.reserveToken, 0)} FLZ`
-            : `GIWA Sepolia ${DOT} ETH / FLZ`}
+            ? `Pool ${fmt(price.reserveWeth, 4)} ETH / ${fmt(price.reserveToken, 0)} ${asset}`
+            : `GIWA Sepolia ${DOT} ETH / ${asset}`}
         </p>
+      </div>
+      <div className="grid grid-cols-4 gap-[5px]" role="radiogroup" aria-label="Pool">
+        {assets.map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="radio"
+            aria-checked={asset === t}
+            onClick={() => onAsset(t)}
+            className={`hit-y-44 flex h-[32px] items-center justify-center gap-[6px] rounded-[4px] border font-sans text-[10px] font-medium ${
+              asset === t ? 'border-sun bg-sun-wash text-sun' : 'border-[#2a2b30] bg-[#0f0f10] text-[#d6d6d6] hover:text-white'
+            }`}
+          >
+            <TokenLogo token={t} size={16} />
+            {t}
+          </button>
+        ))}
       </div>
       <div className="flex h-[32px] rounded-[5px] border border-chrome-line bg-[#0e0f11]" role="tablist" aria-label="Liquidity action">
         <ModeTab active={lpMode === 'add'} onClick={() => setLpMode('add')} icon={<PlusIcon size={11} />} label="Add" />
@@ -1128,20 +1185,20 @@ function LiquidityPanel({
               onChange={(e) => {
                 const v = e.target.value.replace(/[^0-9.]/g, '');
                 setLpEth(v);
-                if (flzPerEth > 0 && Number(v) > 0) setLpFlz(String(Number((Number(v) * flzPerEth).toFixed(4))));
+                if (tokenPerEth > 0 && Number(v) > 0) setLpToken(String(Number((Number(v) * tokenPerEth).toFixed(4))));
               }}
             />
           </label>
           <label className="grid gap-[5px] font-sans text-[10px] text-[#cfcfcf]">
-            FLZ
+            {asset}
             <input
               className={field}
               inputMode="decimal"
-              value={lpFlz}
+              value={lpToken}
               onChange={(e) => {
                 const v = e.target.value.replace(/[^0-9.]/g, '');
-                setLpFlz(v);
-                if (flzPerEth > 0 && Number(v) > 0) setLpEth(String(Number((Number(v) / flzPerEth).toFixed(6))));
+                setLpToken(v);
+                if (tokenPerEth > 0 && Number(v) > 0) setLpEth(String(Number((Number(v) / tokenPerEth).toFixed(6))));
               }}
             />
           </label>
@@ -1153,13 +1210,13 @@ function LiquidityPanel({
         <>
           <div className="grid gap-[4px] rounded-[5px] border border-[#23242a] bg-[#0d0d0e] px-[11px] py-[9px] font-sans text-[10px] text-[#a9a9a9]">
             <span className="flex justify-between">
-              Your LP <span className="text-white">{lpPosition ? fmt(lpPosition.lpBalanceFormatted, 6) : '...'} FLZ-LP</span>
+              Your LP <span className="text-white">{lpPosition ? fmt(lpPosition.lpBalanceFormatted, 6) : '...'} {asset}-LP</span>
             </span>
             <span className="flex justify-between">
               Pooled ETH <span className="text-white">{lpPosition ? fmt(lpPosition.ethShare, 6) : '...'}</span>
             </span>
             <span className="flex justify-between">
-              Pooled FLZ <span className="text-white">{lpPosition ? fmt(lpPosition.flzShare, 4) : '...'}</span>
+              Pooled {asset} <span className="text-white">{lpPosition ? fmt(lpPosition.tokenShare, 4) : '...'}</span>
             </span>
           </div>
           <div className="grid grid-cols-4 gap-[5px]">
@@ -1178,7 +1235,7 @@ function LiquidityPanel({
           </div>
           <p className="m-0 font-sans text-[9px] text-[#a9a9a9]">
             {lp > 0 && lpPosition
-              ? `You receive about ${fmt(Number(lpPosition.ethShare) * frac, 6)} ETH and ${fmt(Number(lpPosition.flzShare) * frac, 4)} FLZ.`
+              ? `You receive about ${fmt(Number(lpPosition.ethShare) * frac, 6)} ETH and ${fmt(Number(lpPosition.tokenShare) * frac, 4)} ${asset}.`
               : 'No LP position yet. Supply liquidity first.'}
           </p>
         </>

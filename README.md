@@ -57,7 +57,7 @@
 | **How** | One policy engine behind every channel. Chat can spend inside your rules; only the website, behind your password, can change them |
 | **Where** | Live on [flizy.app](https://flizy.app), WhatsApp and Telegram, settling on GIWA Sepolia (testnet) |
 | **Earns from** | Swap protocol fee, NFT marketplace fee, paid-mint fee, collection generation fee |
-| **Built** | 98 API routes, 72 database migrations, 14 verified contracts, 2,577 automated tests passing |
+| **Built** | 98 API routes, 72 database migrations, 14 verified contracts, 2,596 automated tests passing |
 
 ---
 
@@ -108,7 +108,7 @@ another adapter, not a second product.
 | **Pay by identity** | Pay a Flizy `@username`, a 9-digit Flizy number, or a scanned QR. First payments are flagged | Live |
 | **Escrow claims** | Send to a phone, email, GitHub, Discord or Telegram identity. Funds wait in escrow until the owner proves that identity; the sender can cancel until then | Live (X identities: linking paused) |
 | **Pay me** | A personal QR, Flizy number and pay link, printable | Live |
-| **Swap and liquidity** | Trade ETH against FLZ, IZY, MAKI or DCAT, add liquidity to the FLZ pool, with fees and slippage shown before confirm | Live |
+| **Swap and liquidity** | Trade ETH against FLZ, IZY, MAKI or DCAT, and add liquidity to any of those pools, with fees and slippage shown before confirm | Live |
 | **Listed tokens** | FLZ, IZY and MAKI are verified; DCAT is listed. Each trades against an ETH pool Flizy seeded and shows in Explore, Home and the wallet. Only ETH and FLZ can be sent on socials | Live |
 | **Limit orders** | Place an FLZ buy or sell at a price; a watcher fills it when the pool reaches it | Live |
 | **NFT marketplace** | Browse collections, list, buy, make and accept offers, with creator royalties up to 10% | Live |
@@ -290,8 +290,8 @@ xychart-beta
 
 | Quality measure | Today |
 | --- | --- |
-| Automated tests | 2,408 Node tests and 169 Foundry contract tests, all passing |
-| Test files | 183 Node, 8 Foundry |
+| Automated tests | 2,427 Node tests and 169 Foundry contract tests, all passing |
+| Test files | 186 Node, 8 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
 | Database | 72 idempotent migrations, each ending in a post-condition check that fails loudly |
 | API surface | 98 route handlers; every payment, trade and security setting re-checks the account password |
@@ -371,7 +371,7 @@ WhatsApp uses the `flizy` prefix. Telegram uses `/command` and also accepts the 
 | [/](https://flizy.app/) · [/how-it-works](https://flizy.app/how-it-works) · [/docs](https://flizy.app/docs) | Product, guides and security |
 | [/dashboard](https://flizy.app/dashboard) | Home and history |
 | [/dashboard/wallet](https://flizy.app/dashboard/wallet) | Balances, tokens, NFTs, offers and Scan |
-| [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap any listed token against ETH; FLZ liquidity and limit orders |
+| [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap and add liquidity for any listed token against ETH; FLZ limit orders |
 | [/dashboard/explore](https://flizy.app/dashboard/explore) | Tokens, NFTs, mints and tasks |
 | [/dashboard/account](https://flizy.app/dashboard/account) | Profile, projects, Pay me, language, country, chat, platforms, trusted wallets, PIN, limits, security |
 | `/pay/[username]` · `/claim/[token]` · `/i/[username]` | Pay link, public claim, personal invite |

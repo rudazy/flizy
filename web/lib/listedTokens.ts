@@ -20,6 +20,8 @@ export type ListedToken = {
   address: string;
   decimals: number;
   pair: string;
+  /** Served from web/public. DCAT's is the art its own contract points to. */
+  logo: string;
 };
 
 export const LISTED_TOKENS: readonly ListedToken[] = [
@@ -30,6 +32,7 @@ export const LISTED_TOKENS: readonly ListedToken[] = [
     address: '0x58fB4D3DA82F5d610ad36E6e39e674C17B32Ffd1',
     decimals: 18,
     pair: '0x3083C7Aa86Bc20256439c102156E7fCbe7b91797',
+    logo: '/tokens/dcat.webp',
   },
   {
     symbol: 'IZY',
@@ -38,6 +41,7 @@ export const LISTED_TOKENS: readonly ListedToken[] = [
     address: '0x8CA7A8F78abC8dA471df82BE4F374e1661e34473',
     decimals: 18,
     pair: '0x2fC40Df0c997310E07370cE547c56A0014B029Da',
+    logo: '/tokens/izy.svg',
   },
   {
     symbol: 'MAKI',
@@ -46,6 +50,7 @@ export const LISTED_TOKENS: readonly ListedToken[] = [
     address: '0xd08d83cdf19Db8CCd53Ed462034c8631De5F693d',
     decimals: 18,
     pair: '0xf9A9FCF725bE455E9523a4846C649BC86d6533c5',
+    logo: '/tokens/maki.svg',
   },
 ];
 

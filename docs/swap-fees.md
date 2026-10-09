@@ -27,9 +27,10 @@ The same fees apply on every Flizy pool: FLZ, IZY, MAKI and DCAT, each against E
 
 ## Liquidity
 
-- Adding and removing liquidity is **site only** (Swap → + Liquidity → Add / Remove), for the FLZ pool.
+- Adding and removing liquidity is **site only** (Swap → + Liquidity, pick the pool → Add / Remove),
+  for FLZ, IZY, MAKI or DCAT against ETH.
 - No protocol fee on add or remove; you still pay gas.
-- Remove burns FLZ-LP from your agent wallet and returns proportional ETH + FLZ.
+- Remove burns that pool's LP from your agent wallet and returns proportional ETH and the token.
 
 ## Addresses
 

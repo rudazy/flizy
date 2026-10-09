@@ -437,9 +437,40 @@ textarea {
   outline-offset: 2px;
 }
 
+/*
+ * Home trending tokens slide past. The track holds the chips twice, so moving
+ * it by half its width loops without a jump. Hover or focus pauses it.
+ */
+@keyframes tokenMarquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.token-marquee {
+  animation: tokenMarquee 28s linear infinite;
+}
+
+.token-marquee:hover,
+.token-marquee:focus-within {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .scan-orbit {
     animation: none;
+  }
+
+  /* No slide: the strip scrolls by hand instead, and the copy is hidden. */
+  .token-marquee {
+    animation: none;
+  }
+
+  .token-marquee-copy {
+    display: none;
   }
 }
 

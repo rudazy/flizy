@@ -178,12 +178,12 @@ describe('listed tokens on the swap screen', () => {
     }
   });
 
-  it('prices the pair being traded, and keeps Limit and Liquidity on FLZ', () => {
+  it('prices the pair being traded, and keeps only Limit on FLZ', () => {
     const page = read('web/app/dashboard/swap/page.tsx');
     assert.match(page, /fetch\(`\/api\/swap\/quote\?price=1&token=\$\{encodeURIComponent\(asset\)\}`\)/);
     assert.match(page, /const price = priceInfo && priceInfo\.symbol === asset \? priceInfo : null;/);
     assert.match(page, /const pickable: Token\[\] = mode === 'swap' \? \['ETH', \.\.\.SWAP_ASSETS\] : \['ETH', 'FLZ'\];/);
-    assert.match(page, /if \(next !== 'swap' && asset !== 'FLZ'\) \{/);
+    assert.match(page, /if \(next === 'limit' && asset !== 'FLZ'\) \{/);
     // Listed balances are matched by contract, never by a symbol someone typed.
     assert.match(page, /String\(t\.address \|\| ''\)\.toLowerCase\(\) === listed\.address\.toLowerCase\(\)/);
   });

@@ -260,12 +260,15 @@ transfers and claims consume the daily send budget.
 
 ```mermaid
 flowchart LR
-  A[Site Swap · + Liquidity] --> B{Add or Remove}
-  B -->|Add| C[Approve FLZ · FeeRouter.addLiquidityETH]
-  B -->|Remove| D[Approve FLZ-LP · V2 removeLiquidityETH]
+  A[Site Swap · + Liquidity · pick a pool] --> B{Add or Remove}
+  B -->|Add| C[Approve token · FeeRouter.addLiquidityETH]
+  B -->|Remove| D[Approve pool LP · V2 removeLiquidityETH]
   C --> E[LP tokens on agent wallet]
-  D --> F[ETH + FLZ back to agent wallet]
+  D --> F[ETH + token back to agent wallet]
 ```
+
+The pool is FLZ or a listed token (`liquidityPool` in `web/lib/dexServer.ts`). The route
+refuses any other token before it asks for the password.
 
 ---
 
@@ -436,4 +439,5 @@ A listed token:
 
 `verified` on a listed token (IZY and MAKI, not DCAT) is display only: it draws the mark.
 Sending on socials is a separate fixed list, ETH and FLZ, in `listedSendSymbols` and
-`web/lib/payAsset.ts`. Limit orders and site liquidity remain FLZ only.
+`web/lib/payAsset.ts`. Site liquidity works for every listed pool; limit orders remain FLZ
+only.

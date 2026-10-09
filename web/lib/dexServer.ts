@@ -414,12 +414,33 @@ export async function addLiquidityEth(args: {
   return { txHash: tx.hash, receipt };
 }
 
+/** An ETH pool the site manages liquidity for. */
+export type LiquidityPool = { symbol: string; token: string; pair: string; decimals: number };
+
 /**
- * Read LP position for an agent wallet (pair balance + underlying ETH/FLZ share).
+ * The FLZ pool, or a listed token's pool, by symbol. Null for anything else:
+ * the site only adds to and removes from pools Flizy seeded.
  */
-export async function getLpPosition(provider: ethers.Provider, ownerAddress: string) {
+export function liquidityPool(symbol: string | null | undefined): LiquidityPool | null {
+  const upper = String(symbol || 'FLZ').trim().toUpperCase();
   const d = getDexAddresses();
-  const pair = new ethers.Contract(d.pair, PAIR_ABI, provider);
+  if (upper === 'FLZ') return { symbol: 'FLZ', token: d.flz, pair: d.pair, decimals: 18 };
+  const listed = listedBySymbol(upper);
+  if (!listed) return null;
+  return {
+    symbol: listed.symbol,
+    token: ethers.getAddress(listed.address),
+    pair: ethers.getAddress(listed.pair),
+    decimals: listed.decimals,
+  };
+}
+
+/**
+ * Read an LP position for an agent wallet: pair balance and the underlying ETH
+ * and token share, in one pool.
+ */
+export async function getLpPosition(provider: ethers.Provider, ownerAddress: string, pool: LiquidityPool) {
+  const pair = new ethers.Contract(pool.pair, PAIR_ABI, provider);
   const [lpBal, totalSupply, reserves, t0] = await Promise.all([
     pair.balanceOf(ownerAddress) as Promise<bigint>,
     pair.totalSupply() as Promise<bigint>,
@@ -429,36 +450,38 @@ export async function getLpPosition(provider: ethers.Provider, ownerAddress: str
 
   const reserve0 = reserves[0];
   const reserve1 = reserves[1];
-  const flzIs0 = ethers.getAddress(String(t0)) === d.flz;
-  const reserveFlz = flzIs0 ? reserve0 : reserve1;
-  const reserveWeth = flzIs0 ? reserve1 : reserve0;
+  const tokenIs0 = ethers.getAddress(String(t0)) === ethers.getAddress(pool.token);
+  const reserveToken = tokenIs0 ? reserve0 : reserve1;
+  const reserveWeth = tokenIs0 ? reserve1 : reserve0;
 
   let ethShare = 0n;
-  let flzShare = 0n;
+  let tokenShare = 0n;
   if (totalSupply > 0n && lpBal > 0n) {
     ethShare = (reserveWeth * lpBal) / totalSupply;
-    flzShare = (reserveFlz * lpBal) / totalSupply;
+    tokenShare = (reserveToken * lpBal) / totalSupply;
   }
 
   return {
-    pair: d.pair,
+    symbol: pool.symbol,
+    pair: pool.pair,
     lpBalance: lpBal,
     lpBalanceFormatted: ethers.formatEther(lpBal),
     totalSupply: totalSupply.toString(),
     ethShare: ethers.formatEther(ethShare),
-    flzShare: ethers.formatEther(flzShare),
+    tokenShare: ethers.formatUnits(tokenShare, pool.decimals),
     ethShareWei: ethShare,
-    flzShareWei: flzShare,
+    tokenShareWei: tokenShare,
     poolShareBps: totalSupply > 0n ? Number((lpBal * 10000n) / totalSupply) : 0,
   };
 }
 
 /**
- * Remove LP for FLZ/WETH via the V2 router (allowlisted). No protocol fee on remove.
+ * Remove LP from one pool via the V2 router (allowlisted). No protocol fee on remove.
  * @param liquidityWei amount of LP tokens to burn; omit or use max for full position
  */
 export async function removeLiquidityEth(args: {
   signer: ethers.Wallet;
+  pool: LiquidityPool;
   liquidityWei: bigint;
   amountTokenMin?: bigint;
   amountEthMin?: bigint;
@@ -469,7 +492,7 @@ export async function removeLiquidityEth(args: {
 
   const to = args.recipient || (await args.signer.getAddress());
   const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
-  const pair = new ethers.Contract(d.pair, PAIR_ABI, args.signer);
+  const pair = new ethers.Contract(args.pool.pair, PAIR_ABI, args.signer);
   const bal: bigint = await pair.balanceOf(await args.signer.getAddress());
   if (bal < args.liquidityWei) {
     throw new Error('Not enough LP tokens in your Flizy wallet');
@@ -479,7 +502,7 @@ export async function removeLiquidityEth(args: {
 
   const router = new ethers.Contract(d.dexRouter, V2_ROUTER_ABI, args.signer);
   const tx = await router.removeLiquidityETH(
-    d.flz,
+    args.pool.token,
     args.liquidityWei,
     args.amountTokenMin ?? 0n,
     args.amountEthMin ?? 0n,
@@ -496,6 +519,7 @@ export async function removeLiquidityEthViaGator(args: {
   accountId: string;
   provider: ethers.JsonRpcProvider;
   chainId?: number;
+  pool: LiquidityPool;
   liquidityWei: bigint;
   amountTokenMin?: bigint;
   amountEthMin?: bigint;
@@ -505,7 +529,7 @@ export async function removeLiquidityEthViaGator(args: {
   if (args.liquidityWei <= 0n) throw new Error('Liquidity amount must be greater than 0');
   const to = ethers.getAddress(args.recipient);
   const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
-  const pairRead = new ethers.Contract(d.pair, PAIR_ABI, args.provider);
+  const pairRead = new ethers.Contract(args.pool.pair, PAIR_ABI, args.provider);
   const bal: bigint = await pairRead.balanceOf(to);
   if (bal < args.liquidityWei) {
     throw new Error('Not enough LP tokens in your Flizy wallet');
@@ -515,7 +539,7 @@ export async function removeLiquidityEthViaGator(args: {
     accountId: args.accountId,
     provider: args.provider,
     chainId: args.chainId,
-    target: d.pair,
+    target: args.pool.pair,
     value: 0n,
     data: pairIface.encodeFunctionData('approve', [d.dexRouter, args.liquidityWei]),
   });
@@ -527,7 +551,7 @@ export async function removeLiquidityEthViaGator(args: {
     target: d.dexRouter,
     value: 0n,
     data: router.encodeFunctionData('removeLiquidityETH', [
-      d.flz,
+      args.pool.token,
       args.liquidityWei,
       args.amountTokenMin ?? 0n,
       args.amountEthMin ?? 0n,
