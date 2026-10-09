@@ -95,7 +95,7 @@ export default function SwapPage() {
   const [tokenIn, setTokenIn] = useState<Token>(linked.tokenIn);
   const [tokenOut, setTokenOut] = useState<Token>(linked.tokenOut);
   const [amountIn, setAmountIn] = useState('0.01');
-  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoted, setQuote] = useState<(Quote & { inputs: string }) | null>(null);
   const [price, setPrice] = useState<PriceInfo | null>(null);
   const [balances, setBalances] = useState<Balances>({ eth: '0', flz: '0' });
   const [slippagePct, setSlippagePct] = useState('1.00');
@@ -126,6 +126,12 @@ export default function SwapPage() {
 
   // A quote request that has been overtaken must not overwrite a newer one.
   const quoteSeq = useRef(0);
+
+  // A quote counts only for the inputs it was made for. Once the amount, the
+  // pair or the slippage changes it is gone from the screen and Swap waits for
+  // a fresh one, so the figures shown and the minimum sent always match.
+  const inputs = `${amountIn}|${tokenIn}|${tokenOut}|${slippageBps}`;
+  const quote = quoted && quoted.inputs === inputs ? quoted : null;
 
   const loadBalances = useCallback(async () => {
     try {
@@ -170,7 +176,7 @@ export default function SwapPage() {
         return;
       }
       setError('');
-      setQuote(data);
+      setQuote({ ...data, inputs: `${amountIn}|${tokenIn}|${tokenOut}|${slippageBps}` });
     } catch {
       if (seq === quoteSeq.current) {
         setQuote(null);
@@ -432,9 +438,7 @@ export default function SwapPage() {
     : !(Number(amountIn) > 0)
       ? 'Enter an amount'
       : !quote
-        ? quoting
-          ? 'Fetching quote...'
-          : 'Enter an amount'
+        ? 'Fetching quote...'
         : `Swap ${tokenIn} for ${tokenOut}`;
 
   const tradeTitle = mode === 'limit' ? 'Limit order' : 'Trade';
@@ -533,7 +537,7 @@ export default function SwapPage() {
                       : '0'
                     : quote
                       ? fmt(quote.amountOut, 6)
-                      : quoting
+                      : Number(amountIn) > 0
                         ? '...'
                         : '0'}
                 </span>
@@ -612,6 +616,7 @@ export default function SwapPage() {
                         prefix={`1 ${tokenIn} =`}
                         suffix={tokenOut}
                         label="Limit price"
+                        onLive={setLimitPrice}
                         onCommit={(v) => {
                           if (Number(v) > 0) {
                             setLimitPrice(v);
@@ -820,7 +825,7 @@ function ModeTab({ active, onClick, icon, label }: { active: boolean; onClick: (
 function TokenLogo({ token, size = 36 }: { token: Token; size?: number }) {
   if (token === 'ETH') {
     return (
-      <span className="flex shrink-0 items-center justify-center rounded-full bg-[#627eea] text-white" style={{ width: size, height: size }}>
+      <span className="flex shrink-0 items-center justify-center rounded-full border border-[#2e2e2e] bg-[#161616] text-[#e6e6e6]" style={{ width: size, height: size }}>
         <EthDiamondIcon size={Math.round(size * 0.58)} />
       </span>
     );
@@ -940,7 +945,11 @@ function IconAction({ label, onClick, children }: { label: string; onClick: () =
   );
 }
 
-/** A number edited in place in a detail row. Enter or leaving the field saves; Escape cancels. */
+/**
+ * A number edited in place in a detail row. Enter or leaving the field saves;
+ * Escape cancels. With onLive, every valid keystroke applies at once, so the
+ * figures that depend on it never lag behind what is typed.
+ */
 function InlineNumber({
   initial,
   prefix,
@@ -948,6 +957,7 @@ function InlineNumber({
   label,
   onCommit,
   onCancel,
+  onLive,
 }: {
   initial: string;
   prefix?: string;
@@ -955,6 +965,7 @@ function InlineNumber({
   label: string;
   onCommit: (v: string) => void;
   onCancel: () => void;
+  onLive?: (v: string) => void;
 }) {
   const [v, setV] = useState(initial);
   return (
@@ -965,7 +976,11 @@ function InlineNumber({
         aria-label={label}
         inputMode="decimal"
         value={v}
-        onChange={(e) => setV(e.target.value.replace(/[^0-9.]/g, ''))}
+        onChange={(e) => {
+          const next = e.target.value.replace(/[^0-9.]/g, '');
+          setV(next);
+          if (onLive && Number(next) > 0) onLive(next);
+        }}
         onBlur={() => onCommit(v)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') onCommit(v);

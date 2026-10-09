@@ -1,6 +1,6 @@
 /**
  * Whether Scan, the public ledger, may show this account's @username.
- * On by default; off, Scan shows the short wallet address or nothing.
+ * Off by default. Off, Scan shows the short wallet address or nothing.
  */
 
 import { NextResponse } from 'next/server';
@@ -22,7 +22,7 @@ export async function GET() {
       .eq('id', accountId)
       .single();
     if (error) return NextResponse.json(apiErrorBody(GET_ROUTE, error), { status: 500 });
-    return NextResponse.json({ showUsername: data?.scan_show_username !== false });
+    return NextResponse.json({ showUsername: data?.scan_show_username === true });
   } catch (err) {
     return NextResponse.json(apiErrorBody(GET_ROUTE, err), { status: 500 });
   }
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       .select('scan_show_username')
       .single();
     if (error) return NextResponse.json(apiErrorBody(POST_ROUTE, error), { status: 500 });
-    return NextResponse.json({ showUsername: data?.scan_show_username !== false });
+    return NextResponse.json({ showUsername: data?.scan_show_username === true });
   } catch (err) {
     return NextResponse.json(apiErrorBody(POST_ROUTE, err), { status: 500 });
   }

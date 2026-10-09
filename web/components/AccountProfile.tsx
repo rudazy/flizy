@@ -143,9 +143,10 @@ function SoonToggle({
 }
 
 /**
- * "Show username on Scan": a real setting, saved as soon as it is flipped.
- * Off, Scan never shows the @username: payments to this account show its
- * short wallet address, and its own payments show only how they travelled.
+ * "Show username on Scan": a real setting, off by default, saved as soon as it
+ * is flipped. Off, Scan never shows the @username: payments to this account
+ * show its short wallet address, and its own payments show only how they
+ * travelled.
  */
 function ScanUsernameToggle() {
   const [on, setOn] = useState<boolean | null>(null);
@@ -154,15 +155,21 @@ function ScanUsernameToggle() {
 
   useEffect(() => {
     let live = true;
-    fetch('/api/account/scan-visibility')
+    // A request that never answers would leave this on Loading for good.
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => abort.abort(), 10000);
+    fetch('/api/account/scan-visibility', { signal: abort.signal })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (live && res.ok && typeof data.showUsername === 'boolean') setOn(data.showUsername);
         else if (live) setError('Could not load this setting.');
       })
-      .catch(() => live && setError('Could not load this setting.'));
+      .catch(() => live && setError('Could not load this setting. Reload to try again.'))
+      .finally(() => window.clearTimeout(timer));
     return () => {
       live = false;
+      window.clearTimeout(timer);
+      abort.abort();
     };
   }, []);
 
@@ -344,7 +351,7 @@ export function AccountProfile({
                   onClick={() => void copyAddress()}
                   className="hit-y-44 mt-2 inline-flex h-7 max-w-full items-center gap-1.5 rounded-full border border-[#2e2e32] bg-[#0c0c0e]/80 px-2 font-mono text-[11px] text-[#d9d4cc]"
                 >
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#627eea] text-white">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[#2e2e2e] bg-[#161616] text-[#e6e6e6]">
                     <EthDiamondIcon size={10} />
                   </span>
                   <span className="whitespace-nowrap">{copied ? 'Copied' : short}</span>
@@ -461,7 +468,7 @@ export function AccountProfile({
       >
         <div className="flex min-h-[52px] w-full items-center gap-2.5 border-t border-[#26262a] px-3.5 py-2">
           <button type="button" onClick={onWallet} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#627eea] text-white">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#2e2e2e] bg-[#161616] text-[#e6e6e6]">
               <EthDiamondIcon size={14} />
             </span>
             <span className="whitespace-nowrap font-mono text-[11px] text-[#f3f1ec] sm:hidden">

@@ -343,7 +343,7 @@ function Hero({ slide, setSlide }: { slide: number; setSlide: (n: number) => voi
 function TokenLogo({ symbol }: { symbol: string }) {
   if (symbol === 'ETH') {
     return (
-      <span className="flex h-[25px] w-[25px] shrink-0 items-center justify-center rounded-full bg-[#627eea] text-white">
+      <span className="flex h-[25px] w-[25px] shrink-0 items-center justify-center rounded-full border border-[#2e2e2e] bg-[#161616] text-[#e6e6e6]">
         <EthDiamondIcon size={14} />
       </span>
     );

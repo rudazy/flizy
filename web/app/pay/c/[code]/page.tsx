@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getSupabase } from '../../../../lib/supabase';
 import { resolvePayCode } from '../../../../lib/payCode.ts';
+import { decodeRouteParam } from '../../../../lib/routeParam.ts';
 import { pageMetadata } from '../../../../lib/seo';
 import { PayLanding } from '../../../../components/PayLanding';
 
@@ -33,7 +34,7 @@ export function generateMetadata({ params }: Props): Metadata {
 }
 
 export default async function PayByCodePage({ params }: Props) {
-  const raw = String(params.code || '');
+  const raw = decodeRouteParam(params.code);
 
   let found: Awaited<ReturnType<typeof resolvePayCode>> = null;
   try {

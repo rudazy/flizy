@@ -28,30 +28,28 @@ export function PayLanding({
   const [saveSkipped, setSaveSkipped] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [savePassword, setSavePassword] = useState('');
+  /** Enter the amount, then review it, then pay. Nothing moves before Confirm. */
+  const [stage, setStage] = useState<'edit' | 'review'>('edit');
 
   const handle = username ? `@${username}` : 'this Flizy account';
   const next = `/pay/${encodeURIComponent(refSlug)}`;
+  const amountOk = Number(amount) > 0;
 
   useEffect(() => {
-    fetch('/api/dashboard', { cache: 'no-store' })
+    let live = true;
+    // The preview alone says signed in or not, own page or not, and first
+    // payment or not, so the form and its warning wait on nothing else.
+    fetch(`/api/pay/preview?ref=${encodeURIComponent(refSlug)}`, { cache: 'no-store' })
       .then(async (res) => {
-        if (!res.ok) {
+        if (!live) return;
+        if (res.status === 401) {
           setLoggedIn(false);
           return;
         }
-        const body = await res.json().catch(() => ({}));
+        const info = await res.json().catch(() => ({}));
+        if (!live) return;
         setLoggedIn(true);
-        const mine = String(body?.account?.username || '').toLowerCase();
-        if (mine) setPayerHandle(`@${mine}`);
-        if (username && mine === username.toLowerCase()) {
-          setSelf(true);
-          return;
-        }
-        const prev = await fetch(`/api/pay/preview?ref=${encodeURIComponent(refSlug)}`, {
-          cache: 'no-store',
-        });
-        const info = await prev.json().catch(() => ({}));
-        if (prev.ok) {
+        if (res.ok) {
           if (info.self) {
             setSelf(true);
             return;
@@ -60,11 +58,33 @@ export function PayLanding({
           setAlreadySaved(Boolean(info.alreadySaved));
         }
       })
-      .catch(() => setLoggedIn(false));
-  }, [username, refSlug]);
+      .catch(() => live && setLoggedIn(false));
+    // Only for the "Signed in as" line; the form does not wait for it.
+    fetch('/api/dashboard', { cache: 'no-store' })
+      .then(async (res) => {
+        if (!res.ok || !live) return;
+        const body = await res.json().catch(() => ({}));
+        const mine = String(body?.account?.username || '').toLowerCase();
+        if (live && mine) setPayerHandle(`@${mine}`);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [refSlug]);
 
-  async function onPay(e: React.FormEvent) {
+  function onReview(e: React.FormEvent) {
     e.preventDefault();
+    if (!amountOk) {
+      setMsg('Enter an amount above 0.');
+      return;
+    }
+    setMsg('');
+    setStage('review');
+  }
+
+  async function onPay() {
+    if (!password || busy) return;
     setBusy(true);
     setMsg('');
     setOk(false);
@@ -85,7 +105,6 @@ export function PayLanding({
       }
       setOk(true);
       setExplorer(body.explorerUrl || '');
-      setMsg('Paid.');
       setPassword('');
       if (body.alreadySaved === true) setAlreadySaved(true);
       else setAlreadySaved(false);
@@ -129,8 +148,80 @@ export function PayLanding({
         </div>
       ) : null}
 
-      {loggedIn && !self && !ok ? (
-        <form onSubmit={onPay} className="card space-y-4 p-6">
+      {loggedIn && !self && !ok && stage === 'review' ? (
+        <div className="card space-y-4 p-6">
+          <p className="text-xs uppercase tracking-[0.18em] text-muted">Review payment</p>
+          {firstPay ? (
+            <div className="alert alert-warn text-sm">
+              First payment. You have not paid {handle} before. Check this is the right
+              person before you confirm.
+            </div>
+          ) : null}
+          <dl className="space-y-2 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted">To</dt>
+              <dd className="m-0 text-right text-paper">
+                {displayName ? `${displayName} ` : ''}
+                {username ? <span className="font-mono">@{username}</span> : handle}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted">Amount</dt>
+              <dd className="m-0 font-mono text-paper">
+                {amount} {asset}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted">From</dt>
+              <dd className="m-0 text-right text-paper">{payerHandle ? `${payerHandle}, Flizy wallet` : 'Your Flizy wallet'}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-muted">Network fee</dt>
+              <dd className="m-0 text-right text-paper">Paid in ETH from your wallet</dd>
+            </div>
+          </dl>
+          <div>
+            <label className="label" htmlFor="pay-password">
+              Account password
+            </label>
+            <input
+              id="pay-password"
+              className="input"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+            />
+          </div>
+          {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
+          <div className="grid grid-cols-[auto_1fr] gap-2">
+            <button
+              type="button"
+              className="btn btn-ghost px-5 py-3"
+              disabled={busy}
+              onClick={() => {
+                setPassword('');
+                setMsg('');
+                setStage('edit');
+              }}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary py-3 font-semibold"
+              disabled={busy || !password}
+              onClick={() => void onPay()}
+            >
+              {busy ? 'Paying…' : `Confirm and pay ${amount} ${asset}`}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {loggedIn && !self && !ok && stage === 'edit' ? (
+        <form onSubmit={onReview} className="card space-y-4 p-6">
           <p className="text-sm text-muted">
             {payerHandle
               ? `Signed in as ${payerHandle}. This send comes from your Flizy wallet.`
@@ -173,23 +264,9 @@ export function PayLanding({
               required
             />
           </div>
-          <div>
-            <label className="label" htmlFor="pay-password">
-              Account password
-            </label>
-            <input
-              id="pay-password"
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
           {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
-          <button type="submit" className="btn btn-primary w-full py-3 font-semibold" disabled={busy}>
-            {busy ? 'Paying…' : `Pay ${handle} in ${asset}`}
+          <button type="submit" className="btn btn-primary w-full py-3 font-semibold" disabled={!amountOk}>
+            Review payment to {handle}
           </button>
         </form>
       ) : null}

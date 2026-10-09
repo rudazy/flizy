@@ -178,6 +178,14 @@ textarea {
   color: #1a1405;
 }
 
+/* Off reads as off: a gold button that cannot be pressed must not look pressable. */
+.btn-sun:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+  box-shadow: none;
+}
+
 /* Explore outline button: View ended campaigns. */
 .btn-chrome {
   display: inline-flex;

@@ -292,7 +292,7 @@ export function WalletBalances() {
               href={address ? `${explorerBase}/address/${address}` : null}
               external
               logo={
-                <span className="flex h-[37px] w-[37px] items-center justify-center rounded-full bg-[#627eea] text-white">
+                <span className="flex h-[37px] w-[37px] items-center justify-center rounded-full border border-[#2e2e2e] bg-[#161616] text-[#e6e6e6]">
                   <EthDiamondIcon size={22} />
                 </span>
               }

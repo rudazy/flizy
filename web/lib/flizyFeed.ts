@@ -5,8 +5,8 @@
  * leave the server are the ones the ledger draws. A payment shows its rail
  * (GitHub pay, Telegram pay, Phone pay, Email pay, Flizy pay), never the
  * recipient's handle, saved name or display name. A Flizy @username shows
- * only while that account keeps "Show username on Scan" on; the route passes
- * null for an account that turned it off, and the row then shows the rail and
+ * only once that account turns "Show username on Scan" on (it is off by
+ * default); otherwise the route passes null, and the row shows the rail and
  * the short wallet address instead. The sender's note stays in their own
  * History. A phone key, an email, an account id, and a claim recipient hint
  * are read at most to choose a rail name, then dropped.

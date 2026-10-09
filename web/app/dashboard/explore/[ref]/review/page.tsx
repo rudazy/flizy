@@ -42,6 +42,32 @@ export default function ReviewPage() {
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [done, setDone] = useState<{ winners: number; notified: number } | null>(null);
+  const [cancelAsk, setCancelAsk] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  /**
+   * Withdraw a live task. Rewards are not held by Flizy yet, so there is
+   * nothing to refund; once rewards are locked up front, this must return them.
+   */
+  async function cancelTask() {
+    if (cancelling) return;
+    setCancelling(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/tasks/${taskRef}/cancel`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof body.error === 'string' ? body.error : 'Could not cancel this task.');
+        return;
+      }
+      setCancelAsk(false);
+      setState('cancelled');
+    } catch {
+      setError('Could not cancel this task.');
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setError('');
@@ -153,6 +179,36 @@ export default function ReviewPage() {
               See the task page
             </Link>
           </div>
+        </AppSection>
+      ) : null}
+
+      {state === 'live' ? (
+        <AppSection title="Cancel this task">
+          {cancelAsk ? (
+            <div className="grid gap-3 text-sm">
+              <p className="m-0 text-paper">
+                Cancel task #{taskRef}? It closes now, nobody can enter, and no winners are picked. Entries already sent
+                are kept. This cannot be undone.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn btn-ghost" disabled={cancelling} onClick={() => setCancelAsk(false)}>
+                  Keep it live
+                </button>
+                <button type="button" className="btn btn-primary" disabled={cancelling} onClick={() => void cancelTask()}>
+                  {cancelling ? 'Cancelling...' : 'Yes, cancel task'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-3 text-sm text-muted">
+              <p className="m-0">Posted by mistake, or no longer running? Cancel it so nobody else enters.</p>
+              <div>
+                <button type="button" className="btn btn-ghost" onClick={() => setCancelAsk(true)}>
+                  Cancel task
+                </button>
+              </div>
+            </div>
+          )}
         </AppSection>
       ) : null}
 
