@@ -108,7 +108,14 @@ export function TokenChart({
   const fill = `${path} V${TOP_PAD + priceH} H0 Z`;
 
   const ticksY = [0, 1, 2, 3].map((i) => max - ((max - min) * i) / 3);
+  // A narrow range can round two ticks to the same text; add digits until they differ.
+  let yLabels = ticksY.map(axisPrice);
+  for (let digits = 3; digits <= 6 && new Set(yLabels).size < yLabels.length; digits++) {
+    yLabels = ticksY.map((v) => (Number.isFinite(v) && v !== 0 ? Number(v.toPrecision(digits)).toString() : axisPrice(v)));
+  }
   const ticksX = [0, 1, 2, 3, 4, 5, 6].map((i) => windowStart + ((windowEnd - windowStart) * i) / 6);
+  // A time label is about 40px wide; on a narrow plot skip ticks so none overlap.
+  const xEvery = Math.max(1, Math.ceil(48 / Math.max(1, plotW / 6)));
   const maxVol = Math.max(0, ...candles.map((c) => c.volumeEth));
   const bucket = candles.length > 1 ? candles[1].time - candles[0].time : (windowEnd - windowStart) / 30;
   const barW = Math.max(2, (bucket / (windowEnd - windowStart)) * plotW * 0.7);
@@ -128,23 +135,25 @@ export function TokenChart({
             <g key={`y${i}`}>
               <line x1={0} x2={plotW} y1={y(v)} y2={y(v)} stroke={GRID} strokeDasharray="3 4" />
               <text x={plotW + 8} y={y(v) + 4} fill={AXIS_TEXT} fontSize="12" fontFamily="var(--font-geist-mono), monospace">
-                {axisPrice(v)}
+                {yLabels[i]}
               </text>
             </g>
           ))}
           {ticksX.map((t, i) => (
             <g key={`x${i}`}>
               <line x1={x(t)} x2={x(t)} y1={TOP_PAD} y2={TOP_PAD + plotH} stroke={GRID} strokeDasharray="3 4" />
-              <text
-                x={Math.min(Math.max(x(t), 18), plotW - 18)}
-                y={height - 5}
-                fill={AXIS_TEXT}
-                fontSize="12"
-                textAnchor="middle"
-                fontFamily="var(--font-geist-mono), monospace"
-              >
-                {clock(t)}
-              </text>
+              {i % xEvery === 0 ? (
+                <text
+                  x={i === 0 ? 0 : i === ticksX.length - 1 ? plotW : x(t)}
+                  y={height - 5}
+                  fill={AXIS_TEXT}
+                  fontSize="12"
+                  textAnchor={i === 0 ? 'start' : i === ticksX.length - 1 ? 'end' : 'middle'}
+                  fontFamily="var(--font-geist-mono), monospace"
+                >
+                  {clock(t)}
+                </text>
+              ) : null}
             </g>
           ))}
 

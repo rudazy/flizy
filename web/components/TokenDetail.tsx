@@ -7,10 +7,10 @@ import { AppPage } from './AppSection';
 import { useDashboard } from './DashboardProvider';
 import { useComingSoon } from './ComingSoon';
 import { SearchButton } from './SiteSearch';
-import { formatEthDisplay, formatPct, maxSpend } from '../lib/tokenFormat';
+import { formatEthDisplay, formatPct } from '../lib/tokenFormat';
 import { VerifiedMark } from './VerifiedMark';
-import { PasswordField } from './PasswordField';
 import { TokenChart } from './TokenChart';
+import { TokenTradeSheet } from './TokenTradeSheet';
 import { LINK_KINDS, LINK_LABEL } from './AccountProjects';
 import { shrinkProjectImage } from '../lib/projectImage';
 import type { HolderView } from '../lib/tokenHolders';
@@ -58,22 +58,11 @@ import {
  * ETH price. Buy and sell use the existing swap, behind the account password.
  */
 
-type Quote = {
-  amountIn: string;
-  amountOut: string;
-  amountOutMin: string;
-  tokenIn: string;
-  tokenOut: string;
-  slippagePct: string;
-  allInPct: string;
-  disclosure: string;
-};
-
 const UP = 'text-[#2fd27a]';
 const DOWN = 'text-[#f05252]';
 const CARD = 'rounded-[14px] border border-[#232323] bg-[#101010]';
 const SQUARE_BUTTON =
-  'hit-y-44 flex h-12 w-12 items-center justify-center rounded-[12px] border border-[#2a2a2a] bg-[#111111] text-[#e6e6e6] transition-colors hover:border-[#4a4a4a]';
+  'hit-y-44 flex h-10 w-10 items-center justify-center rounded-[10px] border sm:h-12 sm:w-12 sm:rounded-[12px] border-[#2a2a2a] bg-[#111111] text-[#e6e6e6] transition-colors hover:border-[#4a4a4a]';
 const GHOST_BUTTON =
   'hit-y-44 inline-flex h-10 items-center justify-center gap-2 rounded-[8px] border border-[#383838] px-4 font-sans text-sm text-[#f5f5f5] no-underline transition-colors hover:border-[#5a5a5a] disabled:cursor-not-allowed disabled:opacity-50';
 const PRIMARY_BUTTON =
@@ -128,13 +117,6 @@ function linkIcon(kind: string) {
   return <GlobeIcon size={16} />;
 }
 
-function sameAmount(left: string, right: string): boolean {
-  const a = Number(left);
-  const b = Number(right);
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0) return false;
-  return Math.abs(a - b) <= a * 1e-9;
-}
-
 function Letter({ name, className = '' }: { name: string; className?: string }) {
   return (
     <span
@@ -148,12 +130,14 @@ function Letter({ name, className = '' }: { name: string; className?: string }) 
 
 export function TokenDetail({ symbol }: { symbol: string }) {
   const listed = symbol.toLowerCase() === 'flz';
-  const { holdings, refreshAll } = useDashboard();
+  const { refreshAll } = useDashboard();
   const [comingSoon, comingSoonNote] = useComingSoon();
 
   const [range, setRange] = useState<ChartRange>('1d');
   const [chartMode, setChartMode] = useState<'line' | 'candle'>('line');
   const [fullscreen, setFullscreen] = useState(false);
+  /** Phones get a shorter chart so the price, chart and trade buttons share one screen. */
+  const [phone, setPhone] = useState(false);
   const [market, setMarket] = useState<TokenSnapshot | null>(null);
   const [usdPerEth, setUsdPerEth] = useState<number | null>(null);
   const [marketError, setMarketError] = useState('');
@@ -179,16 +163,8 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const [allActivity, setAllActivity] = useState(false);
   const [now, setNow] = useState(0);
 
-  const [tradeOpen, setTradeOpen] = useState(false);
-  const [side, setSide] = useState<'buy' | 'sell'>('buy');
-  const [amount, setAmount] = useState('');
-  const [quote, setQuote] = useState<Quote | null>(null);
-  const [quoting, setQuoting] = useState(false);
-  const [stage, setStage] = useState<'edit' | 'confirm'>('edit');
-  const [busy, setBusy] = useState(false);
-  const [tradeError, setTradeError] = useState('');
-  const [password, setPassword] = useState('');
-  const [result, setResult] = useState<{ explorerUrl?: string } | null>(null);
+  /** Which side the trade sheet is open on, or null when it is closed. */
+  const [tradeSide, setTradeSide] = useState<'buy' | 'sell' | null>(null);
 
   useEffect(() => setNow(Math.floor(Date.now() / 1000)), [market]);
 
@@ -224,6 +200,14 @@ export function TokenDetail({ symbol }: { symbol: string }) {
     if (!listed) return;
     void loadMarket(range);
   }, [listed, range, loadMarket]);
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 639px)');
+    const update = () => setPhone(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
 
   useEffect(() => {
     if (!listed) return;
@@ -275,40 +259,6 @@ export function TokenDetail({ symbol }: { symbol: string }) {
     return () => document.removeEventListener('mousedown', close);
   }, [menuOpen]);
 
-  useEffect(() => {
-    if (!listed) return;
-    setQuote(null);
-    setStage('edit');
-    if (!amount || Number(amount) <= 0) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      setQuoting(true);
-      setTradeError('');
-      try {
-        const params = new URLSearchParams({ side, amount });
-        if (side === 'buy') params.set('tokenOut', 'FLZ');
-        else params.set('tokenIn', 'FLZ');
-        const res = await fetch(`/api/swap/quote?${params.toString()}`);
-        const body = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        if (!res.ok) {
-          setQuote(null);
-          setTradeError(body.error || 'Could not quote that amount.');
-          return;
-        }
-        setQuote(body as Quote);
-      } catch {
-        if (!cancelled) setTradeError('Could not quote that amount.');
-      } finally {
-        if (!cancelled) setQuoting(false);
-      }
-    }, 320);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [listed, side, amount]);
-
   if (!listed) {
     return (
       <AppPage>
@@ -322,60 +272,10 @@ export function TokenDetail({ symbol }: { symbol: string }) {
     );
   }
 
-  const ethBalance = holdings?.holdings?.native?.balance ?? null;
-  const flzRow = (holdings?.holdings?.tokens || []).find((token) => String(token.symbol || '').toUpperCase() === 'FLZ');
-  const balance = side === 'buy' ? ethBalance : flzRow?.balance ?? null;
-  const spendMax = maxSpend(balance, side === 'buy');
-  const quoteReady = quote != null && sameAmount(quote.amountIn, amount);
   const day = market?.day ?? null;
   const change24 = formatPct(day?.changePct ?? null);
   const changeUp = (day?.changePct ?? 0) >= 0;
   const activity = market?.activity ?? [];
-
-  async function confirmTrade() {
-    if (!quoteReady || busy || !password) return;
-    setBusy(true);
-    setTradeError('');
-    setResult(null);
-    try {
-      const res = await fetch('/api/swap/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          side,
-          amount,
-          tokenIn: side === 'sell' ? 'FLZ' : 'ETH',
-          tokenOut: side === 'buy' ? 'FLZ' : 'ETH',
-          minOut: quote?.amountOutMin,
-          password,
-        }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setTradeError(body.error || 'The trade did not go through.');
-        return;
-      }
-      setResult({ explorerUrl: body.explorerUrl });
-      setStage('edit');
-      setPassword('');
-      setAmount('');
-      setQuote(null);
-      void loadMarket(range);
-      refreshAll();
-    } catch {
-      setTradeError('The trade did not go through.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function openTrade(which: 'buy' | 'sell') {
-    setSide(which);
-    setStage('edit');
-    setResult(null);
-    setTradeError('');
-    setTradeOpen(true);
-  }
 
   async function toggleWatch() {
     const next = !watched;
@@ -408,10 +308,10 @@ export function TokenDetail({ symbol }: { symbol: string }) {
       windowStart={market.windowStart}
       windowEnd={market.windowEnd}
       mode={chartMode}
-      height={fullscreen ? 460 : 280}
+      height={fullscreen ? 460 : phone ? 200 : 280}
     />
   ) : (
-    <div className="h-[280px] animate-pulse rounded-[10px] bg-[#141414]" aria-label="Loading the chart" />
+    <div className="h-[200px] animate-pulse sm:h-[280px] rounded-[10px] bg-[#141414]" aria-label="Loading the chart" />
   );
 
   return (
@@ -419,40 +319,40 @@ export function TokenDetail({ symbol }: { symbol: string }) {
       <div className="grid w-full min-w-0 gap-4 [&>*]:min-w-0">
         {/* Header */}
         <div className="flex items-start gap-3">
-          <Link href="/dashboard/explore?s=tokens" className="hit-y-44 mt-2 text-sun" aria-label="Back to tokens">
-            <ArrowLeftIcon size={22} />
+          <Link href="/dashboard/explore?s=tokens" className="hit-y-44 mt-1 text-sun sm:mt-2" aria-label="Back to tokens">
+            <ArrowLeftIcon size={20} />
           </Link>
-          <div className="flex min-w-0 flex-1 items-start gap-3.5">
+          <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:gap-3.5">
             {profile?.logo ? (
-              <img src={profile.logo} alt={`${name} logo`} className="h-[76px] w-[76px] shrink-0 rounded-[16px] border border-sun/40 object-cover" />
+              <img src={profile.logo} alt={`${name} logo`} className="h-14 w-14 shrink-0 rounded-[12px] border border-sun/40 object-cover sm:h-[76px] sm:w-[76px] sm:rounded-[16px]" />
             ) : (
-              <span className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-[16px] border border-sun/40 bg-[#0b0b0b] font-sans text-3xl font-bold text-sun" aria-hidden>
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] border border-sun/40 bg-[#0b0b0b] font-sans text-2xl font-bold text-sun sm:h-[76px] sm:w-[76px] sm:rounded-[16px] sm:text-3xl" aria-hidden>
                 {name.slice(0, 1).toUpperCase()}.
               </span>
             )}
             <div className="min-w-0">
-              <p className="m-0 flex items-center gap-2 font-sans text-[28px] font-bold leading-tight text-[#f5f5f5]">
+              <p className="m-0 flex items-center gap-1.5 font-sans text-[22px] font-bold leading-tight text-[#f5f5f5] sm:gap-2 sm:text-[28px]">
                 <span className="truncate">{name}</span>
-                <span className="scale-[1.45]">
+                <span className="scale-[1.15] sm:scale-[1.45]">
                   <VerifiedMark />
                 </span>
               </p>
-              <p className="m-0 mt-0.5 flex flex-wrap gap-x-3 font-sans text-base text-[#a9a9a9]">
+              <p className="m-0 mt-0.5 flex flex-wrap gap-x-2.5 font-sans text-[13px] text-[#a9a9a9] sm:gap-x-3 sm:text-base">
                 <span>{market?.symbol || 'FLZ'}</span>
                 {profile?.creatorUsername ? <span>@{profile.creatorUsername}</span> : null}
               </p>
-              <p className="m-0 mt-1.5 flex items-center gap-2">
-                <span className="rounded-[6px] bg-[#1c1c1c] px-2 py-0.5 font-mono text-xs font-semibold text-[#e6e6e6]">GIWA</span>
+              <p className="m-0 mt-1 flex items-center gap-2 sm:mt-1.5">
+                <span className="rounded-[6px] bg-[#1c1c1c] px-1.5 py-0.5 font-mono text-[11px] font-semibold text-[#e6e6e6] sm:px-2 sm:text-xs">GIWA</span>
                 <button type="button" onClick={() => void copyContract()} className="hit-y-44 text-[#8f8f8f] hover:text-white" aria-label="Copy the contract address">
                   {copied ? <CheckIcon size={15} className="text-sun" /> : <CopyIcon size={15} />}
                 </button>
               </p>
             </div>
           </div>
-          <div className="grid shrink-0 grid-cols-2 gap-2">
-            <SearchButton className={SQUARE_BUTTON} iconSize={20} />
+          <div className="grid shrink-0 grid-cols-2 gap-1.5 sm:gap-2">
+            <SearchButton className={SQUARE_BUTTON} iconSize={18} />
             <button type="button" className={`${SQUARE_BUTTON} relative`} aria-label="Notifications" onClick={() => comingSoon('Notifications')}>
-              <BellIcon size={20} />
+              <BellIcon size={18} />
             </button>
             <button
               type="button"
@@ -461,14 +361,14 @@ export function TokenDetail({ symbol }: { symbol: string }) {
               aria-pressed={watched}
               onClick={() => void toggleWatch()}
             >
-              <StarIcon size={20} className={watched ? 'fill-current' : ''} />
+              <StarIcon size={18} className={watched ? 'fill-current' : ''} />
             </button>
             <div className="relative" ref={menuRef}>
               <button type="button" className={SQUARE_BUTTON} aria-label="More" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
                 <MoreVerticalIcon size={18} />
               </button>
               {menuOpen ? (
-                <div className="absolute right-0 top-14 z-30 grid min-w-[210px] rounded-[10px] border border-[#2c2c2c] bg-[#121212] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.55)]">
+                <div className="absolute right-0 top-12 z-30 grid min-w-[210px] sm:top-14 rounded-[10px] border border-[#2c2c2c] bg-[#121212] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.55)]">
                   <MenuButton
                     onClick={() => {
                       setMenuOpen(false);
@@ -503,7 +403,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           </div>
         </div>
 
-        {profile?.description ? <p className="m-0 max-w-[640px] text-[15px] leading-relaxed text-[#d6d6d6]">{profile.description}</p> : null}
+        {profile?.description ? <p className="m-0 max-w-[640px] text-[13px] leading-relaxed text-[#d6d6d6] sm:text-[15px]">{profile.description}</p> : null}
         {profile?.links.length ? (
           <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
             {profile.links.map((link) => (
@@ -512,7 +412,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                   href={link.url}
                   target="_blank"
                   rel="noreferrer noopener nofollow"
-                  className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-[#2e2e2e] bg-[#111111] px-3.5 font-sans text-sm text-[#e6e6e6] no-underline transition-colors hover:border-sun/50"
+                  className="hit-y-44 inline-flex h-9 items-center gap-1.5 rounded-[8px] border border-[#2e2e2e] bg-[#111111] px-3 font-sans text-[13px] text-[#e6e6e6] sm:h-11 sm:gap-2 sm:rounded-[10px] sm:px-3.5 sm:text-sm no-underline transition-colors hover:border-sun/50"
                 >
                   <span className="text-[#cfcfcf]">{linkIcon(link.kind)}</span>
                   {link.label}
@@ -523,21 +423,21 @@ export function TokenDetail({ symbol }: { symbol: string }) {
         ) : null}
 
         {/* Price */}
-        <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex items-start justify-between gap-3 sm:items-end sm:gap-4">
           <div className="min-w-0">
-            <p className="m-0 flex flex-wrap items-baseline gap-x-3">
-              <span className="font-sans text-[36px] font-bold leading-tight tracking-wide text-[#f5f5f5]">{ethText(market?.priceEth)}</span>
+            <p className="m-0 flex flex-wrap items-baseline gap-x-2 sm:gap-x-3">
+              <span className="font-sans text-[24px] font-bold leading-tight tracking-wide text-[#f5f5f5] sm:text-[36px]">{ethText(market?.priceEth)}</span>
               {change24 ? (
-                <span className={`font-mono text-base ${changeUp ? UP : DOWN}`}>
-                  {change24} (24h)
+                <span className={`font-mono text-[13px] sm:text-base ${changeUp ? UP : DOWN}`}>
+                  {change24}<span className="hidden sm:inline"> (24h)</span>
                 </span>
               ) : null}
             </p>
-            <p className="m-0 mt-1 text-sm text-[#a9a9a9]">
+            <p className="m-0 mt-1 text-[11px] text-[#a9a9a9] sm:text-sm">
               {usdText(market?.priceEth, usdPerEth) ? `${usdText(market?.priceEth, usdPerEth)} · ` : ''}Priced from the ETH pool
             </p>
           </div>
-          <dl className="m-0 grid grid-cols-[auto_auto] gap-x-6 gap-y-1 font-mono text-sm">
+          <dl className="m-0 grid shrink-0 grid-cols-[auto_auto] gap-x-3 gap-y-1 font-mono text-[11px] sm:gap-x-6 sm:text-sm">
             <dt className="text-[#8f8f8f]">24h High</dt>
             <dd className="m-0 text-right text-[#f0f0f0]">{day?.high == null ? '-' : formatEthDisplay(day.high, 6)}</dd>
             <dt className="text-[#8f8f8f]">24h Low</dt>
@@ -550,7 +450,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
         {marketError ? <p className="alert alert-error">{marketError}</p> : null}
 
         {/* Chart */}
-        <section className={`${CARD} p-3.5 min-[640px]:p-4`}>
+        <section className={`${CARD} p-3 min-[640px]:p-4`}>
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="flex gap-1" role="tablist" aria-label="Chart range">
               {RANGES.map(([id, label]) => (
@@ -560,7 +460,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                   role="tab"
                   aria-selected={range === id}
                   onClick={() => setRange(id)}
-                  className={`hit-y-44 h-10 min-w-[52px] rounded-[9px] px-3 font-mono text-sm transition-colors ${
+                  className={`hit-y-44 h-9 min-w-[42px] rounded-[8px] px-2 font-mono text-[13px] transition-colors sm:h-10 sm:min-w-[52px] sm:rounded-[9px] sm:px-3 sm:text-sm ${
                     range === id ? 'bg-sun-wash text-sun' : 'text-[#bdbdbd] hover:text-white'
                   }`}
                 >
@@ -572,7 +472,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
               <button
                 type="button"
                 onClick={() => setChartMode((m) => (m === 'line' ? 'candle' : 'line'))}
-                className={`hit-y-44 flex h-10 w-11 items-center justify-center rounded-[9px] ${chartMode === 'candle' ? 'bg-sun-wash text-sun' : 'bg-[#161616] text-[#e0a85a]'}`}
+                className={`hit-y-44 flex h-9 w-10 items-center justify-center rounded-[8px] sm:h-10 sm:w-11 sm:rounded-[9px] ${chartMode === 'candle' ? 'bg-sun-wash text-sun' : 'bg-[#161616] text-[#e0a85a]'}`}
                 aria-label={chartMode === 'line' ? 'Show candles' : 'Show line'}
                 aria-pressed={chartMode === 'candle'}
               >
@@ -581,7 +481,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
               <button
                 type="button"
                 onClick={() => setFullscreen(true)}
-                className="hit-y-44 flex h-10 w-11 items-center justify-center rounded-[9px] border border-[#2e2e2e] text-[#e6e6e6]"
+                className="hit-y-44 flex h-9 w-10 items-center justify-center rounded-[8px] border border-[#2e2e2e] text-[#e6e6e6] sm:h-10 sm:w-11 sm:rounded-[9px]"
                 aria-label="Full screen chart"
               >
                 <ExpandIcon size={17} />
@@ -595,36 +495,36 @@ export function TokenDetail({ symbol }: { symbol: string }) {
         </section>
 
         {/* Trade */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
           <button
             type="button"
-            onClick={() => openTrade('buy')}
-            className="hit-y-44 flex h-14 items-center justify-center gap-2.5 rounded-[12px] border border-[#2fd27a]/60 bg-[#2fd27a]/10 font-sans text-lg font-semibold text-[#2fd27a] transition-colors hover:bg-[#2fd27a]/15"
+            onClick={() => setTradeSide('buy')}
+            className="hit-y-44 flex h-12 items-center justify-center gap-2 rounded-[12px] border border-[#2fd27a]/60 bg-[#2fd27a]/10 font-sans text-base font-semibold sm:h-14 sm:gap-2.5 sm:text-lg text-[#2fd27a] transition-colors hover:bg-[#2fd27a]/15"
           >
-            <CartIcon size={22} /> Buy {market?.symbol || 'FLZ'}
+            <CartIcon size={20} /> Buy {market?.symbol || 'FLZ'}
           </button>
           <button
             type="button"
-            onClick={() => openTrade('sell')}
-            className="hit-y-44 flex h-14 items-center justify-center gap-2.5 rounded-[12px] border border-[#f05252]/60 bg-[#f05252]/10 font-sans text-lg font-semibold text-[#f05252] transition-colors hover:bg-[#f05252]/15"
+            onClick={() => setTradeSide('sell')}
+            className="hit-y-44 flex h-12 items-center justify-center gap-2 rounded-[12px] border border-[#f05252]/60 bg-[#f05252]/10 font-sans text-base font-semibold sm:h-14 sm:gap-2.5 sm:text-lg text-[#f05252] transition-colors hover:bg-[#f05252]/15"
           >
-            <SwapArrowsIcon size={22} /> Sell {market?.symbol || 'FLZ'}
+            <SwapArrowsIcon size={20} /> Sell {market?.symbol || 'FLZ'}
           </button>
         </div>
 
         {/* Figures */}
-        <section className="grid grid-cols-2 gap-2.5 min-[600px]:grid-cols-3">
-          <Figure icon={<CoinsIcon size={22} />} label="Market Cap" value={ethText(market?.marketCapEth, 4)} sub={usdText(market?.marketCapEth, usdPerEth)} />
-          <Figure icon={<DropletIcon size={22} />} label="Liquidity" value={ethText(market?.liquidityEth, 4)} sub={usdText(market?.liquidityEth, usdPerEth)} />
-          <Figure icon={<PeopleIcon size={22} />} label="Holders" value={holderCount == null ? '-' : holderCount.toLocaleString('en-US')} />
+        <section className="grid grid-cols-3 gap-2 sm:gap-2.5">
+          <Figure icon={<CoinsIcon size={18} />} label="Market Cap" value={ethText(market?.marketCapEth, 4)} sub={usdText(market?.marketCapEth, usdPerEth)} />
+          <Figure icon={<DropletIcon size={18} />} label="Liquidity" value={ethText(market?.liquidityEth, 4)} sub={usdText(market?.liquidityEth, usdPerEth)} />
+          <Figure icon={<PeopleIcon size={18} />} label="Holders" value={holderCount == null ? '-' : holderCount.toLocaleString('en-US')} />
           <Figure
-            icon={<BarChartIcon size={22} />}
+            icon={<BarChartIcon size={18} />}
             label="Volume (24h)"
             value={day ? ethText(day.volumeEth, 4) : '-'}
             sub={day ? usdText(day.volumeEth, usdPerEth) : null}
           />
           <Figure
-            icon={<SwapArrowsIcon size={22} />}
+            icon={<SwapArrowsIcon size={18} />}
             label="Trades (24h)"
             value={day ? String(day.trades) : '-'}
             sub={
@@ -636,7 +536,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
             }
           />
           <Figure
-            icon={<TrendUpIcon size={22} />}
+            icon={<TrendUpIcon size={18} />}
             label="Price Change (24h)"
             value={<span className={change24 ? (changeUp ? UP : DOWN) : ''}>{change24 ?? 'No trades'}</span>}
           />
@@ -658,13 +558,13 @@ export function TokenDetail({ symbol }: { symbol: string }) {
               role="tab"
               aria-selected={tab === id}
               onClick={() => setTab(id)}
-              className={`hit-y-44 -mb-px flex h-12 items-center justify-center gap-2 border-b-2 font-sans text-[15px] transition-colors ${
+              className={`hit-y-44 -mb-px flex h-11 items-center justify-center gap-1.5 border-b-2 font-sans text-[13px] transition-colors sm:h-12 sm:gap-2 sm:text-[15px] ${
                 tab === id ? 'border-sun text-sun' : 'border-transparent text-[#cfcfcf] hover:text-white'
               }`}
             >
               {label}
               {id === 'thesis' ? (
-                <span className="rounded-full bg-[#2a2a2a] px-1.5 py-0.5 font-mono text-[11px] text-[#cfcfcf]">{thesisTotal}</span>
+                <span className="rounded-full bg-[#2a2a2a] px-1.5 py-0.5 font-mono text-[10px] text-[#cfcfcf] sm:text-[11px]">{thesisTotal}</span>
               ) : null}
             </button>
           ))}
@@ -753,108 +653,22 @@ export function TokenDetail({ symbol }: { symbol: string }) {
         </Sheet>
       ) : null}
 
-      {tradeOpen ? (
-        <Sheet title={side === 'buy' ? `Buy ${market?.symbol || 'FLZ'}` : `Sell ${market?.symbol || 'FLZ'}`} onClose={() => !busy && setTradeOpen(false)}>
-          <div className="grid gap-3">
-            <div className="grid grid-cols-2 gap-1 rounded-[10px] border border-[#2a2a2a] p-1" role="tablist" aria-label="Buy or sell">
-              {(['buy', 'sell'] as const).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  role="tab"
-                  aria-selected={side === item}
-                  onClick={() => {
-                    setSide(item);
-                    setStage('edit');
-                    setResult(null);
-                  }}
-                  className={`min-h-11 rounded-[8px] font-sans text-sm font-semibold uppercase tracking-wide ${
-                    side === item ? (item === 'buy' ? 'bg-[#2fd27a]/15 text-[#2fd27a]' : 'bg-[#f05252]/15 text-[#f05252]') : 'text-muted'
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-            <label className="grid gap-1">
-              <span className="label">Amount ({side === 'buy' ? 'ETH' : 'FLZ'})</span>
-              <input
-                className="input font-mono"
-                inputMode="decimal"
-                value={amount}
-                onChange={(event) => {
-                  setAmount(event.target.value);
-                  setStage('edit');
-                  setResult(null);
-                }}
-              />
-            </label>
-            <div className="flex items-center justify-between gap-3 text-xs text-muted">
-              <span>Balance {balance == null ? 'unavailable' : `${balance} ${side === 'buy' ? 'ETH' : 'FLZ'}`}</span>
-              <button
-                type="button"
-                className="min-h-11 px-2 text-lime"
-                disabled={spendMax == null}
-                onClick={() => {
-                  if (spendMax != null) setAmount(spendMax);
-                  setStage('edit');
-                }}
-              >
-                Max
-              </button>
-            </div>
-            {quoteReady ? (
-              <div className="grid gap-1 font-mono text-[11px] text-muted">
-                <div className="flex justify-between gap-2">
-                  <span>You receive</span>
-                  <span className="text-paper">
-                    {quote.amountOut} {quote.tokenOut}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span>Minimum</span>
-                  <span className="text-paper">
-                    {quote.amountOutMin} {quote.tokenOut}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span>Slippage</span>
-                  <span className="text-paper">{quote.slippagePct}</span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span>All-in</span>
-                  <span className="text-paper">{quote.allInPct}</span>
-                </div>
-                <p className="m-0 leading-relaxed">{quote.disclosure}</p>
-              </div>
-            ) : null}
-            {quoting ? <p className="m-0 text-xs text-muted">Quoting...</p> : null}
-            {tradeError ? <p className="alert alert-error">{tradeError}</p> : null}
-            {result?.explorerUrl ? (
-              <a className="text-sm text-lime" href={result.explorerUrl} target="_blank" rel="noreferrer noopener">
-                Trade sent. View it.
-              </a>
-            ) : null}
-            {stage === 'edit' ? (
-              <button type="button" className="btn btn-primary" disabled={!quoteReady || quoting} onClick={() => setStage('confirm')}>
-                {side === 'buy' ? 'Review buy' : 'Review sell'}
-              </button>
-            ) : (
-              <div className="grid gap-2">
-                <p className="m-0 text-sm text-paper">
-                  {side === 'buy' ? 'Buy' : 'Sell'} {amount} {side === 'buy' ? 'ETH of FLZ' : 'FLZ for ETH'}. This sends from your Flizy wallet.
-                </p>
-                <PasswordField label="Account password" value={password} onChange={setPassword} autoComplete="current-password" />
-                <button type="button" className="btn btn-primary" disabled={busy || !password} onClick={confirmTrade}>
-                  {busy ? 'Sending...' : 'Confirm transaction'}
-                </button>
-                <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setStage('edit')}>
-                  Back
-                </button>
-              </div>
-            )}
-          </div>
-        </Sheet>
+      {tradeSide ? (
+        <TokenTradeSheet
+          side={tradeSide}
+          onSide={setTradeSide}
+          onClose={() => setTradeSide(null)}
+          onTraded={() => {
+            void loadMarket(range);
+            refreshAll();
+          }}
+          symbol={market?.symbol || 'FLZ'}
+          logo={profile?.logo ?? null}
+          priceEth={market?.priceEth == null ? null : Number(market.priceEth)}
+          change24={change24}
+          changeUp={changeUp}
+          usdPerEth={usdPerEth}
+        />
       ) : null}
 
       {writing ? (
@@ -893,12 +707,12 @@ function MenuButton({ children, onClick }: { children: ReactNode; onClick: () =>
 
 function Figure({ icon, label, value, sub }: { icon: ReactNode; label: string; value: ReactNode; sub?: ReactNode }) {
   return (
-    <div className={`${CARD} flex items-start gap-3 p-3.5`}>
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#171410] text-sun">{icon}</span>
+    <div className={`${CARD} flex min-w-0 flex-col gap-1.5 p-2.5 sm:flex-row sm:items-start sm:gap-3 sm:p-3.5`}>
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#171410] text-sun sm:h-11 sm:w-11 sm:rounded-[10px]">{icon}</span>
       <div className="min-w-0">
-        <p className="m-0 font-sans text-[13px] text-[#bdbdbd]">{label}</p>
-        <p className="m-0 mt-0.5 truncate font-sans text-[19px] font-semibold text-[#f5f5f5]">{value}</p>
-        {sub ? <p className="m-0 mt-0.5 font-mono text-xs text-[#a9a9a9]">{sub}</p> : null}
+        <p className="m-0 truncate font-sans text-[11px] text-[#bdbdbd] sm:text-[13px]">{label}</p>
+        <p className="m-0 mt-0.5 truncate font-sans text-[13px] font-semibold text-[#f5f5f5] min-[380px]:text-[14px] sm:text-[19px]">{value}</p>
+        {sub ? <p className="m-0 mt-0.5 truncate font-mono text-[10px] text-[#a9a9a9] sm:text-xs">{sub}</p> : null}
       </div>
     </div>
   );
@@ -927,10 +741,10 @@ function ActivityCard({
   total: number;
 }) {
   return (
-    <section className={`${CARD} p-4`}>
+    <section className={`${CARD} p-3.5 sm:p-4`}>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="m-0 flex items-center gap-2.5 font-sans text-lg font-semibold text-[#f5f5f5]">
-          <SwapArrowsIcon size={20} className="text-sun" /> Recent activity
+        <h2 className="m-0 flex min-w-0 items-center gap-2 font-sans text-[15px] font-semibold text-[#f5f5f5] sm:gap-2.5 sm:text-lg">
+          <SwapArrowsIcon size={18} className="text-sun" /> Recent activity
         </h2>
         {total > 4 ? (
           <button type="button" onClick={onAll} className={GHOST_BUTTON}>
@@ -940,9 +754,9 @@ function ActivityCard({
       </div>
       {rows.length ? (
         <div className="mt-3">
-          <table className="w-full table-fixed border-collapse font-mono text-[12px] min-[480px]:text-sm">
+          <table className="w-full table-fixed border-collapse font-mono text-[11px] min-[480px]:text-sm">
             <thead>
-              <tr className="text-left font-sans text-[13px] text-[#a9a9a9]">
+              <tr className="text-left font-sans text-[11px] text-[#a9a9a9] min-[480px]:text-[13px]">
                 <th className="w-[24%] py-2 font-normal">Time</th>
                 <th className="w-[13%] py-2 font-normal">Type</th>
                 <th className="py-2 font-normal">
@@ -961,7 +775,7 @@ function ActivityCard({
               {rows.map((r) => (
                 <tr key={r.txHash + r.time} className="border-t border-[#1c1c1c]">
                   <td className="py-2.5 text-[#cfcfcf]">
-                    <span className={`mr-2 inline-block h-2 w-2 rounded-full ${r.side === 'buy' ? 'bg-[#2fd27a]' : 'bg-[#f05252]'}`} aria-hidden />
+                    <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full min-[480px]:mr-2 min-[480px]:h-2 min-[480px]:w-2 ${r.side === 'buy' ? 'bg-[#2fd27a]' : 'bg-[#f05252]'}`} aria-hidden />
                     {now ? ago(r.time, now) : ''}
                   </td>
                   <td className={`py-2.5 ${r.side === 'buy' ? UP : DOWN}`}>{r.side === 'buy' ? 'Buy' : 'Sell'}</td>
@@ -1001,17 +815,17 @@ function ThesisCard({
   const [now, setNow] = useState(0);
   useEffect(() => setNow(Math.floor(Date.now() / 1000)), [theses]);
   return (
-    <section className={`${CARD} p-4`}>
+    <section className={`${CARD} p-3.5 sm:p-4`}>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="m-0 flex items-center gap-2.5 font-sans text-lg font-semibold text-[#f5f5f5]">
-          <ChatBubblesIcon size={22} className="text-sun" /> Community thesis ({total})
+        <h2 className="m-0 flex min-w-0 items-center gap-2 font-sans text-[15px] font-semibold text-[#f5f5f5] sm:gap-2.5 sm:text-lg">
+          <ChatBubblesIcon size={18} className="shrink-0 text-sun" /> <span className="truncate">Community thesis ({total})</span>
         </h2>
         <button
           type="button"
           onClick={onWrite}
-          className="hit-y-44 inline-flex h-10 items-center gap-2 rounded-[8px] border border-sun/50 px-3.5 font-sans text-sm text-sun hover:bg-sun-wash"
+          className="hit-y-44 inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[8px] border border-sun/50 px-3 font-sans text-[13px] text-sun hover:bg-sun-wash sm:h-10 sm:gap-2 sm:px-3.5 sm:text-sm"
         >
-          <PencilIcon size={15} /> Write a thesis
+          <PencilIcon size={14} /> Write a thesis
         </button>
       </div>
       {theses === null ? (
@@ -1110,19 +924,19 @@ function ThesisItem({ thesis, now, onChanged }: { thesis: Thesis; now: number; o
   }
 
   return (
-    <li className="grid grid-cols-[52px_1fr] gap-3 border-b border-[#1c1c1c] py-4 last:border-0">
-      <Letter name={thesis.username} className="h-[52px] w-[52px] text-lg" />
+    <li className="grid grid-cols-[40px_1fr] gap-2.5 border-b sm:grid-cols-[52px_1fr] sm:gap-3 border-[#1c1c1c] py-4 last:border-0">
+      <Letter name={thesis.username} className="h-10 w-10 text-base sm:h-[52px] sm:w-[52px] sm:text-lg" />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="m-0">
-            <span className="font-sans text-base text-[#f5f5f5]">{thesis.username}</span>
+            <span className="font-sans text-sm text-[#f5f5f5] sm:text-base">{thesis.username}</span>
             <span className="ml-2 text-xs text-[#8f8f8f]">{now ? ago(createdAt, now) : ''}</span>
           </p>
-          <span className={`inline-flex items-center rounded-[6px] border px-2 py-0.5 font-sans text-[13px] ${SENTIMENT_TONE[thesis.sentiment]}`}>
+          <span className={`inline-flex items-center rounded-[6px] border px-2 py-0.5 font-sans text-[12px] sm:text-[13px] ${SENTIMENT_TONE[thesis.sentiment]}`}>
             {SENTIMENT_LABEL[thesis.sentiment]}
           </span>
         </div>
-        <p className="m-0 mt-1.5 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-[#e6e6e6]">{thesis.body}</p>
+        <p className="m-0 mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-[#e6e6e6] sm:text-[15px]">{thesis.body}</p>
         <div className="mt-2 flex items-center gap-5 text-[#bdbdbd]">
           <button type="button" onClick={() => void like()} className="hit-y-44 inline-flex items-center gap-1.5 font-mono text-sm" aria-pressed={liked}>
             <HeartIcon size={18} filled={liked} className={liked ? 'text-[#f05252]' : ''} /> {likes}

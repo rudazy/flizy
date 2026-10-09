@@ -213,3 +213,28 @@ describe('token social source', () => {
     assert.match(sql, /raise exception 'token_profiles has no flz row'/);
   });
 });
+
+describe('token trade sheet', () => {
+  const ROOT = path.join(__dirname, '..');
+  const sheet = fs.readFileSync(path.join(ROOT, 'web/components/TokenTradeSheet.tsx'), 'utf8');
+
+  it('still asks for the account password and sends the quote minimum as the limit', () => {
+    assert.match(sheet, /<PasswordField label="Account password"/);
+    assert.match(sheet, /fetch\('\/api\/swap\/execute'/);
+    assert.match(sheet, /minOut: quote\?\.amountOutMin,\s*password,/);
+    assert.match(sheet, /disabled=\{busy \|\| !password\}/);
+  });
+
+  it('does not claim a best price it cannot prove, and uses no blue', () => {
+    assert.doesNotMatch(sheet, /best price/i);
+    assert.match(sheet, /Priced from the GIWA pool/);
+    assert.doesNotMatch(sheet, /#1d9bf0|#627eea|text-blue|bg-blue/);
+  });
+
+  it('opens from the token page Buy and Sell buttons', () => {
+    const page = fs.readFileSync(path.join(ROOT, 'web/components/TokenDetail.tsx'), 'utf8');
+    assert.match(page, /onClick=\{\(\) => setTradeSide\('buy'\)\}/);
+    assert.match(page, /onClick=\{\(\) => setTradeSide\('sell'\)\}/);
+    assert.match(page, /<TokenTradeSheet/);
+  });
+});

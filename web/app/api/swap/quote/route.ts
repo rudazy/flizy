@@ -16,6 +16,13 @@ import { parseSlippageBps } from '../../../../lib/swapGate.ts';
 
 const ROUTE = 'GET /api/swap/quote';
 
+/**
+ * A rough gas figure for one Flizy swap, used only for the network fee
+ * estimate the trade sheet shows. It is not a limit: the real cost depends on
+ * the wallet path and the gas price when the trade lands.
+ */
+const SWAP_GAS_UNITS = 350_000n;
+
 export async function GET(req: Request) {
   try {
     const accountId = await getAccountIdFromCookie();
@@ -75,13 +82,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: (e as Error).message }, { status: 400 });
     }
 
-    const quote = await quoteSwap({
-      provider,
-      amountIn,
-      tokenIn,
-      tokenOut,
-      slippageBps,
-    });
+    const [quote, feeData] = await Promise.all([
+      quoteSwap({
+        provider,
+        amountIn,
+        tokenIn,
+        tokenOut,
+        slippageBps,
+      }),
+      provider.getFeeData().catch(() => null),
+    ]);
+    const gasPrice = feeData?.maxFeePerGas ?? feeData?.gasPrice ?? null;
+    const networkFeeEth = gasPrice != null ? ethers.formatEther(gasPrice * SWAP_GAS_UNITS) : null;
 
     const feePct = `${(quote.feeBps / 100).toFixed(2)}%`;
     const poolFeeBps = 30;
@@ -104,6 +116,8 @@ export async function GET(req: Request) {
       allInPct,
       slippageBps: quote.slippageBps,
       slippagePct: slipPct,
+      // An estimate from the current gas price, or null when it could not be read.
+      networkFeeEth,
       tokenIn: inLabel,
       tokenOut: outLabel,
       feeRouter: quote.feeRouter,
