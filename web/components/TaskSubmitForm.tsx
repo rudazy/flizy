@@ -65,12 +65,12 @@ export function TaskSubmitForm({
     );
   }
 
-  const heading = kind === 'x_post' ? 'Submit your X post' : requirements[0]?.label || 'Submit task';
+  const heading = kind === 'x_post' ? 'Submit your X post' : 'Submit your entry';
 
   if (confirming) {
     return (
-      <form onSubmit={onSubmit} className="grid gap-3 border-t border-border pt-5">
-        <h2 className="m-0 text-xs uppercase tracking-[0.18em] text-gold">Confirm submission</h2>
+      <form onSubmit={onSubmit} className="grid gap-3">
+        <h2 className="m-0 font-sans text-base font-semibold tracking-wide text-paper">Confirm submission</h2>
         <p className="m-0 whitespace-pre-wrap break-all font-mono text-sm text-paper">{value.trim()}</p>
         <p className="m-0 text-xs text-muted">
           One submission per person. You cannot change it after this.
@@ -102,11 +102,11 @@ export function TaskSubmitForm({
         setError('');
         setConfirming(true);
       }}
-      className="grid gap-3 border-t border-border pt-5"
+      className="grid gap-3"
     >
-      <h2 className="m-0 text-xs uppercase tracking-[0.18em] text-gold">{heading}</h2>
+      <h2 className="m-0 font-sans text-base font-semibold tracking-wide text-paper">{heading}</h2>
       <div>
-        <label className="label" htmlFor="task-entry">
+        <label className="mb-2 block font-sans text-sm text-[#cfcfcf]" htmlFor="task-entry">
           {requirements[0]?.label || 'Your submission'}
         </label>
         {wantsUrl ? (

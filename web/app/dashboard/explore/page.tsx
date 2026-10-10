@@ -19,6 +19,7 @@ import {
   NftsIcon,
   OnchainIcon,
   PartnerIcon,
+  PeopleIcon,
   PlusIcon,
   SocialIcon,
   TasksIcon,
@@ -62,13 +63,18 @@ export default function ExplorePage() {
 
 type TaskList = 'live' | 'ended' | 'mine';
 
-/** Categories are not stored on a task yet: All lists tasks, the rest open a Coming soon panel. */
-const CATEGORIES: Array<{ id: string; label: string; icon?: ReactNode }> = [
+/**
+ * Category chips. The ones with a `stored` value filter by the category a task
+ * was published with. Airdrop and Partner are not categories a task can carry
+ * yet, so they open a Coming soon panel.
+ */
+const CATEGORIES: Array<{ id: string; label: string; icon?: ReactNode; stored?: string }> = [
   { id: 'all', label: 'All' },
   { id: 'airdrop', label: 'Airdrop', icon: <AirdropIcon size={13} /> },
-  { id: 'social', label: 'Social', icon: <SocialIcon size={13} /> },
-  { id: 'onchain', label: 'On-chain', icon: <OnchainIcon size={13} /> },
-  { id: 'content', label: 'Content', icon: <ContentIcon size={13} /> },
+  { id: 'social', label: 'Social', icon: <SocialIcon size={13} />, stored: 'social' },
+  { id: 'onchain', label: 'On-chain', icon: <OnchainIcon size={13} />, stored: 'onchain' },
+  { id: 'community', label: 'Community', icon: <PeopleIcon size={13} />, stored: 'community' },
+  { id: 'content', label: 'Content', icon: <ContentIcon size={13} />, stored: 'content' },
   { id: 'partner', label: 'Partner', icon: <PartnerIcon size={13} /> },
 ];
 
@@ -81,7 +87,7 @@ function TasksSlide() {
   const [comingSoon, comingSoonNote] = useComingSoon();
   const listTop = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async (which: 'live' | 'ended') => {
+  const load = useCallback(async (which: TaskList) => {
     setTasks(null);
     setError('');
     try {
@@ -95,8 +101,12 @@ function TasksSlide() {
   }, []);
 
   useEffect(() => {
-    if (list !== 'mine') load(list);
+    load(list);
   }, [list, load]);
+
+  const chosen = CATEGORIES.find((c) => c.id === category) || CATEGORIES[0];
+  const comingSoonCategory = chosen.id !== 'all' && !chosen.stored;
+  const shown = tasks && chosen.stored ? tasks.filter((t) => t.category === chosen.stored) : tasks;
 
   // The button appears only for an account that can actually use it. This reads
   // the capability the route reports, not its status code: the route answers
@@ -176,16 +186,28 @@ function TasksSlide() {
       </div>
 
       <div className="mt-[14px]">
-        {list === 'mine' ? <ComingSoonPanel what="My tasks" /> : null}
-        {list !== 'mine' && category !== 'all' ? (
-          <ComingSoonPanel what={`${CATEGORIES.find((c) => c.id === category)?.label} tasks`} />
-        ) : null}
-        {list !== 'mine' && category === 'all' ? (
+        {comingSoonCategory ? <ComingSoonPanel what={`${chosen.label} tasks`} /> : null}
+        {!comingSoonCategory ? (
           <>
             {error ? <p className="alert alert-error">{error}</p> : null}
 
             {tasks === null && !error ? (
               <p className="py-10 text-center font-sans text-sm text-[#9d9d9d]">Loading...</p>
+            ) : null}
+
+            {shown && shown.length === 0 && tasks && tasks.length > 0 ? (
+              <EmptyState
+                title={`No ${chosen.label} tasks`}
+                lines={[`Nothing in ${chosen.label} on this list right now.`, 'Try another category or see them all.']}
+              >
+                <button
+                  type="button"
+                  onClick={() => setCategory('all')}
+                  className="btn-chrome hit-y-44 h-[30px] gap-[8px] rounded-[6px] px-[15px] font-sans text-[9px]"
+                >
+                  Show all tasks
+                </button>
+              </EmptyState>
             ) : null}
 
             {tasks && tasks.length === 0 ? (
@@ -211,7 +233,7 @@ function TasksSlide() {
                     View ended campaigns
                   </button>
                 </EmptyState>
-              ) : (
+              ) : list === 'ended' ? (
                 <EmptyState
                   title="Nothing finished yet"
                   lines={['Finished tasks stay here,', 'with their winners once they are chosen.']}
@@ -224,12 +246,25 @@ function TasksSlide() {
                     View live campaigns
                   </button>
                 </EmptyState>
+              ) : (
+                <EmptyState
+                  title="No tasks of yours yet"
+                  lines={['Tasks you save, join or publish', 'are kept here in one place.']}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setList('live')}
+                    className="btn-chrome hit-y-44 h-[30px] gap-[8px] rounded-[6px] px-[15px] font-sans text-[9px]"
+                  >
+                    Browse live tasks
+                  </button>
+                </EmptyState>
               )
             ) : null}
 
-            {tasks && tasks.length > 0 ? (
+            {shown && shown.length > 0 ? (
               <div className="grid gap-4">
-                {tasks.map((task) => (
+                {shown.map((task) => (
                   <TaskCard key={task.ref} task={task} />
                 ))}
               </div>

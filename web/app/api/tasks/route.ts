@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { rejectIfCrossOrigin } from '../../../lib/requestOrigin.ts';
 import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../lib/apiError';
-import { listTasks, createTask, canCreateTasks } from '../../../lib/tasks';
+import { listTasks, listMyTasks, createTask, canCreateTasks } from '../../../lib/tasks';
 
 const LIST_ROUTE = 'GET /api/tasks';
 const CREATE_ROUTE = 'POST /api/tasks';
@@ -11,12 +11,22 @@ const CREATE_ROUTE = 'POST /api/tasks';
  * The discovery list. Public: a task page is meant to be shared, so the list
  * behind it cannot require a session.
  *
- * Counts only. Entries are never included here.
+ * Counts only. Entries are never included here. A session is optional: with
+ * one, each task says whether the viewer saved it. `state=mine` is the viewer's
+ * own list (saved, entered, published) and is the one form that needs a session.
  */
 export async function GET(req: Request) {
   try {
-    const state = new URL(req.url).searchParams.get('state') === 'ended' ? 'ended' : 'live';
-    const tasks = await listTasks({ state });
+    const raw = new URL(req.url).searchParams.get('state');
+    const viewerAccountId = await getAccountIdFromCookie().catch(() => null);
+
+    if (raw === 'mine') {
+      if (!viewerAccountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+      return NextResponse.json({ tasks: await listMyTasks(viewerAccountId), state: 'mine' });
+    }
+
+    const state = raw === 'ended' ? 'ended' : 'live';
+    const tasks = await listTasks({ state, viewerAccountId });
     return NextResponse.json({ tasks, state });
   } catch (err) {
     return NextResponse.json(apiErrorBody(LIST_ROUTE, err), { status: 500 });

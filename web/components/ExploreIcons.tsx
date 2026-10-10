@@ -820,3 +820,15 @@ export function TrendUpIcon({ size, strokeWidth = 1.9, className }: IconProps) {
     </Svg>
   );
 }
+
+export function BookmarkIcon({ size, strokeWidth = 1.8, className, filled = false }: IconProps & { filled?: boolean }) {
+  return (
+    <Svg size={size} className={className}>
+      <path
+        strokeWidth={strokeWidth}
+        fill={filled ? 'currentColor' : 'none'}
+        d="M6.5 3.5h11a1 1 0 0 1 1 1v16l-6.5-4.2-6.5 4.2v-16a1 1 0 0 1 1-1z"
+      />
+    </Svg>
+  );
+}

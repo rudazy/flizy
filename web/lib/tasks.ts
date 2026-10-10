@@ -57,6 +57,7 @@ export type TaskRow = {
   xp_reward?: number | null;
   category?: string | null;
   level?: string | null;
+  featured_at?: string | null;
 };
 
 /**
@@ -112,7 +113,7 @@ export function parseXPostUrl(raw: unknown): { handle: string; postId: string; c
 }
 
 const TASK_SELECT =
-  'id, ref, creator_account_id, project_id, title, description, reward_kind, reward_asset, reward_total, reward_display, winners_count, distribution, requires_x_identity, ends_at, status, completed_at, cancelled_at, created_at, xp_reward, category, level';
+  'id, ref, creator_account_id, project_id, title, description, reward_kind, reward_asset, reward_total, reward_display, winners_count, distribution, requires_x_identity, ends_at, status, completed_at, cancelled_at, created_at, xp_reward, category, level, featured_at';
 
 export const TASK_CATEGORIES = ['social', 'onchain', 'community', 'content'] as const;
 export const TASK_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
@@ -138,7 +139,21 @@ export type TaskListItem = {
   xpReward: number | null;
   /** verified: a project Flizy has verified. Always false for a personal creator. */
   creator: { kind: 'project' | 'personal'; name: string; handle: string | null; verified: boolean };
+  /** A Flizy admin featured it. Featured tasks list first. */
+  featured: boolean;
+  /** What a participant does, in order: the reference links, then the one requirement. */
+  steps: TaskStep[];
+  /** The viewer saved it. Always false with no viewer. */
+  saved: boolean;
 };
+
+/**
+ * One step on a task card. `open` is a reference link the creator added; `submit`
+ * is the requirement, which is always last because it is what gets judged.
+ */
+export type TaskStep =
+  | { kind: 'open'; label: string; url: string }
+  | { kind: 'submit'; label: string; requirement: string };
 
 /**
  * The discovery list. Counts only, no submission contents: the Live page is for
@@ -146,7 +161,7 @@ export type TaskListItem = {
  * copy each other while the task is still running.
  */
 export async function listTasks(
-  opts: { state?: 'live' | 'ended' } = {},
+  opts: { state?: 'live' | 'ended'; viewerAccountId?: string | null } = {},
   client?: Db
 ): Promise<TaskListItem[]> {
   const supabase = db(client);
@@ -214,14 +229,38 @@ export async function listTasks(
         : new Date(b.ends_at).getTime() - new Date(a.ends_at).getTime()
     )
     .slice(0, LIST_LIMIT);
-  if (!picked.length) return [];
 
-  const [counts, creators] = await Promise.all([
-    participantCounts(picked.map((r) => r.id), client),
-    creatorLabels(picked, client),
+  // Featured first. Array sort is stable, so each group keeps the deadline order above.
+  picked.sort((a, b) => Number(Boolean(b.featured_at)) - Number(Boolean(a.featured_at)));
+
+  return toListItems(picked, opts.viewerAccountId ?? null, client);
+}
+
+const LIST_LIMIT = 60;
+
+const PERSONAL_FALLBACK: TaskListItem['creator'] = { kind: 'personal', name: 'Flizy', handle: null, verified: false };
+
+/**
+ * Task rows as list items: counts, creator labels, steps and the viewer's saves,
+ * each read once for the whole batch rather than once per task.
+ */
+async function toListItems(
+  rows: TaskRow[],
+  viewerAccountId: string | null,
+  client?: Db,
+  fallbackCreator: TaskListItem['creator'] = PERSONAL_FALLBACK
+): Promise<TaskListItem[]> {
+  if (!rows.length) return [];
+  const now = Date.now();
+  const ids = rows.map((r) => r.id);
+  const [counts, creators, steps, saved] = await Promise.all([
+    participantCounts(ids, client),
+    creatorLabels(rows, client),
+    stepsFor(ids, client),
+    savedTaskIds(viewerAccountId, ids, client),
   ]);
 
-  return picked.map((r) => ({
+  return rows.map((r) => ({
     ref: r.ref,
     title: r.title,
     ...listLabelsOf(r),
@@ -231,11 +270,60 @@ export async function listTasks(
     endsAt: r.ends_at,
     state: deriveTaskState(r, now),
     xpReward: xpRewardOf(r),
-    creator: creators.get(r.id) || { kind: 'personal', name: 'Flizy', handle: null, verified: false },
+    creator: creators.get(r.id) || fallbackCreator,
+    featured: Boolean(r.featured_at),
+    steps: steps.get(r.id) || [],
+    saved: saved.has(r.id),
   }));
 }
 
-const LIST_LIMIT = 60;
+type StepRow = { task_id: string; kind: string; label: string; position?: number | null };
+
+/**
+ * Each task's steps: reference links in the creator's order, then the
+ * requirement. Two reads for the whole batch, whatever its size.
+ */
+async function stepsFor(taskIds: string[], client?: Db): Promise<Map<string, TaskStep[]>> {
+  const out = new Map<string, TaskStep[]>();
+  if (!taskIds.length) return out;
+  const supabase = db(client);
+  const [reqs, links] = await Promise.all([
+    supabase.from('task_requirements').select('task_id, kind, label, position').in('task_id', taskIds),
+    supabase.from('task_links').select('task_id, kind, label, url, position').in('task_id', taskIds),
+  ]);
+  if (reqs.error) throw new Error(reqs.error.message);
+  if (links.error) throw new Error(links.error.message);
+
+  const byPosition = (a: { position?: number | null }, b: { position?: number | null }) =>
+    Number(a.position ?? 0) - Number(b.position ?? 0);
+
+  for (const l of ((links.data || []) as Array<StepRow & { url: string }>).sort(byPosition)) {
+    // Stored links are https only, since createTask refuses anything else. A row
+    // that is not is skipped rather than turned into a link on a public card.
+    if (!/^https:\/\//i.test(String(l.url || ''))) continue;
+    const list = out.get(String(l.task_id)) || [];
+    list.push({ kind: 'open', label: String(l.label || 'Open link'), url: String(l.url) });
+    out.set(String(l.task_id), list);
+  }
+  for (const r of ((reqs.data || []) as StepRow[]).sort(byPosition)) {
+    const list = out.get(String(r.task_id)) || [];
+    list.push({ kind: 'submit', label: String(r.label || 'Submit your entry'), requirement: String(r.kind) });
+    out.set(String(r.task_id), list);
+  }
+  return out;
+}
+
+/** Which of these tasks the viewer saved. Empty with no viewer. */
+async function savedTaskIds(viewerAccountId: string | null, taskIds: string[], client?: Db): Promise<Set<string>> {
+  if (!viewerAccountId || !taskIds.length) return new Set();
+  const { data, error } = await db(client)
+    .from('task_saves')
+    .select('task_id')
+    .eq('account_id', viewerAccountId)
+    .in('task_id', taskIds);
+  if (error) throw new Error(error.message);
+  return new Set(((data || []) as Array<{ task_id: string }>).map((r) => String(r.task_id)));
+}
 
 /** The label fields a list row shows. An unknown stored value is dropped rather than shown. */
 function listLabelsOf(row: TaskRow): Pick<TaskListItem, 'description' | 'category' | 'level'> {
@@ -337,6 +425,13 @@ export type TaskDetail = {
   links: Array<{ kind: string; label: string; url: string }>;
   viewerHasEntered: boolean;
   winners: Array<{ place: number; username: string; submissionRef: number; url: string | null; rewardNote: string }>;
+  category: TaskCategory | null;
+  level: TaskLevel | null;
+  featured: boolean;
+  /** The viewer saved it. Always false with no viewer. */
+  saved: boolean;
+  /** The viewer is a Flizy admin, so the page offers Feature. Never shown to anyone else. */
+  viewerIsAdmin: boolean;
 };
 
 /**
@@ -360,7 +455,7 @@ export async function getTaskByRef(
   const state = deriveTaskState(task);
   const viewer = opts.viewerAccountId || null;
 
-  const [counts, creators, reqs, links, entered, winners] = await Promise.all([
+  const [counts, creators, reqs, links, entered, winners, saved, viewerIsAdmin] = await Promise.all([
     participantCounts([task.id], client),
     creatorLabels([task], client),
     supabase
@@ -383,7 +478,10 @@ export async function getTaskByRef(
           .maybeSingle()
       : Promise.resolve({ data: null }),
     state === 'completed' ? loadWinners(task.id, client) : Promise.resolve([]),
+    savedTaskIds(viewer, [task.id], client),
+    viewer ? isAdminAccount(viewer, supabase) : Promise.resolve(false),
   ]);
+  const labels = listLabelsOf(task);
 
   return {
     ref: task.ref,
@@ -407,6 +505,11 @@ export async function getTaskByRef(
     links: ((links as { data: unknown[] }).data || []) as TaskDetail['links'],
     viewerHasEntered: Boolean((entered as { data: unknown }).data),
     winners,
+    category: labels.category,
+    level: labels.level,
+    featured: Boolean(task.featured_at),
+    saved: saved.has(task.id),
+    viewerIsAdmin,
   };
 }
 
@@ -1617,31 +1720,12 @@ async function projectByHandle(handle: string, supabase: Db): Promise<ProjectRec
 }
 
 async function projectTaskItems(project: ProjectRecord, rows: TaskRow[], client?: Db): Promise<TaskListItem[]> {
-  const now = Date.now();
-  const [counts, creators] = rows.length
-    ? await Promise.all([
-        participantCounts(rows.map((r) => r.id), client),
-        creatorLabels(rows, client),
-      ])
-    : [new Map<string, number>(), new Map<string, TaskListItem['creator']>()];
-
-  return rows.map((r) => ({
-    ref: r.ref,
-    title: r.title,
-    ...listLabelsOf(r),
-    rewardDisplay: r.reward_display,
-    winnersCount: r.winners_count,
-    participants: counts.get(r.id) || 0,
-    endsAt: r.ends_at,
-    state: deriveTaskState(r, now),
-    xpReward: xpRewardOf(r),
-    creator: creators.get(r.id) || {
-      kind: 'project' as const,
-      name: project.name,
-      handle: project.handle,
-      verified: Boolean(project.verified_at),
-    },
-  }));
+  return toListItems(rows, null, client, {
+    kind: 'project',
+    name: project.name,
+    handle: project.handle,
+    verified: Boolean(project.verified_at),
+  });
 }
 
 /** How many entrant letters the avatar stack shows. */
@@ -2048,4 +2132,131 @@ export async function countEnteredTasks(accountId: string, client?: Db): Promise
     counts[deriveTaskState(row, now)] += 1;
   }
   return counts;
+}
+
+// ---------------------------------------------------------------------------
+// Saves and Featured
+// ---------------------------------------------------------------------------
+
+/** How many tasks one account may keep saved. A bound on the table, not a product limit. */
+export const TASK_SAVES_MAX = 200;
+
+async function taskIdForRef(ref: number, supabase: Db): Promise<string> {
+  if (!Number.isInteger(ref) || ref <= 0) throw new ClientError('Task not found.');
+  const { data, error } = await supabase.from('tasks').select('id').eq('ref', ref).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new ClientError('Task not found.');
+  return String((data as { id: string }).id);
+}
+
+/**
+ * Save a task to come back to, or drop the save. Any task can be saved, in any
+ * state: somebody may want a finished one for its winners. Returns the new state.
+ */
+export async function setTaskSaved(accountId: string, ref: number, on: boolean, client?: Db): Promise<boolean> {
+  if (!accountId) throw new ClientError('Not logged in');
+  const supabase = db(client);
+  const taskId = await taskIdForRef(ref, supabase);
+
+  if (!on) {
+    const { error } = await supabase.from('task_saves').delete().eq('account_id', accountId).eq('task_id', taskId);
+    if (error) throw new Error(error.message);
+    return false;
+  }
+
+  const already = await savedTaskIds(accountId, [taskId], supabase);
+  if (already.size) return true;
+  const count = await countRows(
+    supabase.from('task_saves').select('task_id', { count: 'exact', head: true }).eq('account_id', accountId)
+  );
+  if (count >= TASK_SAVES_MAX) {
+    throw new ClientError(`You can keep ${TASK_SAVES_MAX} tasks saved. Remove one to save another.`);
+  }
+  const { error } = await supabase
+    .from('task_saves')
+    .upsert({ account_id: accountId, task_id: taskId }, { onConflict: 'account_id,task_id' });
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+/**
+ * Feature a task, or take the mark off. Flizy admins only: the mark puts a task
+ * at the top of Explore, which is the product speaking, not the creator.
+ */
+export async function setTaskFeatured(accountId: string, ref: number, on: boolean, client?: Db): Promise<boolean> {
+  if (!accountId) throw new ClientError('Not logged in');
+  const supabase = db(client);
+  if (!(await isAdminAccount(accountId, supabase))) {
+    throw new ClientError('Only Flizy admins can feature a task.');
+  }
+  const taskId = await taskIdForRef(ref, supabase);
+  const { error } = await supabase
+    .from('tasks')
+    .update({ featured_at: on ? new Date().toISOString() : null })
+    .eq('id', taskId);
+  if (error) throw new Error(error.message);
+  return on;
+}
+
+export type MyTaskRelation = 'saved' | 'joined' | 'created';
+export type MyTaskItem = TaskListItem & { relations: MyTaskRelation[] };
+
+/** Rows read per source for My tasks. The list shows the newest of each. */
+const MY_TASKS_PER_SOURCE = 60;
+
+/**
+ * The viewer's own tasks: the ones they saved, entered or published, newest
+ * deadline first, each once with every way it is theirs. Entries themselves are
+ * not included, only the fact of having entered.
+ */
+export async function listMyTasks(accountId: string, client?: Db): Promise<MyTaskItem[]> {
+  if (!accountId) return [];
+  const supabase = db(client);
+
+  const [saves, entries, created] = await Promise.all([
+    supabase
+      .from('task_saves')
+      .select('task_id')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false })
+      .limit(MY_TASKS_PER_SOURCE),
+    supabase
+      .from('task_submissions')
+      .select('task_id')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false })
+      .limit(MY_TASKS_PER_SOURCE),
+    supabase
+      .from('tasks')
+      .select('id')
+      .eq('creator_account_id', accountId)
+      .order('created_at', { ascending: false })
+      .limit(MY_TASKS_PER_SOURCE),
+  ]);
+  if (saves.error) throw new Error(saves.error.message);
+  if (entries.error) throw new Error(entries.error.message);
+  if (created.error) throw new Error(created.error.message);
+
+  const relations = new Map<string, MyTaskRelation[]>();
+  const mark = (rows: unknown[] | null, key: 'task_id' | 'id', relation: MyTaskRelation) => {
+    for (const row of (rows || []) as Array<Record<string, unknown>>) {
+      const id = String(row[key]);
+      const list = relations.get(id) || [];
+      if (!list.includes(relation)) list.push(relation);
+      relations.set(id, list);
+    }
+  };
+  mark(saves.data, 'task_id', 'saved');
+  mark(entries.data, 'task_id', 'joined');
+  mark(created.data, 'id', 'created');
+  if (!relations.size) return [];
+
+  const { data, error } = await supabase.from('tasks').select(TASK_SELECT).in('id', [...relations.keys()]);
+  if (error) throw new Error(error.message);
+  const rows = ((data || []) as TaskRow[]).sort(
+    (a, b) => new Date(b.ends_at).getTime() - new Date(a.ends_at).getTime()
+  );
+
+  const items = await toListItems(rows, accountId, client);
+  return items.map((item, i) => ({ ...item, relations: relations.get(rows[i].id) || [] }));
 }

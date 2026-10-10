@@ -1090,6 +1090,12 @@
     },
     {
       "kind": "table",
+      "name": "task_saves",
+      "providedBy": "20261014120000_task_featured_saves.sql",
+      "requiredBy": "web/lib/tasks.ts"
+    },
+    {
+      "kind": "table",
       "name": "task_submissions",
       "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "web/lib/tasks.ts"

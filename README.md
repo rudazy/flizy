@@ -57,7 +57,7 @@
 | **How** | One policy engine behind every channel. Chat can spend inside your rules; only the website, behind your password, can change them |
 | **Where** | Live on [flizy.app](https://flizy.app), WhatsApp and Telegram, settling on GIWA Sepolia (testnet) |
 | **Earns from** | Swap protocol fee, NFT marketplace fee, paid-mint fee, collection generation fee |
-| **Built** | 98 API routes, 72 database migrations, 14 verified contracts, 2,596 automated tests passing |
+| **Built** | 100 API routes, 73 database migrations, 14 verified contracts, 2,607 automated tests passing |
 
 ---
 
@@ -290,8 +290,8 @@ xychart-beta
 
 | Quality measure | Today |
 | --- | --- |
-| Automated tests | 2,427 Node tests and 169 Foundry contract tests, all passing |
-| Test files | 186 Node, 8 Foundry |
+| Automated tests | 2,438 Node tests and 169 Foundry contract tests, all passing |
+| Test files | 187 Node, 8 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
 | Database | 72 idempotent migrations, each ending in a post-condition check that fails loudly |
 | API surface | 98 route handlers; every payment, trade and security setting re-checks the account password |

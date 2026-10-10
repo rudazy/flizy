@@ -25,7 +25,7 @@ describe('task time labels', () => {
   it('gives the detail page days and hours', () => {
     const now = Date.parse('2026-10-02T12:00:00.000Z');
     const end = new Date(now + (2 * 24 + 14) * 60 * 60 * 1000).toISOString();
-    assert.equal(time.formatRemaining(end, now), '2d 14h remaining');
+    assert.equal(time.formatRemaining(end, now), '2d 14h');
     assert.equal(time.formatRemaining(new Date(now - 1000).toISOString(), now), 'Ended');
   });
 

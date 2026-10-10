@@ -44,15 +44,28 @@ describe('every control opens something', () => {
     assert.match(PAGE, /label="Live" active=\{list === 'live'\} onClick=\{\(\) => setList\('live'\)\}/);
     assert.match(PAGE, /label="Ended" active=\{list === 'ended'\} onClick=\{\(\) => setList\('ended'\)\}/);
     assert.match(PAGE, /label="My tasks" active=\{list === 'mine'\} onClick=\{\(\) => setList\('mine'\)\}/);
-    assert.match(PAGE, /list === 'mine' \? <ComingSoonPanel what="My tasks" \/>/);
+    // My tasks is a real list now: every tab loads from the same route.
+    assert.match(PAGE, /useEffect\(\(\) => \{\s*load\(list\);\s*\}, \[list, load\]\);/);
+    assert.match(PAGE, /fetch\(`\/api\/tasks\?state=\$\{which\}`\)/);
+    assert.match(PAGE, /title="No tasks of yours yet"/);
+    assert.doesNotMatch(PAGE, /<ComingSoonPanel what="My tasks" \/>/);
   });
 
-  it('lets every category chip be chosen, and the rest open Coming soon', () => {
-    for (const label of ['All', 'Airdrop', 'Social', 'On-chain', 'Content', 'Partner']) {
+  it('filters by the stored categories, and the chips with none open Coming soon', () => {
+    for (const label of ['All', 'Airdrop', 'Social', 'On-chain', 'Community', 'Content', 'Partner']) {
       assert.match(PAGE, new RegExp(`label: '${label}'`), `${label} chip is missing`);
     }
     assert.match(PAGE, /onClick=\{\(\) => setCategory\(c\.id\)\}/);
-    assert.match(PAGE, /category !== 'all' \? \(\s*<ComingSoonPanel/);
+    // Each filtering chip names a category the server stores.
+    const stored = [...PAGE.matchAll(/stored: '([a-z]+)'/g)].map((m) => m[1]);
+    const server = read('lib/tasks.ts').match(/export const TASK_CATEGORIES = \[([^\]]+)\]/)[1];
+    assert.ok(stored.length >= 4, 'category chips lost their filter');
+    for (const c of stored) assert.ok(server.includes(`'${c}'`), `${c} is not a stored category`);
+    // Airdrop and Partner have no stored value, so they say Coming soon.
+    assert.match(PAGE, /\{ id: 'airdrop', label: 'Airdrop', icon: <AirdropIcon size=\{13\} \/> \}/);
+    assert.match(PAGE, /\{ id: 'partner', label: 'Partner', icon: <PartnerIcon size=\{13\} \/> \}/);
+    assert.match(PAGE, /const comingSoonCategory = chosen\.id !== 'all' && !chosen\.stored;/);
+    assert.match(PAGE, /\{comingSoonCategory \? <ComingSoonPanel/);
   });
 
   it('opens each of the four hero slides from its dot', () => {
@@ -150,8 +163,12 @@ describe('New task page', () => {
     assert.ok(preview > NEW.lastIndexOf('{step === 4 ? ('), 'the live preview is inside a single step');
   });
 
-  it('renders the preview card as a plain card, not a link to a task that does not exist', () => {
+  it('renders the preview card with nothing to press, since the task does not exist yet', () => {
     const card = read('components/TaskCard.tsx');
-    assert.match(card, /if \(preview\) \{\s*return <div className="card overflow-hidden p-0">\{body\}<\/div>;/);
+    // Title, Start task, the actions and View details all drop their link in preview.
+    assert.match(card, /\{preview \? task\.title : \(\s*<Link href=\{href\}/);
+    assert.match(card, /\{preview \? \(\s*<span className="btn-sun pointer-events-none/);
+    assert.match(card, /\{preview \? null : \(\s*<div className="flex items-center gap-\[6px\]">\s*<ShareTaskButton/);
+    assert.match(card, /\{preview \? null : \(\s*<Link\s+href=\{href\}/);
   });
 });

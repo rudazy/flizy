@@ -28,7 +28,7 @@ export function formatTaskInstant(iso: string, timeZone: string, locale?: string
   }).format(ms);
 }
 
-/** Detail page. "2d 14h remaining", or "Ended" once the instant has passed. */
+/** Detail page, under a "Time left" label. "2d 14h", or "Ended" once the instant has passed. */
 export function formatRemaining(iso: string, now: number): string {
   const end = new Date(iso).getTime();
   if (!Number.isFinite(end)) return '';
@@ -40,9 +40,9 @@ export function formatRemaining(iso: string, now: number): string {
   const hours = Math.floor((totalMinutes - days * 60 * 24) / 60);
   const minutes = totalMinutes % 60;
 
-  if (days >= 1) return `${days}d ${hours}h remaining`;
-  if (hours >= 1) return `${hours}h ${minutes}m remaining`;
-  return `${Math.max(1, minutes)}m remaining`;
+  if (days >= 1) return `${days}d ${hours}h`;
+  if (hours >= 1) return `${hours}h ${minutes}m`;
+  return `${Math.max(1, minutes)}m`;
 }
 
 /**
