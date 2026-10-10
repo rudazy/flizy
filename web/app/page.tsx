@@ -75,8 +75,8 @@ export default function HomePage() {
           <p className="text-xs uppercase tracking-[0.22em] text-gold">Simple · Social · On GIWA</p>
           <h1 className="mt-4 font-sans text-4xl font-semibold tracking-wide text-paper sm:text-5xl md:leading-[1.05] lg:text-5xl xl:text-6xl">
             Your crypto wallet,
-            <span className="mt-1 block bg-gradient-to-r from-[#e8c45a] to-[#c4893f] bg-clip-text text-transparent">
-              inside your chats.
+            <span className="mt-1 block">
+              inside your <span className="text-[#f5c842]">chats</span>.
             </span>
           </h1>
           <p className="mt-6 font-sans text-base leading-relaxed text-paper md:text-lg">
