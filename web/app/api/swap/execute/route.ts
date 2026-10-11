@@ -15,6 +15,7 @@ import {
   deriveAgentWallet,
   explorerTxUrl,
   assertSwapAllowed,
+  tokenLabel,
 } from '../../../../lib/dexServer';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
@@ -147,8 +148,9 @@ export async function POST(req: Request) {
     }
     const floor = bindAmountOutMin(quote.amountOutMin, confirmedMin);
 
-    const inLabel = tokenInRaw.toUpperCase() === 'ETH' ? 'ETH' : tokenInRaw.toUpperCase();
-    const outLabel = tokenOutRaw.toUpperCase() === 'ETH' ? 'ETH' : tokenOutRaw.toUpperCase();
+    // From the resolved sides, so a token picked by address logs as MAKI, not its address.
+    const inLabel = tokenLabel(tokenIn);
+    const outLabel = tokenLabel(tokenOut);
     const amountOutStr = ethers.formatUnits(quote.amountOut, outDecimals);
 
     // phone required on older schemas; 'site' marks dashboard-originated swaps

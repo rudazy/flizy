@@ -13,7 +13,7 @@
  */
 
 import { shortAddr, type ActivityItem } from './dashboardTypes.ts';
-import { channelLabel, historyCategory } from './historyRow.ts';
+import { assetSymbol, channelLabel, historyCategory } from './historyRow.ts';
 import { displaySafeLabel } from './sanitize.ts';
 import { validateUsername } from './username.ts';
 
@@ -161,14 +161,14 @@ export type ScanRecipient = { username: string | null };
  */
 export function scanTransferItem(row: TransferScanRow, username: unknown, recipient: ScanRecipient | null = null): ActivityItem {
   const kind = String(row.kind || 'transfer').toLowerCase();
-  const asset = String(row.asset || 'ETH').toUpperCase();
+  const asset = assetSymbol(row.asset);
   const amount = row.amount_eth ?? '0';
   const to = publicAddress(row.to_address);
   // The recipient label is a saved name, a username or a display name, so it
   // is read only on marketplace rows, where it names a collection or token.
   const marketLabel = kind === 'nft_market' ? publicText(row.counterparty_label, LABEL_MAX) : null;
   const outAmt = row.amount_secondary ? String(row.amount_secondary) : null;
-  const outAsset = row.asset_secondary ? String(row.asset_secondary) : null;
+  const outAsset = row.asset_secondary ? assetSymbol(row.asset_secondary) : null;
 
   let type: ActivityItem['type'] = 'transfer';
   if (kind === 'swap') type = 'swap';

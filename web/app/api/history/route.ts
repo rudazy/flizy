@@ -5,7 +5,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { apiErrorBody } from '../../../lib/apiError';
 import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
 import { ethUsd } from '../../../lib/ethUsd.ts';
-import { channelLabel, historyCategory, type HistoryCategory } from '../../../lib/historyRow.ts';
+import { assetSymbol, channelLabel, historyCategory, type HistoryCategory } from '../../../lib/historyRow.ts';
 // Shared with chat history — platform claims must show GitHub pay / Phone / X pay
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
@@ -70,7 +70,7 @@ function mapTransferRow(
   // Reading row.direction here would call every payment "sent", because the row
   // belongs to whoever made it.
   const direction = received ? 'in' : 'out';
-  const asset = String(row.asset || 'ETH').toUpperCase();
+  const asset = assetSymbol(row.asset);
   const amount = row.amount_eth as string | number;
   const to = row.to_address ? String(row.to_address) : '';
   const labelExtra = row.counterparty_label ? String(row.counterparty_label) : null;
@@ -84,7 +84,7 @@ function mapTransferRow(
   let label = '';
   if (type === 'swap') {
     const outAmt = row.amount_secondary ? String(row.amount_secondary) : null;
-    const outAsset = row.asset_secondary ? String(row.asset_secondary) : null;
+    const outAsset = row.asset_secondary ? assetSymbol(row.asset_secondary) : null;
     label = outAmt && outAsset ? `${amount} ${asset} → ${outAmt} ${outAsset}` : `Swap ${amount} ${asset}`;
   } else if (type === 'receive') {
     // Not labelExtra: on a received row that names the reader, not the payer.
@@ -107,7 +107,7 @@ function mapTransferRow(
     amount,
     asset,
     amountSecondary: row.amount_secondary ? String(row.amount_secondary) : null,
-    assetSecondary: row.asset_secondary ? String(row.asset_secondary) : null,
+    assetSecondary: row.asset_secondary ? assetSymbol(row.asset_secondary) : null,
     counterparty: labelExtra || to || null,
     status: String(row.status || 'unknown'),
     txHash: row.tx_hash ? String(row.tx_hash) : null,

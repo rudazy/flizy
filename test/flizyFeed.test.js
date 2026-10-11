@@ -167,6 +167,22 @@ describe('a transfer from any account', () => {
     assert.equal(item.type, 'swap');
     assert.equal(item.category, 'swap');
   });
+
+  it('names a swap output that was logged as a contract address', () => {
+    const item = feed.scanTransferItem({
+      id: 'row-3',
+      phone: 'site',
+      kind: 'swap',
+      amount_eth: '0.99',
+      asset: 'ETH',
+      amount_secondary: '198584.31',
+      asset_secondary: '0XD08D83CDF19DB8CCD53ED462034C8631DE5F693D',
+      status: 'confirmed',
+      created_at: '2026-10-11T06:00:00.000Z',
+    }, 'ludarep');
+    assert.equal(item.assetSecondary, 'MAKI');
+    assert.equal(item.label, '0.99 ETH → 198584.31 MAKI');
+  });
 });
 
 describe('a claim from any account', () => {

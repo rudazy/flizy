@@ -40,6 +40,24 @@ describe('channelLabel', () => {
   });
 });
 
+describe('assetSymbol', () => {
+  it('names a listed token logged by its address, in any casing', () => {
+    assert.equal(row.assetSymbol('0XD08D83CDF19DB8CCD53ED462034C8631DE5F693D'), 'MAKI');
+    assert.equal(row.assetSymbol('0x8ca7a8f78abc8da471df82be4f374e1661e34473'), 'IZY');
+    assert.equal(row.assetSymbol('0X58FB4D3DA82F5D610AD36E6E39E674C17B32FFD1'), 'DCAT');
+  });
+
+  it('shortens an address that is not listed', () => {
+    assert.equal(row.assetSymbol('0XABCDEF0000000000000000000000000000001234'), '0xabcd…1234');
+  });
+
+  it('upper-cases a symbol and treats an empty asset as ETH', () => {
+    assert.equal(row.assetSymbol('flz'), 'FLZ');
+    assert.equal(row.assetSymbol('ETH'), 'ETH');
+    for (const v of [null, undefined, '', '  ']) assert.equal(row.assetSymbol(v), 'ETH', String(v));
+  });
+});
+
 describe('historyCategory', () => {
   it('files every row under one filter', () => {
     assert.equal(row.historyCategory('transfer', 'nft_market'), 'nft');

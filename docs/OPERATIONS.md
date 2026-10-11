@@ -62,16 +62,26 @@ deep-link button will not render on the dashboard.
 
 ### Database
 
-```bash
-npx supabase db push
-```
+Migrations in `supabase/migrations/` are applied by hand, in timestamp order. Never run
+`supabase db push` from this folder: it is CLI-linked to the production project and applies
+pending migrations with no confirmation.
 
-Or apply SQL directly from `supabase/migrations/`. To run a single migration file against
-the remote database:
+- **Dev:** the guarded runner, which reads only `.env.dev` and refuses any project not
+  declared as dev in two places.
 
-```cmd
-node scripts\run-migration-file.js supabase\migrations\FILE.sql
-```
+  ```cmd
+  node scripts\run-dev-migrations.js --dry-run --only FILE.sql
+  node scripts\run-dev-migrations.js --confirm --only FILE.sql
+  node scripts\verify-dev-schema.js
+  ```
+
+- **Production:** paste the file into the Supabase dashboard SQL Editor after confirming the
+  project ref in the browser URL. Each migration ends with a post-condition block that
+  raises if an expected object is missing.
+
+Apply a migration to production before deploying code that needs it. The site build runs
+`web/scripts/verify-schema.mjs` and refuses to build while an object the code reads is
+missing.
 
 ### Contracts
 
@@ -112,6 +122,13 @@ already exists. To list another token:
    `lib/listedTokens.js` and `web/lib/listedTokens.ts` with a logo in `web/public/tokens/`
    (the token's own art, or a mark drawn in the palette), and run `node --test test/listedTokensDrift.test.js test/tokenLogos.test.js`.
 4. Pull and restart the chat services so chat resolves the new symbol.
+
+### Featuring a task
+
+A Flizy admin (`accounts.is_admin`) sees **Feature on Explore** at the bottom of any task
+page. Featured tasks carry a Featured badge and list first on Explore; the same button
+takes the mark off. The route checks the admin flag before it writes `tasks.featured_at`,
+so no creator can feature their own task.
 
 ---
 

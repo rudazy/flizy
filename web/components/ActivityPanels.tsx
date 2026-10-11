@@ -281,18 +281,19 @@ function HistoryCard({
           {row.note ? <span className="truncate font-sans text-[12px] text-[#9a9a9a]">{row.note}</span> : null}
           <span className="font-sans text-[12px] text-[#8d8d8d]">{relativeTime(row.createdAt)}</span>
         </span>
-        <span className="grid shrink-0 justify-items-end gap-[4px]">
+        {/* Capped so a long amount truncates here instead of squeezing the title or widening the card. */}
+        <span className="flex min-w-0 max-w-[48%] shrink-0 flex-col items-end gap-[4px]">
           {hasAmount ? (
-            <span className={`font-sans text-[15px] font-semibold ${row.direction === 'in' ? 'text-[#2fd27a]' : 'text-white'}`}>
+            <span className={`max-w-full truncate font-sans text-[15px] font-semibold ${row.direction === 'in' ? 'text-[#2fd27a]' : 'text-white'}`}>
               {amountLine(row)}
             </span>
           ) : null}
           {cat === 'swap' && row.amountSecondary && row.assetSecondary ? (
-            <span className="font-sans text-[12.5px] text-[#a9a9a9]">
+            <span className="max-w-full truncate font-sans text-[12.5px] text-[#a9a9a9]">
               +{fmtAmt(row.amountSecondary)} {row.assetSecondary}
             </span>
           ) : usd ? (
-            <span className="font-sans text-[12.5px] text-[#a9a9a9]">{usd}</span>
+            <span className="max-w-full truncate font-sans text-[12.5px] text-[#a9a9a9]">{usd}</span>
           ) : null}
           <span className={`rounded-[6px] px-[9px] py-[2px] font-sans text-[11.5px] ${PILL[pill.tone]}`}>{pill.label}</span>
         </span>

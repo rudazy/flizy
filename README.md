@@ -116,7 +116,7 @@ another adapter, not a second product.
 | **Collection creator** | Build a collection from artwork layers: traits, rarity weights, rules, unique combinations, standard metadata | Built: the creator runs today; launching switches on once the updated factory and storage are configured |
 | **Generate with AI** | Describe a collection; AI plans the traits and draws each layer, then the creator takes over | Built: switches on once AI and storage keys are configured |
 | **Scan** | A public ledger of Flizy activity. Recipients show as the payment rail, and each person chooses whether their username appears | Live |
-| **Tasks and projects** | Publish tasks with a declared reward; participants submit, the creator picks winners | Live (reward escrow comes later) |
+| **Tasks and projects** | Publish tasks with a declared reward, category, level and steps; participants submit, the creator picks winners. Filter by category, save tasks, see saved, joined and published tasks under My tasks; Flizy features tasks at the top of Explore | Live (reward escrow comes later) |
 | **Copy trade** | Choose wallets to follow and set dollar rules | Settings only; nothing copies yet |
 | **Account and security** | Trusted wallets, unlock PIN, daily ETH limit, password change that signs out other devices, chat links, platform identities, privacy controls | Live |
 
