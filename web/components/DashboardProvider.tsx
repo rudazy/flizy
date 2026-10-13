@@ -20,6 +20,7 @@ import type {
 } from '../lib/dashboardTypes';
 import { useLocale } from './LocaleProvider';
 import { normalizeLocale, type LocaleCode } from '../lib/locale';
+import type { PublicAppearance } from '../lib/appearance';
 
 type DashboardContextValue = {
   data: DashboardData | null;
@@ -53,6 +54,7 @@ type DashboardContextValue = {
   setAccountLocale: (locale: LocaleCode) => Promise<boolean>;
   setDefaultCallingCode: (countryIso: string) => Promise<boolean>;
   setAttachInviteOnClaims: (enabled: boolean) => Promise<boolean>;
+  patchAppearance: (appearance: PublicAppearance) => void;
   explorerBase: string;
 };
 
@@ -411,6 +413,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [loadAccount]
   );
 
+  const patchAppearance = useCallback((appearance: PublicAppearance) => {
+    setData((current) => (current ? { ...current, appearance } : current));
+  }, []);
+
   const explorerBase =
     holdings?.holdings?.chain?.explorerBaseUrl || 'https://sepolia-explorer.giwa.io';
 
@@ -439,6 +445,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setAccountLocale,
       setDefaultCallingCode,
       setAttachInviteOnClaims,
+      patchAppearance,
       explorerBase,
     }),
     [
@@ -463,6 +470,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setAccountLocale,
       setDefaultCallingCode,
       setAttachInviteOnClaims,
+      patchAppearance,
       explorerBase,
     ]
   );

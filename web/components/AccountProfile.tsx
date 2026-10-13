@@ -1,9 +1,11 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { AccountBackground } from './AccountBackground';
 import { useEffect, useId, useState } from 'react';
 import {
   ChartLineIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   EthDiamondIcon,
   EyeIcon,
@@ -62,14 +64,35 @@ function Card({
   title,
   hint,
   extra,
+  dropdown = false,
   children,
 }: {
   icon: ReactNode;
   title: string;
   hint: string;
   extra?: ReactNode;
+  /** Closed until the header is opened. Account Information stays expanded. */
+  dropdown?: boolean;
   children: ReactNode;
 }) {
+  if (dropdown) {
+    return (
+      <details className="group rounded-[16px] border border-[#2a2b30] bg-[#101012]">
+        <summary className="flex min-h-[44px] cursor-pointer list-none items-start gap-3 px-3.5 py-3.5 text-left [&::-webkit-details-marker]:hidden">
+          <Mark>{icon}</Mark>
+          <span className="min-w-0 flex-1 pt-0.5">
+            <span className="block font-sans text-[15px] font-semibold leading-tight text-white">{title}</span>
+            <span className="mt-0.5 block font-sans text-[12px] leading-snug text-[#8d867c]">{hint}</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-2 pt-0.5">
+            {extra}
+            <ChevronDownIcon size={16} className="text-[#8d867c] transition-transform group-open:rotate-180" />
+          </span>
+        </summary>
+        {children}
+      </details>
+    );
+  }
   return (
     <section className="rounded-[16px] border border-[#2a2b30] bg-[#101012]">
       <div className="flex items-start gap-3 px-3.5 pb-2 pt-3.5">
@@ -470,7 +493,10 @@ export function AccountProfile({
         ) : null}
       </Card>
 
+      <AccountBackground />
+
       <Card
+        dropdown
         icon={<WalletIcon size={16} />}
         title="Flizy Wallet"
         hint="Your default wallet for all Flizy transactions."
@@ -507,7 +533,7 @@ export function AccountProfile({
         </div>
       </Card>
 
-      <Card icon={<BarsGlyph />} title="Stats & Social" hint="Your activity, followers and community.">
+      <Card dropdown icon={<BarsGlyph />} title="Stats & Social" hint="Your activity, followers and community.">
         <div className="grid grid-cols-4 gap-1.5 border-t border-[#26262a] px-3 py-3">
           <Mini icon={<UserPlusIcon size={14} />} value={String(invites)} label="Invites" />
           <Mini icon={<CoinsGlyph />} value={String(credits)} label="Credits" />
@@ -516,7 +542,7 @@ export function AccountProfile({
         </div>
       </Card>
 
-      <Card icon={<EyeIcon size={16} />} title="Privacy & Visibility" hint="Control what others can see of your profile.">
+      <Card dropdown icon={<EyeIcon size={16} />} title="Privacy & Visibility" hint="Control what others can see of your profile.">
         <Row icon={<GlobeIcon size={16} />} label="Profile visibility" value="Public" onClick={() => onSoon('Profile visibility')} />
         <ScanUsernameToggle />
         <SoonToggle on icon={<ChartLineIcon size={16} />} label="Show trading stats" onSoon={() => onSoon('Show trading stats')} />
@@ -525,7 +551,7 @@ export function AccountProfile({
         <SoonToggle on={false} icon={<PieGlyph />} label="Show portfolio value" onSoon={() => onSoon('Show portfolio value')} />
       </Card>
 
-      <Card icon={<ShieldCheckIcon size={16} />} title="Security" hint="Keep your account safe.">
+      <Card dropdown icon={<ShieldCheckIcon size={16} />} title="Security" hint="Keep your account safe.">
         <Row icon={<LockIcon size={16} />} label="Change password" onClick={onSecurity} />
         <Row icon={<DevicesGlyph />} label="Connected devices" value="-" onClick={() => onSoon('Connected devices')} />
         <Row icon={<ShieldCheckIcon size={16} />} label="Two-factor authentication" value="Not enabled" onClick={() => onSoon('Two-factor authentication')} />

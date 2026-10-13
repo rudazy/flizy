@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { track } from '../../lib/analytics';
+import { clearAppearanceCache } from '../../lib/appearanceCache';
 import type { LocaleCode } from '../../lib/locale';
 import { safeNext } from '../../lib/safeNext.ts';
 
@@ -81,6 +82,7 @@ export function LoginForm() {
         return;
       }
       track('login_completed');
+      clearAppearanceCache();
       leaving = true;
       router.push(next);
     } catch (err) {

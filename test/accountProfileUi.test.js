@@ -29,6 +29,12 @@ describe('account profile layout', () => {
       assert.match(PROFILE, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     }
     assert.equal(PROFILE.includes('\u2014'), false);
+    for (const title of ['Flizy Wallet', 'Stats & Social', 'Privacy & Visibility', 'Security']) {
+      assert.match(PROFILE, new RegExp(`dropdown[\\s\\S]{0,180}title="${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
+    }
+    const infoAt = PROFILE.indexOf('title="Account Information"');
+    const backgroundAt = PROFILE.indexOf('<AccountBackground');
+    assert.equal(PROFILE.slice(infoAt, backgroundAt).includes('dropdown'), false);
   });
 
   it('uses the account counts and leaves unknown figures blank', () => {

@@ -339,6 +339,10 @@ textarea {
 .app-shell {
   display: flex;
   flex-direction: column;
+  /* Above the fixed background layer. z-index does not trap position:fixed. */
+  position: relative;
+  z-index: 1;
+  background: transparent;
 }
 
 @media (max-width: 767.98px) {
@@ -472,6 +476,206 @@ textarea {
   .token-marquee-copy {
     display: none;
   }
+}
+
+/*
+ * Personal dashboard background. The element is a sibling of .app-shell, so
+ * this filter-free layer (and its own overlay) is not an ancestor of the nav.
+ */
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.app-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: var(--app-bg-dim, 0);
+  pointer-events: none;
+}
+
+html[data-flizy-preset='wine'] {
+  --paper: #f6eee8;
+  --muted: #e4ccc8;
+  --surface: #1a0c10;
+  --accent: #f5c842;
+  --accent-ink: #1a1408;
+}
+
+html[data-flizy-preset='wine'] #flizy-app-bg {
+  background-color: #2a1218;
+  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(245, 200, 66, 0.16), transparent 55%);
+}
+
+html[data-flizy-preset='green'] {
+  --paper: #e8f2e6;
+  --muted: #c9dcc8;
+  --surface: #0c1c14;
+  --accent: #e0b84a;
+  --accent-ink: #1a1408;
+}
+
+html[data-flizy-preset='green'] #flizy-app-bg {
+  background-color: #10261a;
+  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(224, 184, 74, 0.14), transparent 55%);
+}
+
+html[data-flizy-preset='gold'] {
+  color-scheme: light;
+  --ink: #f3e2a6;
+  --paper: #2a1c08;
+  --muted: #5c4314;
+  --surface: #fff6d8;
+  --border: #e4cf96;
+  --accent: #7a4e0c;
+  --accent-deep: #5e3b09;
+  --accent-ink: #fff8e8;
+}
+
+html[data-flizy-preset='gold'] body {
+  background: #f3e2a6;
+  color: #2a1c08;
+}
+
+html[data-flizy-preset='gold'] #flizy-app-bg {
+  background-color: #f3e2a6;
+  background-image: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(255, 246, 216, 0.9), transparent 60%);
+}
+
+html[data-flizy-preset='yellow'] {
+  color-scheme: light;
+  --ink: #f6eeb0;
+  --paper: #2a2208;
+  --muted: #5e4810;
+  --surface: #fff9d6;
+  --border: #e6d98a;
+  --accent: #7a5608;
+  --accent-deep: #5c4006;
+  --accent-ink: #fff8e4;
+}
+
+html[data-flizy-preset='yellow'] body {
+  background: #f6eeb0;
+  color: #2a2208;
+}
+
+html[data-flizy-preset='yellow'] #flizy-app-bg {
+  background-color: #f6eeb0;
+}
+
+html[data-flizy-preset='white'] {
+  color-scheme: light;
+  --ink: #f7f5f1;
+  --paper: #1c1916;
+  --muted: #5c564e;
+  --surface: #fffcf8;
+  --border: #e4dfd6;
+  --accent: #7a5610;
+  --accent-deep: #5c400c;
+  --accent-ink: #f7f5f1;
+}
+
+html[data-flizy-preset='white'] body {
+  background: #f7f5f1;
+  color: #1c1916;
+}
+
+html[data-flizy-preset='white'] #flizy-app-bg {
+  background-color: #f7f5f1;
+}
+
+html[data-flizy-preset='image'] #flizy-app-bg {
+  background-color: #0b0a09;
+}
+
+html[data-flizy-preset='gold'] .app-bottom-nav,
+html[data-flizy-preset='yellow'] .app-bottom-nav,
+html[data-flizy-preset='white'] .app-bottom-nav {
+  backdrop-filter: none;
+}
+
+html[data-flizy-preset='gold'] .app-bottom-nav {
+  background: #f8edc4;
+  border-top-color: #e4cf96;
+  color: #2a1c08;
+}
+
+html[data-flizy-preset='yellow'] .app-bottom-nav {
+  background: #fbf6cc;
+  border-top-color: #e6d98a;
+  color: #2a2208;
+}
+
+html[data-flizy-preset='white'] .app-bottom-nav {
+  background: #f3f0ea;
+  border-top-color: #e4dfd6;
+  color: #1c1916;
+}
+
+html[data-flizy-preset='gold'] .app-bottom-nav a,
+html[data-flizy-preset='gold'] .app-bottom-nav a span {
+  color: #2a1c08;
+}
+
+html[data-flizy-preset='gold'] .app-bottom-nav a[aria-current='page'],
+html[data-flizy-preset='gold'] .app-bottom-nav a[aria-current='page'] span {
+  color: #6b4208;
+}
+
+html[data-flizy-preset='yellow'] .app-bottom-nav a,
+html[data-flizy-preset='yellow'] .app-bottom-nav a span {
+  color: #2a2208;
+}
+
+html[data-flizy-preset='yellow'] .app-bottom-nav a[aria-current='page'],
+html[data-flizy-preset='yellow'] .app-bottom-nav a[aria-current='page'] span {
+  color: #6a4806;
+}
+
+html[data-flizy-preset='white'] .app-bottom-nav a,
+html[data-flizy-preset='white'] .app-bottom-nav a span {
+  color: #1c1916;
+}
+
+html[data-flizy-preset='white'] .app-bottom-nav a[aria-current='page'],
+html[data-flizy-preset='white'] .app-bottom-nav a[aria-current='page'] span {
+  color: #7a5610;
+}
+
+html[data-flizy-preset='gold'] a:hover,
+html[data-flizy-preset='yellow'] a:hover,
+html[data-flizy-preset='white'] a:hover {
+  color: var(--accent-deep);
+}
+
+html[data-flizy-preset='gold'] .input,
+html[data-flizy-preset='yellow'] .input,
+html[data-flizy-preset='white'] .input {
+  color: #f2ebe1;
+  background: rgba(11, 10, 9, 0.92);
+}
+
+html[data-flizy-preset='gold'] .btn,
+html[data-flizy-preset='yellow'] .btn,
+html[data-flizy-preset='white'] .btn {
+  color: var(--paper);
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+html[data-flizy-preset='gold'] .btn-primary,
+html[data-flizy-preset='yellow'] .btn-primary,
+html[data-flizy-preset='white'] .btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
 }
 
 /* Soft divider for premium sections */

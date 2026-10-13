@@ -4,6 +4,42 @@
   "objects": [
     {
       "kind": "check",
+      "name": "account_appearance.account_appearance_dim_check",
+      "providedBy": "20261015120000_account_appearance.sql",
+      "requiredBy": "check on account_appearance"
+    },
+    {
+      "kind": "check",
+      "name": "account_appearance.account_appearance_image_check",
+      "providedBy": "20261015120000_account_appearance.sql",
+      "requiredBy": "check on account_appearance"
+    },
+    {
+      "kind": "check",
+      "name": "account_appearance.account_appearance_mode_check",
+      "providedBy": "20261015120000_account_appearance.sql",
+      "requiredBy": "check on account_appearance"
+    },
+    {
+      "kind": "check",
+      "name": "account_appearance.account_appearance_path_check",
+      "providedBy": "20261015120000_account_appearance.sql",
+      "requiredBy": "check on account_appearance"
+    },
+    {
+      "kind": "check",
+      "name": "account_appearance.account_appearance_preset_check",
+      "providedBy": "20261015120000_account_appearance.sql",
+      "requiredBy": "check on account_appearance"
+    },
+    {
+      "kind": "check",
+      "name": "account_appearance.account_appearance_version_check",
+      "providedBy": "20261015120000_account_appearance.sql",
+      "requiredBy": "check on account_appearance"
+    },
+    {
+      "kind": "check",
       "name": "account_emails.account_emails_email_format",
       "providedBy": "20260805120000_claim_email_recipient.sql",
       "requiredBy": "check on account_emails"
@@ -760,6 +796,12 @@
     },
     {
       "kind": "function",
+      "name": "claim_background_upload",
+      "providedBy": "20261015130000_account_background_uploads.sql",
+      "requiredBy": "web/lib/accountBackground.ts"
+    },
+    {
+      "kind": "function",
       "name": "daily_native_sent_eth",
       "providedBy": "20260930120000_daily_native_sent.sql",
       "requiredBy": "web/lib/dailyLimits.ts"
@@ -901,6 +943,18 @@
       "name": "username_reserved_key",
       "providedBy": "20260811000000_reserved_usernames.sql",
       "requiredBy": "called by accounts_enforce_username_not_reserved"
+    },
+    {
+      "kind": "table",
+      "name": "account_appearance",
+      "providedBy": "20261015120000_account_appearance.sql",
+      "requiredBy": "web/lib/accountBackground.ts"
+    },
+    {
+      "kind": "table",
+      "name": "account_background_uploads",
+      "providedBy": "20261015130000_account_background_uploads.sql",
+      "requiredBy": "web/lib/accountBackground.ts"
     },
     {
       "kind": "table",

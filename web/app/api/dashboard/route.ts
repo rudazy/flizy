@@ -5,9 +5,11 @@ import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { predictGatorAddress } from '../../../lib/gatorAccount.ts';
 import { toPublicAccount } from '../../../lib/publicAccount';
 import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
-import { apiErrorBody } from '../../../lib/apiError';
+import { apiErrorBody, logApiError } from '../../../lib/apiError';
 import { getInviteSummary } from '../../../lib/invite.ts';
 import { getPaySummary } from '../../../lib/payCode.ts';
+import { DEFAULT_APPEARANCE, type PublicAppearance } from '../../../lib/appearance';
+import { readAppearance } from '../../../lib/accountBackground';
 
 const ROUTE = 'GET /api/dashboard';
 
@@ -143,6 +145,13 @@ export async function GET() {
       }
     }
 
+    let appearance: PublicAppearance = { ...DEFAULT_APPEARANCE };
+    try {
+      appearance = await readAppearance(supabase, accountId);
+    } catch (err) {
+      logApiError(ROUTE, err, { step: 'appearance' });
+    }
+
     return NextResponse.json({
       account: toPublicAccount(account),
       trusted,
@@ -150,6 +159,7 @@ export async function GET() {
       pendingClaims,
       invite,
       pay,
+      appearance,
     });
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });

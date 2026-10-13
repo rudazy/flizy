@@ -1,3 +1,5 @@
+import type { PublicAppearance } from './appearance';
+
 export type PendingClaimItem = {
   id: string;
   amountEth: string;
@@ -70,6 +72,8 @@ export type DashboardData = {
     username: string | null;
     displayName?: string | null;
   } | null;
+  /** This account's dashboard background. Absent until the dashboard answers. */
+  appearance?: PublicAppearance;
 };
 
 /**

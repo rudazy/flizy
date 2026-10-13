@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '5 October 2026';
+const UPDATED = '13 October 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -91,6 +91,11 @@ export default function PrivacyPage() {
             <li>
               <span className="text-paper">Chat link.</span> One-time link codes and the
               channel bind (WhatsApp or Telegram chat id) after you redeem a code.
+            </li>
+            <li>
+              <span className="text-paper">App background.</span> If you upload one, the image
+              is stored privately, shown only on your own signed-in pages, and deleted when you
+              replace it or delete the account.
             </li>
           </ul>
         </section>

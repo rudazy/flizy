@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { clearAppearanceCache } from '../lib/appearanceCache';
 
 /**
  * Four steps before a Flizy sign-in is closed.
@@ -37,6 +38,7 @@ export function AccountClosureSheet({ open, onClose, onDeactivate, onDelete }: P
   function leave() {
     if (busy) return;
     if (done) {
+      if (done === 'deleted') clearAppearanceCache();
       window.location.href = done === 'deleted' ? '/login?account=deleted' : '/login?account=deactivated';
       return;
     }
@@ -126,6 +128,7 @@ export function AccountClosureSheet({ open, onClose, onDeactivate, onDelete }: P
               type="button"
               className="hit-y-44 mt-4 inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-[#f7d047] font-sans text-[13px] font-bold text-[#1a1405]"
               onClick={() => {
+                if (done === 'deleted') clearAppearanceCache();
                 window.location.href = done === 'deleted' ? '/login?account=deleted' : '/login?account=deactivated';
               }}
             >

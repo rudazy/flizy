@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { DashboardProvider } from '../../components/DashboardProvider';
 import { DashboardGate } from '../../components/DashboardGate';
+import { AppBackgroundSync } from '../../components/AppBackgroundSync';
 import { pageMetadata } from '../../lib/seo';
+import { APPEARANCE_BOOT_SCRIPT } from '../../lib/appearanceCache';
 
 /**
  * Private app surface. noindex rather than a robots.txt block, so Google can
@@ -18,10 +20,19 @@ export const metadata: Metadata = pageMetadata({
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={<p className="text-muted">Loading dashboard...</p>}>
-      <DashboardProvider>
-        <DashboardGate>{children}</DashboardGate>
-      </DashboardProvider>
-    </Suspense>
+    <>
+      {/*
+        Fixed layer behind the app. A sibling of the shell, never a wrapper,
+        so a filter here cannot become the containing block for the bottom nav.
+      */}
+      <div id="flizy-app-bg" className="app-bg" aria-hidden="true" />
+      <script dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOT_SCRIPT }} />
+      <Suspense fallback={<p className="text-muted">Loading dashboard...</p>}>
+        <DashboardProvider>
+          <AppBackgroundSync />
+          <DashboardGate>{children}</DashboardGate>
+        </DashboardProvider>
+      </Suspense>
+    </>
   );
 }

@@ -168,6 +168,18 @@ describe('code scan', () => {
     assert.deepEqual([...tables.keys()], ['accounts']);
   });
 
+  it('does not treat a storage bucket as a table', () => {
+    const dir = fixture({
+      'a.js': [
+        "const bucket = supabase.storage.from('user-backgrounds');",
+        "const row = supabase.from('account_appearance');",
+      ].join('\n'),
+    });
+    const { tables } = scanCode([dir]);
+    assert.deepEqual([...tables.keys()], ['account_appearance']);
+    assert.equal(tables.has('user-backgrounds'), false);
+  });
+
   it('ignores calls written in comments', () => {
     const dir = fixture({
       'a.js': [

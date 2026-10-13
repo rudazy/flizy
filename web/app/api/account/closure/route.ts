@@ -14,8 +14,9 @@ import { clearAccountCookie, getAccountIdFromCookie, revokeAllSessions } from '.
 import { getSupabase } from '../../../../lib/supabase';
 import { requirePassword } from '../../../../lib/passwordGate.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
-import { apiErrorBody, apiErrorBodyAllowingClientError, ClientError } from '../../../../lib/apiError';
+import { apiErrorBody, apiErrorBodyAllowingClientError, ClientError, logApiError } from '../../../../lib/apiError';
 import { closureOf, isMissingClosureColumn } from '../../../../lib/accountClosure.ts';
+import { removeAccountBackground } from '../../../../lib/accountBackground';
 
 const ROUTE = 'POST /api/account/closure';
 
@@ -152,6 +153,11 @@ export async function POST(req: Request) {
           );
         }
         return NextResponse.json({ error: 'This account could not be deleted.' }, { status: 409 });
+      }
+      try {
+        await removeAccountBackground(supabase, accountId);
+      } catch (err) {
+        logApiError(ROUTE, err, { step: 'background' });
       }
     } else {
       const now = new Date().toISOString();

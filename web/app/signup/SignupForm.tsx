@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { PasswordField } from '../../components/PasswordField';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { track } from '../../lib/analytics';
+import { clearAppearanceCache } from '../../lib/appearanceCache';
 import { validatePassword } from '../../lib/passwordPolicy';
 import type { LocaleCode } from '../../lib/locale';
 import { safeNext } from '../../lib/safeNext.ts';
@@ -89,6 +90,7 @@ export function SignupForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Signup failed');
       track('signup_completed', { locale });
+      clearAppearanceCache();
       // Always land on dashboard: email gate then profile gate.
       leaving = true;
       router.push('/dashboard');

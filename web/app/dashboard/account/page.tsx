@@ -13,6 +13,7 @@ import {
 } from '../../../components/AppSection';
 import { useComingSoon } from '../../../components/ComingSoon';
 import { useDashboard } from '../../../components/DashboardProvider';
+import { clearAppearanceCache } from '../../../lib/appearanceCache';
 import { useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { PayIdentity } from '../../../components/PayIdentity';
@@ -266,6 +267,7 @@ export default function AccountPage() {
         setMsg(json.error || 'Could not sign out. Try again.');
         return;
       }
+      clearAppearanceCache();
       window.location.href = '/login';
     } catch {
       setMsg('Could not sign out. Try again.');
@@ -378,6 +380,7 @@ export default function AccountPage() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) return typeof json.error === 'string' ? json.error : 'Could not change the password.';
       if (json.stillSignedIn === false) {
+        clearAppearanceCache();
         window.location.href = '/login';
         return null;
       }
