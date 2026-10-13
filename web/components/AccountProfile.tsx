@@ -22,8 +22,8 @@ import {
 /**
  * The Account profile, drawn to the phone layout.
  *
- * This is the signed-in account, so it does not offer Follow. Delete opens
- * the closure sheet. Figures that Flizy does not store stay blank. Invite
+ * This is the signed-in account, so it does not offer Follow. Deactivate
+ * opens the pause sheet. Figures that Flizy does not store stay blank. Invite
  * and credit counts are the account's own.
  */
 
@@ -44,7 +44,7 @@ type Props = {
   onSecurity: () => void;
   onSoon: (what: string) => void;
   onOpen: (id: string) => void;
-  onDelete: () => void;
+  onDeactivate: () => void;
   /** Same sign-out as Security, also offered from More so it is easy to find. */
   onSignOut: () => void;
 };
@@ -277,7 +277,7 @@ export function AccountProfile({
   onSecurity,
   onSoon,
   onOpen,
-  onDelete,
+  onDeactivate,
   onSignOut,
 }: Props) {
   const stats = useAccountStats();
@@ -559,19 +559,16 @@ export function AccountProfile({
 
       <button
         type="button"
-        onClick={onDelete}
-        className="flex min-h-[64px] w-full items-center gap-3 rounded-[16px] border border-[#6b2430] bg-[#2a1216] px-3.5 py-3 text-left"
+        onClick={onDeactivate}
+        className="flex min-h-[64px] w-full items-center gap-3 rounded-[16px] border border-[#2a2b30] bg-[#101012] px-3.5 py-3 text-left"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#6b2430] text-[#f05252]">
-          <TrashGlyph />
-        </span>
         <span className="min-w-0 flex-1">
-          <span className="block font-sans text-[14px] font-semibold text-[#f05252]">Delete account</span>
-          <span className="mt-0.5 block font-sans text-[12px] text-[#c48b93]">
-            Deactivate, or delete the sign-in. This takes several steps.
+          <span className="block font-sans text-[14px] font-semibold text-[#f3f1ec]">Deactivate account</span>
+          <span className="mt-0.5 block font-sans text-[12px] text-[#8d867c]">
+            Pauses the sign-in. The same email and password bring it back.
           </span>
         </span>
-        <ChevronRightIcon size={16} className="shrink-0 text-[#f05252]" />
+        <ChevronRightIcon size={16} className="shrink-0 text-[#8d867c]" />
       </button>
     </div>
   );
@@ -732,10 +729,3 @@ function InfoGlyph() {
   );
 }
 
-function TrashGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
-      <path d="M5 7h14M9 7V5h6v2M8 7l1 13h6l1-13" strokeWidth="1.7" />
-    </svg>
-  );
-}

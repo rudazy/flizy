@@ -87,15 +87,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // Said only after the password matches, so a wrong password still looks
-    // like any other wrong password.
-    if (closureOf(data) === 'deleted') {
-      return NextResponse.json(
-        { error: 'This account was deleted and cannot be restored.', code: 'ACCOUNT_DELETED' },
-        { status: 403 }
-      );
-    }
-
     /*
      * An unrecognised browser needs the emailed code on every runtime. A local
      * build has no mail transport, so issueEmailVerificationCode returns the
@@ -137,10 +128,12 @@ export async function POST(req: Request) {
       }
     }
 
-    if (closureOf(data) === 'deactivated') {
+    if (closureOf(data) !== 'open') {
       // Drop every old session before the pause flag clears. A revoke that
       // failed at deactivate would otherwise start working again the moment
       // this update lands, and this request has not created its own row yet.
+      // The same sign-in clears an older deleted_at, so the email comes back
+      // to this row rather than a new one.
       try {
         await revokeAllSessions(data.id);
       } catch (err) {
@@ -148,19 +141,15 @@ export async function POST(req: Request) {
       }
       const { data: restored, error: restoreError } = await supabase
         .from('accounts')
-        .update({ deactivated_at: null })
+        .update({ deactivated_at: null, deleted_at: null })
         .eq('id', data.id)
-        .is('deleted_at', null)
         .select('id')
         .maybeSingle();
-      if (restoreError) {
+      if (restoreError && !isMissingClosureColumn(restoreError)) {
         return NextResponse.json(apiErrorBody(ROUTE, restoreError), { status: 500 });
       }
-      if (!restored) {
-        return NextResponse.json(
-          { error: 'This account was deleted and cannot be restored.', code: 'ACCOUNT_DELETED' },
-          { status: 403 }
-        );
+      if (!restoreError && !restored) {
+        return NextResponse.json(apiErrorBody(ROUTE, new Error('restore matched no row')), { status: 500 });
       }
     }
 

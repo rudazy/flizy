@@ -1,10 +1,10 @@
--- Account pause and permanent sign-in close.
+-- Account pause columns.
 --
--- deactivated_at: the person can sign in with the account password and the
--- timestamp is cleared. Chat stays refused until then.
--- deleted_at: the password cannot restore the sign-in. The row stays so the
--- wallet pointer and chain history are not dropped.
--- Re-running is safe.
+-- deactivated_at: sign-in with the account password clears it. Chat stays
+-- refused until then.
+-- deleted_at: an older close. The same sign-in clears it too. The row stays
+-- so the wallet pointer and chain history are not dropped.
+-- Re-running is safe. This file only adds the columns.
 
 alter table public.accounts
   add column if not exists deactivated_at timestamptz,

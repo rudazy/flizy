@@ -276,9 +276,7 @@ export default function AccountPage() {
     }
   }
 
-  async function closeAccount(
-    body: { action: 'deactivate' } | { action: 'delete'; password: string }
-  ): Promise<string | null> {
+  async function closeAccount(body: { action: 'deactivate' }): Promise<string | null> {
     try {
       const res = await fetch('/api/account/closure', {
         method: 'POST',
@@ -534,7 +532,6 @@ export default function AccountPage() {
         open={closureOpen}
         onClose={() => setClosureOpen(false)}
         onDeactivate={() => closeAccount({ action: 'deactivate' })}
-        onDelete={(password) => closeAccount({ action: 'delete', password })}
       />
 
       <AppSlideNav
@@ -585,7 +582,7 @@ export default function AccountPage() {
           onSecurity={() => setSlide('security')}
           onSoon={comingSoon}
           onOpen={setSlide}
-          onDelete={() => setClosureOpen(true)}
+          onDeactivate={() => setClosureOpen(true)}
           onSignOut={() => void onSignOut()}
           emailPanel={
             profileEditor === 'email' ? (

@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     // Not a person. Answer exactly as a taken address does, so the response
     // cannot be used to find out which field is the trap.
     if (isHoneypotFilled(body)) {
-      return NextResponse.json({ error: 'Could not create that account.' }, { status: 400 });
+      return NextResponse.json({ error: 'This email already has an account. Sign in with it and the account comes back.' }, { status: 400 });
     }
 
     const email = parseEmail(body.email);
@@ -120,7 +120,10 @@ export async function POST(req: Request) {
 
     if (error) {
       if (String(error.message).includes('duplicate') || error.code === '23505') {
-        return NextResponse.json({ error: 'Could not create that account.' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'This email already has an account. Sign in with it and the account comes back.' },
+          { status: 400 }
+        );
       }
       return NextResponse.json(apiErrorBody(ROUTE, error), { status: 500 });
     }

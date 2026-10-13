@@ -20,7 +20,7 @@ describe('account profile layout', () => {
       'Stats & Social',
       'Privacy & Visibility',
       'Change banner',
-      'Delete account',
+      'Deactivate account',
       'Show trading stats',
       'Show followers & following',
       'Two-factor authentication',
@@ -65,19 +65,21 @@ describe('account profile layout', () => {
     assert.doesNotMatch(PROFILE, />\s*Follow\s*</);
   });
 
-  it('opens delete through the multi-step sheet', () => {
+  it('opens deactivate through the sheet and does not offer delete', () => {
     assert.doesNotMatch(PROFILE, /onSoon\('Delete account'\)/);
-    assert.match(PROFILE, /onDelete/);
+    assert.doesNotMatch(PROFILE, /Delete account/);
+    assert.match(PROFILE, /onDeactivate/);
     assert.match(PAGE, /AccountClosureSheet/);
     assert.match(PAGE, /action: 'deactivate'/);
-    assert.match(PAGE, /action: 'delete'/);
+    assert.doesNotMatch(PAGE, /action: 'delete'/);
     const sheet = fs.readFileSync(
       path.join(__dirname, '../web/components/AccountClosureSheet.tsx'),
       'utf8'
     );
     assert.match(sheet, /Deactivate/);
-    assert.match(sheet, /Proceed to delete/);
-    assert.match(sheet, /Account password/);
+    assert.doesNotMatch(sheet, /Proceed to delete/);
+    assert.doesNotMatch(sheet, /Delete account/);
+    assert.doesNotMatch(sheet, /cannot be restored/);
     assert.equal(sheet.includes('\u2014'), false);
     assert.doesNotMatch(sheet, /console\.(log|debug|info)/);
   });

@@ -28,10 +28,8 @@ export function LoginForm() {
     const params = new URLSearchParams(window.location.search);
     setNext(safeNext(params.get('next')));
     const account = params.get('account');
-    if (account === 'deleted') {
-      setAccountNote('This sign-in was deleted and cannot be restored.');
-    } else if (account === 'deactivated') {
-      setAccountNote('This account is paused. Enter the account password to bring it back.');
+    if (account === 'deleted' || account === 'deactivated') {
+      setAccountNote('This account is paused. Enter the same email and the account password to bring it back.');
     }
   }, []);
 

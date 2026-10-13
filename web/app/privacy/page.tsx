@@ -12,7 +12,7 @@ import { siteOrigin } from '../../lib/siteOrigin';
 export const metadata: Metadata = pageMetadata({
   title: 'Privacy policy | Flizy',
   description:
-    'What Flizy collects, why we hold it, who it is shared with, how long we keep it, and how to ask us to delete your account.',
+    'What Flizy collects, why we hold it, who it is shared with, how long we keep it, and how to pause your account.',
   path: '/privacy',
 });
 
@@ -94,8 +94,8 @@ export default function PrivacyPage() {
             </li>
             <li>
               <span className="text-paper">App background.</span> If you upload one, the image
-              is stored privately, shown only on your own signed-in pages, and deleted when you
-              replace it or delete the account.
+              is stored privately, shown only on your own signed-in pages, and removed when you
+              replace it. Pausing the account keeps it. Signing in brings it back.
             </li>
           </ul>
         </section>
@@ -202,24 +202,19 @@ export default function PrivacyPage() {
         </section>
 
         <section className="space-y-3">
-          <LegalH id="delete">Deleting your account</LegalH>
+          <LegalH id="delete">Deactivating your account</LegalH>
           <p>
             You can unlink WhatsApp, Telegram, GitHub, Discord, X, and TikTok yourself on
             Account. You can remove extra emails and trusted addresses there too.
           </p>
           <p>
-            Account has two ways to close the sign-in. Deactivate pauses it. Sign in
-            with the account password and it comes back. A new browser still asks for
-            the emailed code before the pause is lifted. Chat does not run while the
-            account is paused. Payments sent to the username or Flizy number can still
-            arrive.
-          </p>
-          <p>
-            Delete is a later step on the same screen and it asks for the account
-            password. It cannot be restored. Chat stops. The username and Flizy number
-            no longer receive payments. The button does not move funds, and delete is
-            refused while the Flizy wallet still holds ETH. The account row and the
-            wallet pointer stay. Confirmed chain transactions stay on the chain.
+            Deactivate is the only way to close the sign-in. It pauses the account.
+            Sign in later with the same email and the account password and that same
+            account opens again, including the wallet and the history. A new browser
+            still asks for the emailed code before the pause is lifted. Chat does not
+            run while the account is paused. Payments sent to the username or Flizy
+            number can still arrive. The button does not move funds. Confirmed chain
+            transactions stay on the chain.
           </p>
           <p>
             Unlink and extra-email removal stay available while the account is open.

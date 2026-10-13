@@ -1,6 +1,6 @@
 /**
- * Account pause and delete: the two copies of the predicate, and the gates
- * that have to stay in front of a burn, a spend, or a password-free deactivate.
+ * Account pause: the two copies of the predicate, and the gates that have
+ * to stay in front of a burn, a spend, or a password-free deactivate.
  *
  * Run: node --test test/accountClosure.test.js
  */
@@ -41,7 +41,7 @@ describe('account closure predicate', () => {
     web = await import('../web/lib/accountClosure.ts');
   });
 
-  it('treats delete as final and a pause as recoverable state', () => {
+  it('keeps a past delete closed until sign-in, ahead of a pause', () => {
     assert.equal(closureOf(null), 'open');
     assert.equal(closureOf({}), 'open');
     assert.equal(closureOf({ deactivated_at: 'x' }), 'deactivated');
@@ -63,34 +63,31 @@ describe('closure stays behind the password and ahead of the burn', () => {
   const root = path.join(__dirname, '..');
   const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-  it('asks for the password only on delete', () => {
+  it('pauses the account and does not write a delete', () => {
     const route = read('web/app/api/account/closure/route.ts');
     assert.match(route, /rejectIfCrossOrigin/);
     assert.match(route, /getAccountIdFromCookie/);
-    const deleteAt = route.indexOf("if (action === 'delete')");
-    const gateAt = route.indexOf('await requirePassword(');
-    assert.ok(deleteAt !== -1 && gateAt > deleteAt);
-    assert.equal(route.split('requirePassword(').length - 1, 1);
+    assert.doesNotMatch(route, /requirePassword\(/);
+    assert.doesNotMatch(route, /deleted_at: now/);
     assert.doesNotMatch(route, /console\.(log|debug|info|warn)\([^)]*password/);
     assert.match(route, /deactivated_at: now/);
-    assert.match(route, /deleted_at: now/);
-    assert.match(route, /\.lte\('balance_eth', 0\)/);
-    assert.match(route, /CHAIN_GIWA_SEPOLIA_RPC/);
-    assert.match(route, /staticNetwork: true/);
+    assert.match(route, /body\.action !== 'deactivate'/);
     const pauseAt = route.indexOf('deactivated_at: now');
-    const pauseRowAt = route.indexOf("if (!paused)");
+    const pauseRowAt = route.indexOf('if (!paused)');
     assert.ok(pauseAt !== -1 && pauseRowAt > pauseAt);
   });
 
-  it('refuses a deleted sign-in only after the password matches', () => {
+  it('restores a paused or previously closed account after the password matches', () => {
     const login = read('web/app/api/auth/login/route.ts');
     const matchAt = login.indexOf("error: 'Invalid credentials'");
-    const deletedAt = login.indexOf("code: 'ACCOUNT_DELETED'");
+    const codeAt = login.indexOf('needsCode: true');
     const sessionAt = login.indexOf('await createSession(');
     const revokeAt = login.indexOf('await revokeAllSessions(data.id)');
-    const restoreAt = login.indexOf('.update({ deactivated_at: null })');
-    assert.ok(matchAt !== -1 && deletedAt > matchAt);
-    assert.ok(revokeAt > deletedAt && restoreAt > revokeAt && sessionAt > restoreAt);
+    const restoreAt = login.indexOf('deactivated_at: null, deleted_at: null');
+    assert.doesNotMatch(login, /ACCOUNT_DELETED/);
+    assert.doesNotMatch(login, /cannot be restored/);
+    assert.ok(matchAt !== -1 && codeAt > matchAt);
+    assert.ok(revokeAt > codeAt && restoreAt > revokeAt && sessionAt > restoreAt);
   });
 
   it('does not burn a link code for a closed account', () => {
@@ -105,12 +102,15 @@ describe('closure stays behind the password and ahead of the burn', () => {
     const replyAt = router.indexOf('const closedChat = closureReply(account)');
     const lockAt = router.indexOf('parseLockCommand(text)');
     assert.ok(replyAt !== -1 && lockAt !== -1 && replyAt < lockAt);
-    assert.match(router, /This Flizy account was deleted\. Chat can no longer use it\./);
+    assert.doesNotMatch(router, /Chat can no longer use it/);
     assert.match(
       router,
-      /This Flizy account is deactivated\. Sign in on the Flizy site with your account password to restore it\./
+      /This Flizy account is paused\. Sign in on the Flizy site with your account password to restore it\./
     );
-    assert.match(router, /That Flizy account is deactivated or deleted, so this chat was not linked\./);
+    assert.match(
+      router,
+      /That Flizy account is paused\. Sign in on the Flizy site with the account password, then link again\./
+    );
   });
 
   it('rejects a session whose account row is gone', () => {
