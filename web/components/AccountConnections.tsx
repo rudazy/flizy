@@ -3,6 +3,7 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { HeroArt, PREF_CARD, PrefHero } from './AccountPrefs';
+import type { LinkCode } from '../lib/dashboardTypes';
 
 /**
  * Account Chat and Trusted slides, and the brand tiles Platforms shares.
@@ -203,7 +204,6 @@ export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: 
 // ---------------------------------------------------------------------------
 
 type ChatLink = { channel: string; phone: string | null; has_phone: boolean };
-type LinkCode = { code: string; waDeepLink: string; telegramDeepLink?: string | null; expiresAt: string };
 
 const CHAT_APPS: Array<'whatsapp' | 'telegram'> = ['whatsapp', 'telegram'];
 
@@ -224,7 +224,8 @@ export function ChatAppsPanel({
   links: ChatLink[];
   code: LinkCode | null;
   generating: boolean;
-  onGenerate: () => void;
+  /** Mint a code with the account password. Resolves null when refused. */
+  onGenerate: (password: string) => Promise<LinkCode | null>;
   /** The app whose password prompt is open. */
   unlinking: string | null;
   password: string;
@@ -237,6 +238,9 @@ export function ChatAppsPanel({
   onStart: (channel: 'whatsapp' | 'telegram') => void;
 }) {
   const [copied, setCopied] = useState(false);
+  // A code hands a chat control of the account, so minting one takes the password.
+  const [askingPassword, setAskingPassword] = useState(false);
+  const [generatePassword, setGeneratePassword] = useState('');
   const linkedCount = CHAT_APPS.filter((app) => links.some((l) => l.channel === app)).length;
 
   async function copyMessage() {
@@ -324,7 +328,7 @@ export function ChatAppsPanel({
 
         <button
           type="button"
-          onClick={onGenerate}
+          onClick={() => setAskingPassword((open) => !open)}
           disabled={generating}
           className="btn-sun relative mt-1 flex h-[54px] w-full items-center justify-center overflow-hidden rounded-[12px] font-sans text-[16px] font-semibold disabled:opacity-60"
         >
@@ -334,6 +338,28 @@ export function ChatAppsPanel({
             <ChevronGlyph />
           </span>
         </button>
+
+        {askingPassword ? (
+          <ConfirmPassword
+            intro="A link code lets a chat app operate this account. Enter your password to create one."
+            value={generatePassword}
+            onChange={setGeneratePassword}
+            onSubmit={() => {
+              void onGenerate(generatePassword).then((minted) => {
+                if (!minted) return;
+                setGeneratePassword('');
+                setAskingPassword(false);
+              });
+            }}
+            onCancel={() => {
+              setGeneratePassword('');
+              setAskingPassword(false);
+            }}
+            busy={generating}
+            confirmLabel="Create link code"
+            busyLabel="Generating..."
+          />
+        ) : null}
 
         {code ? (
           <div className="grid gap-3 rounded-[16px] border border-[#5a4a1f] bg-[linear-gradient(180deg,rgba(247,208,71,0.07),rgba(247,208,71,0.01))] p-4">

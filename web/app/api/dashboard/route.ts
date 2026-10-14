@@ -87,32 +87,15 @@ export async function GET() {
 
     const trusted = await listTrusted(accountId);
 
-    const { data: linkRow } = await supabase
-      .from('link_codes')
-      .select('code, expires_at')
+    // Whether a chat app is linked, never the live link code. The code is a
+    // credential that attaches a chat to this account, so it is returned only by
+    // POST /api/link/create, to the browser that proved the password.
+    const { count: chatCount } = await supabase
+      .from('channel_identities')
+      .select('id', { count: 'exact', head: true })
       .eq('account_id', accountId)
-      .is('used_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    let link = null;
-    if (linkRow) {
-      const { botWhatsAppNumber, telegramBotUsername } = getSiteConfig();
-      const prefill = encodeURIComponent(`flizy link ${linkRow.code}`);
-      link = {
-        code: linkRow.code,
-        expiresAt: linkRow.expires_at,
-        waDeepLink: botWhatsAppNumber
-          ? `https://wa.me/${botWhatsAppNumber}?text=${prefill}`
-          : `https://wa.me/?text=${prefill}`,
-        // Same code, any channel. Telegram fills it in via the start parameter.
-        telegramDeepLink: telegramBotUsername
-          ? `https://t.me/${telegramBotUsername}?start=${linkRow.code}`
-          : null,
-      };
-    }
+      .in('channel', ['whatsapp', 'telegram']);
+    const chatLinked = (chatCount || 0) > 0;
 
     let pendingClaims: Awaited<ReturnType<typeof listPendingClaimSummaries>> = [];
     try {
@@ -155,7 +138,7 @@ export async function GET() {
     return NextResponse.json({
       account: toPublicAccount(account),
       trusted,
-      link,
+      chatLinked,
       pendingClaims,
       invite,
       pay,

@@ -9,9 +9,10 @@ const assert = require('node:assert/strict');
 // Policy reads the unlock state itself (lib/session.js sessionGate). The
 // database it reads is a fake, so no test here can reach a real one.
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+const { PIN_HASH_PRESENT, unlockedSession } = require('./helpers/unlockedChat');
 const fake = createFakeSupabase({
   accounts: [
-    { id: 'acc-ok', unlock_pin_hash: null },
+    { id: 'acc-ok', unlock_pin_hash: PIN_HASH_PRESENT },
     { id: 'acc-locked', unlock_pin_hash: 'pin-hash-present' },
   ],
   sessions: [
@@ -22,6 +23,7 @@ const fake = createFakeSupabase({
       is_locked: true,
       expires_at: new Date(0).toISOString(),
     },
+    unlockedSession('acc-ok', 'whatsapp', '2348012345678'),
   ],
 });
 mockSupabaseModule({ from: (table) => fake.client.from(table) });

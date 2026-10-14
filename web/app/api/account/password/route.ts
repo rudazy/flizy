@@ -6,6 +6,13 @@ import { requirePassword } from '../../../../lib/passwordGate.ts';
 import { validatePassword } from '../../../../lib/passwordPolicy';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { apiErrorBody, logApiError } from '../../../../lib/apiError';
+import {
+  listLinkedChats,
+  lockAllChats,
+  mailOwner,
+  passwordChangedMail,
+} from '../../../../lib/securityNotice.ts';
+import { siteOrigin } from '../../../../lib/siteOrigin';
 
 const ROUTE = 'POST /api/account/password';
 
@@ -18,8 +25,12 @@ const ROUTE = 'POST /api/account/password';
  *
  * Every session is then revoked and this browser gets a fresh one: a password
  * is changed most often because it may have leaked, and a changed credential
- * must not leave old sessions alive (see revokeAllSessions). Chat is not
- * signed out; it is gated by the PIN, not the password.
+ * must not leave old sessions alive (see revokeAllSessions).
+ *
+ * Every linked chat is locked too, so a chat someone attached with a stolen
+ * password cannot keep spending once the owner changes it: each chat has to
+ * unlock again with the PIN. The owner is emailed the list of linked chats so
+ * they can spot one they do not recognise.
  */
 export async function POST(req: Request) {
   try {
@@ -71,7 +82,21 @@ export async function POST(req: Request) {
         logApiError(ROUTE, err, { accountId, step: 'session' });
       }
     }
-    return NextResponse.json({ ok: true, signedOutElsewhere, stillSignedIn });
+    let chatsLocked = true;
+    try {
+      await lockAllChats(supabase, accountId);
+    } catch (err) {
+      chatsLocked = false;
+      logApiError(ROUTE, err, { accountId, step: 'lock-chats' });
+    }
+    let chats: Awaited<ReturnType<typeof listLinkedChats>> = [];
+    try {
+      chats = await listLinkedChats(supabase, accountId);
+    } catch (err) {
+      logApiError(ROUTE, err, { accountId, step: 'list-chats' });
+    }
+    await mailOwner(supabase, accountId, passwordChangedMail(siteOrigin(), chats, new Date(), chatsLocked));
+    return NextResponse.json({ ok: true, signedOutElsewhere, stillSignedIn, chatsLocked });
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }

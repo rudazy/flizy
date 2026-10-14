@@ -13,12 +13,16 @@ function isProd(): boolean {
   return process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 }
 
+/**
+ * The site's own origins. The local dev server's addresses are added only off
+ * production: in production a page served from localhost is not Flizy, and
+ * nothing should treat it as Flizy.
+ */
 function allowedOrigins(): string[] {
   const raw = [
     process.env.NEXT_PUBLIC_SITE_URL,
     process.env.SITE_URL,
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
+    ...(isProd() ? [] : ['http://localhost:3000', 'http://127.0.0.1:3000']),
   ];
   return raw
     .filter((u): u is string => Boolean(u))

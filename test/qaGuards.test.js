@@ -296,8 +296,10 @@ describe('sign-in and sign-up', () => {
 
 describe('account ids stay on the server', () => {
   it('drops account_id from the legacy transfers rows History returns', () => {
+    // Rows are projected to an allowlist, which drops account_id and the
+    // sender's phone (test/securityNotice.test.js covers the projection).
     const route = read('web/app/api/history/route.ts');
-    assert.match(route, /const \{ account_id: _accountId, \.\.\.rest \} = e\.row;/);
+    assert.match(route, /\.map\(\(e: HistoryEntry\) => publicTransferRow\(e\.row\)\)/);
     assert.match(route, /transfers: transferRows\.slice\(0, 30\)/);
   });
 

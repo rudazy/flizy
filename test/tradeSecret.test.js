@@ -14,6 +14,7 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+const { unlockedSession } = require('./helpers/unlockedChat');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
 const { hashPin, hashPassword } = require('../lib/cryptoPin');
 
@@ -134,7 +135,7 @@ function seed({ pin = true } = {}) {
     ],
     link_codes: [],
     users: [],
-    sessions: [],
+    sessions: pin ? [unlockedSession('acc-trader', 'telegram', TG)] : [],
     trusted_addresses: [],
     transfers: [],
   });

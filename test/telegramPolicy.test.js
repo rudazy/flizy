@@ -10,24 +10,29 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 // Policy reads the unlock state itself (lib/session.js sessionGate), so the
-// database it reads is a fake: acc-ok has no PIN, acc-locked has a PIN and a
-// locked session on both channels.
+// database it reads is a fake: acc-ok has a PIN and a live unlock on both
+// channels, acc-locked has a PIN and a locked session on both channels.
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+const { PIN_HASH_PRESENT, unlockedSession } = require('./helpers/unlockedChat');
 
 const WA_ID = '2348012345678';
 const TG_ID = '778899123';
 const fake = createFakeSupabase({
   accounts: [
-    { id: 'acc-ok', unlock_pin_hash: null, password_hash: 'x' },
+    { id: 'acc-ok', unlock_pin_hash: PIN_HASH_PRESENT, password_hash: 'x' },
     { id: 'acc-locked', unlock_pin_hash: 'pin-hash-present', password_hash: 'x' },
   ],
-  sessions: [WA_ID, TG_ID].map((externalId) => ({
-    account_id: 'acc-locked',
-    channel: externalId === TG_ID ? 'telegram' : 'whatsapp',
-    external_id: externalId,
-    is_locked: true,
-    expires_at: new Date(0).toISOString(),
-  })),
+  sessions: [
+    ...[WA_ID, TG_ID].map((externalId) => ({
+      account_id: 'acc-locked',
+      channel: externalId === TG_ID ? 'telegram' : 'whatsapp',
+      external_id: externalId,
+      is_locked: true,
+      expires_at: new Date(0).toISOString(),
+    })),
+    unlockedSession('acc-ok', 'whatsapp', WA_ID),
+    unlockedSession('acc-ok', 'telegram', TG_ID),
+  ],
 });
 mockSupabaseModule({ from: (table) => fake.client.from(table) });
 

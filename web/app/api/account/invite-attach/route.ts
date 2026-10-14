@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
 import { apiErrorBody } from '../../../../lib/apiError';
@@ -6,6 +7,8 @@ import { apiErrorBody } from '../../../../lib/apiError';
 const ROUTE = 'POST /api/account/invite-attach';
 
 export async function POST(req: Request) {
+  const denied = rejectIfCrossOrigin(req);
+  if (denied) return denied;
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) {

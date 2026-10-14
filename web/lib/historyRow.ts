@@ -63,3 +63,34 @@ export function historyCategory(
   if (type === 'receive') return 'receive';
   return 'send';
 }
+
+/** The fields of a transfer row the site may hand to a browser. */
+const PUBLIC_TRANSFER_FIELDS = [
+  'id',
+  'amount_eth',
+  'to_address',
+  'status',
+  'tx_hash',
+  'created_at',
+  'kind',
+  'asset',
+] as const;
+
+export type PublicTransferRow = { [K in (typeof PUBLIC_TRANSFER_FIELDS)[number]]?: unknown };
+
+/**
+ * A transfer row reduced to what the browser renders.
+ *
+ * History reads rows the reader received as well as rows they sent, and a
+ * received row is the sender's: its phone column is the sender's chat identity
+ * key (a phone number, WhatsApp LID or Telegram id) and its account_id is the
+ * sender's account. An allowlist rather than deleting known-bad keys, so a
+ * column added to the select later cannot leak by default.
+ */
+export function publicTransferRow(row: Record<string, unknown>): PublicTransferRow {
+  const out: PublicTransferRow = {};
+  for (const key of PUBLIC_TRANSFER_FIELDS) {
+    if (key in row) out[key] = row[key];
+  }
+  return out;
+}

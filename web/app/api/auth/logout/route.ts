@@ -3,12 +3,15 @@
  */
 
 import { NextResponse } from 'next/server';
+import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { clearAccountCookie } from '../../../../lib/cookies';
 import { apiErrorBody } from '../../../../lib/apiError';
 
 const ROUTE = 'POST /api/auth/logout';
 
-export async function POST() {
+export async function POST(req: Request) {
+  const denied = rejectIfCrossOrigin(req);
+  if (denied) return denied;
   try {
     await clearAccountCookie();
     return NextResponse.json({ ok: true });

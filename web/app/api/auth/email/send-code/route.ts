@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rejectIfCrossOrigin } from '../../../../../lib/requestOrigin.ts';
 import { getAccountIdFromCookie } from '../../../../../lib/cookies';
 import { getSupabase } from '../../../../../lib/supabase';
 import { parseEmail } from '../../../../../lib/email';
@@ -11,6 +12,8 @@ import { apiErrorBody } from '../../../../../lib/apiError';
 const ROUTE = 'POST /api/auth/email/send-code';
 
 export async function POST(req: Request) {
+  const denied = rejectIfCrossOrigin(req);
+  if (denied) return denied;
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) {

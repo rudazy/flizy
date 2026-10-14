@@ -94,7 +94,13 @@ describe('POST /api/account/password', () => {
   it('signs out every other session and renews this one, and says so honestly', () => {
     assert.match(ROUTE_SRC, /await revokeAllSessions\(accountId\);/);
     assert.match(ROUTE_SRC, /if \(signedOutElsewhere\) \{\s*try \{\s*await createSession\(accountId\);/);
-    assert.match(ROUTE_SRC, /NextResponse\.json\(\{ ok: true, signedOutElsewhere, stillSignedIn \}\)/);
+    assert.match(ROUTE_SRC, /NextResponse\.json\(\{ ok: true, signedOutElsewhere, stillSignedIn, chatsLocked \}\)/);
+  });
+
+  it('locks every linked chat and emails the owner the list of chats', () => {
+    assert.match(ROUTE_SRC, /await lockAllChats\(supabase, accountId\);/);
+    assert.match(ROUTE_SRC, /chats = await listLinkedChats\(supabase, accountId\);/);
+    assert.match(ROUTE_SRC, /passwordChangedMail\(siteOrigin\(\), chats, new Date\(\), chatsLocked\)/);
   });
 });
 

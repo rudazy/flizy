@@ -3,6 +3,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
 import { toPublicAccount } from '../../../../lib/publicAccount';
@@ -15,6 +16,8 @@ const ACCOUNT_SELECT =
   'email, display_name, username, username_changed_at, locale, agent_wallet_address, balance_eth, unlock_pin_hash, daily_send_limit_eth';
 
 export async function POST(req: Request) {
+  const denied = rejectIfCrossOrigin(req);
+  if (denied) return denied;
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) {

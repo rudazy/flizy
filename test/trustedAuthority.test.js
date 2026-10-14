@@ -21,6 +21,7 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+const { unlockAllChats } = require('./helpers/unlockedChat');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
 
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
@@ -104,6 +105,7 @@ function seed(trustedRows = []) {
     sessions: [],
     notifications: [],
   });
+  unlockAllChats(fake.db.tables);
 }
 
 const rows = () => fake.db.tables.trusted_addresses || [];

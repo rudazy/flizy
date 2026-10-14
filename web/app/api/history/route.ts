@@ -5,7 +5,13 @@ import { getSupabase } from '../../../lib/supabase';
 import { apiErrorBody } from '../../../lib/apiError';
 import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
 import { ethUsd } from '../../../lib/ethUsd.ts';
-import { assetSymbol, channelLabel, historyCategory, type HistoryCategory } from '../../../lib/historyRow.ts';
+import {
+  assetSymbol,
+  channelLabel,
+  historyCategory,
+  publicTransferRow,
+  type HistoryCategory,
+} from '../../../lib/historyRow.ts';
 // Shared with chat history — platform claims must show GitHub pay / Phone / X pay
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
@@ -254,15 +260,12 @@ export async function GET() {
       items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
 
-    // The rows carry account_id so a received payment can be named; that id is
-    // another account's on a received row, so it never leaves the server.
+    // The rows carry account_id and phone so a received payment can be named.
+    // On a received row both are the sender's, so only the rendered fields leave
+    // the server (publicTransferRow).
     const transferRows = settled.items
       .filter((e: HistoryEntry) => e.source === 'transfer')
-      .map((e: HistoryEntry) => {
-        const { account_id: _accountId, ...rest } = e.row;
-        void _accountId;
-        return rest;
-      });
+      .map((e: HistoryEntry) => publicTransferRow(e.row));
 
     // Money already sent to this user and not yet collected. Kept out of the
     // settled list on purpose: it is not something that happened, it is

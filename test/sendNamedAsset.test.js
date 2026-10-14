@@ -128,6 +128,7 @@ const router = require('../lib/router');
 const { scanOwnedTokenIds } = realHoldings;
 const { parseSendNamedAssetCommand } = router;
 const { canonicalizeCommand } = require('../lib/commandAliases');
+const { PIN_HASH_PRESENT, unlockedSession } = require('./helpers/unlockedChat');
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -142,10 +143,11 @@ function seed() {
       agent_wallet_address: SENDER_WALLET,
       balance_eth: 5,
       is_admin: false,
-      unlock_pin_hash: null,
+      unlock_pin_hash: PIN_HASH_PRESENT,
       daily_send_limit_eth: null,
     },
   ];
+  fake.db.tables.sessions = [unlockedSession('acc-sender', 'whatsapp', SENDER_WA)];
   fake.db.tables.channel_identities = [
     {
       id: 'id-sender',

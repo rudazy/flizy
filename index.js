@@ -32,6 +32,7 @@ const {
 const { publicErrorMessage } = require('./lib/sanitize');
 const { CHANNELS } = require('./lib/identity');
 const { normalizePhoneNumber, isPlausiblePhone } = require('./lib/phone');
+const { isBotSelfChat } = require('./lib/whatsappSelfChat');
 const { registerChannelSender, startOutboxDrain } = require('./lib/notify');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const router = require('./lib/router');
@@ -194,62 +195,12 @@ async function isAllowedBotChat(message) {
     return true;
   }
 
+  // A message the bot account sent counts only in the bot's own chat. Anywhere
+  // else it would act as the person on the other end (lib/whatsappSelfChat.js).
   const botUser = normalizePhoneNumber(client.info?.wid?.user || botWhatsAppNumber || '');
-  const peer = peerPhone(message);
-  const idStr = String(chatId || '');
-  const fromN = normalizePhoneNumber(message.from);
-  const toN = normalizePhoneNumber(message.to);
-
-  // Classic Message yourself: from and to are the same account
-  if (fromN && toN && fromN === toN) {
-    return true;
-  }
-
-  const isSelfById =
-    (botUser && peer === botUser) ||
-    (botUser && idStr.includes(botUser)) ||
-    (botUser && fromN === botUser) ||
-    (botUser && toN === botUser);
-
-  if (isSelfById) {
-    return true;
-  }
-
-  try {
-    const chat = await message.getChat();
-    if (chat.isGroup) {
-      console.log('[skip] group chat');
-      return false;
-    }
-    const title = `${chat.name || ''} ${chat.formattedTitle || ''}`.toLowerCase();
-    const serialized = String(chat.id?._serialized || chat.id || '');
-    const isSelfByName =
-      title.includes('yourself') ||
-      title.includes('(you)') ||
-      title.includes('message yourself') ||
-      /\byou\b/.test(title);
-    const isSelfBySerialized = botUser && serialized.includes(botUser);
-
-    if (isSelfByName || isSelfBySerialized) {
-      return true;
-    }
-
-    console.log(
-      `[skip] fromMe outside Message yourself title=${JSON.stringify(chat.name)} peer=${peer}`
-    );
-    return false;
-  } catch (err) {
-    console.warn('getChat failed (fromMe):', err && err.message ? err.message : err);
-    if (botUser && peer && (peer === botUser || idStr.includes(botUser))) {
-      return true;
-    }
-    if (process.env.BOT_ALLOW_SELF_ON_GETCHAT_FAIL === '1') {
-      console.warn('[allow] fromMe self fallback (BOT_ALLOW_SELF_ON_GETCHAT_FAIL=1) peer=', peer);
-      return true;
-    }
-    console.log(`[skip] fromMe getChat failed and peer not bot peer=${peer} chatId=${idStr}`);
-    return false;
-  }
+  if (isBotSelfChat(message, botUser, normalizePhoneNumber)) return true;
+  console.log('[skip] fromMe outside the bot self chat');
+  return false;
 }
 
 // ---------------------------------------------------------------------------

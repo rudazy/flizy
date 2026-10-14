@@ -48,7 +48,7 @@ export default function DashboardHomePage() {
     data,
     holdings,
     activity,
-    generateLink,
+    linkCode,
     busy,
     refreshing,
     refreshAll,
@@ -135,9 +135,9 @@ export default function DashboardHomePage() {
         href: '/dashboard/account?s=trusted',
       },
       {
-        done: Boolean(data.link),
+        done: Boolean(data.chatLinked),
         title: 'Chat app',
-        body: data.link ? 'Code ready to link' : 'Generate code on Account',
+        body: data.chatLinked ? 'Linked' : 'Link one on Account',
         href: '/dashboard/account?s=chat',
       },
     ];
@@ -473,8 +473,8 @@ export default function DashboardHomePage() {
                 subtitle="Nothing needs attention. Money moves in chat."
                 action={<Badge>Ready</Badge>}
               />
-              {data.link ? (
-                <p className="m-0 mt-[10px] font-mono text-[9.5px] text-sun">Link code ready: {data.link.code}</p>
+              {linkCode ? (
+                <p className="m-0 mt-[10px] font-mono text-[9.5px] text-sun">Link code ready: {linkCode.code}</p>
               ) : null}
             </AppCard>
           ) : null}
@@ -628,21 +628,14 @@ export default function DashboardHomePage() {
           </div>
           <div className="mt-[12px] border-t border-[#1f1f22] pt-[11px]">
             <p className="m-0 font-mono text-[8px] uppercase tracking-[0.1em] text-[#d0d0d0]">Chat link</p>
-            <button
-              type="button"
-              className="btn-sun mt-[7px] h-[31px] w-full rounded-[4px] font-sans text-[10.5px]"
-              onClick={() => generateLink()}
-              disabled={busy === 'link'}
-            >
-              {busy === 'link' ? 'Working...' : data.link ? 'New code' : 'Generate link code'}
-            </button>
-            {data.link ? <p className="m-0 mt-[7px] font-mono text-[10px] text-sun">{data.link.code}</p> : null}
+            {/* A code takes the account password, which is asked on Account. */}
             <Link
               href="/dashboard/account?s=chat"
-              className="mt-[7px] inline-block font-sans text-[9px] text-[#e6e6e6] no-underline hover:text-white"
+              className="btn-sun mt-[7px] flex h-[31px] w-full items-center justify-center rounded-[4px] font-sans text-[10.5px] no-underline"
             >
-              Full chat link options
+              {data.chatLinked ? 'Manage chat apps' : 'Link a chat app'}
             </Link>
+            {linkCode ? <p className="m-0 mt-[7px] font-mono text-[10px] text-sun">{linkCode.code}</p> : null}
           </div>
         </AppCard>
       ) : null}

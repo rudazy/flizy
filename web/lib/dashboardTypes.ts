@@ -38,13 +38,8 @@ export type DashboardData = {
     default_country_iso?: string | null;
   };
   trusted: Array<{ address: string; label: string }>;
-  link?: {
-    code: string;
-    waDeepLink: string;
-    /** null when TELEGRAM_BOT_USERNAME is not configured */
-    telegramDeepLink?: string | null;
-    expiresAt: string;
-  } | null;
+  /** Whether a WhatsApp or Telegram chat is linked. The live link code is never here. */
+  chatLinked?: boolean;
   /** Claims this account can receive after proving phone / platform identity */
   pendingClaims?: PendingClaimItem[];
   /**
@@ -181,3 +176,15 @@ export function isHeld(balance: string | null | undefined): boolean {
   if (!Number.isFinite(n)) return true;
   return n > 0;
 }
+
+/**
+ * A chat link code as POST /api/link/create returns it. It is held in browser
+ * memory only, by the page that proved the password to mint it.
+ */
+export type LinkCode = {
+  code: string;
+  waDeepLink: string;
+  /** null when TELEGRAM_BOT_USERNAME is not configured */
+  telegramDeepLink?: string | null;
+  expiresAt: string;
+};

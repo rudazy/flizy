@@ -4,8 +4,8 @@
  * They are handed who is acting (account, channel, external id) and look the
  * session up. Nothing the caller says about being unlocked is consulted, so a
  * new entry point cannot pass the check by claiming it. A missing context, an
- * unknown account and a failed read all deny. No PIN set still means no unlock
- * prompt, the rule chat has always had.
+ * unknown account and a failed read all deny. So do an account with no PIN and
+ * a chat that has never unlocked (no session row).
  *
  * Run: node --test test/sessionGate.test.js
  */
@@ -79,13 +79,21 @@ describe('sessionGate', () => {
     assert.deepEqual(gate, { ok: false, reason: 'no_context' });
   });
 
-  it('does not prompt when no PIN is set', async () => {
-    seed({ pin: false, session: { is_locked: false, expires_at: past() } });
-    assert.deepEqual(await sessionGate(actor(), { requireUnlock: true }), { ok: true });
+  it('denies an account with no PIN, whatever its session says', async () => {
+    // A chat cannot move money until the account has a PIN, set on the site.
+    seed({ pin: false });
+    assert.deepEqual(await sessionGate(actor(), { requireUnlock: true }), { ok: false, reason: 'no_pin' });
+    seed({ pin: false, session: { is_locked: false, expires_at: future() } });
+    assert.deepEqual(await sessionGate(actor(), { requireUnlock: true }), { ok: false, reason: 'no_pin' });
   });
 
-  it('allows a PIN account with no session row, as chat always has', async () => {
-    assert.deepEqual(await sessionGate(actor(), { requireUnlock: true }), { ok: true });
+  it('denies a PIN account with no session row: a newly linked chat starts locked', async () => {
+    // A link code alone (minted from a site session) attaches a chat with no
+    // session row. That chat must unlock with the PIN before it can spend.
+    assert.deepEqual(await sessionGate(actor(), { requireUnlock: true }), {
+      ok: false,
+      reason: 'session_locked',
+    });
   });
 
   it('allows a live unlocked session', async () => {

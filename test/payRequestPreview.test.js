@@ -13,6 +13,7 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+const { PIN_HASH_PRESENT, unlockedSession } = require('./helpers/unlockedChat');
 
 process.env.WALLET_DERIVATION_SECRET =
   process.env.WALLET_DERIVATION_SECRET || 'test-derivation-secret';
@@ -201,7 +202,11 @@ describe('a pay-request preview names the requester', () => {
 describe('the preview says the recipient is not on the trusted list', () => {
   beforeEach(() => {
     fake = createFakeSupabase({
-      accounts: [{ id: PAYER_ACCOUNT }, { id: REQUESTER_ACCOUNT, display_name: 'Ada Obi' }],
+      accounts: [
+        { id: PAYER_ACCOUNT, unlock_pin_hash: PIN_HASH_PRESENT },
+        { id: REQUESTER_ACCOUNT, display_name: 'Ada Obi' },
+      ],
+      sessions: [unlockedSession(PAYER_ACCOUNT, 'whatsapp', '2349000000000')],
     });
     require.cache[runtimePath].exports.supabase = { from: (table) => fake.client.from(table) };
   });
@@ -231,7 +236,11 @@ describe('the preview says the recipient is not on the trusted list', () => {
 describe('skipTrusted stays on for pay-request (decided, not incidental)', () => {
   beforeEach(() => {
     fake = createFakeSupabase({
-      accounts: [{ id: PAYER_ACCOUNT }, { id: REQUESTER_ACCOUNT, display_name: 'Ada Obi' }],
+      accounts: [
+        { id: PAYER_ACCOUNT, unlock_pin_hash: PIN_HASH_PRESENT },
+        { id: REQUESTER_ACCOUNT, display_name: 'Ada Obi' },
+      ],
+      sessions: [unlockedSession(PAYER_ACCOUNT, 'whatsapp', '2349000000000')],
     });
     require.cache[runtimePath].exports.supabase = { from: (table) => fake.client.from(table) };
   });

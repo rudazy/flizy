@@ -15,6 +15,7 @@ import type {
   ActivityItem,
   DashboardData,
   HoldingsData,
+  LinkCode,
   TransferRow,
   PendingClaimItem,
 } from '../lib/dashboardTypes';
@@ -39,7 +40,10 @@ type DashboardContextValue = {
   refreshing: boolean;
   load: () => Promise<void>;
   refreshAll: () => Promise<void>;
-  generateLink: () => Promise<{ code?: string; waDeepLink?: string; expiresAt?: string } | null | void>;
+  /** The chat link code this page minted, held in memory only. */
+  linkCode: LinkCode | null;
+  /** Mint a link code. Takes the account password; null when refused. */
+  generateLink: (password: string) => Promise<LinkCode | null>;
   addTrusted: (input: {
     address: string;
     label: string;
@@ -73,6 +77,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [historyUsdPerEth, setHistoryUsdPerEth] = useState<number | null>(null);
   const [waiting, setWaiting] = useState<PendingClaimItem[]>([]);
+  const [linkCode, setLinkCode] = useState<LinkCode | null>(null);
   const [holdings, setHoldings] = useState<HoldingsData | null>(null);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -190,11 +195,15 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     };
   }, [loadAccount]);
 
-  const generateLink = useCallback(async () => {
+  const generateLink = useCallback(async (password: string) => {
     setBusy('link');
     setMsg('');
     try {
-      const res = await fetch('/api/link/create', { method: 'POST' });
+      const res = await fetch('/api/link/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed');
       // Deliberately does not open a chat app. This used to open WhatsApp by
@@ -202,15 +211,15 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       // sending that prefilled message spent it, and the Telegram button beside
       // it was then pointing at a dead code. Let the user pick.
       track('link_code_generated');
-      await loadAccount();
-      return json as { code?: string; waDeepLink?: string; expiresAt?: string };
+      setLinkCode(json as LinkCode);
+      return json as LinkCode;
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Failed');
       return null;
     } finally {
       setBusy('');
     }
-  }, [loadAccount]);
+  }, []);
 
   const addTrusted = useCallback(
     async (input: { address: string; label: string; password: string; ticket?: string }) => {
@@ -436,6 +445,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       refreshing,
       load,
       refreshAll,
+      linkCode,
       generateLink,
       addTrusted,
       removeTrusted,
@@ -461,6 +471,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       refreshing,
       load,
       refreshAll,
+      linkCode,
       generateLink,
       addTrusted,
       removeTrusted,

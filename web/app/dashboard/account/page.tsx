@@ -58,6 +58,7 @@ export default function AccountPage() {
     setMsg,
     setBusy,
     load,
+    linkCode,
     generateLink,
     addTrusted,
     removeTrusted,
@@ -555,7 +556,7 @@ export default function AccountPage() {
                 ? `+${data.account.default_calling_code}`
                 : undefined,
           },
-          { id: 'chat', label: 'Chat', badge: data.link ? undefined : '!' },
+          { id: 'chat', label: 'Chat', badge: data.chatLinked ? undefined : '!' },
           { id: 'platforms', label: 'Platforms' },
           { id: 'trusted', label: 'Trusted', badge: String(data.trusted.length) },
           { id: 'pin', label: 'PIN', badge: data.account.has_pin ? undefined : '!' },
@@ -926,9 +927,9 @@ export default function AccountPage() {
       {slide === 'chat' ? (
         <ChatAppsPanel
           links={chatLinks}
-          code={data.link ?? null}
+          code={linkCode}
           generating={busy === 'link'}
-          onGenerate={() => void generateLink()}
+          onGenerate={generateLink}
           unlinking={unlinkChat}
           password={unlinkChatPassword}
           onPassword={setUnlinkChatPassword}

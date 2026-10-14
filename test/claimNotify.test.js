@@ -17,6 +17,7 @@ const { ethers } = require('ethers');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
+const { PIN_HASH_PRESENT, unlockedSession } = require('./helpers/unlockedChat');
 
 // Agent wallet derivation refuses to run without a secret, by design. These
 // paths derive an address, so give them the test fixture one.
@@ -90,7 +91,7 @@ function seed({ recipientOnFlizy = true, recipientChannels = ['whatsapp', 'teleg
       agent_wallet_address: '0x1111111111111111111111111111111111111111',
       balance_eth: 5,
       is_admin: false,
-      unlock_pin_hash: null,
+      unlock_pin_hash: PIN_HASH_PRESENT,
       daily_send_limit_eth: null,
     },
   ];
@@ -148,7 +149,7 @@ function seed({ recipientOnFlizy = true, recipientChannels = ['whatsapp', 'teleg
   fake.db.tables.accounts = accounts;
   fake.db.tables.channel_identities = identities;
   fake.db.tables.users = users;
-  fake.db.tables.sessions = [];
+  fake.db.tables.sessions = [unlockedSession('acc-sender', 'whatsapp', SENDER_WA)];
   fake.db.tables.claims = [];
   fake.db.tables.notifications = [];
   fake.db.tables.transfers = [];
@@ -311,6 +312,7 @@ describe('the recipient is notified the moment the claim is held', () => {
       external_id: '5566778899',
       phone_e164: null,
     });
+    fake.db.tables.sessions.push(unlockedSession('acc-sender', 'telegram', '5566778899'));
 
     await router.handle(tgCtx, '/send 0.01 to ' + RECIPIENT_PHONE);
     await router.handle(tgCtx, 'confirm');

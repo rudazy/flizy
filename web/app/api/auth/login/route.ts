@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { getSupabase } from '../../../../lib/supabase';
 import { hashPassword, verifyPassword } from '../../../../lib/cryptoPin';
 import { createSession, hasTrustedLoginDevice, revokeAllSessions } from '../../../../lib/cookies';
@@ -34,6 +35,8 @@ function lockedResponse(retryAfterText: string) {
 }
 
 export async function POST(req: Request) {
+  const denied = rejectIfCrossOrigin(req);
+  if (denied) return denied;
   try {
     const body = await req.json();
     const email = String(body.email || '')

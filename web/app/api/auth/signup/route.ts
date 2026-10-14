@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { getSupabase } from '../../../../lib/supabase';
 import { hashPassword } from '../../../../lib/cryptoPin';
 import { createSession } from '../../../../lib/cookies';
@@ -67,6 +68,8 @@ async function insertAccount(
  * refused anyway should not spend anyone's budget.
  */
 export async function POST(req: Request) {
+  const denied = rejectIfCrossOrigin(req);
+  if (denied) return denied;
   try {
     const body = await req.json();
 

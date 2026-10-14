@@ -107,6 +107,12 @@ describe('a local dev server on its own port only', () => {
     assert.equal(req('http://127.0.0.1:9999', PROD), false);
   });
 
+  it('does not accept the default dev origin in production either', () => {
+    // A page served from localhost:3000 is not Flizy once the site is live.
+    assert.equal(req('http://localhost:3000', PROD), false);
+    assert.equal(req('http://127.0.0.1:3000', PROD), false);
+  });
+
   it('still refuses anything dressed up to look local', () => {
     for (const o of [
       'http://localhost.evil.test',
