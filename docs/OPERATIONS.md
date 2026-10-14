@@ -209,9 +209,10 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `OUTBOX_DRAIN_MS` | Notification outbox poll, default 5000. Worst case delay for a cross-channel notice |
 | `SITE_URL` | Public site URL. Production: `https://flizy.app` (also set `NEXT_PUBLIC_SITE_URL` on Vercel) |
 | `ADMIN_PHONES` / `ADMIN_SETUP_SECRET` | Admin bootstrap |
-| `ENFORCE_TRUSTED` | Approved-destination enforcement on transfers |
+| `ENFORCE_TRUSTED` | Approved-destination enforcement on transfers. Keep `true`; the bots report `false` to Sentry at startup in production |
 | `ENFORCE_CREDIT` | Require internal credit before a send |
-| `REQUIRE_UNLOCK` | Require an unlocked session for sensitive actions |
+| `REQUIRE_UNLOCK` | Chat moves money only after a PIN unlock. Keep `true`; the bots report `false` to Sentry at startup in production |
+| `SECURITY_MAIL_SECRET` | Same value on the VPS and on Vercel. Lets a bot ask the site to email the owner when a chat is linked or unlinked. Unset: no email, reported at startup in production |
 | `REQUIRE_FLIZY_PREFIX` | Require the `flizy` prefix on WhatsApp |
 | `MAX_SEND_ETH` / `DEFAULT_DAILY_SEND_LIMIT_ETH` | Per-transaction and per-day caps |
 | `PENDING_TTL_MS` / `SESSION_TTL_MS` / `LINK_CODE_TTL_MS` | Plan, session and link code lifetimes |

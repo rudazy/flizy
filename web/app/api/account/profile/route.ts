@@ -15,6 +15,7 @@ import {
   validateUsername,
 } from '../../../../lib/username';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { hasControlChars } from '../../../../lib/sanitize.ts';
 import { ensureInviteCode, maybeMarkOnboarded } from '../../../../lib/invite.ts';
 
 const ROUTE = 'POST /api/account/profile';
@@ -37,6 +38,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: check.error }, { status: 400 });
     }
 
+    // Shown to other people in chat confirm screens, where a line break or a
+    // bidi control could forge or reorder a line. Refused rather than cleaned,
+    // so what is stored is what everyone sees.
+    if (hasControlChars(body.displayName ?? body.display_name ?? '')) {
+      return NextResponse.json(
+        { error: 'Display name cannot contain line breaks or hidden characters.' },
+        { status: 400 }
+      );
+    }
     const displayNameRaw = String(body.displayName ?? body.display_name ?? '').trim();
     const display_name = displayNameRaw ? displayNameRaw.slice(0, 64) : null;
 

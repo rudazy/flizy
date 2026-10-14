@@ -17,7 +17,14 @@ const { initSentry, installProcessHandlers } = require('./lib/sentry');
 initSentry('flizy-telegram');
 installProcessHandlers('flizy-telegram');
 // Fails fast on shared env (Supabase, RPC, keys) before anything else starts
-const { chain, opsWallet, escrowWallet, addressUrl, assertSchema } = require('./lib/runtime');
+const {
+  chain,
+  opsWallet,
+  escrowWallet,
+  addressUrl,
+  assertSchema,
+  checkSecurityConfig,
+} = require('./lib/runtime');
 const { config } = require('./lib/config');
 const { TelegramBot } = require('./lib/telegram/bot');
 
@@ -33,6 +40,7 @@ const bot = new TelegramBot({ token, pollTimeoutSec: config.telegramPollTimeoutS
 async function main() {
   // Schema before code. Refuses to poll if a migration has not been applied.
   await assertSchema();
+  checkSecurityConfig('flizy-telegram');
 
   console.log(`Chain:                  ${chain.name} (${chain.chainId})`);
   console.log(`Ops wallet (gas/infra): ${opsWallet.address}`);

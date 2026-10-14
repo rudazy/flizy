@@ -4,9 +4,9 @@
  *
  * Chat warnings only reach chats that are already linked, and an account that
  * lives on the web has none, so the moments that hand out control of the
- * account also go to the owner's email: creating a chat link code, and
- * changing the password (which lists every linked chat so the owner can spot
- * one they do not recognise).
+ * account also go to the owner's email: creating a chat link code, a chat
+ * being linked or unlinked, and changing the password (which lists every
+ * linked chat so the owner can spot one they do not recognise).
  *
  * Sending is best effort. A notice that fails to send is logged and never
  * undoes the action the owner just took. The mail text is built by pure
@@ -83,6 +83,81 @@ export function passwordChangedMail(
       `If you do not recognise one of them, unlink it now: ${siteUrl}/dashboard/account?s=chat`,
       'If you did not change your password, someone has it. Change it again and check your PIN.',
     ].join('\n'),
+  };
+}
+
+/** A chat link or unlink, as identity_events recorded it. */
+export type ChatEvent = { kind: 'linked' | 'unlinked'; channel: string; label: string; at: Date };
+
+const EVENT_TYPE: Record<ChatEvent['kind'], string> = { linked: 'LINKED', unlinked: 'UNLINKED' };
+
+/** How far back a chat event can be and still be mailed. */
+export const CHAT_EVENT_WINDOW_MS = 10 * 60 * 1000;
+
+export function chatChangeMail(siteUrl: string, event: ChatEvent, chats: LinkedChat[]): MailBody {
+  const name = `${CHAT_NAME[event.channel] || event.channel} (${event.label})`;
+  const list = chats.length
+    ? chats.map((c) => `  - ${CHAT_NAME[c.channel] || c.channel} (${c.label})`)
+    : ['  (none)'];
+  const ifNotYou =
+    event.kind === 'unlinked'
+      ? [
+          'If this was not you, someone has one of your linked chats and your PIN:',
+          `1. Change your password: ${siteUrl}/dashboard/account?s=security`,
+          '   This also locks every linked chat.',
+          `2. Set a new PIN: ${siteUrl}/dashboard/account`,
+        ]
+      : [
+          'If this was not you, someone has a link code for your account:',
+          `1. Unlink it: ${siteUrl}/dashboard/account?s=chat`,
+          `2. Change your password: ${siteUrl}/dashboard/account?s=security`,
+        ];
+  return {
+    subject:
+      event.kind === 'unlinked'
+        ? 'A chat was unlinked from your Flizy account'
+        : 'A chat was linked to your Flizy account',
+    text: [
+      event.kind === 'unlinked'
+        ? `${name} was unlinked from your Flizy account on ${event.at.toUTCString()}.`
+        : `${name} was linked to your Flizy account on ${event.at.toUTCString()}. It cannot move money until it is unlocked with your PIN.`,
+      '',
+      'Chats linked to this account now:',
+      ...list,
+      '',
+      ...ifNotYou,
+    ].join('\n'),
+  };
+}
+
+/**
+ * The newest chat link or unlink of this kind on the account, if it happened
+ * inside CHAT_EVENT_WINDOW_MS. The site mails only what this finds, so a
+ * caller can ask for a notice but cannot invent the event it describes.
+ */
+export async function recentChatEvent(
+  supabase: SupabaseClient,
+  accountId: string,
+  kind: ChatEvent['kind'],
+  now: Date = new Date()
+): Promise<ChatEvent | null> {
+  const { data, error } = await supabase
+    .from('identity_events')
+    .select('channel, external_id, display_handle, created_at')
+    .eq('account_id', accountId)
+    .eq('event_type', EVENT_TYPE[kind])
+    .in('channel', CHAT_CHANNELS)
+    .gte('created_at', new Date(now.getTime() - CHAT_EVENT_WINDOW_MS).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`could not read chat events: ${error.message}`);
+  if (!data) return null;
+  return {
+    kind,
+    channel: String(data.channel),
+    label: chatLabel(data),
+    at: new Date(String(data.created_at)),
   };
 }
 

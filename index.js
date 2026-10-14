@@ -27,6 +27,7 @@ const {
   addressUrl,
   getOpsBalanceEth,
   assertSchema,
+  checkSecurityConfig,
   supabase,
 } = require('./lib/runtime');
 const { publicErrorMessage } = require('./lib/sanitize');
@@ -453,6 +454,7 @@ async function main() {
   // Schema before code. A migration that has not been applied stops the process
   // here, rather than surfacing as "Something went wrong" to a user mid-flow.
   await assertSchema();
+  checkSecurityConfig('flizy-whatsapp');
   // Limit orders fill from this process only. It does not wait for WhatsApp:
   // an order is a chain action and needs no chat session. The claim on each
   // order is a conditional update, so a second process could not fill one twice.

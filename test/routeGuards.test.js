@@ -38,6 +38,7 @@ describe('every state-changing route checks the request Origin', () => {
    */
   const ORIGIN_EXEMPT = {
     withdraw: 'disabled: every method answers a fixed 403 and reads nothing',
+    'internal/security-mail': 'server to server: no cookie, a bearer secret instead (checked below)',
   };
   const ORIGIN_CHECK = /rejectIfCrossOrigin\(|generationCaller\(/;
 
@@ -51,6 +52,20 @@ describe('every state-changing route checks the request Origin', () => {
       .filter((f) => !ORIGIN_EXEMPT[rel(f)] && !ORIGIN_CHECK.test(read(f)))
       .map(rel);
     assert.deepEqual(missing, []);
+  });
+});
+
+describe('server-to-server routes take a bearer secret', () => {
+  it('every route under api/internal checks one before anything else', () => {
+    const internal = routeFiles().filter((f) => rel(f).startsWith('internal/'));
+    assert.ok(internal.length >= 1);
+    for (const file of internal) {
+      const src = read(file);
+      const handler = src.search(MUTATING);
+      const check = src.indexOf('bearerMatches(', handler);
+      assert.ok(handler > 0 && check > handler, rel(file));
+      assert.ok(src.indexOf('req.json()') > check, `${rel(file)} reads the body before the secret`);
+    }
   });
 });
 

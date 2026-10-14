@@ -1020,7 +1020,7 @@
       "kind": "table",
       "name": "identity_events",
       "providedBy": "20260802160000_identity_events.sql",
-      "requiredBy": "web/lib/channelBind.ts"
+      "requiredBy": "web/lib/channelBind.ts, web/lib/securityNotice.ts"
     },
     {
       "kind": "table",

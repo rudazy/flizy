@@ -21,11 +21,11 @@
  * never carries object names, only counts.
  */
 
-import { createHash, timingSafeEqual } from 'crypto';
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 
 import { apiErrorBody } from '@/lib/apiError';
+import { bearerMatches } from '@/lib/bearerSecret';
 import { checkSchema } from '@/lib/schemaGuard.mjs';
 import { getSupabase } from '@/lib/supabase.ts';
 import manifest from '@/lib/generated/schemaManifest.json';
@@ -56,16 +56,9 @@ const MONITOR_CONFIG = {
   recoveryThreshold: 1,
 } as const;
 
-/**
- * Constant time compare of an "Authorization: Bearer <secret>" header. Both
- * sides are hashed first so the comparison is fixed length and an early
- * length mismatch cannot reveal how long the secret is.
- */
+/** The bearer token Vercel Cron sends, checked in constant time. */
 function authorized(header: string | null): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || !header) return false;
-  const digest = (value: string) => createHash('sha256').update(value).digest();
-  return timingSafeEqual(digest(header), digest(`Bearer ${secret}`));
+  return bearerMatches(header, process.env.CRON_SECRET);
 }
 
 const NO_STORE = { 'cache-control': 'no-store' };

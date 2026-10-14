@@ -92,7 +92,7 @@ describe('the reply seam', () => {
    * path. The engine copy under test is the real string from
    * lib/engine/policy.js.
    */
-  const LOCKED = 'Session locked. Send:\n{{cmd:unlock your-pin}}';
+  const LOCKED = 'Session locked. Send: {{cmd:unlock}}\nThen reply with your unlock PIN.';
 
   async function replied(channel) {
     let got = null;
@@ -101,8 +101,13 @@ describe('the reply seam', () => {
   }
 
   it('renders the locked refusal in each channel own dialect', async () => {
-    assert.equal(await replied('whatsapp'), 'Session locked. Send:\nflizy unlock your-pin');
-    assert.equal(await replied('telegram'), 'Session locked. Send:\n/unlock your-pin');
+    assert.equal(await replied('whatsapp'), 'Session locked. Send: flizy unlock\nThen reply with your unlock PIN.');
+    assert.equal(await replied('telegram'), 'Session locked. Send: /unlock\nThen reply with your unlock PIN.');
+  });
+
+  it('is the string the policy actually sends', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'lib', 'engine', 'policy.js'), 'utf8');
+    assert.ok(src.includes(`session_locked: '${LOCKED.replace('\n', '\\n')}',`));
   });
 });
 
