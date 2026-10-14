@@ -3,24 +3,42 @@
  *
  * WHY THIS DUPLICATION EXISTS: the Vercel Root Directory is web, so ../lib is
  * never uploaded to the deploy (see the same note in web/lib/channelBind.ts).
- * The build gate, the cold-start check and the health route all run inside the
- * deploy, so the comparison logic has to live inside web/ too.
+ * The build gate, the cold-start check, the health route and the daily cron
+ * check all run inside the deploy, so the comparison logic has to live inside
+ * web/ too.
  *
- * KEEPING IT HONEST: test/webSchemaGuard.test.js runs this implementation and
+ * KEEPING IT HONEST: test/schemaGuard.test.js runs this implementation and
  * lib/schemaGuard.js against identical inputs and asserts they agree on which
- * objects are missing and on the message text. Change one side and that test
- * fails until you change the other.
+ * objects are missing, on what is exposed and on the message text. It also
+ * asserts the two allowlist files are identical. Change one side and that
+ * test fails until you change the other.
  *
  * Plain .mjs, not .ts, on purpose: web/scripts/verify-schema.mjs imports it
  * from bare node during prebuild, where TypeScript type stripping cannot be
  * assumed. The explicit .mjs extension is what keeps node from having to guess
  * the module type, since web/package.json has no "type" field.
  *
- * The manifest is passed in rather than imported here, because webpack and bare
- * node disagree about JSON import attributes. Each caller loads it its own way.
+ * The manifest and the allowlist are passed in rather than imported here,
+ * because webpack and bare node disagree about JSON import attributes. Each
+ * caller loads them its own way.
  */
 
 export const GUARD_FUNCTION = 'schema_guard_objects';
+
+/** Sentry tag value every exposure report carries, under the tag key "alert". */
+export const EXPOSURE_ALERT_TAG = 'schema_exposure';
+
+/** Roles that must reach nothing in public. PUBLIC is the everyone pseudo-role. */
+const BROWSER_ROLES = ['anon', 'authenticated', 'PUBLIC'];
+
+/** Finding kinds diffExposure produces, and the only kinds an allowlist may name. */
+const EXPOSURE_KINDS = [
+  'rls_off',
+  'relation_grant',
+  'function_execute',
+  'definer_search_path',
+  'default_acl',
+];
 
 /**
  * One entry from a generated manifest.
@@ -29,6 +47,14 @@ export const GUARD_FUNCTION = 'schema_guard_objects';
 
 /**
  * @typedef {{ surface: string, objects: RequiredObject[] }} SchemaManifest
+ */
+
+/**
+ * @typedef {{ kind: string, name: string, grantee: string|null, detail: string, reason?: string }} ExposureFinding
+ */
+
+/**
+ * @typedef {{ findings: ExposureFinding[], allowlisted: ExposureFinding[], unavailable: boolean, message: string|null }} ExposureResult
  */
 
 /** Where a required object of this kind can legitimately show up. */
@@ -85,32 +111,137 @@ export function formatMissing(missing, surface) {
 }
 
 /**
- * Public tables with RLS off. PostgREST will serve these to anon if they also
- * have grants, which new tables in public usually do.
- * @param {Record<string, string[]>} present
- * @returns {string[]}
+ * Reject an allowlist that is malformed. Every entry needs a known kind, a
+ * name and a written reason; an exception nobody can explain is not one.
+ * @param {{ entries?: object[] }} allowlist
  */
-export function diffRlsOff(present) {
-  const rls = new Set(present.rls_enabled || []);
-  return (present.tables || []).filter((name) => !rls.has(name)).sort();
+function validateAllowlist(allowlist) {
+  const entries = allowlist && Array.isArray(allowlist.entries) ? allowlist.entries : null;
+  if (!entries) {
+    throw new Error('schema exposure allowlist: expected an object with an "entries" array');
+  }
+  entries.forEach((entry, i) => {
+    if (!entry || !EXPOSURE_KINDS.includes(entry.kind)) {
+      throw new Error(`schema exposure allowlist: entry ${i} has an unknown kind`);
+    }
+    if (typeof entry.name !== 'string' || !entry.name.trim()) {
+      throw new Error(`schema exposure allowlist: entry ${i} has no name`);
+    }
+    if (typeof entry.reason !== 'string' || !entry.reason.trim()) {
+      throw new Error(`schema exposure allowlist: entry ${i} (${entry.name}) has no reason`);
+    }
+  });
+  return entries;
 }
 
-/** Operator-facing failure when any public table has RLS off. */
-export function formatRlsOff(tables) {
+/**
+ * Everything in public that anon, authenticated or PUBLIC can reach, minus
+ * what the allowlist accepts. Returns null when the guard function predates
+ * the exposure report, so the caller can say that rather than report "clean".
+ *
+ * @param {Record<string, any>} present schema_guard_objects() payload
+ * @param {{ entries: object[] }} allowlist
+ * @returns {{ findings: ExposureFinding[], allowlisted: ExposureFinding[] } | null}
+ */
+export function diffExposure(present, allowlist) {
+  const entries = validateAllowlist(allowlist);
+  const exposure = present && present.exposure;
+  if (!exposure || typeof exposure !== 'object') return null;
+
+  const browser = (grantee) => BROWSER_ROLES.includes(grantee);
+  const list = (key) => (Array.isArray(exposure[key]) ? exposure[key] : []);
+  const all = [];
+
+  const rls = new Set(present.rls_enabled || []);
+  for (const name of present.tables || []) {
+    if (!rls.has(name)) {
+      all.push({ kind: 'rls_off', name, grantee: null, detail: 'row level security off' });
+    }
+  }
+  for (const g of list('relation_grants')) {
+    if (!browser(g.grantee)) continue;
+    all.push({
+      kind: 'relation_grant',
+      name: g.name,
+      grantee: g.grantee,
+      detail: `${g.type}: ${(g.privileges || []).join(',')}`,
+    });
+  }
+  for (const f of list('function_execute')) {
+    if (!browser(f.grantee)) continue;
+    all.push({
+      kind: 'function_execute',
+      name: f.name,
+      grantee: f.grantee,
+      detail: f.security_definer ? 'EXECUTE, SECURITY DEFINER' : 'EXECUTE',
+    });
+  }
+  for (const f of list('definer_functions')) {
+    if (f.search_path) continue;
+    all.push({
+      kind: 'definer_search_path',
+      name: f.name,
+      grantee: null,
+      detail: 'SECURITY DEFINER with no pinned search_path',
+    });
+  }
+  for (const d of list('default_acl')) {
+    if (!browser(d.grantee)) continue;
+    all.push({
+      kind: 'default_acl',
+      name: `${d.role}:${d.schema}:${d.object_type}`,
+      grantee: d.grantee,
+      detail: `new ${d.object_type} get ${(d.privileges || []).join(',')}`,
+    });
+  }
+
+  const findings = [];
+  const allowlisted = [];
+  for (const finding of all) {
+    const entry = entries.find(
+      (e) =>
+        e.kind === finding.kind &&
+        e.name === finding.name &&
+        (!e.grantee || e.grantee === finding.grantee)
+    );
+    if (entry) allowlisted.push({ ...finding, reason: entry.reason });
+    else findings.push(finding);
+  }
+  return { findings, allowlisted };
+}
+
+function findingLabel(finding) {
+  return `${finding.kind} ${finding.name}${finding.grantee ? ` (${finding.grantee})` : ''}`;
+}
+
+/** Operator-facing report of what the browser roles can reach. */
+export function formatExposure(findings, surface) {
   const lines = [
-    `SCHEMA GUARD: ${tables.length} public table` +
-      `${tables.length === 1 ? '' : 's'} ${tables.length === 1 ? 'has' : 'have'}` +
-      ' row level security off.',
+    `SCHEMA EXPOSURE: ${findings.length} finding${findings.length === 1 ? '' : 's'} ` +
+      `in the public schema (${surface}).`,
     '',
   ];
-  for (const name of tables) {
-    lines.push(`  table ${name}`);
+  for (const finding of findings) {
+    lines.push(`  ${findingLabel(finding)}`);
+    lines.push(`    ${finding.detail}`);
   }
   lines.push('');
-  lines.push(
-    'Enable RLS with no policies (service_role still bypasses). A table with'
-  );
-  lines.push('RLS off and default grants is readable and writable from the internet.');
+  lines.push('anon, authenticated and PUBLIC must reach nothing in public. Fix it with a');
+  lines.push('migration: enable RLS, grant service_role what it uses, then revoke from anon,');
+  lines.push('authenticated and PUBLIC (20261015140000_lock_public_exposure.sql shows how).');
+  lines.push('A deliberate exception goes in schemaExposureAllowlist.json, in both lib/ and');
+  lines.push('web/lib/, with a written reason.');
+  return lines.join('\n');
+}
+
+/** Printed on every check that passes through the allowlist, so it stays visible. */
+export function formatAllowlisted(allowlisted) {
+  const lines = [`Schema exposure allowlist: ${allowlisted.length} accepted.`];
+  for (const finding of allowlisted) {
+    lines.push(`  ${findingLabel(finding)}`);
+    lines.push(`    ${finding.detail}`);
+    lines.push(`    reason: ${finding.reason}`);
+  }
   return lines.join('\n');
 }
 
@@ -136,17 +267,50 @@ export function guardMigration(manifest) {
 }
 
 /**
+ * The exposure half of a check, ready for a caller to act on.
+ * message is null when nothing is exposed; unavailable is true when the guard
+ * function is too old to say.
+ *
+ * @returns {ExposureResult}
+ */
+export function exposureResult(present, manifest, allowlist) {
+  const diff = diffExposure(present, allowlist);
+  if (!diff) {
+    return {
+      findings: [],
+      allowlisted: [],
+      unavailable: true,
+      message: formatGuardUnavailable(
+        'is an older version that does not report exposure',
+        guardMigration(manifest)
+      ),
+    };
+  }
+  return {
+    ...diff,
+    unavailable: false,
+    message: diff.findings.length ? formatExposure(diff.findings, manifest.surface) : null,
+  };
+}
+
+/**
  * Check the live schema against a manifest. One round trip.
  *
  * Returns a result rather than throwing: the build gate turns a failure into a
- * non-zero exit, while the cold-start hook only logs. Deciding that here would
- * take the choice away from the caller.
+ * non-zero exit, while the cold-start hook and the daily check only report.
+ * Deciding that here would take the choice away from the caller.
+ *
+ * ok covers presence only (every required object exists). exposure is
+ * reported separately and is null when presence could not be checked. The
+ * public health route answers with ok alone, so it never advertises a hole.
  *
  * @param {{ rpc: Function }} supabase
  * @param {SchemaManifest} manifest
- * @returns {Promise<{ ok: boolean, surface: string, checked: number, missing: RequiredObject[], message: string|null }>}
+ * @param {{ entries: object[] }} [allowlist] defaults to empty, which fails closed:
+ *   an exception the caller forgot to pass is reported, not silently accepted
+ * @returns {Promise<{ ok: boolean, surface: string, checked: number, missing: RequiredObject[], message: string|null, exposure: ExposureResult|null }>}
  */
-export async function checkSchema(supabase, manifest) {
+export async function checkSchema(supabase, manifest, allowlist = { entries: [] }) {
   const base = { surface: manifest.surface, checked: manifest.objects.length };
 
   let result;
@@ -159,6 +323,7 @@ export async function checkSchema(supabase, manifest) {
       ok: false,
       missing: [],
       message: formatGuardUnavailable(reason, guardMigration(manifest)),
+      exposure: null,
     };
   }
 
@@ -170,6 +335,7 @@ export async function checkSchema(supabase, manifest) {
       ok: false,
       missing: [],
       message: formatGuardUnavailable(reason, guardMigration(manifest)),
+      exposure: null,
     };
   }
 
@@ -184,9 +350,11 @@ export async function checkSchema(supabase, manifest) {
         'is an older version that does not report check constraints',
         guardMigration(manifest)
       ),
+      exposure: null,
     };
   }
 
+  const exposure = exposureResult(data, manifest, allowlist);
   const missing = diffObjects(manifest.objects, data);
   if (missing.length) {
     return {
@@ -194,16 +362,7 @@ export async function checkSchema(supabase, manifest) {
       ok: false,
       missing,
       message: formatMissing(missing, manifest.surface),
-    };
-  }
-
-  const rlsOff = diffRlsOff(data);
-  if (rlsOff.length) {
-    return {
-      ...base,
-      ok: false,
-      missing: [],
-      message: formatRlsOff(rlsOff),
+      exposure,
     };
   }
 
@@ -212,5 +371,6 @@ export async function checkSchema(supabase, manifest) {
     ok: true,
     missing: [],
     message: null,
+    exposure,
   };
 }

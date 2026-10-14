@@ -1,0 +1,19 @@
+{
+  "entries": [
+    {
+      "kind": "default_acl",
+      "name": "supabase_admin:public:tables",
+      "reason": "Supabase platform default for objects supabase_admin creates in public. The migration role (postgres) is not a member of supabase_admin and cannot alter its default privileges. Our migrations never create objects as supabase_admin, and any object that did would still fail the relation_grant rule."
+    },
+    {
+      "kind": "default_acl",
+      "name": "supabase_admin:public:sequences",
+      "reason": "Supabase platform default for objects supabase_admin creates in public. The migration role (postgres) is not a member of supabase_admin and cannot alter its default privileges. Our migrations never create objects as supabase_admin, and any object that did would still fail the relation_grant rule."
+    },
+    {
+      "kind": "default_acl",
+      "name": "supabase_admin:public:functions",
+      "reason": "Supabase platform default for objects supabase_admin creates in public. The migration role (postgres) is not a member of supabase_admin and cannot alter its default privileges. Our migrations never create objects as supabase_admin, and any object that did would still fail the function_execute rule."
+    }
+  ]
+}

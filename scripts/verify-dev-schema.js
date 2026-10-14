@@ -21,6 +21,8 @@ const path = require('path');
 const { Client } = require('pg');
 
 const { declaredObjects } = require('../lib/schemaRequirements');
+const { diffExposure, formatAllowlisted } = require('../lib/schemaGuard');
+const EXPOSURE_ALLOWLIST = require('../lib/schemaExposureAllowlist.json');
 const { MIGRATIONS_DIR } = require('../lib/schemaSurfaces');
 // Env parsing, the dev guard and the connection route all live here now, shared
 // with run-dev-migrations.js so the two cannot disagree about what is dev.
@@ -205,6 +207,26 @@ async function main() {
   console.log(`  policies: ${policies.length} (0 expected: service_role bypasses RLS)`);
   if (policies.length) {
     notes.push(`policies present: ${policies.map((p) => p.tablename + '.' + p.policyname).join(', ')}`);
+  }
+
+  // --- exposure: the same rule the bots and the web build enforce ----------
+  console.log('\nExposure (anon, authenticated, PUBLIC)');
+  const [{ payload }] = await q(`select public.schema_guard_objects() as payload`);
+  const exposure = diffExposure(payload, EXPOSURE_ALLOWLIST);
+  if (!exposure) {
+    problems.push('schema_guard_objects() does not report exposure: apply the latest guard migration');
+    console.log('  not reported by this version of schema_guard_objects()');
+  } else {
+    console.log(`  findings    ${exposure.findings.length}`);
+    console.log(`  allowlisted ${exposure.allowlisted.length}`);
+    for (const f of exposure.findings) {
+      problems.push(`exposure: ${f.kind} ${f.name}${f.grantee ? ` (${f.grantee})` : ''}: ${f.detail}`);
+    }
+    if (exposure.allowlisted.length) {
+      formatAllowlisted(exposure.allowlisted)
+        .split('\n')
+        .forEach((line) => console.log(`  ${line}`));
+    }
   }
 
   // --- targeted checks the brief calls out ---------------------------------

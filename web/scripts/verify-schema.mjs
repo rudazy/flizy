@@ -1,6 +1,7 @@
 /**
  * Build gate: refuse to build the site if the database is missing an object
- * this build depends on.
+ * this build depends on, or if anon, authenticated or PUBLIC can reach anything
+ * in the public schema that the exposure allowlist does not accept.
  *
  * This is the real guard on the web side. Vercel is serverless, so there is no
  * long lived boot to hang a startup check on, but a failing build never
@@ -12,8 +13,8 @@
  * web/lib/generated/schemaManifest.json, which is derived from source by
  * scripts/generate-schema-manifest.js and pinned by a test in the root suite.
  *
- * No bypass. Missing credentials, an unreachable database and a missing object
- * all fail the build.
+ * No bypass. Missing credentials, an unreachable database, a missing object and
+ * an exposure finding all fail the build.
  */
 
 import path from 'path';
@@ -22,11 +23,12 @@ import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import { config as loadEnv } from 'dotenv';
 
-import { checkSchema } from '../lib/schemaGuard.mjs';
+import { checkSchema, formatAllowlisted } from '../lib/schemaGuard.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(HERE, '..');
 const MANIFEST = path.join(WEB_ROOT, 'lib', 'generated', 'schemaManifest.json');
+const ALLOWLIST = path.join(WEB_ROOT, 'lib', 'schemaExposureAllowlist.json');
 
 // Same order and precedence as web/lib/supabase.ts, so the gate always checks
 // the database the application itself would talk to. See the comment there for
@@ -61,6 +63,18 @@ async function main() {
     );
   }
 
+  // Between deploys the daily cron (/api/cron/schema-check) is the only check
+  // that runs, and without CRON_SECRET it refuses every call, Vercel's
+  // included. A production build without it would ship a watcher that is
+  // silently off.
+  if (process.env.VERCEL_ENV === 'production' && !process.env.CRON_SECRET) {
+    return fail(
+      'SCHEMA GUARD: CRON_SECRET is required for a production build.\n\n' +
+        '  The daily schema check authenticates Vercel Cron with it. Set it in\n' +
+        '  the Vercel project environment variables, then redeploy.'
+    );
+  }
+
   let manifest;
   try {
     manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'));
@@ -72,15 +86,26 @@ async function main() {
     );
   }
 
+  let allowlist;
+  try {
+    allowlist = JSON.parse(readFileSync(ALLOWLIST, 'utf8'));
+  } catch (err) {
+    return fail(`SCHEMA GUARD: cannot read ${path.relative(WEB_ROOT, ALLOWLIST)}.\n\n  ${err.message}`);
+  }
+
   const supabase = createClient(url, key);
   const started = Date.now();
-  const result = await checkSchema(supabase, manifest);
+  const result = await checkSchema(supabase, manifest, allowlist);
   const elapsed = Date.now() - started;
 
   if (!result.ok) return fail(result.message);
+  if (result.exposure.allowlisted.length) {
+    console.log(formatAllowlisted(result.exposure.allowlisted));
+  }
+  if (result.exposure.message) return fail(result.exposure.message);
 
   console.log(
-    `Schema guard: ${result.checked} objects present (${result.surface}), ${elapsed} ms.`
+    `Schema guard: ${result.checked} objects present, nothing exposed (${result.surface}), ${elapsed} ms.`
   );
 }
 

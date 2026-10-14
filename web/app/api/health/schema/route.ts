@@ -8,6 +8,10 @@
  * but it is more than an anonymous caller needs, so the public response is a
  * count. Set SCHEMA_HEALTH_TOKEN and send it as x-schema-health-token to get the
  * detail; leave it unset and no caller can.
+ *
+ * Exposure (what anon, authenticated or PUBLIC can reach) is never part of the
+ * public answer: ok and the status code cover presence only, so this route
+ * cannot advertise a hole. The token holder gets the exposure findings too.
  */
 
 import { timingSafeEqual } from 'crypto';
@@ -16,6 +20,7 @@ import { NextResponse } from 'next/server';
 import { checkSchema } from '@/lib/schemaGuard.mjs';
 import { getSupabase } from '@/lib/supabase.ts';
 import manifest from '@/lib/generated/schemaManifest.json';
+import allowlist from '@/lib/schemaExposureAllowlist.json';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -33,7 +38,7 @@ function tokenMatches(offered: string | null): boolean {
 export async function GET(request: Request) {
   let result;
   try {
-    result = await checkSchema(getSupabase(), manifest as never);
+    result = await checkSchema(getSupabase(), manifest as never, allowlist);
   } catch {
     // Never surface the underlying message: it can carry connection detail.
     return NextResponse.json({ ok: false, error: 'check_failed' }, { status: 503 });
@@ -53,6 +58,13 @@ export async function GET(request: Request) {
       name: object.name,
       providedBy: object.providedBy,
     }));
+    body.exposure = result.exposure
+      ? {
+          unavailable: result.exposure.unavailable,
+          findings: result.exposure.findings,
+          allowlisted: result.exposure.allowlisted.length,
+        }
+      : null;
   }
 
   return NextResponse.json(body, {

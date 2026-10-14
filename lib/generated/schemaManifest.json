@@ -377,7 +377,7 @@
     {
       "kind": "function",
       "name": "schema_guard_objects",
-      "providedBy": "20261002150000_schema_guard_checks.sql",
+      "providedBy": "20261015140000_lock_public_exposure.sql",
       "requiredBy": "lib/schemaGuard.js"
     },
     {

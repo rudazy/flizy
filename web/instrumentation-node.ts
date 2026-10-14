@@ -9,10 +9,12 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { checkSchema } from './lib/schemaGuard.mjs';
+import { checkSchema, formatAllowlisted } from './lib/schemaGuard.mjs';
 import { getSupabase } from './lib/supabase.ts';
 import manifest from './lib/generated/schemaManifest.json';
+import allowlist from './lib/schemaExposureAllowlist.json';
 import { scrubEvent } from './lib/errorScrub';
+import { reportSchemaExposure } from './lib/schemaExposureReport';
 
 /**
  * Error reporting, off unless a DSN is configured in production.
@@ -47,17 +49,28 @@ if (process.env.SENTRY_DSN && process.env.NODE_ENV === 'production') {
   });
 }
 
-const result = await checkSchema(getSupabase(), manifest as never).catch((err: unknown) => ({
+const result = await checkSchema(getSupabase(), manifest as never, allowlist).catch((err: unknown) => ({
   ok: false,
   surface: 'web',
   checked: 0,
   missing: [],
   // Never let the check itself break a boot it was only observing.
   message: `cold start check did not run: ${err instanceof Error ? err.message : String(err)}`,
+  exposure: null,
 }));
 
 if (result.ok) {
   console.log(`[schema-guard] ${result.checked} objects present (${result.surface}).`);
 } else {
   console.error(`[schema-guard] ${result.message}`);
+}
+
+if (result.exposure) {
+  if (result.exposure.allowlisted.length) {
+    console.log(`[schema-guard] ${formatAllowlisted(result.exposure.allowlisted)}`);
+  }
+  if (result.exposure.message) {
+    console.error(`[schema-guard] ${result.exposure.message}`);
+    await reportSchemaExposure(result.exposure.message, 'web-cold-start').catch(() => {});
+  }
 }
