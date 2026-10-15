@@ -5,8 +5,10 @@
  * Chat warnings only reach chats that are already linked, and an account that
  * lives on the web has none, so the moments that hand out control of the
  * account also go to the owner's email: creating a chat link code, a chat
- * being linked or unlinked, and changing the password (which lists every
- * linked chat so the owner can spot one they do not recognise).
+ * being linked or unlinked, a GitHub, Discord or X account being linked,
+ * someone signing up with the owner's address, and changing the password
+ * (which lists every linked chat so the owner can spot one they do not
+ * recognise).
  *
  * Sending is best effort. A notice that fails to send is logged and never
  * undoes the action the owner just took. The mail text is built by pure
@@ -24,6 +26,8 @@ type MailBody = { subject: string; text: string };
 const CHAT_CHANNELS = ['whatsapp', 'telegram'];
 
 const CHAT_NAME: Record<string, string> = { whatsapp: 'WhatsApp', telegram: 'Telegram' };
+
+const PLATFORM_NAME: Record<string, string> = { github: 'GitHub', discord: 'Discord', x: 'X' };
 
 /**
  * How a linked chat is named in an email: the Telegram @handle when there is
@@ -56,6 +60,83 @@ export function linkCodeMail(siteUrl: string, at: Date): MailBody {
       `1. Change your password: ${siteUrl}/dashboard/account?s=security`,
       '   This also locks every linked chat.',
       `2. Check the linked chats and unlink any you do not recognise: ${siteUrl}/dashboard/account?s=chat`,
+    ].join('\n'),
+  };
+}
+
+/**
+ * Sent to a verified owner when someone signs up with their address. Signup
+ * answers that caller exactly as it answers a new address, so this mail is
+ * the only place the attempt is visible, and only to the owner.
+ */
+export function signupAttemptMail(siteUrl: string, at: Date): MailBody {
+  return {
+    subject: 'Someone tried to sign up to Flizy with your email',
+    text: [
+      `Someone tried to create a Flizy account with this email on ${at.toUTCString()}.`,
+      'This address already has an account, so nothing was created and nothing on your account changed.',
+      '',
+      `If it was you, sign in instead: ${siteUrl}/login`,
+      'If it was not you, you do not need to do anything.',
+    ].join('\n'),
+  };
+}
+
+/**
+ * Sent to the address that just verified at a re-signup and took over an
+ * account it had never verified (web/lib/accountReset.ts). It explains why
+ * the PIN, the links and the trusted list are gone, so the new owner is not
+ * left guessing.
+ */
+export function accountResetMail(
+  siteUrl: string,
+  unlinked: string[],
+  trustedRemoved: number,
+  at: Date
+): MailBody {
+  const names = unlinked.map((c) => CHAT_NAME[c] || PLATFORM_NAME[c] || c);
+  return {
+    subject: 'Your Flizy account was reset when you verified your email',
+    text: [
+      `You verified this email for a Flizy account on ${at.toUTCString()}, with the new password you chose at signup.`,
+      'The account had been created with this address but never verified, so whatever was set up on it before may not have been yours. It was reset:',
+      '',
+      '  - the unlock PIN was cleared',
+      names.length
+        ? `  - these were unlinked: ${names.join(', ')}`
+        : '  - nothing was linked, so nothing was unlinked',
+      trustedRemoved
+        ? `  - the trusted list was emptied (${trustedRemoved} ${trustedRemoved === 1 ? 'address' : 'addresses'} removed)`
+        : '  - the trusted list was already empty',
+      '  - every other signed-in browser was signed out',
+      '',
+      'To use Flizy from chat again:',
+      `1. Set a new unlock PIN: ${siteUrl}/dashboard/account`,
+      `2. Link your chat apps and platforms again: ${siteUrl}/dashboard/account?s=chat`,
+      `3. Add the wallets you send to back to your trusted list: ${siteUrl}/dashboard/account`,
+      '',
+      'If you did not sign up just now, someone has access to this inbox. Secure the email account first, then change your Flizy password.',
+    ].join('\n'),
+  };
+}
+
+/**
+ * Sent when a GitHub, Discord or X account is linked. Claims sent to that
+ * handle now reach this Flizy account, so a link the owner did not make is
+ * worth knowing about at once.
+ */
+export function platformLinkedMail(siteUrl: string, platform: string, handle: string | null, at: Date): MailBody {
+  const name = PLATFORM_NAME[platform] || platform;
+  const who = handle ? ` (@${handle.replace(/^@/, '').replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 40)})` : '';
+  return {
+    subject: `${name} was linked to your Flizy account`,
+    text: [
+      `${name}${who} was linked to your Flizy account on ${at.toUTCString()}.`,
+      `Payments sent to that ${name} account on Flizy now reach you.`,
+      '',
+      'If this was not you:',
+      `1. Unlink it: ${siteUrl}/dashboard/account?s=platforms`,
+      `2. Change your password: ${siteUrl}/dashboard/account?s=security`,
     ].join('\n'),
   };
 }

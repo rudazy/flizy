@@ -316,6 +316,12 @@
     },
     {
       "kind": "function",
+      "name": "accounts_hold_released_username",
+      "providedBy": "20261016110000_username_holds.sql",
+      "requiredBy": "executed by trigger accounts_username_hold"
+    },
+    {
+      "kind": "function",
       "name": "accounts_username_not_project_handle",
       "providedBy": "20260925010000_tasks.sql",
       "requiredBy": "executed by trigger accounts_username_not_project_handle"
@@ -420,7 +426,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/router.js, lib/saleNotice.js, lib/session.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js"
     },
     {
       "kind": "table",
@@ -564,6 +570,12 @@
       "kind": "trigger",
       "name": "accounts_set_updated_at",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
+      "requiredBy": "trigger on accounts"
+    },
+    {
+      "kind": "trigger",
+      "name": "accounts_username_hold",
+      "providedBy": "20261016110000_username_holds.sql",
       "requiredBy": "trigger on accounts"
     },
     {

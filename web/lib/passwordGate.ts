@@ -1,11 +1,12 @@
 /**
- * Password re-auth for a route that changes a credential.
+ * Password re-auth for a route that changes a credential or moves value.
  *
- * Same gate, same responses, as the inline one in app/api/trusted/route.ts:
  * 400 with no password, 401 when it is wrong, 400 when the account has no
- * password hash to check against. It sits here rather than inside a route file
- * because two callers need it and because a Next route module may only export
- * HTTP handlers, so an inline copy cannot be unit tested. The supabase client is
+ * password hash to check against, 429 once the account's re-auth counter
+ * locks (web/lib/loginAttempts.ts reauthKey, separate from sign-in). Every
+ * such route calls this one gate (test/routeGuards.test.js lists them), and it
+ * sits outside a route file because a Next route module may only export HTTP
+ * handlers, so it could not be unit tested there. The supabase client is
  * passed in for the same reason.
  */
 
@@ -14,11 +15,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // which does not resolve an extensionless relative specifier.
 import { verifyPassword } from './cryptoPin.ts';
 import {
-  clearFailedLogins,
-  loginLockState,
+  clearFailures,
+  lockState,
   loginLockedMessage,
   LOGIN_LOCKED,
-  recordFailedLogin,
+  reauthKey,
+  recordFailure,
 } from './loginAttempts.ts';
 
 export type PasswordGateResult =
@@ -42,39 +44,39 @@ export async function requirePassword(
   }
   const { data, error } = await supabase
     .from('accounts')
-    .select('password_hash, email')
+    .select('password_hash')
     .eq('id', accountId)
     .single();
   if (error || !data?.password_hash) {
     return { ok: false, status: 400, error: 'Could not verify account' };
   }
-  const email = String(data.email || '').trim();
-  if (email) {
-    const lock = await loginLockState(supabase, email);
-    if (lock.locked && lock.retryAfterText) {
+  // Keyed on the account, not the email: only a signed-in session reaches
+  // this, so a stranger who knows the email cannot lock the owner out of
+  // their own PIN, password and limit changes, and the sign-in counters
+  // (loginAttempts.ts) are untouched by what happens here.
+  const key = reauthKey(accountId);
+  const lock = await lockState(supabase, key);
+  if (lock.locked && lock.retryAfterText) {
+    return {
+      ok: false,
+      status: 429,
+      error: loginLockedMessage(lock.retryAfterText),
+      code: LOGIN_LOCKED,
+    };
+  }
+  if (!verifyPassword(password, data.password_hash)) {
+    const recorded = await recordFailure(supabase, key);
+    if (recorded.retryAfterText) {
       return {
         ok: false,
         status: 429,
-        error: loginLockedMessage(lock.retryAfterText),
+        error: loginLockedMessage(recorded.retryAfterText),
         code: LOGIN_LOCKED,
       };
     }
-  }
-  if (!verifyPassword(password, data.password_hash)) {
-    if (email) {
-      const recorded = await recordFailedLogin(supabase, email);
-      if (recorded.retryAfterText) {
-        return {
-          ok: false,
-          status: 429,
-          error: loginLockedMessage(recorded.retryAfterText),
-          code: LOGIN_LOCKED,
-        };
-      }
-    }
     return { ok: false, status: 401, error: 'Incorrect password' };
   }
-  if (email) await clearFailedLogins(supabase, email);
+  await clearFailures(supabase, key);
   return { ok: true };
 }
 

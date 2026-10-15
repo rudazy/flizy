@@ -54,7 +54,8 @@ type DashboardContextValue = {
   removeTrusted: (address: string, password: string) => Promise<boolean>;
   setUnlockPin: (pin: string, password: string) => Promise<boolean>;
   setDailyLimit: (limit: number | null, password: string) => Promise<boolean>;
-  setUsername: (username: string) => Promise<boolean>;
+  /** password is needed to change an existing username, not to set the first. */
+  setUsername: (username: string, password?: string) => Promise<boolean>;
   setAccountLocale: (locale: LocaleCode) => Promise<boolean>;
   setDefaultCallingCode: (countryIso: string) => Promise<boolean>;
   setAttachInviteOnClaims: (enabled: boolean) => Promise<boolean>;
@@ -326,14 +327,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   );
 
   const setUsername = useCallback(
-    async (username: string) => {
+    async (username: string, password?: string) => {
       setBusy('username');
       setMsg('');
       try {
         const res = await fetch('/api/account/username', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username }),
+          body: JSON.stringify(password ? { username, password } : { username }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || 'Failed');

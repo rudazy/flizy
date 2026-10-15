@@ -15,8 +15,10 @@ import { HONEYPOT_FIELD } from '../../lib/honeypot.ts';
 import { SITE_PHONE_COUNTRIES, countryFlag } from '../../lib/phoneFormat';
 
 /**
- * Stage 1 only: email + password.
- * Stage 2 (verify email) and stage 3 (username) run on /dashboard gates.
+ * Stage 1: email and password, then the 6-digit code from the inbox, which is
+ * what signs the browser in (POST /api/auth/signup/verify). Signup answers the
+ * same way for every address, so the code step is shown whatever the email.
+ * Stage 3 (username) runs on the /dashboard gate.
  */
 export function SignupForm() {
   const router = useRouter();
@@ -31,6 +33,10 @@ export function SignupForm() {
   const [countryIso, setCountryIso] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [needsCode, setNeedsCode] = useState(false);
+  const [code, setCode] = useState('');
+  const [devCode, setDevCode] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -75,29 +81,61 @@ export function SignupForm() {
     // does, rather than flipping back to "Continue" as if signing up failed.
     let leaving = false;
     try {
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password,
-          locale,
-          countryIso,
-          inviteCode,
-          [HONEYPOT_FIELD]: honeypot,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Signup failed');
-      track('signup_completed', { locale });
-      clearAppearanceCache();
-      // Always land on dashboard: email gate then profile gate.
-      leaving = true;
-      router.push('/dashboard');
+      if (needsCode) {
+        const res = await fetch('/api/auth/signup/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'That code did not work.');
+        track('signup_completed', { locale });
+        clearAppearanceCache();
+        leaving = true;
+        router.push('/dashboard');
+        return;
+      }
+      await requestCode();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
       if (!leaving) setLoading(false);
+    }
+  }
+
+  /** Send (or send again) the signup request, which emails the code. */
+  async function requestCode() {
+    setNotice('');
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        locale,
+        countryIso,
+        inviteCode,
+        [HONEYPOT_FIELD]: honeypot,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Signup failed');
+    if (needsCode) setNotice('We sent a new code. Only the newest one works.');
+    setNeedsCode(true);
+    setCode('');
+    setDevCode(typeof data.devCode === 'string' ? data.devCode : '');
+  }
+
+  async function resend() {
+    if (loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      await requestCode();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send a new code');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -167,6 +205,7 @@ export function SignupForm() {
             placeholder="you@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            readOnly={needsCode}
             autoComplete="email"
           />
         </div>
@@ -230,9 +269,59 @@ export function SignupForm() {
             autoComplete="off"
           />
         </div>
+        {needsCode ? (
+          <div>
+            <div className="alert mb-3 text-sm" role="status">
+              Check {email} for a 6-digit code and enter it below to finish.
+            </div>
+            <label className="label" htmlFor="signup-code">
+              Email code
+            </label>
+            <input
+              id="signup-code"
+              className="input font-mono"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="6-digit code"
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                if (error) setError('');
+              }}
+              autoFocus
+              required
+            />
+            {devCode ? (
+              <p className="mt-1.5 font-mono text-xs text-lime">
+                Local build, no mail configured. Your code is {devCode}
+              </p>
+            ) : null}
+            <p className="mt-1.5 text-xs text-muted">
+              It expires in 15 minutes. Nothing arrived?{' '}
+              <button
+                type="button"
+                className="text-lime underline-offset-2 hover:text-gold"
+                onClick={() => void resend()}
+                disabled={loading}
+              >
+                Send a new code
+              </button>
+            </p>
+          </div>
+        ) : null}
+        {notice ? (
+          <div className="alert alert-ok text-sm" role="status">
+            {notice}
+          </div>
+        ) : null}
         {error ? <div className="alert alert-error">{error}</div> : null}
-        <button className="btn btn-primary w-full" type="submit" disabled={loading || mismatch}>
-          {loading ? t('auth.signup.submitting') : 'Continue'}
+        <button
+          className="btn btn-primary w-full"
+          type="submit"
+          disabled={loading || mismatch || (needsCode && code.length !== 6)}
+        >
+          {loading ? t('auth.signup.submitting') : needsCode ? 'Finish' : 'Continue'}
         </button>
         <p className="text-center text-xs text-muted">
           Next: we email a code, then you pick your @username.

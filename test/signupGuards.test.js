@@ -23,11 +23,13 @@ const path = require('path');
 
 let limit;
 let honeypot;
+let clientIp;
 let savedMax;
 
 before(async () => {
   limit = await import('../web/lib/signupLimit.ts');
   honeypot = await import('../web/lib/honeypot.ts');
+  clientIp = await import('../web/lib/clientIp.ts');
   savedMax = process.env.SIGNUP_MAX_PER_HOUR;
 });
 
@@ -80,10 +82,10 @@ describe('signupsPerWindow', () => {
   });
 });
 
-describe('signupIpKey', () => {
+describe('clientIpKey (the signup cap and the login lockout key on it)', () => {
   it('prefers x-real-ip, which the proxy sets and the caller cannot', () => {
-    const a = limit.signupIpKey(headers({ 'x-real-ip': '203.0.113.7' }));
-    const b = limit.signupIpKey(
+    const a = clientIp.clientIpKey(headers({ 'x-real-ip': '203.0.113.7' }));
+    const b = clientIp.clientIpKey(
       headers({ 'x-real-ip': '203.0.113.7', 'x-forwarded-for': '198.51.100.1' })
     );
     assert.equal(a, b);
@@ -92,33 +94,33 @@ describe('signupIpKey', () => {
   it('falls back to the LAST forwarded entry, so a caller cannot pick their bucket', () => {
     // A caller sending their own x-forwarded-for gets it appended to, not
     // replaced. Reading the first entry would let them choose the counter.
-    const spoofed = limit.signupIpKey(
+    const spoofed = clientIp.clientIpKey(
       headers({ 'x-forwarded-for': '1.2.3.4, 203.0.113.7' })
     );
-    const honest = limit.signupIpKey(headers({ 'x-forwarded-for': '203.0.113.7' }));
+    const honest = clientIp.clientIpKey(headers({ 'x-forwarded-for': '203.0.113.7' }));
     assert.equal(spoofed, honest);
 
-    const chosen = limit.signupIpKey(headers({ 'x-forwarded-for': '1.2.3.4' }));
+    const chosen = clientIp.clientIpKey(headers({ 'x-forwarded-for': '1.2.3.4' }));
     assert.notEqual(spoofed, chosen);
   });
 
   it('separates different addresses and is stable for the same one', () => {
-    const one = limit.signupIpKey(headers({ 'x-real-ip': '203.0.113.7' }));
-    const same = limit.signupIpKey(headers({ 'x-real-ip': '203.0.113.7' }));
-    const other = limit.signupIpKey(headers({ 'x-real-ip': '203.0.113.8' }));
+    const one = clientIp.clientIpKey(headers({ 'x-real-ip': '203.0.113.7' }));
+    const same = clientIp.clientIpKey(headers({ 'x-real-ip': '203.0.113.7' }));
+    const other = clientIp.clientIpKey(headers({ 'x-real-ip': '203.0.113.8' }));
     assert.equal(one, same);
     assert.notEqual(one, other);
   });
 
   it('is a hash, never the address itself', () => {
-    const key = limit.signupIpKey(headers({ 'x-real-ip': '203.0.113.7' }));
+    const key = clientIp.clientIpKey(headers({ 'x-real-ip': '203.0.113.7' }));
     assert.match(key, /^[0-9a-f]{64}$/);
     assert.ok(!key.includes('203'));
   });
 
   it('an unreadable address shares one bucket rather than skipping the cap', () => {
-    const a = limit.signupIpKey(headers({}));
-    const b = limit.signupIpKey(headers({ 'x-forwarded-for': '  ,  ' }));
+    const a = clientIp.clientIpKey(headers({}));
+    const b = clientIp.clientIpKey(headers({ 'x-forwarded-for': '  ,  ' }));
     assert.match(a, /^[0-9a-f]{64}$/);
     assert.equal(a, b);
   });
@@ -239,7 +241,7 @@ describe('the signup route wires all three guards', () => {
 
   it('checks the honeypot and the cap', () => {
     assert.match(src, /isHoneypotFilled\(body\)/);
-    assert.match(src, /checkSignupRateLimit\(supabase, signupIpKey\(req\.headers\)\)/);
+    assert.match(src, /checkSignupRateLimit\(supabase, clientIpKey\(req\.headers\)\)/);
   });
 
   it('spends nothing on a request it was going to refuse', () => {

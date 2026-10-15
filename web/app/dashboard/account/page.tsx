@@ -18,7 +18,7 @@ import { useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { PayIdentity } from '../../../components/PayIdentity';
 import { CountryPanel, LanguagePanel } from '../../../components/AccountPrefs';
-import { ChatAppsPanel, TrustedPanel } from '../../../components/AccountConnections';
+import { ChatAppsPanel, SecretInput, TrustedPanel } from '../../../components/AccountConnections';
 import { LimitsPanel, PinPanel, SecurityPanel } from '../../../components/AccountSecurity';
 import { AccountProjects } from '../../../components/AccountProjects';
 import type { LocaleCode } from '../../../lib/locale';
@@ -80,6 +80,7 @@ export default function AccountPage() {
   const [ticket, setTicket] = useState('');
   const [removing, setRemoving] = useState<string | null>(null);
   const [usernameInput, setUsernameInput] = useState('');
+  const [usernamePassword, setUsernamePassword] = useState('');
   const [chatLinks, setChatLinks] = useState<
     Array<{ channel: string; phone: string | null; has_phone: boolean }>
   >([]);
@@ -277,7 +278,7 @@ export default function AccountPage() {
     }
   }
 
-  async function closeAccount(body: { action: 'deactivate' }): Promise<string | null> {
+  async function closeAccount(body: { action: 'deactivate'; password: string }): Promise<string | null> {
     try {
       const res = await fetch('/api/account/closure', {
         method: 'POST',
@@ -401,7 +402,8 @@ export default function AccountPage() {
 
   async function onUsername(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await setUsername(usernameInput);
+    const ok = await setUsername(usernameInput, usernamePassword || undefined);
+    setUsernamePassword('');
     if (ok) setProfileEditor(null);
   }
 
@@ -532,7 +534,7 @@ export default function AccountPage() {
       <AccountClosureSheet
         open={closureOpen}
         onClose={() => setClosureOpen(false)}
-        onDeactivate={() => closeAccount({ action: 'deactivate' })}
+        onDeactivate={(password) => closeAccount({ action: 'deactivate', password })}
       />
 
       <AppSlideNav
@@ -846,10 +848,17 @@ export default function AccountPage() {
                       maxLength={24}
                       required
                     />
+                    {data.account.username ? (
+                      <SecretInput
+                        value={usernamePassword}
+                        onChange={setUsernamePassword}
+                        placeholder="Account password"
+                      />
+                    ) : null}
                     <button
                       type="submit"
                       className="btn btn-primary w-full py-3 font-semibold"
-                      disabled={busy === 'username'}
+                      disabled={busy === 'username' || (Boolean(data.account.username) && !usernamePassword)}
                     >
                       {busy === 'username'
                         ? t('account.usernameSaving')

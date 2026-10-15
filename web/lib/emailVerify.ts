@@ -61,11 +61,17 @@ function isMissingTable(err: { message?: string; code?: string } | null): boolea
 
 /**
  * Issue a code, email it, invalidate older open codes for same account+purpose+email.
+ *
+ * pendingPasswordHash rides on the code's row for a re-signup of an account
+ * that never verified its email (POST /api/auth/signup). Nothing here applies
+ * it: consumeEmailVerificationCode hands it back, and only the signup verify
+ * route sets it as the password. An invalidated code loses it.
  */
 export async function issueEmailVerificationCode(p: {
   accountId: string;
   email: string;
   purpose: EmailVerifyPurpose;
+  pendingPasswordHash?: string;
 }): Promise<
   | { ok: true; email: string; expiresAt: string; devCode?: string }
   | { ok: false; error: string; status: number; code?: string }
@@ -125,10 +131,11 @@ export async function issueEmailVerificationCode(p: {
     }
   }
 
-  // Invalidate prior open codes for this email+purpose
+  // Invalidate prior open codes for this email+purpose, and drop any password
+  // a replaced code was holding.
   await supabase
     .from('email_verifications')
-    .update({ consumed_at: new Date().toISOString() })
+    .update({ consumed_at: new Date().toISOString(), pending_password_hash: null })
     .eq('account_id', p.accountId)
     .eq('purpose', p.purpose)
     .eq('email', email)
@@ -144,6 +151,7 @@ export async function issueEmailVerificationCode(p: {
     purpose: p.purpose,
     code_hash,
     expires_at: expiresAt,
+    ...(p.pendingPasswordHash ? { pending_password_hash: p.pendingPasswordHash } : {}),
   });
   if (insErr) {
     return { ok: false, error: 'Could not start verification.', status: 500 };
@@ -188,13 +196,24 @@ export async function issueEmailVerificationCode(p: {
 
 /**
  * Consume a valid code and mark the email verified on the account or secondary row.
+ *
+ * Returns the pending password the code was holding, if any, for the caller
+ * to apply. Only POST /api/auth/signup/verify does; every other caller ignores
+ * it, so a code from someone else's signup can never set a password through
+ * the dashboard's verify step.
+ *
+ * supabase is injectable so the consume path can be driven in tests.
  */
 export async function consumeEmailVerificationCode(p: {
   accountId: string;
   email: string;
   purpose: EmailVerifyPurpose;
   code: string;
-}): Promise<{ ok: true } | { ok: false; error: string; status: number; code?: string }> {
+  supabase?: ReturnType<typeof getSupabase>;
+}): Promise<
+  | { ok: true; pendingPasswordHash: string | null }
+  | { ok: false; error: string; status: number; code?: string }
+> {
   const email = parseEmail(p.email);
   const code = String(p.code || '').trim().replace(/\s+/g, '');
   if (!email || !isValidEmail(email)) {
@@ -207,10 +226,10 @@ export async function consumeEmailVerificationCode(p: {
     return { ok: false, error: 'Not logged in.', status: 401 };
   }
 
-  const supabase = getSupabase();
+  const supabase = p.supabase ?? getSupabase();
   const { data: rows, error } = await supabase
     .from('email_verifications')
-    .select('id, code_hash, expires_at, attempts, consumed_at')
+    .select('id, code_hash, expires_at, attempts, consumed_at, pending_password_hash')
     .eq('account_id', p.accountId)
     .eq('purpose', p.purpose)
     .eq('email', email)
@@ -262,13 +281,14 @@ export async function consumeEmailVerificationCode(p: {
   }
 
   const now = new Date().toISOString();
+  const pendingPasswordHash = row.pending_password_hash ? String(row.pending_password_hash) : null;
   await supabase
     .from('email_verifications')
-    .update({ consumed_at: now })
+    .update({ consumed_at: now, pending_password_hash: null })
     .eq('id', row.id);
 
   if (p.purpose === 'login') {
-    return { ok: true };
+    return { ok: true, pendingPasswordHash: null };
   }
 
   if (p.purpose === 'primary') {
@@ -305,6 +325,16 @@ export async function consumeEmailVerificationCode(p: {
       .eq('email', email)
       .select('id')
       .maybeSingle();
+    // Verified addresses are unique across accounts
+    // (account_emails_verified_email_unique), so this inbox is already
+    // verified on another account. An unverified row never blocks anyone.
+    if (sErr?.code === '23505') {
+      return {
+        ok: false,
+        error: 'That email is already verified on another Flizy account.',
+        status: 409,
+      };
+    }
     if (sErr || !sec) {
       return {
         ok: false,
@@ -314,7 +344,7 @@ export async function consumeEmailVerificationCode(p: {
     }
   }
 
-  return { ok: true };
+  return { ok: true, pendingPasswordHash };
 }
 
 export function normalizePurpose(raw: unknown): EmailVerifyPurpose | null {

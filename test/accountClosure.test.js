@@ -67,7 +67,10 @@ describe('closure stays behind the password and ahead of the burn', () => {
     const route = read('web/app/api/account/closure/route.ts');
     assert.match(route, /rejectIfCrossOrigin/);
     assert.match(route, /getAccountIdFromCookie/);
-    assert.doesNotMatch(route, /requirePassword\(/);
+    // A pause signs every session out, so a cookie alone must not do it.
+    const passwordAt = route.indexOf("requirePassword(supabase, accountId, password, 'pause your account')");
+    assert.ok(passwordAt !== -1 && passwordAt < route.indexOf('deactivated_at: now'));
+    assert.ok(route.indexOf('password.length > 256') < passwordAt);
     assert.doesNotMatch(route, /deleted_at: now/);
     assert.doesNotMatch(route, /console\.(log|debug|info|warn)\([^)]*password/);
     assert.match(route, /deactivated_at: now/);

@@ -1,8 +1,9 @@
 /**
  * Pause the signed-in account.
  *
- * Sets deactivated_at and ends every web session. The next successful
- * sign-in with the same email and the account password clears it. An older
+ * Takes the account password. Sets deactivated_at and ends every web
+ * session. The next successful sign-in with the same email and the account
+ * password clears it. An older
  * deleted_at is cleared by that same sign-in. The account row, the wallet,
  * and the history stay. There is no delete.
  */
@@ -13,6 +14,7 @@ import { getSupabase } from '../../../../lib/supabase';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { apiErrorBody, apiErrorBodyAllowingClientError, ClientError } from '../../../../lib/apiError';
 import { closureOf, isMissingClosureColumn } from '../../../../lib/accountClosure.ts';
+import { requirePassword } from '../../../../lib/passwordGate.ts';
 
 const ROUTE = 'POST /api/account/closure';
 
@@ -32,6 +34,17 @@ export async function POST(req: Request) {
     }
 
     const supabase = getSupabase();
+
+    // A pause signs out every session and stops chat. A stolen cookie alone
+    // must not be able to do that to the owner.
+    const password = String(body.password || '');
+    if (password.length > 256) {
+      return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
+    }
+    const pw = await requirePassword(supabase, accountId, password, 'pause your account');
+    if (!pw.ok) {
+      return NextResponse.json({ error: pw.error, code: pw.code }, { status: pw.status });
+    }
     const { data: account, error: readError } = await supabase
       .from('accounts')
       .select('id, deleted_at, deactivated_at')

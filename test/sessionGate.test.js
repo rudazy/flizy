@@ -114,11 +114,18 @@ describe('sessionGate', () => {
     });
   });
 
-  it('lets an admin and an unlock-off config through, but only with a context', async () => {
+  it('holds an admin to the same lock: there is no admin bypass', async () => {
     seed({ session: { is_locked: true, expires_at: future() } });
-    assert.deepEqual(await sessionGate(actor({ isAdmin: true }), { requireUnlock: true }), { ok: true });
+    assert.deepEqual(await sessionGate(actor({ isAdmin: true }), { requireUnlock: true }), {
+      ok: false,
+      reason: 'session_locked',
+    });
+  });
+
+  it('lets an unlock-off config through, but only with a context', async () => {
+    seed({ session: { is_locked: true, expires_at: future() } });
     assert.deepEqual(await sessionGate(actor(), { requireUnlock: false }), { ok: true });
-    assert.equal((await sessionGate(actor({ isAdmin: true, channel: null }))).ok, false);
+    assert.equal((await sessionGate(actor({ channel: null }), { requireUnlock: false })).ok, false);
   });
 
   it('denies when the state cannot be read', async () => {

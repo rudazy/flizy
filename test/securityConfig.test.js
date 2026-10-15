@@ -72,6 +72,16 @@ describe('checkSecuritySettings', () => {
     assert.equal(r.reported.length, 0);
   });
 
+  it('warns about a retired admin setting, without an alert', () => {
+    const r = run(SAFE, { ...SAFE_ENV, ADMIN_SETUP_SECRET: 'old-secret', ADMIN_PHONES: '2348000000000' });
+    assert.equal(r.found, false);
+    assert.equal(r.reported.length, 0);
+    assert.equal(r.warned.length, 2);
+    assert.match(r.warned.join('\n'), /ADMIN_SETUP_SECRET is set but retired/);
+    assert.match(r.warned.join('\n'), /ADMIN_PHONES is set but retired/);
+    assert.doesNotMatch(r.warned.join('\n'), /old-secret|2348000000000/);
+  });
+
   it('is silent when everything is on', () => {
     const r = run(SAFE, SAFE_ENV);
     assert.deepEqual(r, { found: false, warned: [], reported: [] });

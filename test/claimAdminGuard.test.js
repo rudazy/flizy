@@ -1,17 +1,15 @@
 /**
- * `claimadmin` is the most valuable command in the product, so it gets the same
- * protection as the others that take a secret over chat.
+ * Admin is accounts.is_admin, set by hand in the SQL editor, and nothing else.
  *
- * What admin buys, from lib/engine/policy.js: exemption from the session unlock
- * requirement (evaluateSendPolicy and evaluateSwapPolicy), and within
- * evaluateSendPolicy from the daily send limit and the credit check. Three spend
- * controls, removed by one command.
+ * claimadmin, ADMIN_SETUP_SECRET and ADMIN_PHONES used to grant it from chat,
+ * and admin used to skip the session unlock, the daily limit and the credit
+ * check. Both are gone: the old command promotes nobody (and its secret is
+ * still kept out of the log, for anyone who types it from habit), the legacy
+ * users row cannot make anyone an admin, and an admin is locked out of
+ * spending exactly like everyone else.
  *
- * So the secret is compared in constant time, a failure is logged, and guesses
- * are counted on the same lockout ladder as link codes, keyed the same way on
- * (channel, external_id). Unlike a link code, the admin lockout fails closed:
- * if the counter cannot be read or a failure cannot be recorded, the attempt is
- * refused rather than let through uncounted.
+ * The escrow custody checks at the end are unrelated and live here because
+ * this file already loads the runtime they need.
  *
  * Run: node --test test/claimAdminGuard.test.js
  */
@@ -25,10 +23,8 @@ const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupaba
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
 
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
-// Long enough to clear the floor, so the tests exercise the comparison and the
-// lockout rather than the configuration refusal.
+// A setup secret as it may still sit in an old .env. It must grant nothing.
 const GOOD_SECRET = 'a-very-long-setup-secret-0123456789';
-process.env.ADMIN_SETUP_SECRET = GOOD_SECRET;
 
 let fake = createFakeSupabase();
 mockSupabaseModule({
@@ -104,114 +100,124 @@ function seed() {
 }
 
 const users = () => fake.db.tables.users || [];
-const attempts = () => fake.db.tables.link_code_attempts || [];
-const isAdminNow = () => Boolean(users()[0] && users()[0].is_admin);
 
-describe('a wrong secret is counted, not just refused', () => {
+describe('claimadmin is retired', () => {
   beforeEach(seed);
 
-  it('refuses and records the attempt', async () => {
-    const sent = [];
-    await router.handle(ctxFor(sent), '/claimadmin wrong-guess-entirely');
-
-    assert.match(sent.join('\n'), /Invalid setup secret/i);
-    assert.equal(isAdminNow(), false, 'nobody was promoted');
-    assert.equal(attempts().length, 1, 'the guess was recorded');
-  });
-
-  it('counts each guess, so grinding runs into the ladder', async () => {
-    for (let i = 0; i < 4; i += 1) {
-      const sent = [];
-      await router.handle(ctxFor(sent), `/claimadmin guess-number-${i}`);
-      assert.equal(isAdminNow(), false);
-    }
-    const row = attempts()[0];
-    assert.ok(Number(row.failed_attempts) >= 4, `expected 4 or more, got ${row.failed_attempts}`);
-  });
-
-  it('eventually locks the chat out, and says so without hinting', async () => {
-    // Enough wrong guesses to pass the free allowance and land in the ladder.
-    for (let i = 0; i < 8; i += 1) {
-      await router.handle(ctxFor([]), `/claimadmin still-wrong-${i}`);
-    }
+  it('the old command with the old secret promotes nobody', async () => {
     const sent = [];
     await router.handle(ctxFor(sent), `/claimadmin ${GOOD_SECRET}`);
-    const out = sent.join('\n');
+    assert.equal(fake.db.tables.accounts[0].is_admin, false);
+    assert.equal(users()[0].is_admin, false);
+    assert.doesNotMatch(sent.join('\n'), /now an admin/i);
+  });
 
-    // The correct secret offered while locked out must not promote. The lockout
-    // check sits above the comparison for exactly this reason.
-    assert.match(out, /Too many wrong secrets/i);
-    assert.equal(isAdminNow(), false, 'a locked-out chat cannot promote, even with the real secret');
-    assert.doesNotMatch(out, /valid|correct|close/i, 'and it must not say the guess was right');
+  it('keeps the old secret out of the log if someone still types it', async () => {
+    const logged = [];
+    const original = console.log;
+    console.log = (...args) => logged.push(args.join(' '));
+    try {
+      await router.handle(ctxFor([]), `/claimadmin ${GOOD_SECRET}`);
+    } finally {
+      console.log = original;
+    }
+    assert.ok(logged.length > 0);
+    assert.ok(!logged.join('\n').includes(GOOD_SECRET));
+  });
+
+  it('nothing in lib reads ADMIN_PHONES or ADMIN_SETUP_SECRET any more', () => {
+    const libDir = path.join(__dirname, '..', 'lib');
+    const offenders = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith('.js') && entry.name !== 'securityConfig.js') {
+          if (/ADMIN_PHONES|ADMIN_SETUP_SECRET|adminPhones|adminSetupSecret/.test(fs.readFileSync(full, 'utf8'))) {
+            offenders.push(path.relative(libDir, full));
+          }
+        }
+      }
+    };
+    walk(libDir);
+    assert.deepEqual(offenders, []);
   });
 });
 
-describe('the right secret still works', () => {
+describe('admin is accounts.is_admin, and nothing else', () => {
   beforeEach(seed);
 
-  it('promotes and clears the counter', async () => {
-    // One wrong guess first, so there is a counter to clear.
-    await router.handle(ctxFor([]), '/claimadmin wrong-the-first-time');
-    assert.equal(attempts().length, 1);
-
+  it('the account flag opens the operator commands on an unlocked chat', async () => {
+    fake.db.tables.accounts[0].is_admin = true;
+    fake.db.tables.accounts[0].unlock_pin_hash = 'pin-hash-present';
+    fake.db.tables.sessions.push({
+      account_id: 'acc-a',
+      channel: 'telegram',
+      external_id: TG_ID,
+      is_locked: false,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    });
     const sent = [];
-    await router.handle(ctxFor(sent), `/claimadmin ${GOOD_SECRET}`);
-
-    assert.match(sent.join('\n'), /now an admin/i);
-    assert.equal(isAdminNow(), true);
-    const row = attempts()[0];
-    assert.equal(Number(row?.failed_attempts || 0), 0, 'a correct secret clears the counter');
+    await router.handle(ctxFor(sent), '/pool');
+    assert.match(sent.join('\n'), /Ops wallet/);
   });
 
-  it('says so plainly when already an admin', async () => {
+  it('the flag alone is not enough: a chat that never unlocked cannot list users or credit', async () => {
+    fake.db.tables.accounts[0].is_admin = true;
+    fake.db.tables.accounts[0].unlock_pin_hash = 'pin-hash-present';
+    for (const command of ['/users', '/pool', '/credit 2348012345678 0.01']) {
+      const sent = [];
+      await router.handle(ctxFor(sent), command);
+      assert.match(sent.join('\n'), /Operator commands need an unlocked chat/, command);
+    }
+    assert.equal(users()[0].balance_eth, 0);
+  });
+
+  it('the legacy users flag alone does not', async () => {
     users()[0].is_admin = true;
     const sent = [];
-    await router.handle(ctxFor(sent), `/claimadmin ${GOOD_SECRET}`);
-    assert.match(sent.join('\n'), /already an admin/i);
-  });
-});
-
-describe('the comparison and the floor', () => {
-  const SRC = fs.readFileSync(path.join(__dirname, '..', 'lib', 'handlers', 'admin.js'), 'utf8');
-
-  it('compares the secret in constant time', () => {
-    assert.match(SRC, /crypto\.timingSafeEqual\(/, 'the secret must not be compared with ===');
-    // A direct comparison leaks the secret one character at a time.
-    assert.doesNotMatch(
-      SRC,
-      /secret\s*!==\s*expected|expected\s*!==\s*secret/,
-      'a direct string comparison on the secret leaks it through timing'
-    );
+    await router.handle(ctxFor(sent), '/pool');
+    assert.match(sent.join('\n'), /admin-only/);
   });
 
-  it('checks the lockout before it checks the secret', () => {
-    const lockAt = SRC.indexOf('linkLockState(channel, externalId)');
-    const compareAt = SRC.indexOf('secretsMatch(secret, expected)');
-    assert.ok(lockAt > 0 && compareAt > 0, 'both steps must be present');
-    assert.ok(
-      lockAt < compareAt,
-      'comparing first would let a locked-out guesser keep learning from timing'
-    );
+  it('only the operator commands read the flag: no money path exempts an admin', () => {
+    const libDir = path.join(__dirname, '..', 'lib');
+    const readers = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== 'generated') walk(full);
+        } else if (entry.name.endsWith('.js')) {
+          const code = fs
+            .readFileSync(full, 'utf8')
+            .split('\n')
+            .filter((line) => !/^\s*(\/?\*|\/\/)/.test(line))
+            .join('\n');
+          if (/\bisAdmin\b|is_admin|isAdminAccount\(/.test(code)) readers.push(path.relative(libDir, full).replace(/\\/g, '/'));
+        }
+      }
+    };
+    walk(libDir);
+    assert.deepEqual(readers.sort(), ['commands/chat.js', 'handlers/admin.js']);
   });
 
-  it('logs a failure, so grinding is visible', () => {
-    assert.match(SRC, /\[admin\] claimadmin failed/, 'a failed attempt must leave a trace');
-    assert.match(SRC, /\[admin\] promoted to admin/, 'and so must a successful promotion');
-  });
-
-  it('refuses a trivially short configured secret', async () => {
-    seed();
-    const previous = process.env.ADMIN_SETUP_SECRET;
-    process.env.ADMIN_SETUP_SECRET = 'short';
-    // config caches at require time, so this asserts the floor exists and its
-    // value rather than re-reading the environment.
-    try {
-      assert.match(SRC, /ADMIN_SECRET_MIN_LENGTH = 16/);
-      assert.match(SRC, /length < ADMIN_SECRET_MIN_LENGTH/);
-      assert.match(SRC, /Admin setup is not usable/);
-    } finally {
-      process.env.ADMIN_SETUP_SECRET = previous;
-    }
+  it('an admin goes through the same lock as everyone else', async () => {
+    // Both flags, so this would also catch the old bypass, which read the
+    // legacy users row.
+    fake.db.tables.accounts[0].is_admin = true;
+    users()[0].is_admin = true;
+    fake.db.tables.accounts[0].unlock_pin_hash = 'pin-hash-present';
+    fake.db.tables.sessions.push({
+      account_id: 'acc-a',
+      channel: 'telegram',
+      external_id: TG_ID,
+      is_locked: true,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const sent = [];
+    await router.handle(ctxFor(sent), '/pool');
+    assert.match(sent.join('\n'), /Session locked/);
   });
 });
 

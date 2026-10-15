@@ -20,8 +20,8 @@ const ROUTE = 'POST /api/account/password';
  * Change the account password.
  *
  * The current password goes through the same gate as every sensitive change,
- * so wrong guesses here climb the same login lockout ladder. The new one must
- * pass the signup rules.
+ * so wrong guesses here climb the account's re-auth lockout ladder. The new
+ * one must pass the signup rules.
  *
  * Every session is then revoked and this browser gets a fresh one: a password
  * is changed most often because it may have leaked, and a changed credential

@@ -435,7 +435,7 @@ async function resolveCrossAccount(supabase: AnyClient, existing: any, ctx: Ctx)
   return { outcome: BIND_OUTCOME.MOVED, identity: data || existing };
 }
 
-async function rejectAlreadyLinked(supabase: AnyClient, ctx: Ctx) {
+async function rejectAlreadyLinked(supabase: AnyClient, ctx: Ctx): Promise<never> {
   await recordRejectedBind(supabase, ctx.accountId);
   await logIdentityEvent(supabase, { ...ctx, eventType: IDENTITY_EVENT.LINK_REJECTED_ALREADY_LINKED });
   throw new BindError(

@@ -82,14 +82,15 @@ describe('daily limit failure denies the send', () => {
     assert.match(result.message, /try again/i);
   });
 
-  it('still lets an admin through', async () => {
+  it('denies an admin too: admins have no limit bypass', async () => {
     const result = await evaluateSendPolicy(
       intent({
         actor: { accountId: 'acct-1', isAdmin: true, channel: 'whatsapp', externalId: '2348012345678' },
       }),
       opts
     );
-    assert.equal(result.decision, 'ALLOW_WITH_CONFIRM');
+    assert.equal(result.decision, 'DENY');
+    assert.equal(result.reason, 'daily_limit_unavailable');
   });
 
   it('does not block a token send, which has no daily cap', async () => {

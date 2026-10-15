@@ -133,8 +133,10 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
+      // Only verified rows are unique across accounts, so a unique violation
+      // here means this account already lists the address.
       if (error.code === '23505') {
-        return NextResponse.json({ error: 'Could not add that email.' }, { status: 400 });
+        return NextResponse.json({ error: 'That email is already on your account.' }, { status: 400 });
       }
       return NextResponse.json(apiErrorBody(`POST ${ROUTE}`, error), { status: 500 });
     }

@@ -133,7 +133,7 @@ Two rules do the heavy lifting:
 - **A phone column never receives a transfer key.** `normalizePhoneNumber` rejects any value
   containing a letter rather than salvaging its digits, because stripping the namespace off
   `telegram:5566778899` would forge a plausible number out of a chat user id. That forged
-  number could then match an `ADMIN_PHONES` entry or a stranger's pending claim. Columns
+  number could then match a stranger's pending claim. Columns
   rendered back to a user as a phone (`claims.from_wa_sender`, `payment_requests.requester_wa`)
   additionally store `null` unless the value passes `isPlausiblePhone`.
 - Sessions are keyed `(account_id, channel, external_id)`. Locking one chat app leaves the

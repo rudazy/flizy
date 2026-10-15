@@ -3,17 +3,21 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { clearAppearanceCache } from '../lib/appearanceCache';
+import { SecretInput } from './AccountConnections';
 
 /**
  * Confirm a pause. There is no delete.
  * Signing in later with the same email and the account password opens this
  * account again. The wallet and the history stay on the row.
+ *
+ * The second step takes the account password: a pause signs every session
+ * out and stops chat, so a stolen cookie alone must not be able to do it.
  */
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onDeactivate: () => Promise<string | null>;
+  onDeactivate: (password: string) => Promise<string | null>;
 };
 
 export function AccountClosureSheet({ open, onClose, onDeactivate }: Props) {
@@ -21,6 +25,7 @@ export function AccountClosureSheet({ open, onClose, onDeactivate }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -28,6 +33,7 @@ export function AccountClosureSheet({ open, onClose, onDeactivate }: Props) {
     setBusy(false);
     setError('');
     setDone(false);
+    setPassword('');
   }, [open]);
 
   function leave() {
@@ -52,10 +58,11 @@ export function AccountClosureSheet({ open, onClose, onDeactivate }: Props) {
   if (!open || typeof document === 'undefined') return null;
 
   async function deactivate() {
-    if (busy) return;
+    if (busy || !password) return;
     setBusy(true);
     setError('');
-    const message = await onDeactivate();
+    const message = await onDeactivate(password);
+    setPassword('');
     if (message) {
       setError(message);
       setBusy(false);
@@ -132,6 +139,9 @@ export function AccountClosureSheet({ open, onClose, onDeactivate }: Props) {
             <p className="font-sans text-[13px] leading-relaxed text-[#d5d0c8]">
               Chat stays off while the account is paused. Sign in later with the same email and the account password to bring it back.
             </p>
+            <div className="mt-3">
+              <SecretInput value={password} onChange={setPassword} placeholder="Account password" autoFocus />
+            </div>
             {error ? <p className="mt-3 font-sans text-[12px] text-[#f05252]">{error}</p> : null}
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
@@ -147,7 +157,7 @@ export function AccountClosureSheet({ open, onClose, onDeactivate }: Props) {
               </button>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || !password}
                 className="hit-y-44 h-10 rounded-[10px] border border-[#f7d047] font-sans text-[13px] font-semibold text-[#f7d047] disabled:opacity-60"
                 onClick={() => void deactivate()}
               >

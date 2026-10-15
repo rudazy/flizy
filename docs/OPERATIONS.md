@@ -208,7 +208,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `TELEGRAM_POLL_TIMEOUT_SEC` | Long poll wait, default 30 |
 | `OUTBOX_DRAIN_MS` | Notification outbox poll, default 5000. Worst case delay for a cross-channel notice |
 | `SITE_URL` | Public site URL. Production: `https://flizy.app` (also set `NEXT_PUBLIC_SITE_URL` on Vercel) |
-| `ADMIN_PHONES` / `ADMIN_SETUP_SECRET` | Admin bootstrap |
+| `ADMIN_PHONES` / `ADMIN_SETUP_SECRET` | Retired. Admin is `accounts.is_admin`, set by hand in the SQL editor. The bots warn at startup if either is still set |
 | `ENFORCE_TRUSTED` | Approved-destination enforcement on transfers. Keep `true`; the bots report `false` to Sentry at startup in production |
 | `ENFORCE_CREDIT` | Require internal credit before a send |
 | `REQUIRE_UNLOCK` | Chat moves money only after a PIN unlock. Keep `true`; the bots report `false` to Sentry at startup in production |

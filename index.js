@@ -39,7 +39,6 @@ const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const router = require('./lib/router');
 
 const CHANNEL = CHANNELS.WHATSAPP;
-const ADMIN_PHONES = config.adminPhones;
 
 let botWhatsAppNumber = config.botWhatsAppNumber || '';
 
@@ -349,11 +348,6 @@ client.on('ready', async () => {
   console.log('  Friends must message THAT number (via site Dashboard).');
   console.log('  Each user is identified by their own WhatsApp id (not the bot number).');
   console.log('');
-  if (ADMIN_PHONES.size === 0) {
-    console.warn('Tip: claimadmin <secret> in WhatsApp if you are not admin yet.');
-  } else {
-    console.log(`Admins: ${[...ADMIN_PHONES].join(', ')}`);
-  }
   console.log(`Chain:                  ${chain.name} (${chain.chainId})`);
   console.log(`Ops wallet (gas/infra): ${opsWallet.address}`);
   console.log(`Claim escrow:           ${escrowWallet.address}`);

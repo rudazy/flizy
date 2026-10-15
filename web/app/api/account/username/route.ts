@@ -2,7 +2,11 @@
  * Set or change the Flizy-native @username for the signed-in account.
  *
  * Required at signup. Change at most once every 30 days.
- * Not a payment routing key — platform ids and phones still are.
+ *
+ * People pay @username and /pay/username, so a change takes the account
+ * password, and the released name is held for this account for 90 days
+ * (trigger accounts_username_hold, migration 20261016110000_username_holds.sql)
+ * so a payment meant for it cannot reach whoever claims it next.
  */
 
 import { NextResponse } from 'next/server';
@@ -20,6 +24,7 @@ import { apiErrorBody } from '../../../../lib/apiError';
 import { ensureInviteCode } from '../../../../lib/invite.ts';
 import { ensurePayCode } from '../../../../lib/payCode.ts';
 import { isHandleTakenByProject } from '../../../../lib/tasks';
+import { requirePassword } from '../../../../lib/passwordGate.ts';
 
 const ROUTE = 'POST /api/account/username';
 
@@ -69,6 +74,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ account: toPublicAccount(current) });
     }
 
+    // Changing a name people already pay to takes the password: a session
+    // cookie alone must not be able to move @name. The first name, chosen
+    // during signup, does not.
+    if (current.username) {
+      const password = String(body.password || '');
+      if (password.length > 256) {
+        return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
+      }
+      const pw = await requirePassword(supabase, accountId, password, 'change your username');
+      if (!pw.ok) {
+        return NextResponse.json({ error: pw.error, code: pw.code }, { status: pw.status });
+      }
+    }
+
     if (await isUsernameReserved(supabase, check.username)) {
       return NextResponse.json({ error: USERNAME_UNAVAILABLE }, { status: 409 });
     }
@@ -86,12 +105,14 @@ export async function POST(req: Request) {
       .single();
 
     if (error) {
-      // Unique index, FZ002 reserved trigger, or FZ101 project-handle trigger.
+      // Unique index, FZ002 reserved trigger, FZ003 held-name trigger, or
+      // FZ101 project-handle trigger.
       const code = String(error.code || '');
       const msg = String(error.message || '').toLowerCase();
       if (
         code === '23505' ||
         code === 'FZ002' ||
+        code === 'FZ003' ||
         code === 'FZ101' ||
         msg.includes('duplicate') ||
         msg.includes('username is reserved')

@@ -76,7 +76,9 @@ describe('routes that move money or grant authority take the password', () => {
    * requirePassword (web/lib/mintExecute.ts).
    */
   const PASSWORD_ROUTES = [
+    'account/closure',
     'account/password',
+    'account/username',
     'identity',
     'limits',
     'link/create',

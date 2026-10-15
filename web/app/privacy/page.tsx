@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '13 October 2026';
+const UPDATED = '16 October 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -91,6 +91,11 @@ export default function PrivacyPage() {
             <li>
               <span className="text-paper">Chat link.</span> One-time link codes and the
               channel bind (WhatsApp or Telegram chat id) after you redeem a code.
+            </li>
+            <li>
+              <span className="text-paper">Security counters.</span> To limit password guessing
+              and signup abuse, we count failed sign-ins and signups against a one-way hash of
+              your email and of your network address. The counters hold neither in readable form.
             </li>
             <li>
               <span className="text-paper">App background.</span> If you upload one, the image
@@ -189,6 +194,10 @@ export default function PrivacyPage() {
           <LegalH id="keep">How long we keep it</LegalH>
           <ul className="list-disc space-y-2 pl-5">
             <li>Verification codes expire in minutes and are then useless.</li>
+            <li>
+              A sign-in counter clears on a correct sign-in. Network address counters reset
+              after an hour without a failure.
+            </li>
             <li>Session cookies last until you sign out or they expire.</li>
             <li>Invite cookies last up to 14 days, or until they are used at signup.</li>
             <li>The analytics answer lasts six months, or until you change it.</li>

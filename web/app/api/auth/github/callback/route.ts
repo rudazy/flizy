@@ -26,7 +26,8 @@ import {
   recordCallbackFailure,
   clearCallbackFailures,
 } from '../../../../../lib/callbackLimiter';
-import { bindChannelIdentity, REBIND_POLICY, BindError } from '../../../../../lib/channelBind.ts';
+import { bindChannelIdentity, BIND_OUTCOME, REBIND_POLICY, BindError } from '../../../../../lib/channelBind.ts';
+import { announcePlatformLink } from '../../../../../lib/platformLinkNotice';
 import { getSupabase } from '../../../../../lib/supabase';
 
 const ROUTE = 'GET /api/auth/github/callback';
@@ -108,14 +109,16 @@ export async function GET(req: Request) {
     //    moved, because OAuth is not proof of intent for the OLD account, and a
     //    silent move would redirect that handle's payouts without its owner's
     //    password.
+    let linked = false;
     try {
-      await bindChannelIdentity(getSupabase(), {
+      const bound = await bindChannelIdentity(getSupabase(), {
         accountId,
         channel: 'github',
         externalId: identity.externalId,
         displayHandle: identity.login,
         rebindPolicy: REBIND_POLICY.REJECT,
       });
+      linked = bound.outcome === BIND_OUTCOME.LINKED;
     } catch (err) {
       if (err instanceof BindError) {
         if (err.code === 'IDENTITY_TAKEN') return NextResponse.redirect(postOAuthUrl('identity_taken'));
@@ -128,6 +131,8 @@ export async function GET(req: Request) {
     }
 
     await clearCallbackFailures(sessionKey);
+    // A new link routes this handle's claims here, so the owner hears of it.
+    if (linked) await announcePlatformLink(accountId, 'github', identity.login || null);
     return NextResponse.redirect(postOAuthUrl('linked'));
   } catch (err) {
     // Routes the failure through the same helper every other route uses, which

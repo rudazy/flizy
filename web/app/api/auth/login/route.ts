@@ -17,6 +17,7 @@ import {
   recordFailedLogin,
 } from '../../../../lib/loginAttempts.ts';
 import { closureOf, isMissingClosureColumn } from '../../../../lib/accountClosure.ts';
+import { clientIpKey } from '../../../../lib/clientIp.ts';
 
 const ROUTE = 'POST /api/auth/login';
 
@@ -46,9 +47,10 @@ export async function POST(req: Request) {
     const code = String(body.code || '').replace(/\D/g, '');
 
     const supabase = getSupabase();
+    const ipKey = clientIpKey(req.headers);
 
     if (email) {
-      const lock = await loginLockState(supabase, email);
+      const lock = await loginLockState(supabase, email, ipKey);
       if (lock.locked && lock.retryAfterText) {
         return lockedResponse(lock.retryAfterText);
       }
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
     const matches = verifyPassword(password, stored);
     if (!data?.password_hash || !matches) {
       if (email) {
-        const recorded = await recordFailedLogin(supabase, email);
+        const recorded = await recordFailedLogin(supabase, email, ipKey);
         if (recorded.retryAfterText) {
           return lockedResponse(recorded.retryAfterText);
         }
@@ -157,7 +159,7 @@ export async function POST(req: Request) {
     }
 
     await createSession(data.id);
-    await clearFailedLogins(supabase, data.email);
+    await clearFailedLogins(supabase, email, ipKey);
     return NextResponse.json({
       account: toPublicAccount({
         email: data.email,

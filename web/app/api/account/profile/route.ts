@@ -86,6 +86,14 @@ export async function POST(req: Request) {
     };
     // Holders of a name that later becomes reserved may keep it (noop).
     if (!gate.isNoop) {
+      // This route sets the first username. Changing one people already pay
+      // to takes the password, and that is POST /api/account/username.
+      if (current.username) {
+        return NextResponse.json(
+          { error: 'Change your username from Account, with your password.' },
+          { status: 409 }
+        );
+      }
       if (await isUsernameReserved(supabase, check.username)) {
         return NextResponse.json({ error: USERNAME_UNAVAILABLE }, { status: 409 });
       }
@@ -103,9 +111,12 @@ export async function POST(req: Request) {
     if (error) {
       const code = String(error.code || '');
       const msg = String(error.message || '').toLowerCase();
+      // Unique index, FZ002 reserved, FZ003 held, FZ101 project handle.
       if (
         code === '23505' ||
         code === 'FZ002' ||
+        code === 'FZ003' ||
+        code === 'FZ101' ||
         msg.includes('duplicate') ||
         msg.includes('username is reserved')
       ) {

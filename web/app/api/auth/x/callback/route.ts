@@ -12,7 +12,8 @@ import {
   recordCallbackFailure,
   clearCallbackFailures,
 } from '../../../../../lib/callbackLimiter';
-import { bindChannelIdentity, REBIND_POLICY, BindError } from '../../../../../lib/channelBind.ts';
+import { bindChannelIdentity, BIND_OUTCOME, REBIND_POLICY, BindError } from '../../../../../lib/channelBind.ts';
+import { announcePlatformLink } from '../../../../../lib/platformLinkNotice';
 import { getSupabase } from '../../../../../lib/supabase';
 
 const ROUTE = 'GET /api/auth/x/callback';
@@ -74,14 +75,16 @@ export async function GET(req: Request) {
     }
     const identity = exchanged.identity;
 
+    let linked = false;
     try {
-      await bindChannelIdentity(getSupabase(), {
+      const bound = await bindChannelIdentity(getSupabase(), {
         accountId,
         channel: 'x',
         externalId: identity.externalId,
         displayHandle: identity.login,
         rebindPolicy: REBIND_POLICY.REJECT,
       });
+      linked = bound.outcome === BIND_OUTCOME.LINKED;
     } catch (err) {
       if (err instanceof BindError) {
         if (err.code === 'IDENTITY_TAKEN') return NextResponse.redirect(postOAuthUrl('identity_taken'));
@@ -94,6 +97,8 @@ export async function GET(req: Request) {
     }
 
     await clearCallbackFailures(sessionKey);
+    // A new link routes this handle's claims here, so the owner hears of it.
+    if (linked) await announcePlatformLink(accountId, 'x', identity.login || null);
     return NextResponse.redirect(postOAuthUrl('linked'));
   } catch (err) {
     logApiError(ROUTE, err);

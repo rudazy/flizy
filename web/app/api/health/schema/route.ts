@@ -14,9 +14,9 @@
  * cannot advertise a hole. The token holder gets the exposure findings too.
  */
 
-import { timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 
+import { secretMatches } from '@/lib/bearerSecret';
 import { checkSchema } from '@/lib/schemaGuard.mjs';
 import { getSupabase } from '@/lib/supabase.ts';
 import manifest from '@/lib/generated/schemaManifest.json';
@@ -25,14 +25,12 @@ import allowlist from '@/lib/schemaExposureAllowlist.json';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-/** Constant time compare. Returns false when no token is configured. */
+/**
+ * Constant time compare over hashes, so a wrong guess learns nothing about
+ * the token's length either. Returns false when no token is configured.
+ */
 function tokenMatches(offered: string | null): boolean {
-  const expected = process.env.SCHEMA_HEALTH_TOKEN;
-  if (!expected || !offered) return false;
-  const a = Buffer.from(offered);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  return secretMatches(offered, process.env.SCHEMA_HEALTH_TOKEN);
 }
 
 export async function GET(request: Request) {
