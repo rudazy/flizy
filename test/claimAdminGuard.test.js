@@ -217,7 +217,7 @@ describe('admin is accounts.is_admin, and nothing else', () => {
     });
     const sent = [];
     await router.handle(ctxFor(sent), '/pool');
-    assert.match(sent.join('\n'), /Session locked/);
+    assert.match(sent.join('\n'), /Chat locked/);
   });
 });
 

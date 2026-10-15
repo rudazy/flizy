@@ -4,11 +4,13 @@
  * - CONFIRM reads the unlock and the trusted list again, so a plan made while
  *   unlocked cannot be sent after the chat locked or the destination was
  *   removed on the site.
- * - unlink from chat needs an unlocked chat, and tells the owner on every chat
- *   that was linked (the removed one included) and by email.
+ * - unlink from chat takes a fresh PIN approval on flizy.app, then tells the
+ *   owner on every chat that was linked (the removed one included) and by
+ *   email.
  * - a link code cannot move a chat off another site account.
- * - a message carrying a PIN is deleted where the channel allows it, and the
- *   owner is asked to delete it where it does not.
+ * - a PIN typed into chat is never checked; it is deleted where the channel
+ *   allows it, the owner is asked to delete it where it does not, and the
+ *   unlock link is sent instead.
  *
  * Run: node --test test/chatHardening.test.js
  */
@@ -17,9 +19,8 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
-const { unlockedSession } = require('./helpers/unlockedChat');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
-const { hashPin } = require('../lib/cryptoPin');
+const { PIN_HASH_PRESENT, unlockedSession } = require('./helpers/unlockedChat');
 
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
 
@@ -128,7 +129,7 @@ function account(id, extra = {}) {
     balance_eth: 0,
     is_admin: false,
     agent_wallet_address: id === OWNER ? '0x9999999999999999999999999999999999999999' : '0x8888888888888888888888888888888888888888',
-    unlock_pin_hash: hashPin(PIN),
+    unlock_pin_hash: PIN_HASH_PRESENT,
     ...extra,
   };
 }
@@ -211,24 +212,44 @@ describe('CONFIRM rechecks what the plan was allowed on', () => {
     sent.length = 0;
     await router.handle(ctx, 'confirm');
     assert.equal(moved, 0);
-    assert.match(sent.join('\n'), /Nothing was sent\.\nSession locked\./);
+    assert.match(sent.join('\n'), /Nothing was sent\.\nChat locked\./);
     assert.equal(router.pendingFlowFor(TG_KEY).send, false);
   });
 });
 
 describe('unlink from chat', () => {
+  const { pollApprovals } = require('../lib/chatApprovals');
+  const approvals = () => tables().chat_approvals || [];
+
+  /** What the approval page does on a right PIN. */
+  function approveOnPage() {
+    const row = approvals().find((r) => !r.approved_at && !r.cancelled_at);
+    assert.ok(row, 'an open approval');
+    row.approved_at = new Date().toISOString();
+  }
+
   beforeEach(() => {
     router.discardPendingFlows(TG_KEY);
   });
 
-  it('is refused on a chat that is not unlocked, and nothing is removed', async () => {
+  it('sends a fresh PIN link, even on an unlocked chat, and removes nothing yet', async () => {
+    seed();
+    const sent = [];
+    await router.handle(ctxFor(sent), '/unlink whatsapp');
+    assert.match(sent.join('\n'), /Unlink WhatsApp with your PIN on Flizy: \S+\/a\//);
+    assert.equal(identitiesOf(OWNER).length, 2);
+    assert.equal(approvals()[0].kind, 'unlink');
+    assert.equal(tables().notifications.length, 0);
+    assert.deepEqual(mails, []);
+  });
+
+  it('works from a locked chat too: the PIN on the page is the proof', async () => {
     seed({ unlocked: false });
     const sent = [];
     await router.handle(ctxFor(sent), '/unlink whatsapp');
-    assert.match(sent.join('\n'), /Unlinking needs an unlocked chat\./);
-    assert.equal(identitiesOf(OWNER).length, 2);
-    assert.equal(tables().notifications.length, 0);
-    assert.deepEqual(mails, []);
+    approveOnPage();
+    await pollApprovals();
+    assert.deepEqual(identitiesOf(OWNER).map((i) => i.channel), ['telegram']);
   });
 
   it('is refused when the account has no PIN, and points to the site', async () => {
@@ -237,14 +258,15 @@ describe('unlink from chat', () => {
     await router.handle(ctxFor(sent), '/unlink whatsapp');
     assert.match(sent.join('\n'), /needs an unlock PIN, and this account has none/);
     assert.match(sent.join('\n'), /dashboard\/account\?s=chat/);
+    assert.equal(approvals().length, 0);
     assert.equal(identitiesOf(OWNER).length, 2);
   });
 
   it('removing the other chat tells that chat, and emails the owner', async () => {
     seed();
-    const sent = [];
-    await router.handle(ctxFor(sent), '/unlink whatsapp');
-    assert.match(sent.join('\n'), /WhatsApp unlinked from Flizy\./);
+    await router.handle(ctxFor([]), '/unlink whatsapp');
+    approveOnPage();
+    await pollApprovals();
     assert.deepEqual(identitiesOf(OWNER).map((i) => i.channel), ['telegram']);
 
     // The removed WhatsApp is no longer on the account, and still hears it.
@@ -252,19 +274,24 @@ describe('unlink from chat', () => {
     assert.equal(toWa.length, 1);
     assert.match(toWa[0].body, /WhatsApp was unlinked from your Flizy account, from your Telegram chat\./);
     assert.match(toWa[0].body, /someone has that phone and your PIN/);
+    // The chat that asked reads the outcome there.
+    const toTg = tables().notifications.filter((n) => n.channel === 'telegram').map((n) => n.body).join('\n');
+    assert.match(toTg, /WhatsApp unlinked from Flizy\./);
     assert.deepEqual(mails, [{ accountId: OWNER, kind: 'unlinked' }]);
   });
 
   it('removing this chat tells the chats still linked, and emails the owner', async () => {
     seed();
-    const sent = [];
-    await router.handle(ctxFor(sent), '/unlink');
-    assert.match(sent.join('\n'), /Telegram unlinked from Flizy\./);
+    await router.handle(ctxFor([]), '/unlink');
+    approveOnPage();
+    await pollApprovals();
     assert.deepEqual(identitiesOf(OWNER).map((i) => i.channel), ['whatsapp']);
     const toWa = tables().notifications.filter((n) => n.channel === 'whatsapp');
     assert.equal(toWa.length, 1);
     assert.match(toWa[0].body, /Telegram was unlinked from your Flizy account/);
-    assert.equal(tables().notifications.filter((n) => n.channel === 'telegram').length, 0);
+    const toTg = tables().notifications.filter((n) => n.channel === 'telegram').map((n) => n.body).join('\n');
+    assert.match(toTg, /Telegram unlinked from Flizy\./);
+    assert.doesNotMatch(toTg, /was unlinked from your Flizy account/);
     assert.deepEqual(mails, [{ accountId: OWNER, kind: 'unlinked' }]);
   });
 });
@@ -325,54 +352,86 @@ describe('a link code cannot move a chat off another site account', () => {
   });
 });
 
-describe('a message carrying a PIN', () => {
+describe('a PIN typed into chat', () => {
+  const approvals = () => tables().chat_approvals || [];
+
   beforeEach(() => {
     seed({ unlocked: false });
     router.discardPendingFlows(TG_KEY);
   });
 
-  it('is deleted on Telegram, right or wrong', async () => {
+  it('is never checked: right or wrong, the chat stays locked and gets a link', async () => {
     for (const guess of [PIN, '000000']) {
-      router.discardPendingFlows(TG_KEY);
-      let deleted = 0;
+      seed({ unlocked: false });
       const sent = [];
-      const ctx = ctxFor(sent, { forgetMessage: async () => { deleted += 1; } });
-      await router.handle(ctx, '/unlock');
-      assert.equal(deleted, 0, 'the bare command carries no PIN');
-      await router.handle(ctx, guess);
-      assert.equal(deleted, 1, guess);
-      assert.doesNotMatch(sent.join('\n'), /Delete your message with the PIN/);
+      await router.handle(ctxFor(sent), `/unlock ${guess}`);
+      const text = sent.join('\n');
+      assert.match(text, /Flizy never takes your PIN in chat\./);
+      assert.match(text, /Unlock this chat with your PIN on Flizy: \S+\/a\//);
+      assert.doesNotMatch(text, /unlocked|Wrong PIN/i);
+      assert.ok(!text.includes(guess), 'the PIN is never echoed');
+      assert.equal(tables().sessions.length, 0, 'nothing was unlocked');
     }
   });
 
-  it('is deleted when it rides in the one-line form too', async () => {
+  it('is deleted on Telegram', async () => {
     let deleted = 0;
     const sent = [];
     await router.handle(ctxFor(sent, { forgetMessage: async () => { deleted += 1; } }), `/unlock ${PIN}`);
     assert.equal(deleted, 1);
-    assert.match(sent.join('\n'), /Session unlocked/);
+    assert.doesNotMatch(sent.join('\n'), /Delete your message with the PIN/);
   });
 
-  it('asks the owner to delete it where the bot cannot', async () => {
+  it('the owner is asked to delete it where the bot cannot, or when deleting fails', async () => {
+    for (const forgetMessage of [undefined, async () => { throw new Error('message too old'); }]) {
+      seed({ unlocked: false });
+      const sent = [];
+      await router.handle(ctxFor(sent, { forgetMessage }), `/unlock ${PIN}`);
+      assert.match(sent.join('\n'), /Delete your message with the PIN from this chat\./);
+    }
+  });
+
+  it('a bare unlock carries no PIN, so nothing is deleted, and the link is sent', async () => {
+    let deleted = 0;
     const sent = [];
-    const ctx = ctxFor(sent);
-    await router.handle(ctx, '/unlock');
-    await router.handle(ctx, PIN);
-    assert.match(sent.join('\n'), /Session unlocked[\s\S]*\n\nDelete your message with the PIN from this chat\.$/);
+    await router.handle(ctxFor(sent, { forgetMessage: async () => { deleted += 1; } }), '/unlock');
+    assert.equal(deleted, 0);
+    assert.match(sent.join('\n'), /Unlock this chat with your PIN on Flizy: /);
+    assert.equal(approvals()[0].kind, 'unlock');
+    assert.match(approvals()[0].chat_label, /^Telegram/);
   });
 
-  it('still unlocks when the delete fails, and falls back to asking', async () => {
-    const sent = [];
-    const ctx = ctxFor(sent, { forgetMessage: async () => { throw new Error('message too old'); } });
-    await router.handle(ctx, `/unlock ${PIN}`);
-    assert.match(sent.join('\n'), /Session unlocked/);
-    assert.match(sent.join('\n'), /Delete your message with the PIN from this chat\./);
+  it('a new unlock withdraws the link before it, so only one works at a time', async () => {
+    await router.handle(ctxFor([]), '/unlock');
+    await router.handle(ctxFor([]), '/unlock');
+    const rows = approvals();
+    assert.equal(rows.length, 2);
+    assert.ok(rows[0].cancelled_at, 'the first link is withdrawn');
+    assert.equal(rows[1].cancelled_at || null, null);
   });
 
-  it('is never suggested in the one-line form', async () => {
+  it('once the chat is unlocked, a bare number is no longer taken for a PIN', async () => {
+    const { pollApprovals } = require('../lib/chatApprovals');
+    await router.handle(ctxFor([]), '/unlock');
+    approvals()[0].approved_at = new Date().toISOString();
+    await pollApprovals();
+    assert.equal(router.pendingFlowFor(TG_KEY).unlockLink, false);
+  });
+
+  it('the page approving the unlock opens the chat', async () => {
+    const { pollApprovals } = require('../lib/chatApprovals');
+    await router.handle(ctxFor([]), '/unlock');
+    approvals()[0].approved_at = new Date().toISOString();
+    await pollApprovals();
+    assert.equal(tables().sessions[0].is_locked, false);
+    assert.ok(new Date(tables().sessions[0].expires_at).getTime() > Date.now());
+    assert.match(tables().notifications.map((n) => n.body).join('\n'), /Telegram unlocked for 30 minutes of activity\./);
+  });
+
+  it('is never suggested anywhere', async () => {
     const sent = [];
     await router.handle(ctxFor(sent), `/send 0.001 to ${FRIEND}`);
-    assert.match(sent.join('\n'), /Session locked\. Send: \/unlock\nThen reply with your unlock PIN\./);
-    assert.doesNotMatch(sent.join('\n'), /unlock your-pin/);
+    assert.match(sent.join('\n'), /Chat locked\. Send \/unlock and enter your PIN on Flizy\./);
+    assert.doesNotMatch(sent.join('\n'), /unlock your-pin|reply with your unlock PIN/i);
   });
 });

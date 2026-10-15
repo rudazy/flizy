@@ -35,6 +35,7 @@ const { CHANNELS } = require('./lib/identity');
 const { normalizePhoneNumber, isPlausiblePhone } = require('./lib/phone');
 const { isBotSelfChat } = require('./lib/whatsappSelfChat');
 const { registerChannelSender, startOutboxDrain } = require('./lib/notify');
+const { startApprovalWatcher } = require('./lib/chatApprovals');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const router = require('./lib/router');
 
@@ -323,6 +324,8 @@ client.on('ready', async () => {
   // This process owns the WhatsApp session, so it delivers WhatsApp notifications
   registerChannelSender(CHANNEL, sendToIdentity);
   startOutboxDrain(CHANNEL, config.outboxDrainMs);
+  // PIN approvals from flizy.app for plans this process is holding.
+  startApprovalWatcher();
 
   // Telegram delivery is a stateless HTTPS call, so this process can push a
   // cross-channel notice the instant it happens instead of leaving it in the

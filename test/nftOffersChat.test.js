@@ -91,13 +91,13 @@ describe('router wiring', () => {
     assert.match(ROUTER, /if \(isAcceptOfferCommand\(text\)\) \{\s*await handleAcceptOffer\(ctx, user, account\);/);
   });
 
-  it('refuses without an unlock PIN, and always asks for it after CONFIRM', () => {
+  it('refuses without an unlock PIN, and always sends a PIN link after CONFIRM', () => {
     assert.match(handler, /if \(!siteAcc\.unlock_pin_hash\) \{/);
-    assert.match(handler, /pendingSends\.set\(ctx\.key, \{ plan, createdAt: Date\.now\(\), needsSecret: true \}\);/);
+    assert.match(handler, /pendingSends\.set\(ctx\.key, \{ plan, createdAt: Date\.now\(\), needsApproval: true \}\);/);
   });
 
   it('shows the fee, the royalty and what the seller receives before anything is sent', () => {
-    for (const line of ['Flizy fee (2%)', 'Creator royalty', 'You receive', 'Reply CONFIRM, then your unlock PIN. Or CANCEL.']) {
+    for (const line of ['Flizy fee (2%)', 'Creator royalty', 'You receive', 'Reply CONFIRM, then approve with your PIN on Flizy. Or CANCEL.']) {
       assert.ok(handler.includes(line), line);
     }
   });

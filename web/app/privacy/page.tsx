@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '16 October 2026';
+const UPDATED = '17 October 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -91,6 +91,12 @@ export default function PrivacyPage() {
             <li>
               <span className="text-paper">Chat link.</span> One-time link codes and the
               channel bind (WhatsApp or Telegram chat id) after you redeem a code.
+            </li>
+            <li>
+              <span className="text-paper">Approval links.</span> When chat needs your PIN, a
+              one-time link to a Flizy page. We keep what the request was (for example the
+              payment shown to you), which chat it came from, and when it was approved. Your PIN
+              is checked against its stored hash and never kept.
             </li>
             <li>
               <span className="text-paper">Security counters.</span> To limit password guessing

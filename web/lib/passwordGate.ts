@@ -79,34 +79,3 @@ export async function requirePassword(
   await clearFailures(supabase, key);
   return { ok: true };
 }
-
-/**
- * Lift the chat unlock lockout on every session this account has.
- *
- * The interlock with lib/session.js: the failed-PIN ladder there climbs to 24
- * hours, which is only safe because there is a way back in that does not
- * involve waiting it out. Proving the account password here is that way, and
- * setting or resetting the PIN is exactly that proof, so it also clears the
- * block. Do not make the ladder gentler and do not make this path cheaper
- * without reconsidering the other.
- *
- * Every channel is cleared, not just one: the person locked out does not know
- * which session row holds the block, and they have just authenticated.
- *
- * @returns false when the columns are not there yet (migration not applied) or
- *          the write failed. The PIN change itself still stands.
- */
-export async function clearChatPinLockout(
-  supabase: SupabaseClient,
-  accountId: string
-): Promise<boolean> {
-  const { error } = await supabase
-    .from('sessions')
-    .update({ failed_pin_attempts: 0, pin_locked_until: null })
-    .eq('account_id', accountId);
-  if (error) {
-    console.warn(`[pin] could not clear chat unlock lockout: ${error.message}`);
-    return false;
-  }
-  return true;
-}

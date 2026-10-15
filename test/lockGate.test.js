@@ -15,7 +15,7 @@ const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
-const { hashPin } = require('../lib/cryptoPin');
+const { PIN_HASH_PRESENT } = require('./helpers/unlockedChat');
 
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
 
@@ -78,7 +78,7 @@ function seed() {
         balance_eth: 0,
         is_admin: false,
         agent_wallet_address: null,
-        unlock_pin_hash: hashPin('4821'),
+        unlock_pin_hash: PIN_HASH_PRESENT,
       },
     ],
     channel_identities: [
@@ -144,23 +144,19 @@ describe('chat cannot add a payout destination, locked or open', () => {
     await router.handle(ctx, '/unlock');
     const joined = sent.join('\n');
     assert.ok(!/Added unlock/.test(joined), 'unlock must never become a trusted label');
-    assert.match(joined, /Reply with your unlock PIN\./);
+    assert.match(joined, /Unlock this chat with your PIN on Flizy: /);
   });
 
-  it('lock is never swallowed as the secret the bot is waiting for', async () => {
+  it('lock right after unlock still locks: nothing waits for a typed secret', async () => {
     const sent = [];
     const ctx = ctxFor(sent);
 
     await router.handle(ctx, '/unlock');
-    assert.equal(router.pendingFlowFor(ctx.key).unlock, true, 'bot should be awaiting a secret');
-
     sent.length = 0;
     await router.handle(ctx, '/lock');
 
-    assert.match(sent.join('\n'), /Session locked/);
+    assert.match(sent.join('\n'), /Telegram locked\./);
     assert.equal(fake.db.tables.sessions[0].is_locked, true);
-    // And it did not cost the user a failed attempt on their own command.
-    assert.equal(Number(fake.db.tables.sessions[0].failed_pin_attempts || 0), 0);
   });
 });
 
@@ -179,7 +175,7 @@ describe('the contact-share step is gated too, though it skips handle()', () => 
 
     await router.handleSharedPhone(ctx, { phone: '2348012345678', verified: true });
 
-    assert.match(sent.join('\n'), /Session locked/);
+    assert.match(sent.join('\n'), /Chat locked/);
     assert.equal(fake.db.tables.channel_identities[0].phone_e164, null);
   });
 
@@ -213,7 +209,7 @@ describe('the other pending flows already resume behind the gate', () => {
       await router.handle(ctx, body);
       assert.match(
         sent.join('\n'),
-        /Session locked/,
+        /Chat locked/,
         `"${body}" should be refused while the session is locked`
       );
     }

@@ -92,7 +92,7 @@ describe('the reply seam', () => {
    * path. The engine copy under test is the real string from
    * lib/engine/policy.js.
    */
-  const LOCKED = 'Session locked. Send: {{cmd:unlock}}\nThen reply with your unlock PIN.';
+  const LOCKED = 'Chat locked. Send {{cmd:unlock}} and enter your PIN on Flizy.';
 
   async function replied(channel) {
     let got = null;
@@ -101,8 +101,8 @@ describe('the reply seam', () => {
   }
 
   it('renders the locked refusal in each channel own dialect', async () => {
-    assert.equal(await replied('whatsapp'), 'Session locked. Send: flizy unlock\nThen reply with your unlock PIN.');
-    assert.equal(await replied('telegram'), 'Session locked. Send: /unlock\nThen reply with your unlock PIN.');
+    assert.equal(await replied('whatsapp'), 'Chat locked. Send flizy unlock and enter your PIN on Flizy.');
+    assert.equal(await replied('telegram'), 'Chat locked. Send /unlock and enter your PIN on Flizy.');
   });
 
   it('is the string the policy actually sends', () => {

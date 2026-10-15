@@ -34,6 +34,18 @@
     },
     {
       "kind": "check",
+      "name": "chat_approvals.chat_approvals_channel_check",
+      "providedBy": "20261017100000_chat_approvals.sql",
+      "requiredBy": "check on chat_approvals"
+    },
+    {
+      "kind": "check",
+      "name": "chat_approvals.chat_approvals_kind_check",
+      "providedBy": "20261017100000_chat_approvals.sql",
+      "requiredBy": "check on chat_approvals"
+    },
+    {
+      "kind": "check",
       "name": "claims.claims_asset_token_consistency",
       "providedBy": "20260822000000_claim_listed_tokens.sql",
       "requiredBy": "check on claims"
@@ -433,6 +445,12 @@
       "name": "channel_identities",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
       "requiredBy": "lib/channelBind.js, lib/discordLookup.js, lib/history.js, lib/identity.js, lib/invite.js, lib/router.js, lib/telegramLookup.js"
+    },
+    {
+      "kind": "table",
+      "name": "chat_approvals",
+      "providedBy": "20261017100000_chat_approvals.sql",
+      "requiredBy": "lib/chatApprovals.js"
     },
     {
       "kind": "table",

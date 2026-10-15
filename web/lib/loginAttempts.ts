@@ -18,6 +18,9 @@
  *     session reaches it, so knowing an email is no longer enough to block
  *     the owner's PIN, password or limit changes.
  *
+ *   - PIN, per account (pinKey). Every place the PIN is typed shares it;
+ *     web/lib/pinGate.ts checks it.
+ *
  * The same table also holds a once-a-day mark per account for the notice
  * signup sends a verified owner (signupNoticeKey, onceWithin).
  *
@@ -183,6 +186,15 @@ export async function clearFailures(supabase: SupabaseClient, key: string): Prom
   if (error && !isMissingTable(error)) {
     console.warn(`[login] could not clear attempts: ${error.message}`);
   }
+}
+
+/**
+ * PIN counter for one account. One counter for every place the PIN is typed
+ * (the chat approval page today, web payments next), so a guesser cannot get
+ * free tries per chat or per page.
+ */
+export function pinKey(accountId: string): string {
+  return hashKey(`pin:${accountId}`);
 }
 
 /** Key for "the owner was told someone tried to sign up with their address". */

@@ -362,7 +362,7 @@ WhatsApp uses the `flizy` prefix. Telegram uses `/command` and also accepts the 
 | `request` · `pay` · `requests` | Payment requests |
 | `swap AMOUNT ETH for FLZ` · `buy 100 IZY` · `sell 10 MAKI` · `price FLZ` | Trading FLZ and the listed tokens against ETH |
 | `confirm` · `cancel` | Execute or drop the pending plan |
-| `lock` · `unlock`, then the PIN | Device control, per channel |
+| `lock` · `unlock` (PIN entered on a Flizy link, never in chat) | Device control, per channel |
 
 ### On the site
 

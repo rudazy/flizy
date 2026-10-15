@@ -26,7 +26,6 @@ const {
   maskLinkCode,
 } = require('../lib/linkCode');
 const { FREE_ATTEMPTS, LOCKOUT_LADDER_MS, lockoutMsForAttempts } = require('../lib/lockoutLadder');
-const session = require('../lib/session');
 const identity = require('../lib/identity');
 
 /** The DB check constraint the code has to keep satisfying. */
@@ -137,12 +136,12 @@ function attemptRow() {
 describe('wrong link codes lock out on the same ladder as the PIN', () => {
   beforeEach(() => seed([validCode('ABCDEFGHJK')]));
 
-  it('shares the ladder with the PIN lockout rather than copying it', () => {
-    // Same module drives both, so the steps cannot drift apart.
-    assert.equal(session.PIN_FREE_ATTEMPTS, FREE_ATTEMPTS);
-    assert.deepEqual(session.PIN_LOCKOUT_LADDER_MS, LOCKOUT_LADDER_MS);
+  it('climbs the same steps as the PIN pause on the site', async () => {
+    // The PIN is checked on the site now (web/lib/pinGate.ts), on the web copy
+    // of the ladder. Both copies must give the same wait for every count.
+    const web = await import('../web/lib/channelBind.ts');
     for (let n = 0; n <= 12; n += 1) {
-      assert.equal(session.pinLockoutMsForAttempts(n), lockoutMsForAttempts(n), `n=${n}`);
+      assert.equal(web.lockoutMsForAttempts(n), lockoutMsForAttempts(n), `n=${n}`);
     }
   });
 

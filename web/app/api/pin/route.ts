@@ -2,22 +2,24 @@ import { NextResponse } from 'next/server';
 import { getSupabase } from '../../../lib/supabase';
 import { hashPin } from '../../../lib/cryptoPin';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
-import { clearChatPinLockout, requirePassword } from '../../../lib/passwordGate';
+import { requirePassword } from '../../../lib/passwordGate';
+import { clearPinLockout } from '../../../lib/pinGate.ts';
 import { rejectIfCrossOrigin } from '../../../lib/requestOrigin.ts';
 import { apiErrorBody } from '../../../lib/apiError';
 
 const ROUTE = 'POST /api/pin';
 
 /**
- * Set or replace the chat unlock PIN.
+ * Set or replace the unlock PIN.
  *
  * The session cookie alone used to be enough here, which made this the softest
- * way into the money: the PIN is what unlocks sends in chat, so an open browser
- * tab could reassign it without proving anything. It now takes the same
- * password re-auth as the trusted list and the daily limit.
+ * way into the money: the PIN approves chat unlocks and payments, so an open
+ * browser tab could reassign it without proving anything. It now takes the
+ * same password re-auth as the trusted list and the daily limit.
  *
- * It is also the recovery path for the failed-PIN lockout in lib/session.js.
- * See clearChatPinLockout for why the two belong together.
+ * It is also the way out of the PIN pause (web/lib/pinGate.ts). That pause
+ * can climb to a day per miss only because proving the password here lifts
+ * it at once; do not make one gentler or this cheaper without the other.
  */
 export async function POST(req: Request) {
   try {
@@ -54,8 +56,8 @@ export async function POST(req: Request) {
       return NextResponse.json(apiErrorBody(ROUTE, error, { accountId }), { status: 500 });
     }
 
-    const lockoutCleared = await clearChatPinLockout(supabase, accountId);
-    return NextResponse.json({ ok: true, lockout_cleared: lockoutCleared });
+    await clearPinLockout(supabase, accountId);
+    return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }

@@ -1,13 +1,13 @@
 /**
- * Chat takes the unlock PIN, never the account password.
+ * Chat takes no secret at all: not the account password, and not the PIN.
  *
  * A chat message stays in the chat history, on the phone and on the chat
- * provider's servers, and the account password is also the site login. So in
- * every flow that reads a secret from chat, the password is refused even when
- * it is right, the PIN still works, and an account with no PIN is sent to the
- * site to set one. The trade flow is covered in test/tradeSecret.test.js; this
- * file covers the three unlock flows. It also checks that no secret-carrying
- * message reaches the log.
+ * provider's servers. The PIN is typed on a flizy.app approval page instead
+ * (lib/chatApprovals.js). In chat, unlock answers with a link, a secret typed
+ * anyway (with the command, or on its own right after the link) is refused
+ * without being checked, and an account with no PIN is sent to the site to set
+ * one. The trade flow is covered in test/tradeSecret.test.js. This file also
+ * checks that no secret-carrying message reaches the log.
  *
  * Run: node --test test/chatPinOnly.test.js
  */
@@ -17,7 +17,9 @@ const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
-const { hashPin, hashPassword } = require('../lib/cryptoPin');
+// Chat never checks a PIN or a password, so a stored value only has to exist.
+const { PIN_HASH_PRESENT } = require('./helpers/unlockedChat');
+const PASSWORD_HASH_PRESENT = 'password-hash-present';
 
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
 
@@ -83,8 +85,8 @@ function account(id, pin) {
     balance_eth: 0,
     is_admin: false,
     agent_wallet_address: '0x9999999999999999999999999999999999999999',
-    unlock_pin_hash: pin ? hashPin(PIN) : null,
-    password_hash: hashPassword(PASSWORD),
+    unlock_pin_hash: pin ? PIN_HASH_PRESENT : null,
+    password_hash: PASSWORD_HASH_PRESENT,
   };
 }
 
@@ -126,89 +128,49 @@ beforeEach(() => {
   router.discardPendingFlows(`telegram:${NO_PIN}`);
 });
 
-describe('flow 1: one-shot unlock', () => {
-  it('refuses the account password, even when it is right', async () => {
+describe('unlock is a link, whatever is typed', () => {
+  it('a bare unlock sends the PIN link and unlocks nothing', async () => {
     const { ctx, sent } = await lockedChat(WITH_PIN);
-    await router.handle(ctx, `/unlock ${PASSWORD}`);
-    assert.match(sent.join('\n'), /Unlock failed\. Wrong PIN\./);
+    await router.handle(ctx, '/unlock');
+    assert.match(sent.join('\n'), /Unlock this chat with your PIN on Flizy: \S+\/a\//);
     assert.equal(sessionRow(WITH_PIN).is_locked, true);
   });
 
-  it('unlocks with the PIN', async () => {
+  it('the account password typed in chat is refused, even when it is right', async () => {
+    const { ctx, sent } = await lockedChat(WITH_PIN);
+    await router.handle(ctx, `/unlock ${PASSWORD}`);
+    assert.match(sent.join('\n'), /Flizy never takes your PIN in chat\./);
+    assert.equal(sessionRow(WITH_PIN).is_locked, true);
+  });
+
+  it('the right PIN typed in chat is refused too, and never confirmed as right', async () => {
     const { ctx, sent } = await lockedChat(WITH_PIN);
     await router.handle(ctx, `/unlock ${PIN}`);
-    assert.match(sent.join('\n'), /Session unlocked/);
-    assert.equal(sessionRow(WITH_PIN).is_locked, false);
-  });
-
-  it('sends an account with no PIN to the site', async () => {
-    const { ctx, sent } = await lockedChat(NO_PIN);
-    await router.handle(ctx, `/unlock ${PASSWORD}`);
-    assert.match(sent.join('\n'), SET_PIN);
-    assert.equal(sessionRow(NO_PIN).is_locked, true);
-  });
-});
-
-describe('flow 2: unlock, then the secret as the next message', () => {
-  it('asks for the PIN only', async () => {
-    const { ctx, sent } = await lockedChat(WITH_PIN);
-    await router.handle(ctx, '/unlock');
-    const prompt = sent.join('\n');
-    assert.match(prompt, /Reply with your unlock PIN\./);
-    assert.doesNotMatch(prompt, /password/i);
-  });
-
-  it('refuses the account password, even when it is right', async () => {
-    const { ctx, sent } = await lockedChat(WITH_PIN);
-    await router.handle(ctx, '/unlock');
-    sent.length = 0;
-    await router.handle(ctx, PASSWORD);
-    assert.match(sent.join('\n'), /Unlock failed\. Wrong PIN\./);
+    const text = sent.join('\n');
+    assert.match(text, /Flizy never takes your PIN in chat\./);
+    assert.doesNotMatch(text, /unlocked/i);
     assert.equal(sessionRow(WITH_PIN).is_locked, true);
   });
 
-  it('unlocks with the PIN', async () => {
+  it('a PIN sent on its own right after the link is refused the same way', async () => {
     const { ctx, sent } = await lockedChat(WITH_PIN);
-    await router.handle(ctx, '/unlock');
-    await router.handle(ctx, PIN);
-    assert.match(sent.join('\n'), /Session unlocked/);
-  });
-
-  it('sends an account with no PIN to the site', async () => {
-    const { ctx, sent } = await lockedChat(NO_PIN);
     await router.handle(ctx, '/unlock');
     sent.length = 0;
-    await router.handle(ctx, PASSWORD);
-    assert.match(sent.join('\n'), SET_PIN);
-  });
-});
-
-describe('flow 3: the hard-lock gate', () => {
-  it('points at the PIN, not the password', async () => {
-    const { ctx, sent } = await lockedChat(WITH_PIN);
-    await router.handle(ctx, '/balance');
-    const reply = sent.join('\n');
-    assert.match(reply, /Then reply with your unlock PIN\./);
-    assert.doesNotMatch(reply, /password/i);
-  });
-
-  it('stays locked for the password, and opens for the PIN', async () => {
-    const { ctx, sent } = await lockedChat(WITH_PIN);
-    await router.handle(ctx, '/balance');
-    await router.handle(ctx, '/unlock');
-    await router.handle(ctx, PASSWORD);
-    assert.equal(sessionRow(WITH_PIN).is_locked, true);
-    await router.handle(ctx, '/unlock');
     await router.handle(ctx, PIN);
-    assert.equal(sessionRow(WITH_PIN).is_locked, false);
-    assert.match(sent.join('\n'), /Session unlocked/);
+    assert.match(sent.join('\n'), /Flizy never takes your PIN in chat\./);
+    assert.equal(sessionRow(WITH_PIN).is_locked, true);
   });
 
   it('sends an account with no PIN to the site', async () => {
     const { ctx, sent } = await lockedChat(NO_PIN);
-    await router.handle(ctx, '/balance');
-    await router.handle(ctx, `/unlock ${PASSWORD}`);
+    await router.handle(ctx, '/unlock');
     assert.match(sent.join('\n'), SET_PIN);
+  });
+
+  it('the hard-lock gate points at the link, not at a PIN in chat', async () => {
+    const { ctx, sent } = await lockedChat(WITH_PIN);
+    await router.handle(ctx, '/balance');
+    assert.match(sent.join('\n'), /Chat locked\. Send \/unlock and enter your PIN on Flizy\./);
   });
 });
 
@@ -225,18 +187,18 @@ describe('secrets never reach the log', () => {
     return lines.join('\n');
   }
 
-  it('hides the claimadmin secret', async () => {
+  it('hides the retired claimadmin secret', async () => {
     const out = await logged(ctxFor(WITH_PIN, []), '/claimadmin not-the-real-secret-9f3a');
     assert.doesNotMatch(out, /not-the-real-secret-9f3a/);
     assert.match(out, /cmd=claimadmin <secret hidden>/);
   });
 
-  it('hides a PIN and a password sent to unlock', async () => {
+  it('hides a PIN or a password typed into chat, with the command or on its own', async () => {
     const { ctx } = await lockedChat(WITH_PIN);
-    const oneShot = await logged(ctx, `/unlock ${PASSWORD}`);
+    const withCommand = await logged(ctx, `/unlock ${PASSWORD}`);
     await logged(ctx, '/unlock');
-    const reply = await logged(ctx, PIN);
-    for (const out of [oneShot, reply]) {
+    const onItsOwn = await logged(ctx, PIN);
+    for (const out of [withCommand, onItsOwn]) {
       assert.doesNotMatch(out, new RegExp(`${PIN}|${PASSWORD.replace('!', '\\!')}`));
       assert.match(out, /<secret hidden>/);
     }

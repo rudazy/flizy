@@ -19,8 +19,9 @@ export default function robots(): MetadataRoute.Robots {
         // /dashboard is deliberately crawlable but noindex (see app/dashboard/layout.tsx).
         // Blocking it here would hide the noindex directive, and Google would index the
         // URL from the header/footer/homepage links without ever seeing the page.
-        // /api/ and /claim/ stay blocked — claim URLs carry one-time tokens.
-        disallow: ['/api/', '/claim/'],
+        // /api/, /claim/ and /a/ stay blocked: claim and approval URLs carry
+        // one-time tokens.
+        disallow: ['/api/', '/claim/', '/a/'],
       },
     ],
     sitemap: `${base}/sitemap.xml`,

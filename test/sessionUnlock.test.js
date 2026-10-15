@@ -3,13 +3,21 @@
  * Run: node --test test/sessionUnlock.test.js
  */
 
-const { describe, it, mock, beforeEach, afterEach } = require('node:test');
+const { describe, it, before, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { hashPassword, hashPin, verifyPassword, verifyPin } = require('../lib/cryptoPin');
 const { parseUnlockCommand, parseLockCommand, stripFlizyPrefix } = require('../lib/prefix');
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
 
-describe('cryptoPin', () => {
+describe('cryptoPin (web/lib/cryptoPin.ts, where PINs and passwords are checked)', () => {
+  let hashPassword;
+  let hashPin;
+  let verifyPassword;
+  let verifyPin;
+
+  before(async () => {
+    ({ hashPassword, hashPin, verifyPassword, verifyPin } = await import('../web/lib/cryptoPin.ts'));
+  });
+
   it('password round-trip', () => {
     const h = hashPassword('Secret1!');
     assert.equal(verifyPassword('Secret1!', h), true);
@@ -52,7 +60,7 @@ describe('parse unlock/lock', () => {
   });
 });
 
-describe('unlockWithPin with mocked supabase', () => {
+describe('the unlock window: 30 minutes idle, never past 8 hours', () => {
   let sessionPath;
   let originalCache;
 
@@ -65,7 +73,6 @@ describe('unlockWithPin with mocked supabase', () => {
   }
 
   beforeEach(() => {
-    // Fresh load with mocked supabase
     sessionPath = require.resolve('../lib/session');
     originalCache = require.cache[sessionPath];
     delete require.cache[sessionPath];
@@ -77,75 +84,49 @@ describe('unlockWithPin with mocked supabase', () => {
     if (originalCache) require.cache[sessionPath] = originalCache;
   });
 
-  it('refuses the site password from chat, even when it is right', async () => {
+  const MIN = 60 * 1000;
+  const HOUR = 60 * MIN;
+
+  it('chat has no way to check a PIN any more', () => {
+    const { session } = loadSession({ sessions: [] });
+    assert.equal(session.unlockWithPin, undefined);
+  });
+
+  it('an unlock opens the chat for 30 minutes and starts the 8 hour clock', async () => {
+    const { fake, session } = loadSession({ sessions: [] });
+    const before = Date.now();
+    await session.unlockSession('acc-1', 'whatsapp', '2348012345678');
+    const row = fake.db.tables.sessions[0];
+    assert.equal(row.is_locked, false);
+    const ttl = new Date(row.expires_at).getTime() - before;
+    assert.ok(ttl > 29 * MIN && ttl <= 30 * MIN + 1000, `ttl ${ttl}`);
+    assert.ok(await session.isSessionUnlocked('acc-1', 'whatsapp', '2348012345678'));
+  });
+
+  it('activity moves the idle end forward, but never past 8 hours after the unlock', () => {
+    const { session } = loadSession({ sessions: [] });
+    const now = Date.now();
+    const fresh = new Date(now - 10 * MIN).toISOString();
+    assert.ok(Math.abs(new Date(session.unlockExpiry(fresh, now)).getTime() - (now + 30 * MIN)) < 5);
+    const old = new Date(now - 7 * HOUR - 50 * MIN).toISOString();
+    assert.ok(Math.abs(new Date(session.unlockExpiry(old, now)).getTime() - (now + 10 * MIN)) < 5);
+  });
+
+  it('touchSession never moves unlocked_at, and never opens a locked chat', async () => {
+    const unlockedAt = new Date(Date.now() - 2 * HOUR).toISOString();
     const { fake, session } = loadSession({
-      accounts: [
-        {
-          id: 'acc-1',
-          password_hash: hashPassword('Secret1!'),
-          unlock_pin_hash: hashPin('9999'),
-        },
-      ],
       sessions: [
-        {
-          account_id: 'acc-1',
-          channel: 'whatsapp',
-          external_id: '2348012345678',
-          is_locked: true,
-          expires_at: new Date(0).toISOString(),
-        },
+        { account_id: 'acc-1', channel: 'whatsapp', external_id: '2348012345678', is_locked: false, unlocked_at: unlockedAt, expires_at: new Date(Date.now() + 5 * MIN).toISOString() },
+        { account_id: 'acc-1', channel: 'telegram', external_id: '778899123', is_locked: true, unlocked_at: unlockedAt, expires_at: new Date(0).toISOString() },
       ],
     });
-
-    const res = await session.unlockWithPin(
-      { id: 'acc-1' },
-      'whatsapp',
-      '2348012345678',
-      'Secret1!'
-    );
-    assert.equal(res.ok, false);
-    assert.equal(res.reason, 'bad_pin');
-    // Counted like any wrong PIN, and the locked session stays locked.
-    assert.equal(fake.db.tables.sessions[0].failed_pin_attempts, 1);
-    assert.equal(fake.db.tables.sessions[0].is_locked, true);
-  });
-
-  it('accepts unlock PIN', async () => {
-    const { session } = loadSession({
-      accounts: [
-        {
-          id: 'acc-1',
-          password_hash: hashPassword('Secret1!'),
-          unlock_pin_hash: hashPin('48291'),
-        },
-      ],
-      sessions: [],
-    });
-
-    const res = await session.unlockWithPin({ id: 'acc-1' }, 'whatsapp', '2348012345678', '48291');
-    assert.equal(res.ok, true);
-  });
-
-  it('tells an account with no PIN to set one, without counting a guess', async () => {
-    const { session } = loadSession({
-      accounts: [
-        {
-          id: 'acc-1',
-          password_hash: hashPassword('Secret1!'),
-          unlock_pin_hash: null,
-        },
-      ],
-      sessions: [],
-    });
-
-    const res = await session.unlockWithPin(
-      { id: 'acc-1' },
-      'whatsapp',
-      '2348012345678',
-      'Secret1!'
-    );
-    assert.equal(res.ok, false);
-    assert.equal(res.reason, 'no_pin');
+    const [wa, tg] = fake.db.tables.sessions;
+    await session.touchSession('acc-1', 'whatsapp', '2348012345678', { ...wa });
+    await session.touchSession('acc-1', 'telegram', '778899123', { ...tg });
+    assert.equal(wa.unlocked_at, unlockedAt);
+    assert.ok(new Date(wa.expires_at).getTime() > Date.now() + 25 * MIN);
+    assert.equal(tg.is_locked, true);
+    assert.equal(tg.expires_at, new Date(0).toISOString());
   });
 });
 

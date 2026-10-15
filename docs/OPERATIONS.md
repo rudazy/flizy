@@ -215,7 +215,8 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `SECURITY_MAIL_SECRET` | Same value on the VPS and on Vercel. Lets a bot ask the site to email the owner when a chat is linked or unlinked. Unset: no email, reported at startup in production |
 | `REQUIRE_FLIZY_PREFIX` | Require the `flizy` prefix on WhatsApp |
 | `MAX_SEND_ETH` / `DEFAULT_DAILY_SEND_LIMIT_ETH` | Per-transaction and per-day caps |
-| `PENDING_TTL_MS` / `SESSION_TTL_MS` / `LINK_CODE_TTL_MS` | Plan, session and link code lifetimes |
+| `PENDING_TTL_MS` / `LINK_CODE_TTL_MS` | Plan and link code lifetimes |
+| `SESSION_TTL_MS` / `SESSION_MAX_MS` | Chat unlock: ends after this long without a message (default 30 min), and never later than this after the PIN was entered (default 8 h) |
 | `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes |
 | `CHAIN_GIWA_SEPOLIA_*` | Optional overrides for WETH, routers, FLZ, pair |
 | `FLIZY_TREASURY` | Treasury passed at DEX deploy time (defaults to ops). The live fee destination is `feeRouter.treasury` on chain, changed with `setTreasury`, not with this variable |

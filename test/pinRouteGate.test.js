@@ -1,10 +1,10 @@
 /**
- * The password gate on /api/pin, and its interlock with the chat lockout.
+ * The password gate on /api/pin, and its interlock with the PIN pause.
  *
- * The PIN is the credential that unlocks money movement in chat, so the route
- * that sets it has to cost at least as much as editing the trusted list. It is
- * also the way back in for somebody who locked themselves out of chat, which is
- * what lets the ladder in lib/session.js climb to a day.
+ * The PIN approves chat unlocks and payments, so the route that sets it has to
+ * cost at least as much as editing the trusted list. It is also the way back
+ * for somebody who paused their own PIN entry with wrong guesses, which is
+ * what lets the ladder in web/lib/pinGate.ts climb to a day.
  *
  * The route handler itself cannot be imported here (it reads a Next request
  * cookie), so the gate it delegates to is tested directly. web/lib/passwordGate
@@ -81,68 +81,55 @@ describe('/api/pin needs the account password', () => {
   });
 });
 
-describe('a password-authenticated PIN change is the way out of a lockout', () => {
+describe('a password-authenticated PIN change is the way out of a PIN pause', () => {
+  let pins;
   let fake;
+  const PIN = '482915';
+
+  before(async () => {
+    pins = await import('../web/lib/pinGate.ts');
+  });
 
   beforeEach(() => {
-    const lockedUntil = new Date(Date.now() + 24 * 3600_000).toISOString();
     fake = createFakeSupabase({
-      accounts: [{ id: ACCOUNT, password_hash: webCrypto.hashPassword(PASSWORD) }],
-      sessions: [
-        {
-          id: 'sess-1',
-          account_id: ACCOUNT,
-          channel: 'whatsapp',
-          external_id: '2348012345678',
-          is_locked: true,
-          failed_pin_attempts: 9,
-          pin_locked_until: lockedUntil,
-        },
-        {
-          id: 'sess-2',
-          account_id: ACCOUNT,
-          channel: 'telegram',
-          external_id: '778899123',
-          is_locked: false,
-          failed_pin_attempts: 3,
-          pin_locked_until: null,
-        },
-        {
-          id: 'sess-3',
-          account_id: 'acc-other',
-          channel: 'whatsapp',
-          external_id: '2349000000000',
-          is_locked: false,
-          failed_pin_attempts: 6,
-          pin_locked_until: lockedUntil,
-        },
+      accounts: [
+        { id: ACCOUNT, password_hash: webCrypto.hashPassword(PASSWORD), unlock_pin_hash: webCrypto.hashPin(PIN) },
+        { id: 'acc-other', unlock_pin_hash: webCrypto.hashPin(PIN) },
       ],
+      sessions: [{ id: 'sess-1', account_id: ACCOUNT, channel: 'whatsapp', external_id: '2348012345678', is_locked: true }],
+      login_attempts: [],
     });
   });
 
-  it('clears the counter and the block on every session of that account', async () => {
-    const cleared = await gate.clearChatPinLockout(fake.client, ACCOUNT);
-    assert.equal(cleared, true);
+  async function pause(accountId) {
+    for (let i = 0; i < 5; i += 1) await pins.checkPin(fake.client, accountId, '000000');
+    assert.equal((await pins.checkPin(fake.client, accountId, PIN)).reason, 'locked');
+  }
 
-    const mine = fake.db.tables.sessions.filter((r) => r.account_id === ACCOUNT);
-    for (const row of mine) {
-      assert.equal(row.failed_pin_attempts, 0);
-      assert.equal(row.pin_locked_until, null);
-    }
+  it('lifts the pause for that account', async () => {
+    await pause(ACCOUNT);
+    await pins.clearPinLockout(fake.client, ACCOUNT);
+    assert.deepEqual(await pins.checkPin(fake.client, ACCOUNT, PIN), { ok: true });
   });
 
-  it('leaves other accounts alone', async () => {
-    await gate.clearChatPinLockout(fake.client, ACCOUNT);
-    const other = fake.db.tables.sessions.find((r) => r.account_id === 'acc-other');
-    assert.equal(other.failed_pin_attempts, 6);
-    assert.ok(other.pin_locked_until);
+  it('leaves other accounts paused', async () => {
+    await pause(ACCOUNT);
+    await pause('acc-other');
+    await pins.clearPinLockout(fake.client, ACCOUNT);
+    assert.equal((await pins.checkPin(fake.client, 'acc-other', PIN)).reason, 'locked');
   });
 
-  it('does not unlock the session itself, only the attempt block', async () => {
-    // Clearing the brute-force block must not be a remote unlock: the phone in
-    // somebody else's hand still needs the PIN.
-    await gate.clearChatPinLockout(fake.client, ACCOUNT);
-    const whatsapp = fake.db.tables.sessions.find((r) => r.id === 'sess-1');
-    assert.equal(whatsapp.is_locked, true);
+  it('does not unlock any chat: the phone in someone else\'s hand still needs the PIN', async () => {
+    await pause(ACCOUNT);
+    await pins.clearPinLockout(fake.client, ACCOUNT);
+    assert.equal(fake.db.tables.sessions[0].is_locked, true);
+  });
+
+  it('the route clears it right after the new PIN is saved', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'web', 'app', 'api', 'pin', 'route.ts'), 'utf8');
+    const save = src.indexOf('.update({ unlock_pin_hash })');
+    const clear = src.indexOf('await clearPinLockout(supabase, accountId);');
+    assert.ok(save > 0 && clear > save);
+    assert.ok(src.indexOf("requirePassword(") < save);
   });
 });
