@@ -266,13 +266,28 @@ describe('chat trade of FLZ', () => {
     router.discardPendingFlows(KEY);
   });
 
-  it('confirms without a PIN link, as before', async () => {
+  it('confirms without a PIN link at or under the quick-send amount', async () => {
+    seed();
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, '/buy 0.005 eth of FLZ');
+    assert.doesNotMatch(sent.join('\n'), /has not verified|PIN/);
+    await router.handle(ctx, 'confirm');
+    assert.equal(executed, 1);
+  });
+
+  it('above the quick-send amount, CONFIRM sends a PIN link and the page approves it', async () => {
+    const { pollApprovals } = require('../lib/chatApprovals');
     seed();
     const sent = [];
     const ctx = ctxFor(sent);
     await router.handle(ctx, '/buy 0.01 eth of FLZ');
-    assert.doesNotMatch(sent.join('\n'), /has not verified/);
+    assert.match(sent.join('\n'), /above your quick send amount\. After CONFIRM you approve it with your PIN/);
     await router.handle(ctx, 'confirm');
+    assert.equal(executed, 0);
+    assert.match(sent.join('\n'), /Approve with your PIN on Flizy: \S+\/a\//);
+    fake.db.tables.chat_approvals[0].approved_at = new Date().toISOString();
+    await pollApprovals();
     assert.equal(executed, 1);
   });
 });

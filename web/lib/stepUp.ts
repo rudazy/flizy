@@ -2,11 +2,12 @@
  * Step-up for actions that move value: the PIN (a passkey too, from a later
  * slice), never the account password.
  *
- * Tiers (tasks design, approved): the password guards account changes (trusted
- * list, limits, PIN, email, username, linking, pausing). Money actions ask for
- * the PIN, which is short, typed only on flizy.app, and has its own pause per
- * account (web/lib/pinGate.ts). A stolen session cookie still cannot move value
- * without it.
+ * Tiers: the password guards account changes (trusted list, limits, PIN,
+ * email, username, linking, pausing). Money actions ask for the PIN, which is
+ * short, typed only on flizy.app, and has its own pause per account
+ * (web/lib/pinGate.ts). A stolen session cookie still cannot move value
+ * without it, except a small ETH payment to someone the account already pays
+ * (requireApproval below).
  *
  * Same result shape as requirePassword, so a route swaps one call for the
  * other. Codes the site's sheets act on:
@@ -19,6 +20,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 // Explicit extension: this module is also loaded straight by node --test.
 import { checkPin } from './pinGate.ts';
+import type { TierResult } from './tiers.ts';
 
 export type StepUpResult =
   | { ok: true }
@@ -51,4 +53,23 @@ export async function requireStepUp(
     return { ok: false, status: 401, error: check.error, code: 'PIN_WRONG', attemptsLeft: check.attemptsLeft };
   }
   return { ok: false, status: 400, error: check.error, code: 'PIN_REQUIRED' };
+}
+
+/**
+ * The approval a tiered money route asks for: nothing more than the session
+ * for Tier 0 (a small ETH payment to a known recipient, or a small ETH swap
+ * into verified tokens; web/lib/tiers.ts), the PIN for everything else.
+ *
+ * tier must come from evaluateTier on this request, worked out on the server
+ * from what will actually be sent. Nothing the browser says decides it.
+ */
+export async function requireApproval(
+  supabase: SupabaseClient,
+  accountId: string,
+  pin: string,
+  action: string,
+  tier: TierResult
+): Promise<StepUpResult> {
+  if (tier.tier === 0) return { ok: true };
+  return requireStepUp(supabase, accountId, pin, action);
 }

@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
-import { requireStepUp } from '../../../../lib/stepUp.ts';
+import { requireApproval } from '../../../../lib/stepUp.ts';
+import { ethToWei, sendTier } from '../../../../lib/tiers.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { isSavedMerchant, resolvePayRef } from '../../../../lib/payCode.ts';
 import { deriveAgentWallet, getWebChain, explorerTxUrl, resolveToken } from '../../../../lib/dexServer';
@@ -50,10 +51,6 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const supabase = getSupabase();
-    const gate = await requireStepUp(supabase, payerId, String(body.pin || ''), 'pay');
-    if (!gate.ok) {
-      return NextResponse.json({ error: gate.error, code: gate.code, attemptsLeft: gate.attemptsLeft }, { status: gate.status });
-    }
 
     const merchant = await resolvePayRef(supabase, body.ref);
     if (!merchant?.accountId) {
@@ -78,6 +75,15 @@ export async function POST(req: Request) {
     const to = dest?.agent_wallet_address;
     if (!to || !ethers.isAddress(to)) {
       return NextResponse.json({ error: 'That account has no wallet yet.' }, { status: 400 });
+    }
+
+    // A small ETH payment to someone this account already pays needs only the
+    // session; anything else takes the PIN. Decided here from what will be
+    // sent, never from the browser.
+    const tier = await sendTier(supabase, payerId, to, asset === 'ETH', ethToWei(String(body.amount ?? '')) ?? 0n);
+    const gate = await requireApproval(supabase, payerId, String(body.pin || ''), 'pay', tier);
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error, code: gate.code, attemptsLeft: gate.attemptsLeft }, { status: gate.status });
     }
 
     const lock = await tryAccountTxLock(supabase, payerId, 'pay');

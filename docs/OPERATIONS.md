@@ -215,6 +215,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `SECURITY_MAIL_SECRET` | Same value on the VPS and on Vercel. Lets a bot ask the site to email the owner when a chat is linked or unlinked. Unset: no email, reported at startup in production |
 | `REQUIRE_FLIZY_PREFIX` | Require the `flizy` prefix on WhatsApp |
 | `MAX_SEND_ETH` / `DEFAULT_DAILY_SEND_LIMIT_ETH` | Per-transaction and per-day caps |
+| `DEFAULT_QUICK_SEND_ETH` | Most one ETH payment to a known recipient may be without the PIN (default 0.005), and the ceiling on an account's own value. Set the same on the VPS and on Vercel |
 | `PENDING_TTL_MS` / `LINK_CODE_TTL_MS` | Plan and link code lifetimes |
 | `SESSION_TTL_MS` / `SESSION_MAX_MS` | Chat unlock: ends after this long without a message (default 30 min), and never later than this after the PIN was entered (default 8 h) |
 | `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes |

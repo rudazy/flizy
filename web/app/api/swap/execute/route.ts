@@ -22,7 +22,8 @@ import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
 import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
-import { requireStepUp } from '../../../../lib/stepUp.ts';
+import { requireApproval } from '../../../../lib/stepUp.ts';
+import { ethToWei, swapTier } from '../../../../lib/tiers.ts';
 import { bindAmountOutMin, isUnverifiedSwap, parseSlippageBps } from '../../../../lib/swapGate.ts';
 
 const ROUTE = 'POST /api/swap/execute';
@@ -38,10 +39,11 @@ export async function POST(req: Request) {
     const body = await req.json();
     const supabase = getSupabase();
 
-    // Every swap takes the PIN (web/lib/stepUp.ts), the same gate and pause as
-    // pay/execute. It is checked below once the sides are resolved, so the
-    // prompt can say when the token is one Flizy has not verified. The hourly
-    // cap stays as a churn limit behind it.
+    // A swap takes the PIN (web/lib/stepUp.ts), the same gate and pause as
+    // pay/execute, unless it is a small ETH swap into verified tokens
+    // (web/lib/tiers.ts). It is checked below once the sides and the amount
+    // are known, so the prompt can say when the token is one Flizy has not
+    // verified. The hourly cap stays as a churn limit behind it.
     const rate = await checkSwapRateLimit(supabase, accountId);
     if (!rate.ok) {
       return NextResponse.json({ error: rate.error, code: rate.code }, { status: rate.status });
@@ -79,11 +81,18 @@ export async function POST(req: Request) {
       );
     }
 
-    const auth = await requireStepUp(
+    // Before any chain read. Only an ETH input can be Tier 0, and ETH has 18
+    // decimals, so the tier needs nothing from the chain; a token input is
+    // always the PIN.
+    const unverified = isUnverifiedSwap([tokenIn, tokenOut], dex);
+    const ethInWei = tokenIn === null ? (ethToWei(amount) ?? 0n) : 0n;
+    const tier = await swapTier(supabase, accountId, tokenIn === null, ethInWei, !unverified);
+    const auth = await requireApproval(
       supabase,
       accountId,
       String(body.pin || ''),
-      isUnverifiedSwap([tokenIn, tokenOut], dex) ? 'trade a token Flizy has not verified' : 'swap'
+      unverified ? 'trade a token Flizy has not verified' : 'swap',
+      tier
     );
     if (!auth.ok) {
       return NextResponse.json({ error: auth.error, code: auth.code, attemptsLeft: auth.attemptsLeft }, { status: auth.status });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PinField, pinReady } from './PinField';
+import { withinQuickSend } from '../lib/quickSend';
 
 export function PayLanding({
   refSlug,
@@ -25,6 +26,11 @@ export function PayLanding({
   const [explorer, setExplorer] = useState('');
   const [firstPay, setFirstPay] = useState(false);
   const [alreadySaved, setAlreadySaved] = useState(true);
+  /** From the preview: paid before, and the most a payment may be without the PIN. */
+  const [known, setKnown] = useState(false);
+  const [quickSendEth, setQuickSendEth] = useState('0');
+  /** The server asked for the PIN on a payment the page thought was quick. */
+  const [pinAsked, setPinAsked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSkipped, setSaveSkipped] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -35,6 +41,7 @@ export function PayLanding({
   const handle = username ? `@${username}` : 'this Flizy account';
   const next = `/pay/${encodeURIComponent(refSlug)}`;
   const amountOk = Number(amount) > 0;
+  const needsPin = pinAsked || !(asset === 'ETH' && known && withinQuickSend(amount, quickSendEth));
 
   useEffect(() => {
     let live = true;
@@ -57,6 +64,8 @@ export function PayLanding({
           }
           setFirstPay(Boolean(info.firstPay));
           setAlreadySaved(Boolean(info.alreadySaved));
+          setKnown(info.known === true);
+          setQuickSendEth(typeof info.quickSendEth === 'string' ? info.quickSendEth : '0');
         }
       })
       .catch(() => live && setLoggedIn(false));
@@ -85,7 +94,7 @@ export function PayLanding({
   }
 
   async function onPay() {
-    if (!pinReady(pin) || busy) return;
+    if ((needsPin && !pinReady(pin)) || busy) return;
     setBusy(true);
     setMsg('');
     setOk(false);
@@ -93,7 +102,7 @@ export function PayLanding({
       const res = await fetch('/api/pay/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: refSlug, amount, pin, asset }),
+        body: JSON.stringify({ ref: refSlug, amount, pin: needsPin ? pin : '', asset }),
       });
       const body = await res.json().catch(() => ({}));
       // A wrong PIN is a 401 too; only a missing session (no code) means sign in.
@@ -101,6 +110,7 @@ export function PayLanding({
         window.location.href = `/login?next=${encodeURIComponent(next)}`;
         return;
       }
+      if (body.code === 'PIN_REQUIRED') setPinAsked(true);
       if (!res.ok) {
         setMsg(body.error || 'Could not pay.');
         return;
@@ -182,7 +192,13 @@ export function PayLanding({
               <dd className="m-0 text-right text-paper">Paid in ETH from your wallet</dd>
             </div>
           </dl>
-          <PinField id="pay-pin" value={pin} onChange={setPin} />
+          {needsPin ? (
+            <PinField id="pay-pin" value={pin} onChange={setPin} />
+          ) : (
+            <p className="text-sm text-muted">
+              Quick send: no PIN for up to {quickSendEth} ETH to someone you have paid before.
+            </p>
+          )}
           {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
           <div className="grid grid-cols-[auto_1fr] gap-2">
             <button
@@ -200,7 +216,7 @@ export function PayLanding({
             <button
               type="button"
               className="btn btn-primary py-3 font-semibold"
-              disabled={busy || !pinReady(pin)}
+              disabled={busy || (needsPin && !pinReady(pin))}
               onClick={() => void onPay()}
             >
               {busy ? 'Paying…' : `Confirm and pay ${amount} ${asset}`}

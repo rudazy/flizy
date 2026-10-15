@@ -128,7 +128,7 @@ const router = require('../lib/router');
 const { scanOwnedTokenIds } = realHoldings;
 const { parseSendNamedAssetCommand } = router;
 const { canonicalizeCommand } = require('../lib/commandAliases');
-const { PIN_HASH_PRESENT, unlockedSession } = require('./helpers/unlockedChat');
+const { PIN_HASH_PRESENT, unlockedSession, confirmWithPin } = require('./helpers/unlockedChat');
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -182,11 +182,25 @@ function senderCtx(sent) {
   };
 }
 
-/** Say each line to the bot in turn; return every reply, in order. */
+/**
+ * Say each line to the bot in turn; return every reply, in order. NFT sends
+ * and claim holds take the PIN (lib/tiers.js), so "confirm" also does what the
+ * approval page does on a right PIN. What the bot says after the approval goes
+ * through deliver, which queues it for this chat; it is read back from there.
+ */
 async function say(...messages) {
   const sent = [];
   const ctx = senderCtx(sent);
-  for (const m of messages) await router.handle(ctx, m);
+  for (const m of messages) {
+    if (m !== 'confirm') {
+      await router.handle(ctx, m);
+      continue;
+    }
+    const queued = () => (fake.db.tables.notifications || []).filter((n) => n.external_id === SENDER_WA);
+    const before = queued().length;
+    await confirmWithPin(router, ctx, fake.db.tables);
+    for (const n of queued().slice(before)) sent.push({ text: String(n.body), buttons: null });
+  }
   return sent;
 }
 

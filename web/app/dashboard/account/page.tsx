@@ -19,7 +19,7 @@ import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { PayIdentity } from '../../../components/PayIdentity';
 import { CountryPanel, LanguagePanel } from '../../../components/AccountPrefs';
 import { ChatAppsPanel, SecretInput, TrustedPanel } from '../../../components/AccountConnections';
-import { LimitsPanel, PinPanel, SecurityPanel } from '../../../components/AccountSecurity';
+import { LimitsPanel, PinPanel, QuickSendPanel, SecurityPanel } from '../../../components/AccountSecurity';
 import { AccountProjects } from '../../../components/AccountProjects';
 import type { LocaleCode } from '../../../lib/locale';
 import { SITE_PHONE_COUNTRIES, countryByIso, countryFlag } from '../../../lib/phoneFormat';
@@ -64,6 +64,7 @@ export default function AccountPage() {
     removeTrusted,
     setUnlockPin,
     setDailyLimit,
+    setQuickSend,
     setUsername,
     setAccountLocale,
     setDefaultCallingCode,
@@ -983,7 +984,10 @@ export default function AccountPage() {
       ) : null}
 
       {slide === 'limits' ? (
-        <LimitsPanel current={currentLimit} onSave={setDailyLimit} busy={busy === 'limit'} lastError={msg} />
+        <>
+          <LimitsPanel current={currentLimit} onSave={setDailyLimit} busy={busy === 'limit'} lastError={msg} />
+          <QuickSendPanel setting={data.quickSend} onSave={setQuickSend} busy={busy === 'quickSend'} lastError={msg} />
+        </>
       ) : null}
 
       {slide === 'security' ? (

@@ -17,7 +17,7 @@ const { ethers } = require('ethers');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
-const { PIN_HASH_PRESENT, unlockedSession } = require('./helpers/unlockedChat');
+const { PIN_HASH_PRESENT, unlockedSession, confirmWithPin } = require('./helpers/unlockedChat');
 
 // Agent wallet derivation refuses to run without a secret, by design. These
 // paths derive an address, so give them the test fixture one.
@@ -169,13 +169,25 @@ function senderCtx(sent) {
   };
 }
 
-/** Drive a full send + confirm and return everything the sender saw. */
+/**
+ * Drive a full send, confirm and PIN approval (a claim hold always takes the
+ * PIN, lib/tiers.js) and return everything the sender saw. Once the page
+ * approves, the bot answers through deliver, to this same chat.
+ */
 async function sendAndConfirm(to, amount = '0.01') {
   const sent = [];
   const ctx = senderCtx(sent);
   await router.handle(ctx, `flizy send ${amount} to ${to}`);
-  await router.handle(ctx, 'confirm');
-  return sent;
+  await confirmWithPin(router, ctx, fake.db.tables);
+  // Those replies are the sender's own; taken out of the log so the tests
+  // below count only what reached the recipient.
+  const toSender = [];
+  for (const list of [delivered.whatsapp, delivered.telegram]) {
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      if (list[i].externalId === SENDER_WA) toSender.unshift(...list.splice(i, 1));
+    }
+  }
+  return [...sent, ...toSender.map((d) => d.body)];
 }
 
 beforeEach(() => {
@@ -269,8 +281,9 @@ describe('the recipient is notified the moment the claim is held', () => {
     seed({ recipientOnFlizy: true });
     await sendAndConfirm(RECIPIENT_PHONE);
 
+    // The sender's own receipt reaches this chat; the claim notice must not.
     const toSender = [...delivered.whatsapp, ...delivered.telegram].filter(
-      (d) => d.externalId === SENDER_WA
+      (d) => d.externalId === SENDER_WA && /Pending claim/i.test(d.body)
     );
     assert.equal(toSender.length, 0);
   });
@@ -315,7 +328,7 @@ describe('the recipient is notified the moment the claim is held', () => {
     fake.db.tables.sessions.push(unlockedSession('acc-sender', 'telegram', '5566778899'));
 
     await router.handle(tgCtx, '/send 0.01 to ' + RECIPIENT_PHONE);
-    await router.handle(tgCtx, 'confirm');
+    await confirmWithPin(router, tgCtx, fake.db.tables);
 
     assert.equal(claimHoldCalls.length, 1, 'the claim should still be held');
     assert.equal(
@@ -358,12 +371,11 @@ describe('the recipient is notified the moment the claim is held', () => {
 
     await sendAndConfirm(RECIPIENT_PHONE);
 
-    assert.equal(
-      (fake.db.tables.notifications || []).length,
-      1,
-      'an undeliverable notice must land in the outbox, not vanish'
-    );
-    assert.equal(fake.db.tables.notifications[0].channel, 'whatsapp');
+    // The sender is on WhatsApp too, so their own replies queue as well; only
+    // the rows for the recipient are this test's subject.
+    const forRecipient = (fake.db.tables.notifications || []).filter((n) => n.external_id !== SENDER_WA);
+    assert.equal(forRecipient.length, 1, 'an undeliverable notice must land in the outbox, not vanish');
+    assert.equal(forRecipient[0].channel, 'whatsapp');
 
     notify.registerChannelSender('whatsapp', async (externalId, body) => {
       restore.push({ externalId, body });

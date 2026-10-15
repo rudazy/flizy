@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
 import {
@@ -7,6 +8,7 @@ import {
   resolvePayRef,
 } from '../../../../lib/payCode.ts';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { accountQuickSendWei, isKnownRecipient } from '../../../../lib/tiers.ts';
 
 const ROUTE = 'GET /api/pay/preview';
 
@@ -33,10 +35,16 @@ export async function GET(req: Request) {
     const to = dest?.agent_wallet_address || '';
     const firstPay = to ? !(await hasPaidMerchantBefore(supabase, payerId, to)) : true;
     const alreadySaved = to ? await isSavedMerchant(supabase, payerId, to) : false;
+    // For the page only, to hide the PIN field on a small ETH payment to
+    // someone already paid. pay/execute decides again on the server.
+    const known = to ? await isKnownRecipient(supabase, payerId, to).catch(() => false) : false;
+    const quickSendEth = ethers.formatEther(await accountQuickSendWei(supabase, payerId));
     return NextResponse.json({
       self: false,
       firstPay,
       alreadySaved,
+      known,
+      quickSendEth,
       username: merchant.username,
       displayName: merchant.displayName,
     });

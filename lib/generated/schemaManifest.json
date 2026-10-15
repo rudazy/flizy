@@ -22,6 +22,12 @@
     },
     {
       "kind": "check",
+      "name": "accounts.accounts_quick_send_eth_check",
+      "providedBy": "20261018100000_known_recipients.sql",
+      "requiredBy": "check on accounts"
+    },
+    {
+      "kind": "check",
       "name": "channel_identities.channel_identities_channel_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on channel_identities"
@@ -382,9 +388,21 @@
     },
     {
       "kind": "function",
+      "name": "is_known_recipient",
+      "providedBy": "20261018100000_known_recipients.sql",
+      "requiredBy": "lib/tiers.js"
+    },
+    {
+      "kind": "function",
       "name": "limit_orders_before_insert",
       "providedBy": "20261001120000_limit_orders.sql",
       "requiredBy": "executed by trigger limit_orders_before_insert"
+    },
+    {
+      "kind": "function",
+      "name": "record_known_recipient",
+      "providedBy": "20261018100000_known_recipients.sql",
+      "requiredBy": "executed by trigger transfers_record_known_recipient"
     },
     {
       "kind": "function",
@@ -438,7 +456,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
     },
     {
       "kind": "table",
@@ -649,6 +667,12 @@
       "name": "limit_orders_before_insert",
       "providedBy": "20261001120000_limit_orders.sql",
       "requiredBy": "trigger on limit_orders"
+    },
+    {
+      "kind": "trigger",
+      "name": "transfers_record_known_recipient",
+      "providedBy": "20261018100000_known_recipients.sql",
+      "requiredBy": "trigger on transfers"
     },
     {
       "kind": "trigger",

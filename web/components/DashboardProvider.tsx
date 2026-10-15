@@ -54,6 +54,8 @@ type DashboardContextValue = {
   removeTrusted: (address: string, password: string) => Promise<boolean>;
   setUnlockPin: (pin: string, password: string) => Promise<boolean>;
   setDailyLimit: (limit: number | null, password: string) => Promise<boolean>;
+  /** null returns to the app default; "0" asks for the PIN on every payment. */
+  setQuickSend: (amountEth: string | null, password: string) => Promise<boolean>;
   /** password is needed to change an existing username, not to set the first. */
   setUsername: (username: string, password?: string) => Promise<boolean>;
   setAccountLocale: (locale: LocaleCode) => Promise<boolean>;
@@ -326,6 +328,30 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [loadAccount]
   );
 
+  const setQuickSend = useCallback(
+    async (amountEth: string | null, password: string) => {
+      setBusy('quickSend');
+      setMsg('');
+      try {
+        const res = await fetch('/api/limits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quick_send_eth: amountEth, password }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed');
+        await loadAccount();
+        return true;
+      } catch (err) {
+        setMsg(err instanceof Error ? err.message : 'Failed');
+        return false;
+      } finally {
+        setBusy('');
+      }
+    },
+    [loadAccount]
+  );
+
   const setUsername = useCallback(
     async (username: string, password?: string) => {
       setBusy('username');
@@ -452,6 +478,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       removeTrusted,
       setUnlockPin,
       setDailyLimit,
+      setQuickSend,
       setUsername,
       setAccountLocale,
       setDefaultCallingCode,
@@ -478,6 +505,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       removeTrusted,
       setUnlockPin,
       setDailyLimit,
+      setQuickSend,
       setUsername,
       setAccountLocale,
       setDefaultCallingCode,

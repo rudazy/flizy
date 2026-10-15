@@ -47,3 +47,24 @@ function unlockAllChats(tables) {
 }
 
 module.exports.unlockAllChats = unlockAllChats;
+
+/**
+ * CONFIRM a plan that takes the PIN, then do what the approval page does on a
+ * right PIN, and let the bot pick the approval up. For flows whose subject is
+ * what happens after the approval (claim holds, NFT sends, the daily limit
+ * under the lock), not the approval itself.
+ *
+ * @param {{ handle: Function }} router lib/router
+ * @param {object} ctx chat context
+ * @param {{ chat_approvals?: object[] }} tables the fake database tables
+ */
+async function confirmWithPin(router, ctx, tables) {
+  const { pollApprovals } = require('../../lib/chatApprovals');
+  await router.handle(ctx, 'confirm');
+  const row = (tables.chat_approvals || []).find((r) => !r.approved_at && !r.cancelled_at && !r.consumed_at);
+  if (!row) return;
+  row.approved_at = new Date().toISOString();
+  await pollApprovals();
+}
+
+module.exports.confirmWithPin = confirmWithPin;

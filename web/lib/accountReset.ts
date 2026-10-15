@@ -15,7 +15,9 @@
  *     sessions go with them;
  *   - the trusted list is emptied, including addresses still in their 24 hour
  *     hold and adds started from chat, so the new owner does not inherit
- *     destinations someone else chose.
+ *     destinations someone else chose;
+ *   - the record of who the account has paid is forgotten, so payments the
+ *     earlier holder made cannot skip the PIN for the new owner.
  *
  * The caller signs out every web session and mails the address. Only a
  * re-signup reaches this: a first signup has nothing to reset.
@@ -64,6 +66,8 @@ export async function resetForNewOwner(
   if (tErr) throw new Error(`trusted list reset failed: ${tErr.message}`);
   const { error: kErr } = await supabase.from('trusted_add_tickets').delete().eq('account_id', accountId);
   if (kErr) throw new Error(`trusted add ticket reset failed: ${kErr.message}`);
+  const { error: rErr } = await supabase.from('known_recipients').delete().eq('account_id', accountId);
+  if (rErr) throw new Error(`known recipients reset failed: ${rErr.message}`);
 
   return { unlinked, trustedRemoved: (trusted || []).length };
 }

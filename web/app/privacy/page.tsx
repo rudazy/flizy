@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '17 October 2026';
+const UPDATED = '15 October 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -97,6 +97,11 @@ export default function PrivacyPage() {
               one-time link to a Flizy page. We keep what the request was (for example the
               payment shown to you), which chat it came from, and when it was approved. Your PIN
               is checked against its stored hash and never kept.
+            </li>
+            <li>
+              <span className="text-paper">People you have paid.</span> For each address you
+              pay from Flizy, when you first and last paid it and how many times. This decides
+              whether a small payment needs your PIN.
             </li>
             <li>
               <span className="text-paper">Security counters.</span> To limit password guessing
@@ -208,6 +213,10 @@ export default function PrivacyPage() {
             <li>Invite cookies last up to 14 days, or until they are used at signup.</li>
             <li>The analytics answer lasts six months, or until you change it.</li>
             <li>Account, username, trusted addresses, and history stay while the account exists.</li>
+            <li>
+              The record of who you paid stays while the account exists. Someone you have not
+              paid for 180 days no longer counts as someone you pay.
+            </li>
             <li>
               A phone that has already produced an invite credit is remembered so the same
               number cannot mint a second credit after unlink. That record is not a live bind.

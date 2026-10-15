@@ -4,6 +4,8 @@
  * - CONFIRM reads the unlock and the trusted list again, so a plan made while
  *   unlocked cannot be sent after the chat locked or the destination was
  *   removed on the site.
+ * - a small ETH payment to a known recipient goes on CONFIRM alone; anything
+ *   else sends a PIN link, and that is decided again at CONFIRM.
  * - unlink from chat takes a fresh PIN approval on flizy.app, then tells the
  *   owner on every chat that was linked (the removed one included) and by
  *   email.
@@ -214,6 +216,132 @@ describe('CONFIRM rechecks what the plan was allowed on', () => {
     assert.equal(moved, 0);
     assert.match(sent.join('\n'), /Nothing was sent\.\nChat locked\./);
     assert.equal(router.pendingFlowFor(TG_KEY).send, false);
+  });
+});
+
+describe('quick send: a plain CONFIRM, or the PIN on flizy.app', () => {
+  const { pollApprovals } = require('../lib/chatApprovals');
+  const approvals = () => tables().chat_approvals || [];
+  const OTHER_WALLET = '0x8888888888888888888888888888888888888888';
+  const hoursAgo = (h) => new Date(Date.now() - h * 3_600_000).toISOString();
+
+  function approveOnPage() {
+    const row = approvals().find((r) => !r.approved_at && !r.cancelled_at);
+    assert.ok(row, 'an open approval');
+    row.approved_at = new Date().toISOString();
+  }
+
+  beforeEach(() => {
+    seed();
+    router.discardPendingFlows(TG_KEY);
+  });
+
+  it('sends a small ETH payment to a trusted address on CONFIRM alone', async () => {
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, `/send 0.005 to ${FRIEND}`);
+    assert.doesNotMatch(sent.join('\n'), /PIN/);
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 1, sent.join('\n'));
+    assert.equal(approvals().length, 0);
+  });
+
+  it('above the quick-send amount, CONFIRM sends a PIN link and nothing moves until the page approves', async () => {
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, `/send 0.006 to ${FRIEND}`);
+    assert.match(sent.join('\n'), /above your quick send amount\. After CONFIRM you approve it with your PIN on Flizy\./);
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 0);
+    assert.match(sent.join('\n'), /Approve with your PIN on Flizy: \S+\/a\//);
+    approveOnPage();
+    await pollApprovals();
+    assert.equal(moved, 1);
+  });
+
+  it('an account that set quick send to 0 approves every payment with the PIN', async () => {
+    tables().accounts.find((a) => a.id === OWNER).quick_send_eth = '0';
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, `/send 0.001 to ${FRIEND}`);
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 0);
+    assert.equal(approvals().length, 1);
+  });
+
+  it('an account value above the default is held to the default', async () => {
+    tables().accounts.find((a) => a.id === OWNER).quick_send_eth = '1';
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, `/send 0.006 to ${FRIEND}`);
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 0);
+    assert.equal(approvals().length, 1);
+  });
+
+  it('is decided again at CONFIRM: lowering quick send after the plan asks for the PIN', async () => {
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, `/send 0.001 to ${FRIEND}`);
+    assert.doesNotMatch(sent.join('\n'), /PIN/);
+    tables().accounts.find((a) => a.id === OWNER).quick_send_eth = '0';
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 0);
+    assert.match(sent.join('\n'), /Approve with your PIN on Flizy/);
+  });
+
+  it('a first payment to a Flizy account takes the PIN', async () => {
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, '/send 0.001 to @accother');
+    assert.match(sent.join('\n'), /You have not paid this address before\. After CONFIRM/);
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 0);
+  });
+
+  it('someone paid over an hour ago is known: a small payment needs only CONFIRM', async () => {
+    tables().known_recipients = [
+      { account_id: OWNER, address: OTHER_WALLET, first_paid_at: hoursAgo(2), last_paid_at: hoursAgo(2), payments: 1 },
+    ];
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, '/send 0.001 to @accother');
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 1, sent.join('\n'));
+  });
+
+  it('someone first paid minutes ago is not known yet', async () => {
+    tables().known_recipients = [
+      { account_id: OWNER, address: OTHER_WALLET, first_paid_at: hoursAgo(0.1), last_paid_at: hoursAgo(0.1), payments: 1 },
+    ];
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, '/send 0.001 to @accother');
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 0);
+  });
+
+  it('someone last paid over 180 days ago is not known any more', async () => {
+    tables().known_recipients = [
+      { account_id: OWNER, address: OTHER_WALLET, first_paid_at: hoursAgo(24 * 400), last_paid_at: hoursAgo(24 * 181), payments: 3 },
+    ];
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, '/send 0.001 to @accother');
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 0);
+  });
+
+  it('money held for a phone number always takes the PIN', async () => {
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, '/send 0.001 to 2348099999999');
+    assert.match(sent.join('\n'), /The person is not on Flizy yet\. After CONFIRM/);
+    await router.handle(ctx, 'confirm');
+    assert.equal(moved, 0);
+    approveOnPage();
+    await pollApprovals();
+    assert.equal(moved, 1);
   });
 });
 

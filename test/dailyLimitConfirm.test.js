@@ -12,7 +12,7 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
-const { unlockAllChats } = require('./helpers/unlockedChat');
+const { unlockAllChats, confirmWithPin } = require('./helpers/unlockedChat');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
 
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
@@ -141,17 +141,19 @@ describe('daily limit at confirm', () => {
       created_at: new Date().toISOString(),
     });
 
-    sent.length = 0;
-    await router.handle(ctx, 'confirm');
+    // A claim hold takes the PIN (lib/tiers.js); the limit is checked again
+    // under the lock once the page approves, and the answer goes to the chat.
+    await confirmWithPin(router, ctx, fake.db.tables);
     assert.equal(held, 0, 'the claim hold must not run');
-    assert.match(sent.join('\n'), /Daily send limit reached/);
+    const notices = (fake.db.tables.notifications || []).map((n) => n.body).join('\n');
+    assert.match(notices, /Daily send limit reached/);
   });
 
   it('goes through when the allowance still covers it', async () => {
     const sent = [];
     const ctx = ctxFor(sent);
     await router.handle(ctx, '/send 0.03 to 2348099999999');
-    await router.handle(ctx, 'confirm');
+    await confirmWithPin(router, ctx, fake.db.tables);
     assert.equal(held, 1);
   });
 
@@ -168,7 +170,7 @@ describe('daily limit at confirm', () => {
     const sent = [];
     const ctx = ctxFor(sent);
     await router.handle(ctx, '/send 0.03 to 2348099999999');
-    await router.handle(ctx, 'confirm');
+    await confirmWithPin(router, ctx, fake.db.tables);
     assert.equal(held, 1, sent.join('\n'));
   });
 });

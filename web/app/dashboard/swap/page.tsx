@@ -10,6 +10,7 @@ import { LISTED_TOKENS, listedBySymbol } from '../../../lib/listedTokens';
 import { tokenLogo } from '../../../lib/tokenLogos';
 import { announceTx } from '../../../lib/txSignal';
 import { pinReady } from '../../../components/PinField';
+import { withinQuickSend } from '../../../lib/quickSend';
 import {
   ArrowRightIcon,
   ChartLineIcon,
@@ -123,6 +124,10 @@ export default function SwapPage() {
   const [result, setResult] = useState<{ explorerUrl?: string; note?: string } | null>(null);
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
+  /** The most an ETH swap may be without the PIN (GET /api/limits). */
+  const [quickSendEth, setQuickSendEth] = useState('0');
+  /** The server asked for the PIN on a swap the page thought was quick. */
+  const [pinAsked, setPinAsked] = useState(false);
 
   const [lpMode, setLpMode] = useState<'add' | 'remove'>('add');
   const [lpEth, setLpEth] = useState('0.05');
@@ -142,6 +147,9 @@ export default function SwapPage() {
   // A price read for another token is not this pair's price.
   const price = priceInfo && priceInfo.symbol === asset ? priceInfo : null;
   const slippageBps = Math.round(Number(slippagePct) * 100);
+  // Display only: a small ETH swap into a listed token needs no PIN. The server
+  // decides again (web/lib/tiers.ts) and answers PIN_REQUIRED if it disagrees.
+  const quickSwap = mode === 'swap' && tokenIn === 'ETH' && !pinAsked && withinQuickSend(amountIn, quickSendEth);
 
   // A quote request that has been overtaken must not overwrite a newer one.
   const quoteSeq = useRef(0);
@@ -260,6 +268,16 @@ export default function SwapPage() {
     loadBalances();
     loadOrders();
   }, [loadPrice, loadBalances, loadOrders]);
+
+  useEffect(() => {
+    fetch('/api/limits', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const eth = data?.quickSend?.effectiveEth;
+        if (typeof eth === 'string') setQuickSendEth(eth);
+      })
+      .catch(() => {});
+  }, []);
 
   // The quote follows the inputs, and refreshes on its own while the page is
   // open, so the figure on screen is the pool as it is now.
@@ -398,13 +416,14 @@ export default function SwapPage() {
           amount: amountIn,
           tokenIn,
           tokenOut,
-          pin,
+          pin: quickSwap ? '' : pin,
           slippageBps,
           // The minimum on screen. The server refuses a fill below it.
           minOut: quote?.amountOutMin,
         }),
       });
       const data = await res.json();
+      if (data.code === 'PIN_REQUIRED') setPinAsked(true);
       if (!res.ok) {
         setError(data.error || 'Swap failed');
         return;
@@ -785,7 +804,12 @@ export default function SwapPage() {
         />
       )}
 
-      <div className="!mt-[12px]">
+      {quickSwap ? (
+        <p className="!mt-[12px] m-0 font-sans text-[11px] text-[#b7b1a8]">
+          Quick swap: no PIN for up to {quickSendEth} ETH into a listed token.
+        </p>
+      ) : null}
+      <div className="!mt-[12px]" hidden={quickSwap}>
         <label htmlFor="swap-pin" className="mb-[6px] block font-mono text-[9.4px] uppercase tracking-[0.12em] text-[#e6e6e6]">
           Your PIN
         </label>
@@ -827,7 +851,7 @@ export default function SwapPage() {
       ) : null}
 
       {mode === 'swap' ? (
-        <CtaButton disabled={busy || quoting || !quote || !pinReady(pin)} onClick={runSwap}>
+        <CtaButton disabled={busy || quoting || !quote || (!quickSwap && !pinReady(pin))} onClick={runSwap}>
           {swapCta}
         </CtaButton>
       ) : mode === 'limit' ? (

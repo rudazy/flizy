@@ -59,18 +59,21 @@ describe('POST /api/swap/execute', () => {
     'utf8'
   );
 
-  it('asks for the PIN on every swap, not only unverified ones', () => {
-    const call = src.indexOf('await requireStepUp(');
-    assert.ok(call > 0, 'requireStepUp is not called');
+  it('runs the approval on every swap, with the tier worked out on the server', () => {
+    const call = src.indexOf('await requireApproval(');
+    assert.ok(call > 0, 'requireApproval is not called');
     const before = src.slice(0, call);
     const lastLine = before.slice(before.lastIndexOf('\n') + 1);
     // Four spaces is the handler's top level inside its try; anything deeper is
     // inside a block, which is where a condition would put it.
-    assert.match(lastLine, /^ {4}const auth = $/, 'requireStepUp must not sit inside a condition');
+    assert.match(lastLine, /^ {4}const auth = $/, 'requireApproval must not sit inside a condition');
+    // Only an ETH input can skip the PIN, and the tier is never taken from the body.
+    assert.match(src, /const ethInWei = tokenIn === null \? \(ethToWei\(amount\) \?\? 0n\) : 0n;/);
+    assert.match(src, /const tier = await swapTier\(supabase, accountId, tokenIn === null, ethInWei, !unverified\);/);
   });
 
   it('refuses before any chain work or the transaction lock', () => {
-    const gate = src.indexOf('await requireStepUp(');
+    const gate = src.indexOf('await requireApproval(');
     const refusal = src.indexOf('if (!auth.ok)', gate);
     assert.ok(refusal > gate);
     for (const later of ['readErc20Decimals(provider', 'tryAccountTxLock(', 'quoteSwap(', 'executeSwap(']) {

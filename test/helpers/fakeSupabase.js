@@ -322,6 +322,32 @@ function createFakeSupabase(seed = {}, opts = {}) {
    * tests would prove nothing.
    */
   const rpcs = {
+    /**
+     * 20261018100000_known_recipients.sql. Known: on the trusted list, active
+     * and past its hold; or first paid at least an hour ago and last paid
+     * within 180 days.
+     */
+    is_known_recipient({ p_account_id, p_address }) {
+      const addr = String(p_address || '').toLowerCase();
+      const now = Date.now();
+      const trusted = (db.tables.trusted_addresses || []).some(
+        (t) =>
+          String(t.account_id) === String(p_account_id) &&
+          String(t.address || '').toLowerCase() === addr &&
+          t.status === 'active' &&
+          t.active_at != null &&
+          new Date(t.active_at).getTime() <= now
+      );
+      const paid = (db.tables.known_recipients || []).some(
+        (k) =>
+          String(k.account_id) === String(p_account_id) &&
+          k.address === addr &&
+          new Date(k.first_paid_at).getTime() <= now - 60 * 60 * 1000 &&
+          new Date(k.last_paid_at).getTime() >= now - 180 * 24 * 60 * 60 * 1000
+      );
+      return { data: trusted || paid, error: null };
+    },
+
     debit_user_balance({ p_user_id, p_amount }) {
       const amount = Number(p_amount);
       if (!Number.isFinite(amount) || amount <= 0) {

@@ -38,6 +38,8 @@ export type DashboardData = {
     default_country_iso?: string | null;
   };
   trusted: Array<{ address: string; label: string }>;
+  /** Quick send: the most one ETH payment to a known recipient may be without the PIN. */
+  quickSend?: { ownEth: string | null; effectiveEth: string; ceilingEth: string };
   /** Whether a WhatsApp or Telegram chat is linked. The live link code is never here. */
   chatLinked?: boolean;
   /** Claims this account can receive after proving phone / platform identity */

@@ -105,8 +105,16 @@ describe('the tiers hold: account changes take the password, money takes the PIN
     'swap/liquidity',
   ];
 
+  /**
+   * Tier 0 is possible only here: a small ETH payment to a known recipient, or
+   * a small ETH swap into verified tokens (web/lib/tiers.ts). These call
+   * requireApproval with a tier worked out on the server; every other money
+   * route calls requireStepUp and takes the PIN every time.
+   */
+  const TIERED_ROUTES = ['pay/execute', 'swap/execute'];
+
   const PASSWORD_CHECK = /requirePassword\(/;
-  const STEP_UP_CHECK = /requireStepUp\(|runMintTx\(/;
+  const STEP_UP_CHECK = /requireStepUp\(|requireApproval\(|runMintTx\(/;
   const src = (r) => read(path.join(API_DIR, r, 'route.ts'));
 
   it('each listed route exists, and no route is on both lists', () => {
@@ -139,8 +147,33 @@ describe('the tiers hold: account changes take the password, money takes the PIN
     assert.doesNotMatch(mint, /requirePassword\(/);
   });
 
+  it('only the tiered routes may skip the PIN, and they are money routes', () => {
+    assert.deepEqual(TIERED_ROUTES.filter((r) => !STEP_UP_ROUTES.includes(r)), []);
+    const skipping = routeFiles()
+      .filter((f) => /requireApproval\(/.test(read(f)))
+      .map(rel);
+    assert.deepEqual(skipping.sort(), [...TIERED_ROUTES].sort());
+    for (const r of STEP_UP_ROUTES.filter((x) => !TIERED_ROUTES.includes(x))) {
+      assert.doesNotMatch(src(r), /requireApproval\(|evaluateTier\(|sendTier\(|swapTier\(/, r);
+    }
+  });
+
+  it('a tiered route works the tier out itself, from what it will send', () => {
+    for (const r of TIERED_ROUTES) {
+      const s = src(r);
+      assert.match(s, /const tier = await (sendTier|swapTier)\(supabase, (payerId|accountId), /, r);
+      assert.match(s, /requireApproval\([\s\S]{0,200}?,\s*tier\s*\)/, r);
+      assert.doesNotMatch(s, /body\.tier|body\.known|body\.quick/, r);
+    }
+  });
+
+  it('requireApproval skips the PIN for Tier 0 only', () => {
+    const stepUp = read(path.join(ROOT, 'web', 'lib', 'stepUp.ts'));
+    assert.match(stepUp, /if \(tier\.tier === 0\) return \{ ok: true \};\s*return requireStepUp\(supabase, accountId, pin, action\);/);
+  });
+
   it('the step-up reads the PIN from the body, never the password', () => {
-    for (const r of STEP_UP_ROUTES.filter((x) => /requireStepUp\(/.test(src(x)))) {
+    for (const r of STEP_UP_ROUTES.filter((x) => /requireStepUp\(|requireApproval\(/.test(src(x)))) {
       assert.doesNotMatch(src(r), /body\.password|field\(body, 'password'\)/, r);
     }
   });

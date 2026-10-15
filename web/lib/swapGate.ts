@@ -9,8 +9,9 @@
  * liquidity and keeps the ETH. Selling a thin token into a pool someone else
  * controls leaks the same way in reverse.
  *
- * Every site swap takes the PIN. This decides whether the prompt
- * warns that the token is one Flizy has not verified. Mirror of isUnverifiedSwap
+ * A site swap takes the PIN unless it is a small ETH swap into verified tokens
+ * (web/lib/tiers.ts). This decides that, and whether the prompt warns that the
+ * token is one Flizy has not verified. Mirror of isUnverifiedSwap
  * in lib/dex.js, which gates the same trades in chat; test/swapGateDrift.test.js
  * keeps the two verified sets identical.
  */

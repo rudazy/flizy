@@ -24,7 +24,7 @@ describe('swap quote follows the inputs', () => {
   });
 
   it('keeps Swap off until that quote is in', () => {
-    assert.match(swap, /<CtaButton disabled=\{busy \|\| quoting \|\| !quote \|\| !pinReady\(pin\)\} onClick=\{runSwap\}>/);
+    assert.match(swap, /<CtaButton disabled=\{busy \|\| quoting \|\| !quote \|\| \(!quickSwap && !pinReady\(pin\)\)\} onClick=\{runSwap\}>/);
     assert.match(swap, /minOut: quote\?\.amountOutMin,/);
   });
 
@@ -42,7 +42,7 @@ describe('pay link', () => {
     const execute = landing.indexOf("fetch('/api/pay/execute'");
     assert.ok(review > 0 && execute > 0);
     assert.match(landing, /<form onSubmit=\{onReview\}/);
-    assert.match(landing, /disabled=\{busy \|\| !pinReady\(pin\)\}\s*onClick=\{\(\) => void onPay\(\)\}/);
+    assert.match(landing, /disabled=\{busy \|\| \(needsPin && !pinReady\(pin\)\)\}\s*onClick=\{\(\) => void onPay\(\)\}/);
     assert.match(landing, /Review payment to \{handle\}/);
   });
 

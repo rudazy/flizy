@@ -10,6 +10,7 @@ import { getInviteSummary } from '../../../lib/invite.ts';
 import { getPaySummary } from '../../../lib/payCode.ts';
 import { DEFAULT_APPEARANCE, type PublicAppearance } from '../../../lib/appearance';
 import { readAppearance } from '../../../lib/accountBackground';
+import { readQuickSend } from '../../../lib/tiers.ts';
 
 const ROUTE = 'GET /api/dashboard';
 
@@ -135,8 +136,13 @@ export async function GET() {
       logApiError(ROUTE, err, { step: 'appearance' });
     }
 
+    // Its own read, so a deploy that lands before the column still loads the
+    // dashboard; a failed read shows 0, which only asks for the PIN more often.
+    const quickSend = await readQuickSend(supabase, accountId);
+
     return NextResponse.json({
       account: toPublicAccount(account),
+      quickSend,
       trusted,
       chatLinked,
       pendingClaims,

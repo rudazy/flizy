@@ -328,6 +328,131 @@ export function LimitsPanel({
   );
 }
 
+/**
+ * Quick send: the most one ETH payment to someone already paid may be without
+ * the PIN. Anything over it, a first payment, a token or an NFT asks for the
+ * PIN. Capped at the app default for now.
+ */
+export function QuickSendPanel({
+  setting,
+  onSave,
+  busy,
+  lastError,
+}: {
+  setting: { ownEth: string | null; effectiveEth: string; ceilingEth: string } | undefined;
+  /** Save (null returns to the default) with the account password. True when saved. */
+  onSave: (amountEth: string | null, password: string) => Promise<boolean>;
+  busy: boolean;
+  lastError: string;
+}) {
+  const [value, setValue] = useState('');
+  const [problem, setProblem] = useState('');
+  /** The checked amount waiting for the password; undefined while no sheet is open. */
+  const [pending, setPending] = useState<string | null | undefined>(undefined);
+  const [refused, setRefused] = useState(false);
+  const ceiling = setting?.ceilingEth ?? '0';
+  const effective = setting?.effectiveEth ?? '0';
+
+  async function confirm(password: string) {
+    if (pending === undefined) return;
+    setRefused(false);
+    const ok = await onSave(pending, password);
+    if (ok) {
+      setPending(undefined);
+      setValue('');
+    } else {
+      setRefused(true);
+    }
+  }
+
+  return (
+    <section className={PREF_CARD}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const raw = value.trim();
+          if (raw !== '' && (!/^(\d+(\.\d*)?|\.\d+)$/.test(raw) || Number(raw) > Number(ceiling))) {
+            setProblem(`Enter a number from 0 to ${ceiling}, or leave it empty for the default.`);
+            return;
+          }
+          setProblem('');
+          setRefused(false);
+          setPending(raw === '' ? null : raw);
+        }}
+        className="grid gap-4 px-4 pb-5 pt-5"
+      >
+        <div className="grid gap-1">
+          <FieldLabel>Quick send (ETH)</FieldLabel>
+          <p className="m-0 font-sans text-[13px] leading-[1.55] text-[#d9d4ca]">
+            {Number(effective) > 0 ? (
+              <>
+                ETH payments up to <span className="font-semibold text-white">{effective} ETH</span> to someone you
+                have paid before, or on your trusted list, need no PIN. Everything else asks for it.
+              </>
+            ) : (
+              <>Every payment asks for your PIN.</>
+            )}
+          </p>
+        </div>
+        <label className="flex min-h-[56px] w-full items-stretch overflow-hidden rounded-[12px] border border-[#2e2e33] bg-[#0d0d0e] transition-colors focus-within:border-sun/70">
+          <input
+            inputMode="decimal"
+            placeholder={`0 to ${ceiling}`}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setProblem('');
+            }}
+            aria-label="Quick send amount in ETH"
+            className="min-w-0 flex-1 bg-transparent px-4 font-sans text-[16px] text-white outline-none placeholder:text-[#6f6a62]"
+          />
+          <span className="flex shrink-0 items-center border-l border-[#26262a] px-4 font-sans text-[14px] text-[#b7b1a8]">ETH</span>
+        </label>
+        {problem ? (
+          <p role="alert" className="m-0 font-sans text-[13px] text-[#f87171]">{problem}</p>
+        ) : (
+          <p className="m-0 flex items-center gap-2 font-sans text-[12.5px] text-[#9a958c]">
+            <InfoGlyph /> 0 asks for the PIN on every payment. Empty returns to the default.
+          </p>
+        )}
+        <button
+          type="submit"
+          aria-haspopup="dialog"
+          className="flex h-[54px] w-full items-center justify-center rounded-[12px] border border-[#5a4a1f] font-sans text-[16px] font-semibold text-sun hover:border-sun/70"
+        >
+          Save quick send
+        </button>
+      </form>
+
+      {pending !== undefined ? (
+        <PasswordSheet
+          tone="gold"
+          icon={<BarsGlyph />}
+          title="Save quick send"
+          text={
+            pending === null ? (
+              <>Quick send returns to the default, {ceiling} ETH.</>
+            ) : Number(pending) === 0 ? (
+              <>Every payment will ask for your PIN.</>
+            ) : (
+              <>
+                Payments up to <span className="font-semibold text-white">{pending} ETH</span> to people you have paid
+                before will not ask for your PIN.
+              </>
+            )
+          }
+          confirmLabel="Save"
+          busyLabel="Saving..."
+          busy={busy}
+          error={refused ? lastError : ''}
+          onCancel={() => setPending(undefined)}
+          onConfirm={(pw) => void confirm(pw)}
+        />
+      ) : null}
+    </section>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Security
 // ---------------------------------------------------------------------------
