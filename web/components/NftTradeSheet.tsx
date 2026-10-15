@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { parseEther } from 'ethers';
-import { PasswordField } from './PasswordField';
+import { PinField, pinReady } from './PinField';
 import { useDashboard } from './DashboardProvider';
 import { CloseIcon, EthDiamondIcon } from './ExploreIcons';
 import { bpsLabel, ethFromWei, usdLabel } from '../lib/nftFormat';
@@ -65,8 +65,8 @@ function Eth({ wei }: { wei: bigint | string | null }) {
 
 /**
  * Bottom sheet for every marketplace action. Shows the full split (price, the
- * 2% Flizy fee, the creator royalty, what lands where), takes the account
- * password, and posts to /api/market/[action].
+ * 2% Flizy fee, the creator royalty, what lands where), takes the PIN, and
+ * posts to /api/market/[action].
  */
 export function NftTradeSheet({
   intent,
@@ -89,7 +89,7 @@ export function NftTradeSheet({
   );
   const [days, setDays] = useState<number>(7);
   const [bps, setBps] = useState(intent.action === 'royalty' ? String(intent.currentBps / 100) : '');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<{ explorerUrl: string; label: string } | null>(null);
@@ -119,13 +119,13 @@ export function NftTradeSheet({
   const royaltyValid = intent.action !== 'royalty' || (/^[0-9]{1,2}(\.[0-9]{1,2})?$/.test(bps.trim()) && royaltyInput <= 10);
 
   const needsAmount = intent.action === 'list' || intent.action === 'offer';
-  const ready = !busy && !!password && (!needsAmount || typed != null) && royaltyValid;
+  const ready = !busy && pinReady(pin) && (!needsAmount || typed != null) && royaltyValid;
 
   async function submit() {
     if (!ready) return;
     setBusy(true);
     setError('');
-    const body: Record<string, unknown> = { password };
+    const body: Record<string, unknown> = { pin };
     if (intent.action === 'buy') Object.assign(body, { collection: intent.collection, tokenId: intent.tokenId, priceWei: intent.priceWei });
     if (intent.action === 'list') Object.assign(body, { collection: intent.collection, tokenId: intent.tokenId, priceEth: amount.trim(), days });
     if (intent.action === 'cancel') Object.assign(body, { collection: intent.collection, tokenId: intent.tokenId });
@@ -147,7 +147,7 @@ export function NftTradeSheet({
         setError(typeof data.error === 'string' ? data.error : 'That did not go through.');
         return;
       }
-      setPassword('');
+      setPin('');
       setDone({ explorerUrl: data.explorerUrl, label: data.label });
       onDone();
       refreshAll().catch(() => undefined);
@@ -310,7 +310,7 @@ export function NftTradeSheet({
               </>
             ) : null}
 
-            <PasswordField label="Account password" value={password} onChange={setPassword} autoComplete="current-password" />
+            <PinField value={pin} onChange={setPin} />
             {error ? <p className="alert alert-error m-0">{error}</p> : null}
             <button type="button" onClick={submit} disabled={!ready} className="btn-sun h-[44px] rounded-[6px] font-sans text-[13.5px] disabled:opacity-50">
               {busy ? 'Confirming...' : `Confirm ${TITLES[intent.action].toLowerCase()}`}

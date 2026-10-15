@@ -225,8 +225,8 @@ describe('the watcher', () => {
 describe('the route and the bot wiring', () => {
   const route = fs.readFileSync(path.join(__dirname, '..', 'web', 'app', 'api', 'swap', 'limit', 'route.ts'), 'utf8');
 
-  it('takes the password to place, and the account from the session', () => {
-    assert.match(route, /requirePassword\(supabase, accountId, String\(body\.password \|\| ''\), 'place a limit order'\)/);
+  it('takes the PIN to place, and the account from the session', () => {
+    assert.match(route, /requireStepUp\(supabase, accountId, String\(body\.pin \|\| ''\), 'place a limit order'\)/);
     assert.match(route, /const accountId = await getAccountIdFromCookie\(\);/);
     assert.match(route, /rejectIfCrossOrigin\(req\)/);
   });

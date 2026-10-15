@@ -59,22 +59,22 @@ describe('POST /api/swap/execute', () => {
     'utf8'
   );
 
-  it('asks for the password on every swap, not only unverified ones', () => {
-    const call = src.indexOf('await requirePassword(');
-    assert.ok(call > 0, 'requirePassword is not called');
+  it('asks for the PIN on every swap, not only unverified ones', () => {
+    const call = src.indexOf('await requireStepUp(');
+    assert.ok(call > 0, 'requireStepUp is not called');
     const before = src.slice(0, call);
     const lastLine = before.slice(before.lastIndexOf('\n') + 1);
     // Four spaces is the handler's top level inside its try; anything deeper is
     // inside a block, which is where a condition would put it.
-    assert.match(lastLine, /^ {4}const auth = $/, 'requirePassword must not sit inside a condition');
+    assert.match(lastLine, /^ {4}const auth = $/, 'requireStepUp must not sit inside a condition');
   });
 
   it('refuses before any chain work or the transaction lock', () => {
-    const gate = src.indexOf('await requirePassword(');
+    const gate = src.indexOf('await requireStepUp(');
     const refusal = src.indexOf('if (!auth.ok)', gate);
     assert.ok(refusal > gate);
     for (const later of ['readErc20Decimals(provider', 'tryAccountTxLock(', 'quoteSwap(', 'executeSwap(']) {
-      assert.ok(src.indexOf(later) > refusal, `${later} runs before the password is checked`);
+      assert.ok(src.indexOf(later) > refusal, `${later} runs before the PIN is checked`);
     }
   });
 });

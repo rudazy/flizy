@@ -5,7 +5,7 @@
  *     receives, and a free mint says it has no fee;
  *   - Contract-managed mints say plainly that the contract sets the rules;
  *   - unverified collections are labelled;
- *   - every on-chain action goes through the password sheet;
+ *   - every on-chain action goes through the PIN sheet;
  *   - no blue in any new screen.
  *
  * Run: node --test test/mintUi.test.js
@@ -65,11 +65,11 @@ describe('honest labels', () => {
   });
 });
 
-describe('every on-chain action takes the password', () => {
-  it('the sheet posts the password with the body', () => {
+describe('every on-chain action takes the PIN', () => {
+  it('the sheet posts the PIN with the body', () => {
     const src = read('MintActionSheet.tsx');
-    assert.match(src, /<PasswordField label="Account password"/);
-    assert.match(src, /body: JSON\.stringify\(\{ \.\.\.body, password \}\)/);
+    assert.match(src, /<PinField value=\{pin\} onChange=\{setPin\} \/>/);
+    assert.match(src, /body: JSON\.stringify\(\{ \.\.\.body, pin \}\)/);
   });
 
   it('mint, create, configure, publish and pause go through the sheet', () => {

@@ -74,7 +74,7 @@ export async function POST(req: Request) {
       ctx,
       accountId,
       viewer,
-      password: String(field(body, 'password') || ''),
+      pin: String(field(body, 'pin') || ''),
       tx: {
         calls: [
           {

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
-import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { requireStepUp } from '../../../../lib/stepUp.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { isSavedMerchant, resolvePayRef } from '../../../../lib/payCode.ts';
 import { deriveAgentWallet, getWebChain, explorerTxUrl, resolveToken } from '../../../../lib/dexServer';
@@ -50,9 +50,9 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const supabase = getSupabase();
-    const gate = await requirePassword(supabase, payerId, String(body.password || ''), 'pay');
+    const gate = await requireStepUp(supabase, payerId, String(body.pin || ''), 'pay');
     if (!gate.ok) {
-      return NextResponse.json({ error: gate.error, code: gate.code }, { status: gate.status });
+      return NextResponse.json({ error: gate.error, code: gate.code, attemptsLeft: gate.attemptsLeft }, { status: gate.status });
     }
 
     const merchant = await resolvePayRef(supabase, body.ref);

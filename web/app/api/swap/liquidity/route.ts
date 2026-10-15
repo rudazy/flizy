@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
-import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { requireStepUp } from '../../../../lib/stepUp.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import {
   getWebChain,
@@ -83,14 +83,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const pool = liquidityPool(body.token == null ? null : String(body.token));
     if (!pool) return NextResponse.json({ error: NOT_A_POOL }, { status: 400 });
-    const auth = await requirePassword(
-      supabase,
-      accountId,
-      String(body.password || ''),
-      'change liquidity'
-    );
+    const auth = await requireStepUp(supabase, accountId, String(body.pin || ''), 'change liquidity');
     if (!auth.ok) {
-      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
+      return NextResponse.json({ error: auth.error, code: auth.code, attemptsLeft: auth.attemptsLeft }, { status: auth.status });
     }
 
     const lock = await tryAccountTxLock(supabase, accountId, 'liquidity');

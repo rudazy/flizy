@@ -69,11 +69,11 @@ describe('server-to-server routes take a bearer secret', () => {
   });
 });
 
-describe('routes that move money or grant authority take the password', () => {
+describe('the tiers hold: account changes take the password, money takes the PIN', () => {
   /**
-   * Each of these changes who controls the account or moves value out of it,
-   * so a stolen session cookie alone must not be enough. runMintTx calls
-   * requirePassword (web/lib/mintExecute.ts).
+   * Tier 2. Each of these changes who controls the account or what protects
+   * it, so they take the account password (requirePassword) and never only
+   * the PIN.
    */
   const PASSWORD_ROUTES = [
     'account/closure',
@@ -82,34 +82,67 @@ describe('routes that move money or grant authority take the password', () => {
     'identity',
     'limits',
     'link/create',
+    'pay/save',
+    'pin',
+    'trusted',
+  ];
+
+  /**
+   * Tier 1. Each of these moves value or signs a transaction from the wallet,
+   * so a stolen session cookie alone must not be enough. They take the PIN
+   * (requireStepUp, web/lib/stepUp.ts; runMintTx calls it), and never the
+   * password: the password is for account changes, and typing it for every
+   * payment is what the tiers replace.
+   */
+  const STEP_UP_ROUTES = [
     'market/[action]',
     'mints/[collection]/[action]',
     'mints/collections',
     'mints/generated/pay',
     'pay/execute',
-    'pay/save',
-    'pin',
     'swap/execute',
     'swap/limit',
     'swap/liquidity',
-    'trusted',
   ];
-  const PASSWORD_CHECK = /requirePassword\(|runMintTx\(/;
 
-  it('each listed route exists', () => {
+  const PASSWORD_CHECK = /requirePassword\(/;
+  const STEP_UP_CHECK = /requireStepUp\(|runMintTx\(/;
+  const src = (r) => read(path.join(API_DIR, r, 'route.ts'));
+
+  it('each listed route exists, and no route is on both lists', () => {
     const routes = new Set(routeFiles().map(rel));
-    assert.deepEqual(PASSWORD_ROUTES.filter((r) => !routes.has(r)), []);
+    assert.deepEqual([...PASSWORD_ROUTES, ...STEP_UP_ROUTES].filter((r) => !routes.has(r)), []);
+    assert.deepEqual(PASSWORD_ROUTES.filter((r) => STEP_UP_ROUTES.includes(r)), []);
   });
 
-  it('each listed route verifies the password server side', () => {
-    const missing = PASSWORD_ROUTES.filter(
-      (r) => !PASSWORD_CHECK.test(read(path.join(API_DIR, r, 'route.ts')))
-    );
-    assert.deepEqual(missing, []);
+  it('account changes verify the password server side, not the PIN', () => {
+    assert.deepEqual(PASSWORD_ROUTES.filter((r) => !PASSWORD_CHECK.test(src(r))), []);
+    assert.deepEqual(PASSWORD_ROUTES.filter((r) => STEP_UP_CHECK.test(src(r))), []);
   });
 
-  it('runMintTx really does call requirePassword', () => {
-    assert.match(read(path.join(ROOT, 'web', 'lib', 'mintExecute.ts')), /requirePassword\(/);
+  it('money routes verify the PIN server side, not the password', () => {
+    assert.deepEqual(STEP_UP_ROUTES.filter((r) => !STEP_UP_CHECK.test(src(r))), []);
+    assert.deepEqual(STEP_UP_ROUTES.filter((r) => PASSWORD_CHECK.test(src(r))), []);
+  });
+
+  it('every route that takes either is on a list, so a new one has to pick its tier', () => {
+    const unlisted = routeFiles()
+      .filter((f) => PASSWORD_CHECK.test(read(f)) || STEP_UP_CHECK.test(read(f)))
+      .map(rel)
+      .filter((r) => !PASSWORD_ROUTES.includes(r) && !STEP_UP_ROUTES.includes(r));
+    assert.deepEqual(unlisted, []);
+  });
+
+  it('runMintTx really does call requireStepUp, and not requirePassword', () => {
+    const mint = read(path.join(ROOT, 'web', 'lib', 'mintExecute.ts'));
+    assert.match(mint, /requireStepUp\(/);
+    assert.doesNotMatch(mint, /requirePassword\(/);
+  });
+
+  it('the step-up reads the PIN from the body, never the password', () => {
+    for (const r of STEP_UP_ROUTES.filter((x) => /requireStepUp\(/.test(src(x)))) {
+      assert.doesNotMatch(src(r), /body\.password|field\(body, 'password'\)/, r);
+    }
   });
 });
 

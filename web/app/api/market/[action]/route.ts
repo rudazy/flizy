@@ -4,7 +4,7 @@ import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { getSupabase } from '../../../../lib/supabase';
 import { apiErrorBody, ClientError, clientMessage } from '../../../../lib/apiError';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
-import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { requireStepUp } from '../../../../lib/stepUp.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
 import { checkDailyNativeLimit } from '../../../../lib/dailyLimits.ts';
 import { explorerTxUrl } from '../../../../lib/dexServer';
@@ -320,7 +320,7 @@ async function noticeOffer(
 
 /**
  * Every marketplace action from the site. Each one is read and checked against
- * the chain first, then takes the account password, the daily ETH limit (for
+ * the chain first, then takes the PIN, the daily ETH limit (for
  * buys and offers, which send ETH to someone else), the account lock, and is
  * logged in transfers before it is sent.
  */
@@ -354,8 +354,10 @@ export async function POST(req: Request, { params }: { params: { action: string 
 
     const plan = await buildPlan(action, body, ctx, ctx.market.address, viewer.address);
 
-    const auth = await requirePassword(supabase, accountId, String(field(body, 'password') || ''), plan.reason);
-    if (!auth.ok) return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
+    const auth = await requireStepUp(supabase, accountId, String(field(body, 'pin') || ''), plan.reason);
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error, code: auth.code, attemptsLeft: auth.attemptsLeft }, { status: auth.status });
+    }
 
     const lock = await tryAccountTxLock(supabase, accountId, MARKET_KIND);
     if (!lock.ok) return NextResponse.json({ error: lock.error }, { status: 409 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { PasswordField } from './PasswordField';
+import { PinField, pinReady } from './PinField';
 import { useDashboard } from './DashboardProvider';
 import { CloseIcon, EthDiamondIcon } from './ExploreIcons';
 import { ethFromWei } from '../lib/nftFormat';
@@ -31,7 +31,7 @@ export type SheetResult = { explorerUrl?: string; label?: string };
  * Bottom sheet for every Flizy Mint action that sends a transaction: a mint,
  * creating a collection, setting up or changing a drop, publishing an
  * allowlist, pausing. The caller passes the summary (what it costs and where
- * the money goes); the sheet takes the account password and posts.
+ * the money goes); the sheet takes the PIN and posts.
  */
 export function MintActionSheet({
   title,
@@ -48,13 +48,13 @@ export function MintActionSheet({
   children: ReactNode;
   confirmLabel: string;
   url: string;
-  /** Request body without the password; the sheet adds it. */
+  /** Request body without the PIN; the sheet adds it. */
   body: Record<string, unknown>;
   onClose: () => void;
   onDone: (result: SheetResult & Record<string, unknown>) => void;
 }) {
   const { refreshAll } = useDashboard();
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<SheetResult | null>(null);
@@ -70,21 +70,21 @@ export function MintActionSheet({
   }, [busy, onClose]);
 
   async function submit() {
-    if (busy || !password) return;
+    if (busy || !pinReady(pin)) return;
     setBusy(true);
     setError('');
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, password }),
+        body: JSON.stringify({ ...body, pin }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(typeof data.error === 'string' ? data.error : 'That did not go through.');
         return;
       }
-      setPassword('');
+      setPin('');
       setDone({ explorerUrl: data.explorerUrl, label: data.label });
       onDone(data);
       refreshAll().catch(() => undefined);
@@ -132,12 +132,12 @@ export function MintActionSheet({
         ) : (
           <div className="mt-[16px] grid gap-[14px]">
             {children}
-            <PasswordField label="Account password" value={password} onChange={setPassword} autoComplete="current-password" />
+            <PinField value={pin} onChange={setPin} />
             {error ? <p className="alert alert-error m-0">{error}</p> : null}
             <button
               type="button"
               onClick={submit}
-              disabled={busy || !password}
+              disabled={busy || !pinReady(pin)}
               className="btn-sun h-[44px] rounded-[6px] font-sans text-[13.5px] disabled:opacity-50"
             >
               {busy ? 'Confirming...' : confirmLabel}

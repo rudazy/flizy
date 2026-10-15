@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboard } from './DashboardProvider';
-import { PasswordField } from './PasswordField';
+import { PinField, pinReady } from './PinField';
 import { formatEthDisplay, maxSpend } from '../lib/tokenFormat';
 import { announceTx } from '../lib/txSignal';
 import {
@@ -24,8 +24,8 @@ import {
  * What it shows comes from the swap quote (/api/swap/quote) and the pool
  * price the page already holds; nothing is estimated here except the price
  * impact, which is the quote measured against the pool price with the fees
- * taken out. The trade itself is the existing swap, behind the account
- * password, with the quote's minimum as the limit.
+ * taken out. The trade itself is the existing swap, behind the PIN, with the
+ * quote's minimum as the limit.
  */
 
 type Quote = {
@@ -111,7 +111,7 @@ export function TokenTradeSheet({
   const [quoting, setQuoting] = useState(false);
   const [error, setError] = useState('');
   const [stage, setStage] = useState<'edit' | 'confirm' | 'done'>('edit');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [explorerUrl, setExplorerUrl] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -222,7 +222,7 @@ export function TokenTradeSheet({
   const getEth = outNum == null ? null : buying ? (priceEth ? outNum * priceEth : null) : outNum;
 
   async function confirm() {
-    if (!quoteReady || busy || !password) return;
+    if (!quoteReady || busy || !pinReady(pin)) return;
     setBusy(true);
     setError('');
     try {
@@ -235,7 +235,7 @@ export function TokenTradeSheet({
           tokenIn: buying ? 'ETH' : tradeId,
           tokenOut: buying ? tradeId : 'ETH',
           minOut: quote?.amountOutMin,
-          password,
+          pin,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -244,7 +244,7 @@ export function TokenTradeSheet({
         return;
       }
       setExplorerUrl(typeof body.explorerUrl === 'string' ? body.explorerUrl : null);
-      setPassword('');
+      setPin('');
       setStage('done');
       announceTx();
       onTraded();
@@ -523,7 +523,7 @@ export function TokenTradeSheet({
                   <p className="m-0 text-xs leading-relaxed text-[#8f8f8f]">
                     This sends from your Flizy wallet. If the price moves past your limit, the trade does not go through and nothing is spent but network gas.
                   </p>
-                  <PasswordField label="Account password" value={password} onChange={setPassword} autoComplete="current-password" />
+                  <PinField value={pin} onChange={setPin} />
                   {error ? (
                     <p className="m-0 text-sm text-[#e0b070]" role="alert">
                       {error}
@@ -551,7 +551,7 @@ export function TokenTradeSheet({
                 <button
                   type="button"
                   onClick={() => {
-                    setPassword('');
+                    setPin('');
                     setStage('edit');
                   }}
                   disabled={busy}
@@ -562,7 +562,7 @@ export function TokenTradeSheet({
                 <button
                   type="button"
                   onClick={() => void confirm()}
-                  disabled={busy || !password}
+                  disabled={busy || !pinReady(pin)}
                   className="hit-y-44 h-12 rounded-[12px] bg-sun font-sans text-base font-bold text-sun-ink transition-opacity disabled:opacity-40"
                 >
                   {busy ? 'Sending...' : buying ? 'Confirm buy' : 'Confirm sell'}
@@ -571,7 +571,7 @@ export function TokenTradeSheet({
             )}
             <p className="m-0 mt-3 flex items-center gap-2 text-xs text-[#8f8f8f]">
               <ShieldCheckIcon size={15} className="shrink-0 text-[#2fd27a]" />
-              Sent from your Flizy wallet only after your account password.
+              Sent from your Flizy wallet only after your PIN.
             </p>
           </div>
         ) : null}

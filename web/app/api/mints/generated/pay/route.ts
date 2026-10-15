@@ -14,7 +14,7 @@ const ROUTE = 'POST /api/mints/generated/pay';
 
 /**
  * Pay the $2 generation fee in test ETH, from the creator's wallet to Flizy's
- * fee wallet, through the same gated path as every mint action (password,
+ * fee wallet, through the same gated path as every mint action (PIN,
  * lock, daily limit, balance). The amount is worked out here at the current
  * rate; the screen sends the amount it showed, and if the rate has since moved
  * the fee up, nothing is sent and the new figure is shown instead.
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
       ctx,
       accountId,
       viewer,
-      password: String(field(body, 'password') || ''),
+      pin: String(field(body, 'pin') || ''),
       // Again under the lock, so two quick payments cannot both go through.
       underLock: refuseIfPaid,
       tx: {

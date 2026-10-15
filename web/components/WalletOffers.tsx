@@ -38,7 +38,7 @@ function totalWei(offers: MyOffer[]): bigint {
  * The offers this wallet has made and not yet had accepted, expired ones
  * included: their ETH stays in the marketplace until cancelled. The card opens
  * on tap, and two or more offers on one collection sit in that collection's
- * own row, which opens on tap. Cancel takes the account password and returns
+ * own row, which opens on tap. Cancel takes the PIN and returns
  * the ETH to the wallet.
  */
 export function WalletOffers({ hidden }: { hidden: boolean }) {

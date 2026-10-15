@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { PinField, pinReady } from './PinField';
 
 export function PayLanding({
   refSlug,
@@ -17,7 +18,7 @@ export function PayLanding({
   const [payerHandle, setPayerHandle] = useState('');
   const [amount, setAmount] = useState('');
   const [asset, setAsset] = useState<'ETH' | 'FLZ'>('ETH');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [ok, setOk] = useState(false);
@@ -84,7 +85,7 @@ export function PayLanding({
   }
 
   async function onPay() {
-    if (!password || busy) return;
+    if (!pinReady(pin) || busy) return;
     setBusy(true);
     setMsg('');
     setOk(false);
@@ -92,10 +93,11 @@ export function PayLanding({
       const res = await fetch('/api/pay/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: refSlug, amount, password, asset }),
+        body: JSON.stringify({ ref: refSlug, amount, pin, asset }),
       });
       const body = await res.json().catch(() => ({}));
-      if (res.status === 401) {
+      // A wrong PIN is a 401 too; only a missing session (no code) means sign in.
+      if (res.status === 401 && !body.code) {
         window.location.href = `/login?next=${encodeURIComponent(next)}`;
         return;
       }
@@ -105,7 +107,7 @@ export function PayLanding({
       }
       setOk(true);
       setExplorer(body.explorerUrl || '');
-      setPassword('');
+      setPin('');
       if (body.alreadySaved === true) setAlreadySaved(true);
       else setAlreadySaved(false);
     } catch {
@@ -180,20 +182,7 @@ export function PayLanding({
               <dd className="m-0 text-right text-paper">Paid in ETH from your wallet</dd>
             </div>
           </dl>
-          <div>
-            <label className="label" htmlFor="pay-password">
-              Account password
-            </label>
-            <input
-              id="pay-password"
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoFocus
-            />
-          </div>
+          <PinField id="pay-pin" value={pin} onChange={setPin} />
           {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
           <div className="grid grid-cols-[auto_1fr] gap-2">
             <button
@@ -201,7 +190,7 @@ export function PayLanding({
               className="btn btn-ghost px-5 py-3"
               disabled={busy}
               onClick={() => {
-                setPassword('');
+                setPin('');
                 setMsg('');
                 setStage('edit');
               }}
@@ -211,7 +200,7 @@ export function PayLanding({
             <button
               type="button"
               className="btn btn-primary py-3 font-semibold"
-              disabled={busy || !password}
+              disabled={busy || !pinReady(pin)}
               onClick={() => void onPay()}
             >
               {busy ? 'Paying…' : `Confirm and pay ${amount} ${asset}`}

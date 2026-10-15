@@ -268,7 +268,7 @@ flowchart LR
 ```
 
 The pool is FLZ or a listed token (`liquidityPool` in `web/lib/dexServer.ts`). The route
-refuses any other token before it asks for the password.
+refuses any other token before it asks for the PIN.
 
 ---
 
@@ -397,7 +397,7 @@ Until then, do not grow ad-hoc server actions that bypass Policy.
 ## Security (technical)
 
 - Trusted destinations mutated only with password on web; chat cannot expand allowlist
-- Password re-auth on every route that moves value or widens authority: trusted, pay, pin, limits, identity, liquidity
+- PIN on every route that moves value (pay, swap, liquidity, limit orders, marketplace, mints); password on every route that widens authority (trusted, pin, limits, identity, linking)
 - Swap needs none: output is fixed to the caller's own wallet and slippage is server-set, so the route cannot re-target funds — rate-capped per account instead
 - Session lock per `(account, channel, external_id)`; PIN ladder / lockout tables
 - Daily and per-tx limits in Policy

@@ -87,12 +87,12 @@ One account, one balance, one approved list, one history, reachable from three p
 | Send to a phone, email or handle | `flizy send 0.01 to +234...` | `/send 0.01 to @name on telegram` | Claim a hold sent to you |
 | Swap | `flizy swap 0.1 ETH for FLZ` | `/swap 0.1 ETH for FLZ` | Swap, liquidity, limit orders |
 | NFTs | `flizy send giwaforge to john` | `/send giwaforge to john` | Marketplace, mints, creator |
-| Confirm | reply `confirm` | tap Confirm | account password |
+| Confirm | reply `confirm` | tap Confirm | your PIN |
 | Lock this device | `flizy lock` | `/lock` | sign out |
 
 The site deliberately cannot send to an arbitrary address: funds leave only through a linked
 chat app to a trusted destination, through a payment to a Flizy account, or through a claim.
-A password alone never unlocks "any address".
+Neither the PIN nor the password unlocks "any address".
 
 Chat apps are thin clients on one engine. A message becomes an intent, the engine decides
 whether money may move, and nothing executes without an explicit confirm. A new channel is
@@ -187,8 +187,8 @@ Creators keep their royalties (up to 10%) on secondary sales.
 | --- | --- |
 | **Approved destinations** | Sends by name reach the trusted list only. The list is edited on the site behind the account password, never from chat, and a new entry waits 24 hours before it can receive |
 | **Plan, then confirm** | Every money action shows amount, destination, network and fees first. Nothing executes without a confirm |
-| **Password sheets** | Trusted wallets, the PIN, the daily limit and the password itself each ask for the account password in a confirmation sheet. Wrong guesses climb the same lockout as login |
-| **Per-channel lock** | Lock a chat app instantly. Unlocking takes the PIN; chat never takes the account password |
+| **PIN and password, by risk** | Payments, trades, mints and marketplace actions ask for the PIN. Account changes (trusted wallets, the PIN, the daily limit, email, username, linking, the password itself) ask for the account password. Each has its own lockout |
+| **Per-channel lock** | Lock a chat app instantly. Unlocking takes the PIN on a one-time Flizy link; chat never takes the PIN or the password |
 | **Limits** | A daily ETH cap per account, counted the same way in chat and on the site |
 | **Sessions** | Server-side sessions that can be revoked. Changing the password signs out every other device |
 | **Privacy** | Scan never names who was paid, and each account decides whether its username shows there at all |
@@ -294,7 +294,7 @@ xychart-beta
 | Test files | 187 Node, 8 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
 | Database | 72 idempotent migrations, each ending in a post-condition check that fails loudly |
-| API surface | 98 route handlers; every payment, trade and security setting re-checks the account password |
+| API surface | Every payment, trade and mint re-checks the PIN; every security setting re-checks the account password |
 | Contracts | 14 deployed on GIWA Sepolia, all source verified as a full match |
 
 ---

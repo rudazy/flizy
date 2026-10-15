@@ -22,7 +22,7 @@ import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
 import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
-import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { requireStepUp } from '../../../../lib/stepUp.ts';
 import { bindAmountOutMin, isUnverifiedSwap, parseSlippageBps } from '../../../../lib/swapGate.ts';
 
 const ROUTE = 'POST /api/swap/execute';
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const supabase = getSupabase();
 
-    // Every swap takes the account password, the same gate and lockout ladder as
+    // Every swap takes the PIN (web/lib/stepUp.ts), the same gate and pause as
     // pay/execute. It is checked below once the sides are resolved, so the
     // prompt can say when the token is one Flizy has not verified. The hourly
     // cap stays as a churn limit behind it.
@@ -79,14 +79,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const auth = await requirePassword(
+    const auth = await requireStepUp(
       supabase,
       accountId,
-      String(body.password || ''),
+      String(body.pin || ''),
       isUnverifiedSwap([tokenIn, tokenOut], dex) ? 'trade a token Flizy has not verified' : 'swap'
     );
     if (!auth.ok) {
-      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
+      return NextResponse.json({ error: auth.error, code: auth.code, attemptsLeft: auth.attemptsLeft }, { status: auth.status });
     }
 
     const inDecimals = await readErc20Decimals(provider, tokenIn);

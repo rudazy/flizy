@@ -1,6 +1,6 @@
 /**
  * NFT routes: every one needs a session, and the trading route checks in the
- * right order (origin, session, chain checks, password, daily limit, balance,
+ * right order (origin, session, chain checks, PIN, daily limit, balance,
  * lock, log, send) and always releases the lock.
  *
  * Route handlers need a Next runtime, so the order is read from their source,
@@ -69,13 +69,13 @@ describe('trading route order', () => {
     assert.match(post, /if \(!ctx\.market\) return NextResponse\.json\(\{ error: 'Trading is not live yet\.' \}, \{ status: 503 \}\)/);
   });
 
-  it('checks the plan on chain and the password, then locks, then the daily limit and balance, then sends', () => {
+  it('checks the plan on chain and the PIN, then locks, then the daily limit and balance, then sends', () => {
     // The daily limit is read under the lock, so two parallel buys cannot both
     // pass it before either one's transfers row exists.
     const order = [
       'checkMarketRateLimit(',
       'buildPlan(',
-      'requirePassword(',
+      'requireStepUp(',
       'tryAccountTxLock(',
       'checkDailyNativeLimit(',
       'assertCanPay(',

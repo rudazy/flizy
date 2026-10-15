@@ -3,7 +3,7 @@
  * collection create, a drop configure, an allowlist publish, a pause.
  *
  * The order is the marketplace route's (web/app/api/market/[action]/route.ts),
- * so every write path takes the same gates: rate limit, password, the account
+ * so every write path takes the same gates: rate limit, the PIN, the account
  * lock, the daily ETH limit when ETH goes to someone else, a balance check, a
  * transfers row logged before the send, then the send from the EOA or the
  * gator. The row ends confirmed or failed.
@@ -11,7 +11,7 @@
 
 import { ethers } from 'ethers';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { requirePassword } from './passwordGate.ts';
+import { requireStepUp } from './stepUp.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from './accountTxLock.ts';
 import { checkDailyNativeLimit } from './dailyLimits.ts';
 import { assertCanPay, runMarketCalls, type MarketCall } from './marketExecute.ts';
@@ -36,7 +36,7 @@ export type MintTx = {
   value: bigint;
   /** Shown in history: "Mint 2 Franky", "Publish allowlist". */
   label: string;
-  /** Finishes "Password is required to ..." */
+  /** Finishes "Enter your PIN to ..." */
   reason: string;
   /** Where the transfers row says the ETH went. */
   to: string;
@@ -47,7 +47,7 @@ export async function runMintTx(args: {
   ctx: NftContext;
   accountId: string;
   viewer: { address: string; viaGator: boolean };
-  password: string;
+  pin: string;
   tx: MintTx;
   /** Runs under the account lock before anything is sent; throw to refuse. */
   underLock?: () => Promise<void>;
@@ -57,7 +57,7 @@ export async function runMintTx(args: {
   const rate = await checkMarketRateLimit(supabase, accountId);
   if (!rate.ok) throw new MintError(rate.error, rate.status, rate.code);
 
-  const auth = await requirePassword(supabase, accountId, args.password, tx.reason);
+  const auth = await requireStepUp(supabase, accountId, args.pin, tx.reason);
   if (!auth.ok) throw new MintError(auth.error, auth.status, auth.code);
 
   const lock = await tryAccountTxLock(supabase, accountId, MARKET_KIND);

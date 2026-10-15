@@ -92,7 +92,7 @@ type Sheet =
 /**
  * Manage one Flizy-managed drop: overview, the mint schedule (allowlist,
  * public, end), the allowlist (Flizy usernames, wallets, CSV), and pause.
- * Every on-chain change goes through the confirm sheet with the password.
+ * Every on-chain change goes through the confirm sheet with the PIN.
  */
 export function MintManage({ collection }: { collection: string }) {
   const [drop, setDrop] = useState<MintDrop | null>(null);

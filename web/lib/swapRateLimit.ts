@@ -2,12 +2,12 @@
  * Rolling-window cap on site swaps.
  *
  * This is a churn limit, not the authority check. Every swap also takes the
- * account password (POST /api/swap/execute), the same gate as pay/execute.
+ * PIN (POST /api/swap/execute), the same gate as pay/execute.
  *
  * A swap cannot name a recipient: the route hardcodes the caller's own wallet.
  * That alone does not keep value on the account, because any token other than
  * ETH, WETH or FLZ trades against a pool someone else can seed and drain
- * (web/lib/swapGate.ts). The password is what stops a stolen session; this cap
+ * (web/lib/swapGate.ts). The PIN is what stops a stolen session; this cap
  * bounds how often even the account holder can swap in an hour.
  *
  * Database-backed, like web/lib/callbackLimiter.ts and for the same reason: a

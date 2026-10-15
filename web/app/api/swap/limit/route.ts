@@ -5,7 +5,7 @@ import { getSupabase } from '../../../../lib/supabase';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { getWebChain, getDexAddresses, readErc20Decimals, assertSwapAllowed } from '../../../../lib/dexServer';
 import { apiErrorBody, apiErrorBodyAllowingClientError, ClientError } from '../../../../lib/apiError';
-import { requirePassword } from '../../../../lib/passwordGate.ts';
+import { requireStepUp } from '../../../../lib/stepUp.ts';
 import {
   cancelLimitOrder,
   listLimitOrders,
@@ -58,7 +58,7 @@ export async function GET() {
 }
 
 /**
- * Place or cancel. Placing takes the account password, because the watcher
+ * Place or cancel. Placing takes the PIN (web/lib/stepUp.ts), because the watcher
  * will later swap from this wallet without asking again; cancelling does not,
  * since it only ever takes authority away.
  */
@@ -98,9 +98,9 @@ export async function POST(req: Request) {
     const minOutWei = minOutFromPrice(amountInWei, String(body.price || ''), inDecimals, outDecimals);
 
     const supabase = getSupabase();
-    const auth = await requirePassword(supabase, accountId, String(body.password || ''), 'place a limit order');
+    const auth = await requireStepUp(supabase, accountId, String(body.pin || ''), 'place a limit order');
     if (!auth.ok) {
-      return NextResponse.json({ error: auth.error, code: auth.code }, { status: auth.status });
+      return NextResponse.json({ error: auth.error, code: auth.code, attemptsLeft: auth.attemptsLeft }, { status: auth.status });
     }
 
     const placed = await placeLimitOrder(accountId, { side, amountInWei, minOutWei }, supabase);

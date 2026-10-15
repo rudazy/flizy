@@ -218,11 +218,11 @@ describe('token trade sheet', () => {
   const ROOT = path.join(__dirname, '..');
   const sheet = fs.readFileSync(path.join(ROOT, 'web/components/TokenTradeSheet.tsx'), 'utf8');
 
-  it('still asks for the account password and sends the quote minimum as the limit', () => {
-    assert.match(sheet, /<PasswordField label="Account password"/);
+  it('asks for the PIN and sends the quote minimum as the limit', () => {
+    assert.match(sheet, /<PinField value=\{pin\} onChange=\{setPin\} \/>/);
     assert.match(sheet, /fetch\('\/api\/swap\/execute'/);
-    assert.match(sheet, /minOut: quote\?\.amountOutMin,\s*password,/);
-    assert.match(sheet, /disabled=\{busy \|\| !password\}/);
+    assert.match(sheet, /minOut: quote\?\.amountOutMin,\s*pin,/);
+    assert.match(sheet, /disabled=\{busy \|\| !pinReady\(pin\)\}/);
   });
 
   it('does not claim a best price it cannot prove, and uses no blue', () => {

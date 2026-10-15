@@ -70,7 +70,7 @@ export function PinPanel({
         eyebrow="Security"
         title={`${verb} your`}
         accent="PIN"
-        text="Your PIN locks and unlocks Flizy in chat (flizy lock, flizy unlock). Chat takes this PIN, never your password. Choose 4 to 12 digits and never share it."
+        text="Your PIN approves payments, trades and mints on the site, and unlocks chat through a Flizy link. Type it only on flizy.app, never in a chat. Choose 4 to 12 digits and never share it."
         art={<HeroArt src="/account/pin-hero.webp" />}
       />
 
@@ -116,7 +116,7 @@ export function PinPanel({
           tone="gold"
           icon={<LockGlyph />}
           title={`${verb} your PIN`}
-          text="Confirm it is you. The new PIN works in chat as soon as it is saved."
+          text="Confirm it is you. The new PIN works as soon as it is saved."
           confirmLabel={`${verb} PIN`}
           busyLabel="Saving..."
           busy={busy}

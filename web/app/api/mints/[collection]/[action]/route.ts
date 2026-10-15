@@ -121,7 +121,7 @@ async function planPublish(ctx: NftContext, cfg: MintConfig | null, row: DropRow
   const managed = requireManaged(row, cfg);
   const state = await readDrop(ctx.provider, managed, row.collection);
   if (!state.configured) throw new MintError('Set up the mint schedule first; it publishes the allowlist with it.');
-  // Computed from the saved rows, not written: nothing changes before the password check.
+  // Computed from the saved rows, not written: nothing changes before the PIN check.
   const rows = await listAllowlist(row.id);
   const root = allowlistRoot(
     row.collection,
@@ -150,7 +150,7 @@ async function planPause(ctx: NftContext, cfg: MintConfig | null, row: DropRow, 
 /**
  * Mint, and the creator's on-chain controls. Each plan is read and checked
  * against the chain first (and a mint is simulated from the person's wallet),
- * then runMintTx takes the password, the account lock, the daily ETH limit
+ * then runMintTx takes the PIN, the account lock, the daily ETH limit
  * and logs it in transfers before sending.
  */
 export async function POST(req: Request, { params }: { params: { collection: string; action: string } }) {
@@ -186,7 +186,7 @@ export async function POST(req: Request, { params }: { params: { collection: str
       ctx,
       accountId,
       viewer,
-      password: String(field(body, 'password') || ''),
+      pin: String(field(body, 'pin') || ''),
       tx,
     });
     return NextResponse.json({ ok: true, txHash, explorerUrl: explorerTxUrl(ctx.chain, txHash), label: tx.label });

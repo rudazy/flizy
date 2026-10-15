@@ -1,8 +1,8 @@
 /**
  * Rolling-hour cap on marketplace actions (list, buy, offer, cancel, accept).
  *
- * A churn limit, not the authority check: every action also takes the account
- * password. Like web/lib/swapRateLimit.ts it counts the `transfers` rows the
+ * A churn limit, not the authority check: every action also takes the PIN
+ * (web/lib/stepUp.ts). Like web/lib/swapRateLimit.ts it counts the `transfers` rows the
  * actions already write (kind 'nft_market'), so there is no second counter to
  * drift, and it holds across serverless instances.
  */

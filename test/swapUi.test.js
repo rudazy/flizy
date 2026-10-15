@@ -61,10 +61,10 @@ describe('figures', () => {
 });
 
 describe('limit tab', () => {
-  it('places an order with the password, side, amount and price', () => {
+  it('places an order with the PIN, side, amount and price', () => {
     assert.match(
       PAGE,
-      /fetch\('\/api\/swap\/limit', \{[\s\S]{0,200}JSON\.stringify\(\{ action: 'place', side, amount: amountIn, price: limitPrice, password \}\)/
+      /fetch\('\/api\/swap\/limit', \{[\s\S]{0,200}JSON\.stringify\(\{ action: 'place', side, amount: amountIn, price: limitPrice, pin \}\)/
     );
   });
 

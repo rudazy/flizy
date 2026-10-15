@@ -48,7 +48,7 @@ function FeeEth({ wei }: { wei: string }) {
   return <>{formatEther(BigInt(wei))} ETH</>;
 }
 
-/** The $2 fee, its test ETH amount, and that gas is separate. Pays through the usual password sheet. */
+/** The $2 fee, its test ETH amount, and that gas is separate. Pays through the usual PIN sheet. */
 export function FeePanel({
   status,
   name,

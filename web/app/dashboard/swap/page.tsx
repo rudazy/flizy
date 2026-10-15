@@ -9,6 +9,7 @@ import { pairFromQuery, SWAP_ASSETS, type SwapToken } from '../../../lib/swapPai
 import { LISTED_TOKENS, listedBySymbol } from '../../../lib/listedTokens';
 import { tokenLogo } from '../../../lib/tokenLogos';
 import { announceTx } from '../../../lib/txSignal';
+import { pinReady } from '../../../components/PinField';
 import {
   ArrowRightIcon,
   ChartLineIcon,
@@ -120,8 +121,8 @@ export default function SwapPage() {
   const [busy, setBusy] = useState(false);
   const [quoting, setQuoting] = useState(false);
   const [result, setResult] = useState<{ explorerUrl?: string; note?: string } | null>(null);
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
 
   const [lpMode, setLpMode] = useState<'add' | 'remove'>('add');
   const [lpEth, setLpEth] = useState('0.05');
@@ -397,7 +398,7 @@ export default function SwapPage() {
           amount: amountIn,
           tokenIn,
           tokenOut,
-          password,
+          pin,
           slippageBps,
           // The minimum on screen. The server refuses a fill below it.
           minOut: quote?.amountOutMin,
@@ -409,7 +410,7 @@ export default function SwapPage() {
         return;
       }
       setResult({ explorerUrl: data.explorerUrl });
-      setPassword('');
+      setPin('');
       loadPrice();
       loadQuote();
       loadBalances();
@@ -429,7 +430,7 @@ export default function SwapPage() {
       const res = await fetch('/api/swap/limit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'place', side, amount: amountIn, price: limitPrice, password }),
+        body: JSON.stringify({ action: 'place', side, amount: amountIn, price: limitPrice, pin }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -437,7 +438,7 @@ export default function SwapPage() {
         return;
       }
       setResult({ note: 'Limit order placed. It fills when the pool reaches your price.' });
-      setPassword('');
+      setPin('');
       loadOrders();
     } catch {
       setError('Could not place the order.');
@@ -470,7 +471,7 @@ export default function SwapPage() {
       const res = await fetch('/api/swap/liquidity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, password }),
+        body: JSON.stringify({ ...body, pin }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -478,7 +479,7 @@ export default function SwapPage() {
         return;
       }
       setResult({ explorerUrl: data.explorerUrl });
-      setPassword('');
+      setPin('');
       loadPrice();
       loadLpPosition();
       loadBalances();
@@ -785,28 +786,30 @@ export default function SwapPage() {
       )}
 
       <div className="!mt-[12px]">
-        <label htmlFor="swap-password" className="mb-[6px] block font-mono text-[9.4px] uppercase tracking-[0.12em] text-[#e6e6e6]">
-          Account password
+        <label htmlFor="swap-pin" className="mb-[6px] block font-mono text-[9.4px] uppercase tracking-[0.12em] text-[#e6e6e6]">
+          Your PIN
         </label>
         <div className="flex h-[39px] items-center gap-[12px] rounded-[5px] border border-[#2a2b30] bg-[#0d0d0e] pl-[16px] pr-[12px] focus-within:border-sun/60">
           <LockIcon size={15} className="shrink-0 text-[#d6d6d6]" />
           <input
-            id="swap-password"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="current-password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            id="swap-pin"
+            type={showPin ? 'text' : 'password'}
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={12}
+            placeholder="4 to 12 digits"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 12))}
             className="min-w-0 flex-1 bg-transparent font-sans text-[11px] text-white outline-none placeholder:text-[#7a7a7f]"
           />
           <button
             type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-pressed={showPassword}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            onClick={() => setShowPin((v) => !v)}
+            aria-pressed={showPin}
+            aria-label={showPin ? 'Hide PIN' : 'Show PIN'}
             className="hit-44 shrink-0 font-sans text-[9px] font-medium uppercase tracking-[0.06em] text-[#e6e6e6] hover:text-white"
           >
-            {showPassword ? 'Hide' : 'Show'}
+            {showPin ? 'Hide' : 'Show'}
           </button>
         </div>
       </div>
@@ -824,16 +827,16 @@ export default function SwapPage() {
       ) : null}
 
       {mode === 'swap' ? (
-        <CtaButton disabled={busy || quoting || !quote || !password} onClick={runSwap}>
+        <CtaButton disabled={busy || quoting || !quote || !pinReady(pin)} onClick={runSwap}>
           {swapCta}
         </CtaButton>
       ) : mode === 'limit' ? (
-        <CtaButton disabled={busy || !(Number(amountIn) > 0) || !(Number(limitPrice) > 0) || !password} onClick={placeOrder}>
+        <CtaButton disabled={busy || !(Number(amountIn) > 0) || !(Number(limitPrice) > 0) || !pinReady(pin)} onClick={placeOrder}>
           {busy ? 'Placing...' : 'Place limit order'}
         </CtaButton>
       ) : lpMode === 'add' ? (
         <CtaButton
-          disabled={busy || !password || !(Number(lpEth) > 0) || !(Number(lpToken) > 0)}
+          disabled={busy || !pinReady(pin) || !(Number(lpEth) > 0) || !(Number(lpToken) > 0)}
           onClick={() =>
             runLiquidity({ action: 'add', amountEth: lpEth, amountToken: lpToken, token: asset }, 'Liquidity failed')
           }
@@ -842,7 +845,7 @@ export default function SwapPage() {
         </CtaButton>
       ) : (
         <CtaButton
-          disabled={busy || !password || !position || !(Number(position.lpBalanceFormatted) > 0)}
+          disabled={busy || !pinReady(pin) || !position || !(Number(position.lpBalanceFormatted) > 0)}
           onClick={() => runLiquidity({ action: 'remove', percent: lpPercent, token: asset }, 'Remove liquidity failed')}
         >
           {busy ? 'Removing...' : `Remove ${lpPercent}% liquidity`}

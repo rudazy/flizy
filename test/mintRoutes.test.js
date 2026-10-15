@@ -79,10 +79,10 @@ describe('every mint route', () => {
 
 describe('on-chain actions take every gate, in order', () => {
   const src = read('lib', 'mintExecute.ts');
-  it('rate limit, password, lock, daily limit, balance, log, send, outcome', () => {
+  it('rate limit, PIN, lock, daily limit, balance, log, send, outcome', () => {
     order(src, [
       'checkMarketRateLimit(supabase, accountId)',
-      'requirePassword(supabase, accountId, args.password, tx.reason)',
+      'requireStepUp(supabase, accountId, args.pin, tx.reason)',
       'tryAccountTxLock(supabase, accountId, MARKET_KIND)',
       'checkDailyNativeLimit(supabase, accountId, tx.value)',
       'assertCanPay(ctx.provider, viewer, tx.value, tx.calls.length)',

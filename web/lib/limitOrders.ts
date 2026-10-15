@@ -8,7 +8,7 @@ import { ClientError } from './apiError.ts';
  * Filling is not here. The bot's watcher (lib/limitOrders.js) checks open
  * orders and swaps one when the pool would return at least its min_out, with
  * min_out as the on-chain minimum. The route that places an order takes the
- * account password; nothing after that asks again.
+ * PIN; nothing after that asks again.
  */
 
 export type Db = ReturnType<typeof getSupabase>;

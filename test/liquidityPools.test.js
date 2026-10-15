@@ -1,7 +1,7 @@
 /**
  * Site liquidity: add to or remove from the FLZ pool or any listed token's
  * pool, picked on the Liquidity panel. Nothing else: the route refuses a pasted
- * contract before it asks for the password or takes the account lock.
+ * contract before it asks for the PIN or takes the account lock.
  *
  * Run: node --test test/liquidityPools.test.js
  */
@@ -65,11 +65,11 @@ describe('liquidityPool', () => {
 describe('POST and GET /api/swap/liquidity', () => {
   const route = read('web/app/api/swap/liquidity/route.ts');
 
-  it('resolves the pool first, before the password or the lock', () => {
+  it('resolves the pool first, before the PIN or the lock', () => {
     const pool = route.indexOf("const pool = liquidityPool(body.token == null ? null : String(body.token));");
     const refused = route.indexOf('if (!pool) return NextResponse.json({ error: NOT_A_POOL }, { status: 400 });', pool);
     assert.ok(pool > 0 && refused > pool);
-    assert.ok(refused < route.indexOf('await requirePassword('));
+    assert.ok(refused < route.indexOf('await requireStepUp('));
     assert.ok(refused < route.indexOf('await tryAccountTxLock('));
     assert.doesNotMatch(route, /resolveToken\(/);
   });

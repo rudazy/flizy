@@ -60,7 +60,7 @@ import {
  *
  * Every figure is the pool's own, read from the chain in the last 24 hours
  * (lib/tokenMarketServer.ts). Dollar amounts are marked ≈ and come from one
- * ETH price. Buy and sell use the existing swap, behind the account password.
+ * ETH price. Buy and sell use the existing swap, behind the PIN.
  */
 
 const UP = 'text-[#2fd27a]';

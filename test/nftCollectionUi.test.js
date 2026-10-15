@@ -1,6 +1,6 @@
 /**
  * NFT marketplace screens: the collection page has every part of the design,
- * every trade shows its full split before the password, nothing on the
+ * every trade shows its full split before the PIN, nothing on the
  * screens is blue, and the wallet lists every NFT, not only verified ones.
  *
  * The screens are client components that need a browser to render, so this
@@ -76,7 +76,7 @@ describe('collection page', () => {
   });
 });
 
-describe('every trade shows its split before the password', () => {
+describe('every trade shows its split before the PIN', () => {
   it('names the 2% Flizy fee and the creator royalty', () => {
     assert.ok(SHEET.includes('Flizy fee (2%)'));
     assert.match(SHEET, /`Creator royalty \(\$\{bpsLabel\(Number\(capped\)\)\}\)`/);
@@ -92,8 +92,8 @@ describe('every trade shows its split before the password', () => {
     assert.ok(SHEET.includes('at the mainnet ETH price. This is {network} testnet ETH.'));
   });
 
-  it('cannot submit without the password and posts to the market route', () => {
-    assert.match(SHEET, /const ready = !busy && !!password/);
+  it('cannot submit without the PIN and posts to the market route', () => {
+    assert.match(SHEET, /const ready = !busy && pinReady\(pin\)/);
     assert.match(SHEET, /fetch\(`\/api\/market\/\$\{intent\.action\}`/);
   });
 
