@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "attestation": "self-attested",
+  "note": "Pinned by Flizy from the SDK built-in GIWA catalog and live chain reads (scripts/ammora-pin.js). Not signed by Ammora. Replace with Ammora's reviewed release manifest when one is published.",
+  "chainId": 91342,
+  "sdkVersion": "0.2.13",
+  "pinnedAtBlock": 38823917,
+  "dbcFactoryStartBlock": "36220000",
+  "swapTargets": [
+    "aggregationRouter"
+  ],
+  "contracts": {
+    "aggregationRouter": {
+      "address": "0x176d8c2b26C6373Ba7c9dd5ed8E1a626caf2f206",
+      "codeHash": "0x984b7f4a5143e7df50b6e9fa10d8acfc6f73e2c40773b160d7e430a29e6ba29c",
+      "sdkCatalogHash": "0x984b7f4a5143e7df50b6e9fa10d8acfc6f73e2c40773b160d7e430a29e6ba29c"
+    },
+    "aggregationExecutionRegistry": {
+      "address": "0xCCa3e38eAa4F00e43599646a75CcA164B97cC4eB",
+      "codeHash": "0xd217691100337f885c4f9114608b648a2e6bcc15e9f9ab0f503049943c614a76",
+      "sdkCatalogHash": "0xd217691100337f885c4f9114608b648a2e6bcc15e9f9ab0f503049943c614a76"
+    },
+    "alcAggregationAdapter": {
+      "address": "0x074e4e25D1575fa2e66C7638F78c4AF5283eb37C",
+      "codeHash": "0xdcea75c8019820c32e10e438de0fef47a3c0106b210f20f53316489716e08c4f",
+      "sdkCatalogHash": "0xdcea75c8019820c32e10e438de0fef47a3c0106b210f20f53316489716e08c4f"
+    },
+    "nativeRouter": {
+      "address": "0xade9E6dEF440E05640ed07c4a701C238B9FB66a8",
+      "codeHash": "0x3cd701f7547bf1ba314934558d01c33cc4909756b376a90a285e1645a653219c",
+      "sdkCatalogHash": "0x3cd701f7547bf1ba314934558d01c33cc4909756b376a90a285e1645a653219c"
+    },
+    "executionRegistry": {
+      "address": "0x3CDD7cC246Cc49aEa779E5E589Bd175251617626",
+      "codeHash": "0x1ec00147713743740d45896697607c3ad7c1bfe83a2b1303308fce4303936449",
+      "sdkCatalogHash": "0x1ec00147713743740d45896697607c3ad7c1bfe83a2b1303308fce4303936449"
+    },
+    "tokenPolicyRegistry": {
+      "address": "0xADD644Af3a868Ef4165e04CA5eac280ab5819bE3",
+      "codeHash": "0xdb5e4bb300c932111ac68fe35f79752b6532217abecd31535ac7e59b06eda010",
+      "sdkCatalogHash": "0xdb5e4bb300c932111ac68fe35f79752b6532217abecd31535ac7e59b06eda010"
+    },
+    "dbcFactory": {
+      "address": "0x35353a2Dab7426EcCAe6f5FB267702a542ab68fA",
+      "codeHash": "0xf4bdf481252fb37bae95df148ba66e788ff59f22205d4e9c2f4df2c55c4fa173",
+      "sdkCatalogHash": "0xf4bdf481252fb37bae95df148ba66e788ff59f22205d4e9c2f4df2c55c4fa173"
+    },
+    "dbcPoolImplementation": {
+      "address": "0x014133029714f185D976549Dd4Ea2d6Aca9EC031",
+      "codeHash": "0xb4a95aa7c6310ba650ef3b77fabf62a6f5fbe03c21fae708b4950c71316febe5",
+      "sdkCatalogHash": "0xb4a95aa7c6310ba650ef3b77fabf62a6f5fbe03c21fae708b4950c71316febe5"
+    },
+    "wrappedNative": {
+      "address": "0x4200000000000000000000000000000000000006",
+      "codeHash": "0xa62eedb6ad76577d404f9030968b640d14e72bdcd6428707d0d2f0f18546c294",
+      "sdkCatalogHash": "0xa62eedb6ad76577d404f9030968b640d14e72bdcd6428707d0d2f0f18546c294"
+    }
+  }
+}

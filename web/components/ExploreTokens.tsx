@@ -16,6 +16,7 @@ import {
 import { formatEthDisplay } from '../lib/tokenFormat';
 import { useComingSoon } from './ComingSoon';
 import { CopyTradePanel } from './CopyTradePanel';
+import { AmmoraTokens } from './AmmoraTokens';
 import { VerifiedMark } from './VerifiedMark';
 import { tokenLogo } from '../lib/tokenLogos';
 import {
@@ -279,6 +280,8 @@ export function ExploreTokens() {
               <TokenRow key={row.symbol} rank={i + 1} row={row} />
             ))}
           </div>
+
+          {tab === 'discover' ? <AmmoraTokens /> : null}
 
           {tab === 'discover' ? <GiwaCard /> : null}
         </>

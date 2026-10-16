@@ -59,6 +59,8 @@ export type ActivityItem = {
   category: HistoryCategory;
   /** The channel a payment went through ("Telegram", "Flizy app"), never the identity key. */
   channel?: string | null;
+  /** Set on a swap that ran on Ammora; absent for Flizy's own pools. */
+  venue?: 'ammora';
 };
 
 function shortAddr(addr: string) {
@@ -92,6 +94,7 @@ function mapTransferRow(
     const outAmt = row.amount_secondary ? String(row.amount_secondary) : null;
     const outAsset = row.asset_secondary ? assetSymbol(row.asset_secondary) : null;
     label = outAmt && outAsset ? `${amount} ${asset} → ${outAmt} ${outAsset}` : `Swap ${amount} ${asset}`;
+    if (row.venue === 'ammora') label = `${label} on Ammora`;
   } else if (type === 'receive') {
     // Not labelExtra: on a received row that names the reader, not the payer.
     // And never row.phone, which is the sender's own number.
@@ -122,6 +125,7 @@ function mapTransferRow(
     label,
     category: historyCategory(type, kind),
     channel: channelLabel(row.phone),
+    ...(type === 'swap' && row.venue === 'ammora' ? { venue: 'ammora' as const } : {}),
   };
 }
 

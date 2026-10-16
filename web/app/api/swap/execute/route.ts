@@ -27,8 +27,14 @@ import { gatorFailure, markTransferSubmitted } from '../../../../lib/gatorOutcom
 import { outcomeUnknown } from '../../../../lib/gatorExecute.ts';
 import { ethToWei, swapTier } from '../../../../lib/tiers.ts';
 import { bindAmountOutMin, isUnverifiedSwap, parseSlippageBps } from '../../../../lib/swapGate.ts';
+import { ammoraEnabled } from '../../../../lib/ammora/venue.ts';
+import { ammoraSiteExecute } from '../../../../lib/ammora/siteSwap.ts';
+import { ClientError, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
 
 const ROUTE = 'POST /api/swap/execute';
+
+/** An Ammora swap re-quotes, then sends approvals and the swap as UserOps. */
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
@@ -50,6 +56,8 @@ export async function POST(req: Request) {
     if (!rate.ok) {
       return NextResponse.json({ error: rate.error, code: rate.code }, { status: rate.status });
     }
+    if (body.venue === 'ammora') return ammoraSwap(supabase, accountId, body);
+
     const amount = String(body.amount || '');
     const side = String(body.side || 'swap');
     const tokenInRaw = String(body.tokenIn || 'ETH');
@@ -287,5 +295,63 @@ export async function POST(req: Request) {
     const executorOutcome = gatorFailure(err);
     if (executorOutcome) return NextResponse.json(executorOutcome.body, { status: executorOutcome.status });
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
+  }
+}
+
+/**
+ * An Ammora swap (lib/ammora). Same gates as a Flizy swap: same-origin, the
+ * hourly cap above, the PIN (an Ammora token is never in the verified set, so
+ * it is always Tier 1), and the account lock. The venue's own rules (attested
+ * code, a tradable token, the reviewed minimum, the pinned router and its
+ * decoded calldata) are applied in ammoraSiteExecute before anything is sent.
+ */
+async function ammoraSwap(
+  supabase: ReturnType<typeof getSupabase>,
+  accountId: string,
+  body: Record<string, unknown>
+) {
+  if (!ammoraEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const side = body.side === 'sell' ? 'sell' : body.side === 'buy' ? 'buy' : null;
+  if (!side) return NextResponse.json({ error: 'Choose buy or sell.' }, { status: 400 });
+  let slippageBps: number | undefined;
+  try {
+    slippageBps = parseSlippageBps(body.slippageBps);
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+  }
+
+  const tier = await swapTier(supabase, accountId, false, 0n, false);
+  const auth = await requireApproval(supabase, accountId, String(body.pin || ''), 'swap on Ammora', tier);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error, code: auth.code, attemptsLeft: auth.attemptsLeft }, { status: auth.status });
+  }
+
+  const chain = getWebChain();
+  const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
+  const { data: account } = await supabase.from('accounts').select('id, agent_wallet_address').eq('id', accountId).single();
+  if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+  const gator = pointerIsGator(accountId, account.agent_wallet_address) ? predictGatorAddress(accountId) : null;
+
+  const lock = await tryAccountTxLock(supabase, accountId, 'swap');
+  if (!lock.ok) return NextResponse.json({ error: lock.error }, { status: 409 });
+  try {
+    const out = await ammoraSiteExecute(supabase, provider, {
+      accountId,
+      chainId: chain.chainId,
+      gator,
+      side,
+      token: String(body.token || ''),
+      amount: String(body.amount || ''),
+      slippageBps,
+      confirmedMin: body.minOut == null ? null : String(body.minOut),
+    });
+    return NextResponse.json({ ok: true, ...out, explorerUrl: explorerTxUrl(chain, out.txHash) });
+  } catch (err) {
+    const executorOutcome = gatorFailure(err);
+    if (executorOutcome) return NextResponse.json(executorOutcome.body, { status: executorOutcome.status });
+    if (err instanceof ClientError) return NextResponse.json(apiErrorBodyAllowingClientError(ROUTE, err), { status: 400 });
+    return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
+  } finally {
+    await releaseAccountTxLock(supabase, accountId);
   }
 }

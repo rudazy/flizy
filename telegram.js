@@ -19,6 +19,8 @@ installProcessHandlers('flizy-telegram');
 // Fails fast on shared env (Supabase, RPC, keys) before anything else starts
 const {
   chain,
+  provider,
+  supabase,
   opsWallet,
   escrowWallet,
   addressUrl,
@@ -27,6 +29,7 @@ const {
 } = require('./lib/runtime');
 const { config } = require('./lib/config');
 const { TelegramBot } = require('./lib/telegram/bot');
+const { startAmmora } = require('./lib/ammora/boot');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -46,6 +49,9 @@ async function main() {
   console.log(`Ops wallet (gas/infra): ${opsWallet.address}`);
   console.log(`Claim escrow:           ${escrowWallet.address}`);
   console.log(`Explorer ops:           ${addressUrl(opsWallet.address)}`);
+  // Ammora venue, only with AMMORA_ENABLED (lib/ammora/boot.js). The pool
+  // inventory runs from the WhatsApp process, not here.
+  void startAmmora({ supabase, provider });
   await bot.start();
 }
 

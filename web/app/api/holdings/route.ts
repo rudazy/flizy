@@ -6,6 +6,8 @@ import { apiErrorBody } from '../../../lib/apiError';
 import { loadNftHoldings } from '../../../lib/listedNfts.ts';
 import { listAccountTokens } from '../../../lib/accountTokens';
 import { LISTED_TOKENS } from '../../../lib/listedTokens';
+import { ammoraEnabled } from '../../../lib/ammora/venue.ts';
+import { ammoraHoldingCandidates } from '../../../lib/ammora/catalog.ts';
 
 const ROUTE = 'GET /api/holdings';
 
@@ -55,6 +57,7 @@ export async function GET() {
       error?: string;
       verified?: boolean;
       added?: boolean;
+      venue?: 'ammora';
     }> = [];
     let nfts: Awaited<ReturnType<typeof loadNftHoldings>> = [];
 
@@ -75,6 +78,7 @@ export async function GET() {
         decimals: number | null;
         verified?: boolean;
         added?: boolean;
+        venue?: 'ammora';
       }> = [
         { address: dex.flz, symbol: 'FLZ', decimals: 18, verified: true },
         // Listed tokens are read for every wallet, so one bought on Flizy shows
@@ -117,6 +121,20 @@ export async function GET() {
         });
       }
 
+      // Ammora tokens (only with AMMORA_ENABLED): shown when held, labelled
+      // Ammora, never verified. An address Flizy already tracks keeps its row.
+      if (ammoraEnabled()) {
+        try {
+          for (const t of await ammoraHoldingCandidates(supabase)) {
+            if (!ethers.isAddress(t.address)) continue;
+            if (tracked.some((x) => x.address.toLowerCase() === t.address.toLowerCase())) continue;
+            tracked.push({ address: ethers.getAddress(t.address), symbol: t.symbol, decimals: t.decimals, verified: false, venue: 'ammora' });
+          }
+        } catch {
+          console.warn(`[${ROUTE}] Ammora tokens unavailable`);
+        }
+      }
+
       const erc20Abi = [
         'function balanceOf(address) view returns (uint256)',
         'function decimals() view returns (uint8)',
@@ -142,6 +160,7 @@ export async function GET() {
             balance: ethers.formatUnits(b, Number(d)),
             verified: t.verified === true,
             added: t.added === true,
+            ...(t.venue ? { venue: t.venue } : {}),
           };
         } catch {
           return {
@@ -151,11 +170,15 @@ export async function GET() {
             error: 'Could not read',
             verified: t.verified === true,
             added: t.added === true,
+            ...(t.venue ? { venue: t.venue } : {}),
           };
         }
       };
       for (let i = 0; i < tracked.length; i += TOKEN_READ_BATCH) {
-        tokens.push(...(await Promise.all(tracked.slice(i, i + TOKEN_READ_BATCH).map(readToken))));
+        const read = await Promise.all(tracked.slice(i, i + TOKEN_READ_BATCH).map(readToken));
+        // An Ammora token is listed only while held: the inventory is every
+        // launch, not the tokens this wallet chose.
+        tokens.push(...read.filter((r) => !r.venue || (r.balance !== null && Number(r.balance) > 0)));
       }
 
       nfts = await loadNftHoldings(provider, wallet);

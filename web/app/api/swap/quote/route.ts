@@ -11,11 +11,17 @@ import {
   readErc20Decimals,
 } from '../../../../lib/dexServer';
 import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
+import { getSupabase } from '../../../../lib/supabase';
+import { ammoraEnabled } from '../../../../lib/ammora/venue.ts';
+import { ammoraSitePrice, ammoraSiteQuote } from '../../../../lib/ammora/siteSwap.ts';
 import { asSwapQuoteError } from '../../../../lib/swapQuoteError';
 import { parseSlippageBps } from '../../../../lib/swapGate.ts';
 import { listedBySymbol } from '../../../../lib/listedTokens.ts';
 
 const ROUTE = 'GET /api/swap/quote';
+
+/** An Ammora quote builds its route client on a cold instance (several seconds). */
+export const maxDuration = 60;
 
 /**
  * A rough gas figure for one Flizy swap, used only for the network fee
@@ -38,6 +44,23 @@ export async function GET(req: Request) {
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
     const dex = getDexAddresses();
+
+    // Ammora venue (lib/ammora). Off: the request is refused before any Ammora call.
+    if (url.searchParams.get('venue') === 'ammora') {
+      if (!ammoraEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      const token = url.searchParams.get('token') || '';
+      if (side === 'price' || url.searchParams.get('price') === '1') {
+        return NextResponse.json({ price: await ammoraSitePrice(getSupabase(), provider, token) });
+      }
+      if (side !== 'buy' && side !== 'sell') return NextResponse.json({ error: 'Choose buy or sell.' }, { status: 400 });
+      const quote = await ammoraSiteQuote(getSupabase(), provider, {
+        side,
+        token,
+        amount,
+        slippageBps: parseSlippageBps(url.searchParams.get('slippageBps')),
+      });
+      return NextResponse.json(quote);
+    }
 
     if (side === 'price' || url.searchParams.get('price') === '1') {
       const priceSymbol = (url.searchParams.get('token') || 'FLZ').trim().toUpperCase();

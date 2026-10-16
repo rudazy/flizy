@@ -38,6 +38,7 @@ const { registerChannelSender, startOutboxDrain } = require('./lib/notify');
 const { startApprovalWatcher } = require('./lib/chatApprovals');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const { startReconciler } = require('./lib/reconcile');
+const { startAmmora } = require('./lib/ammora/boot');
 const router = require('./lib/router');
 
 const CHANNEL = CHANNELS.WHATSAPP;
@@ -460,6 +461,10 @@ async function main() {
   // Sends whose outcome was unknown (broadcast, no receipt) are settled from
   // their receipt here, also from this process only (lib/reconcile.js).
   startReconciler({ supabase, provider });
+  // Ammora venue, only with AMMORA_ENABLED (lib/ammora/boot.js). The pool
+  // inventory runs from this process only. Never awaited: a slow RPC must not
+  // hold up WhatsApp.
+  void startAmmora({ supabase, provider, inventory: true });
   await client.initialize();
 }
 

@@ -28,6 +28,54 @@
     },
     {
       "kind": "check",
+      "name": "ammora_pools.ammora_pools_base_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_decimals_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_model_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_name_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_pool_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_quote_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_status_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_symbol_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
       "name": "channel_identities.channel_identities_channel_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on channel_identities"
@@ -322,6 +370,12 @@
     },
     {
       "kind": "check",
+      "name": "transfers.transfers_venue_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on transfers"
+    },
+    {
+      "kind": "check",
       "name": "trusted_add_tickets.trusted_add_tickets_addr_format",
       "providedBy": "20260923000000_trusted_destination_hold.sql",
       "requiredBy": "check on trusted_add_tickets"
@@ -481,6 +535,18 @@
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
       "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
+    },
+    {
+      "kind": "table",
+      "name": "ammora_pools",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "lib/ammora/inventory.js, lib/ammora/routes.js"
+    },
+    {
+      "kind": "table",
+      "name": "ammora_scan_state",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "lib/ammora/inventory.js"
     },
     {
       "kind": "table",
@@ -655,6 +721,12 @@
       "name": "accounts_username_not_reserved",
       "providedBy": "20260811000000_reserved_usernames.sql",
       "requiredBy": "trigger on accounts"
+    },
+    {
+      "kind": "trigger",
+      "name": "ammora_pools_set_updated_at",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "trigger on ammora_pools"
     },
     {
       "kind": "trigger",

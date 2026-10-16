@@ -140,6 +140,8 @@ export type HoldingsData = {
       error?: string;
       verified?: boolean;
       added?: boolean;
+      /** An Ammora token (never verified by Flizy). */
+      venue?: 'ammora';
     }>;
     nfts?: Array<{
       ticker: string;

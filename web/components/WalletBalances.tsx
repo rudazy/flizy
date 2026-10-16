@@ -331,7 +331,13 @@ export function WalletBalances() {
                   )
                 }
                 symbol={t.symbol}
-                tag={t.verified ? <VerifiedMark /> : null}
+                tag={
+                  t.verified ? (
+                    <VerifiedMark />
+                  ) : t.venue === 'ammora' ? (
+                    <span className="rounded-[5px] bg-[#26272b] px-[6px] py-[2px] font-sans text-[8.6px] text-[#e0e0e0]">Ammora</span>
+                  ) : null
+                }
                 name={isFlz ? 'Flizy' : t.address ? `${t.address.slice(0, 6)}...${t.address.slice(-4)}` : ''}
                 amount={hidden ? HIDDEN : t.balance == null ? t.error || 'n/a' : formatAmount(t.balance, 3)}
                 value={value != null && !hidden ? `\u2248 ${formatEth(value)} ETH` : null}

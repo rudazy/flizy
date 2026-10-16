@@ -37,14 +37,16 @@ function callers() {
 }
 
 describe('every executor call site is known', () => {
-  it('matches the reviewed list (17 call sites)', () => {
+  it('matches the reviewed list (21 call sites)', () => {
     assert.deepEqual(callers(), {
+      'lib/ammora/execute.js': 2,
       'lib/dex.js': 2,
       'lib/engine/executeAcceptOffer.js': 1,
       'lib/engine/executeClaim.js': 1,
       'lib/engine/executeTransfer.js': 3,
       'lib/listedNfts.js': 1,
       'web/app/api/pay/execute/route.ts': 2,
+      'web/lib/ammora/execute.ts': 2,
       'web/lib/dexServer.ts': 6,
       'web/lib/marketExecute.ts': 1,
     });
@@ -65,6 +67,10 @@ describe('value-moving calls record their hash before broadcast', () => {
     'web/lib/marketExecute.ts': 1,
     'web/lib/mintExecute.ts': 1,
     'web/app/api/market/[action]/route.ts': 1,
+    'lib/ammora/execute.js': 1,
+    'lib/ammora/chat.js': 1,
+    'web/lib/ammora/execute.ts': 1,
+    'web/lib/ammora/siteSwap.ts': 1,
   };
   for (const [file, n] of Object.entries(expectOnBroadcast)) {
     it(file, () => {
@@ -77,6 +83,11 @@ describe('value-moving calls record their hash before broadcast', () => {
     assert.match(read('lib/dex.js'), /await executeApprovalCall\(\{/);
     assert.equal((read('web/lib/dexServer.ts').match(/await executeApprovalCall\(\{/g) || []).length, 3);
     assert.match(read('web/lib/marketExecute.ts'), /: await executeApprovalCall\(params\)/);
+    // Ammora: every approval step is its own executeApprovalCall, the swap the only executeGatorCall.
+    for (const f of ['lib/ammora/execute.js', 'web/lib/ammora/execute.ts']) {
+      assert.equal((read(f).match(/executeApprovalCall\(\{/g) || []).length, 1, f);
+      assert.equal((read(f).match(/executeGatorCall\(\{/g) || []).length, 1, f);
+    }
   });
 
   it('the listed mint moves no value and records nothing (copy only)', () => {
@@ -93,6 +104,8 @@ describe('an unknown outcome is never marked failed or released', () => {
     'web/app/api/swap/execute/route.ts': /if \(logRow\?\.id && !outcomeUnknown\(swapErr\)\)/g,
     'web/app/api/market/[action]/route.ts': /if \(!outcomeUnknown\(sendErr\)\)/g,
     'web/lib/mintExecute.ts': /if \(!outcomeUnknown\(sendErr\)\)/g,
+    'web/lib/ammora/siteSwap.ts': /if \(!outcomeUnknown\(err\)\) \{\s*await supabase\.from\('transfers'\)\.update\(\{ status: 'failed'/g,
+    'lib/ammora/chat.js': /if \(outcomeUnknown\(err\)\) return \{ ok: false, submitted: true/g,
   };
   for (const [file, re] of Object.entries(guarded)) {
     it(file, () => assert.ok((read(file).match(re) || []).length >= 1, file));

@@ -82,6 +82,54 @@
     },
     {
       "kind": "check",
+      "name": "ammora_pools.ammora_pools_base_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_decimals_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_model_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_name_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_pool_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_quote_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_status_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
+      "name": "ammora_pools.ammora_pools_symbol_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on ammora_pools"
+    },
+    {
+      "kind": "check",
       "name": "channel_identities.channel_identities_channel_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on channel_identities"
@@ -766,6 +814,12 @@
     },
     {
       "kind": "check",
+      "name": "transfers.transfers_venue_check",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "check on transfers"
+    },
+    {
+      "kind": "check",
       "name": "trusted_add_tickets.trusted_add_tickets_addr_format",
       "providedBy": "20260923000000_trusted_destination_hold.sql",
       "requiredBy": "check on trusted_add_tickets"
@@ -1024,6 +1078,12 @@
     },
     {
       "kind": "table",
+      "name": "ammora_pools",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "web/lib/ammora/routes.ts"
+    },
+    {
+      "kind": "table",
       "name": "channel_identities",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
       "requiredBy": "web/app/api/dashboard/route.ts, web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/invite.ts, web/lib/notifyChannels.ts, web/lib/pendingClaims.ts, web/lib/securityNotice.ts, web/lib/tasks.ts"
@@ -1260,7 +1320,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
+      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
     },
     {
       "kind": "table",
@@ -1309,6 +1369,12 @@
       "name": "accounts_username_not_reserved",
       "providedBy": "20260811000000_reserved_usernames.sql",
       "requiredBy": "trigger on accounts"
+    },
+    {
+      "kind": "trigger",
+      "name": "ammora_pools_set_updated_at",
+      "providedBy": "20261016140000_ammora_venue.sql",
+      "requiredBy": "trigger on ammora_pools"
     },
     {
       "kind": "trigger",

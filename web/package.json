@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/verify-schema.mjs",
+    "prebuild": "node scripts/verify-schema.mjs && node scripts/verify-ammora.mjs",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
+    "@ammora-protocol/sdk": "0.2.13",
     "@anthropic-ai/sdk": "0.129.0",
     "@sentry/nextjs": "10.73.0",
     "@supabase/supabase-js": "^2.110.3",
@@ -19,7 +20,8 @@
     "nodemailer": "9.0.3",
     "qrcode": "1.5.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "viem": "2.57.4"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",

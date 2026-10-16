@@ -9,6 +9,8 @@ import { pairFromQuery, SWAP_ASSETS, type SwapToken } from '../../../lib/swapPai
 import { LISTED_TOKENS, listedBySymbol } from '../../../lib/listedTokens';
 import { tokenLogo } from '../../../lib/tokenLogos';
 import { announceTx } from '../../../lib/txSignal';
+import { AmmoraSwapPanel } from '../../../components/AmmoraSwapPanel';
+import { ammoraUiEnabled } from '../../../components/AmmoraTokens';
 import { pinReady } from '../../../components/PinField';
 import { withinQuickSend } from '../../../lib/quickSend';
 import {
@@ -101,7 +103,25 @@ function plain(n: number, digits = 6): string {
   return (n >= 1 ? n.toFixed(digits) : n.toPrecision(digits)).replace(/\.?0+$/, '');
 }
 
-export default function SwapPage() {
+/**
+ * /dashboard/swap. With NEXT_PUBLIC_AMMORA_ENABLED on, ?venue=ammora opens the
+ * Ammora venue (components/AmmoraSwapPanel.tsx); everything else is Flizy's
+ * own swap, unchanged.
+ */
+export default function SwapRoute() {
+  const search = useSearchParams();
+  if (ammoraUiEnabled() && search.get('venue') === 'ammora') {
+    return (
+      <AppPage>
+        <AppTopBar title="Swap" />
+        <AmmoraSwapPanel initialToken={search.get('token')} />
+      </AppPage>
+    );
+  }
+  return <SwapPage />;
+}
+
+function SwapPage() {
   const [mode, setMode] = useState<Mode>('swap');
   // A Trade button elsewhere opens this screen on its pair: ?from=FLZ&to=ETH or
   // ?from=ETH&to=IZY. Anything else falls back to buying FLZ.

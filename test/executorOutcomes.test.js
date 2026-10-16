@@ -379,6 +379,14 @@ describe('chat swap and accept offer', () => {
     assert.equal(r.error, 'This would fail right now, so nothing was sent.');
   });
 
+  it('swap of 1,000 or more: the row holds the exact number, not the grouped display string', async () => {
+    script = unknown;
+    const plan = swapPlan();
+    plan.input = { ...plan.input, amount: '1,000', amountInWei: String(1000n * 10n ** 18n), inIsNative: false, outIsNative: true, tokenIn: TOKEN, tokenOut: null, tokenInLabel: 'FLZ', tokenOutLabel: 'ETH' };
+    await executeSwapPlan({ plan, provider, chain });
+    assert.equal(rows()[0].amount_eth, '1000.0');
+  });
+
   const offerPlan = () => ({
     intent: 'NFT_ACCEPT_OFFER',
     expiresAt: Date.now() + 60_000,

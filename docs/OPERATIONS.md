@@ -222,9 +222,42 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `CHAIN_GIWA_SEPOLIA_*` | Optional overrides for WETH, routers, FLZ, pair |
 | `FLIZY_TREASURY` | Treasury passed at DEX deploy time (defaults to ops). The live fee destination is `feeRouter.treasury` on chain, changed with `setTreasury`, not with this variable |
 | `GAS_BUFFER_ETH` | Reserve kept for gas when checking funding |
+| `AMMORA_ENABLED` | Ammora venue, bots and site server. Default off; off loads nothing and reads nothing. See [Ammora venue](#ammora-venue) |
+| `NEXT_PUBLIC_AMMORA_ENABLED` | Vercel only. Shows the Ammora section in Explore and the Ammora swap panel. Default off |
+| `AMMORA_DATA_API_URL` | Ammora Data API for launch status. Defaults to `https://ammora-giwa-sepolia-data.fly.dev` |
 
 Treat `PRIVATE_KEY`, escrow keys and Supabase service keys as production secrets. Rotate
 immediately if one is exposed.
+
+### Ammora venue
+
+Ammora is a separate swap venue on GIWA Sepolia, reached through `@ammora-protocol/sdk`
+(pinned, loaded only when `AMMORA_ENABLED=true`). Flizy's own executor sends every Ammora
+swap; the SDK only quotes and builds the call.
+
+- **Trust anchor.** `deployments/ammora-giwa-sepolia.json` pins each Ammora contract's
+  address and runtime code hash. It is self-attested (written by `scripts/ammora-pin.js`,
+  not signed by Ammora). The bots check it at start and hourly; the site checks it every
+  10 minutes and warns at prebuild (`web/scripts/verify-ammora.mjs`). A mismatch turns the
+  Ammora venue off and nothing else. Regenerate it with `node scripts/ammora-pin.js` after an
+  SDK upgrade, and review the diff.
+- **Inventory.** The WhatsApp bot scans the pinned factory for pools and stores them in
+  `ammora_pools` every 10 minutes (the SDK only routes pools with on-chain provenance). The
+  first scan takes a few minutes. The site and the Telegram bot read that table.
+- **Rules.** Flizy symbols always win: an Ammora token with a Flizy symbol is reached by
+  contract address only. Every Ammora trade takes the PIN, pays no Flizy fee, and does not
+  count against the daily send limit. Approvals are for the exact amount, reset to zero
+  first when an allowance is already there. Every swap is a call to the pinned aggregation
+  router only, and its calldata is decoded and checked before sending: paid to the account's
+  own smart account, the quoted amounts, no referrer or integrator fee, and only pools
+  discovered from the pinned factory.
+- **Schema.** `supabase/migrations/20261016140000_ammora_venue.sql` must be applied before
+  this code is deployed, even with the flag off: the bots' startup schema check requires
+  `ammora_pools` and `ammora_scan_state`.
+- **Turning it on.** Apply the migration, deploy, restart both bots with
+  `AMMORA_ENABLED=true`, wait for the first inventory pass in the WhatsApp journal
+  (`[ammora] inventory`), then set `AMMORA_ENABLED` and `NEXT_PUBLIC_AMMORA_ENABLED` on
+  Vercel and redeploy.
 
 ### `WALLET_DERIVATION_SECRET`
 
