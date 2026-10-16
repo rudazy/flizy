@@ -32,6 +32,8 @@ const EP_IFACE = new ethers.Interface([
   'error FailedOp(uint256 opIndex, string reason)',
   'error FailedOpWithRevert(uint256 opIndex, string reason, bytes inner)',
 ]);
+/** Solidity's built-in revert payloads, for decoding a refused estimate. */
+const REVERT_IFACE = new ethers.Interface(['error Error(string)', 'error Panic(uint256)']);
 
 export const PACKED_USER_OP_TYPEHASH = ethers.keccak256(
   ethers.toUtf8Bytes(
@@ -95,7 +97,7 @@ const GATOR_VERIFICATION_GAS = 1_000_000n;
 const GATOR_PREVERIFICATION_GAS = 80_000n;
 
 /**
- * Call gas is per call: the inner call's own estimate plus 20%, never below
+ * Call gas is per call: the estimate of the gator's execute() plus 20%, never below
  * the floor (the old fixed value, so no existing flow gets less) and never
  * above the ceiling (refused, nothing sent). The ceiling is a code constant on
  * purpose: raising it is a reviewed change with a test, not a setting.
@@ -199,7 +201,7 @@ type AnyErr = {
   code?: string;
   data?: unknown;
   reason?: string;
-  revert?: { name?: string };
+  revert?: { name?: string; data?: unknown };
   shortMessage?: string;
   message?: string;
   info?: { error?: { message?: string; data?: unknown } };
@@ -219,7 +221,13 @@ export function isMissingBlock(err: unknown): boolean {
 }
 
 /** The call itself reverts (or cannot be paid for), as opposed to a network failure. */
+/**
+ * The call itself reverts (or cannot be paid for), as opposed to a network
+ * failure. A node that has not reached the requested block is never a revert:
+ * ethers wraps its "block not found" as CALL_EXCEPTION on an estimate.
+ */
 function isRevert(err: unknown): boolean {
+  if (isMissingBlock(err)) return false;
   const e = (err || {}) as AnyErr;
   return e.code === 'CALL_EXCEPTION' || e.code === 'INSUFFICIENT_FUNDS' || /execution reverted|insufficient funds/i.test(errText(err));
 }
@@ -247,9 +255,39 @@ export function classifyBroadcastError(err: unknown): 'accepted' | 'rejected' | 
   return 'unknown';
 }
 
-function revertReason(err: unknown): string | null {
+/** Hex revert data carried by an ethers or JSON-RPC error, if any. */
+function revertData(err: unknown): string | null {
   const e = (err || {}) as AnyErr;
-  return e.reason || e.revert?.name || (typeof e.data === 'string' ? e.data.slice(0, 10) : null) || null;
+  for (const d of [e.data, e.info?.error?.data, e.error?.data, e.revert?.data]) {
+    if (typeof d === 'string' && /^0x[0-9a-fA-F]{8,}$/.test(d)) return d;
+  }
+  return null;
+}
+
+/**
+ * Why a call reverted, for logs: the Error(string) text, a Panic code, a
+ * custom error's selector, or that there was no revert data at all (out of
+ * gas, or an empty revert). Contract-chosen text, so printable ASCII and capped.
+ * Mirror of lib/gatorExecute.js.
+ */
+function revertReason(err: unknown): string {
+  const e = (err || {}) as AnyErr;
+  const data = revertData(err);
+  let reason: string | null = null;
+  if (data) {
+    try {
+      const parsed = REVERT_IFACE.parseError(data);
+      if (parsed && parsed.name === 'Error') reason = String(parsed.args[0]);
+      if (parsed && parsed.name === 'Panic') reason = `panic 0x${(parsed.args[0] as bigint).toString(16)}`;
+    } catch {
+      reason = null;
+    }
+    if (!reason) reason = `custom error ${data.slice(0, 10)}`;
+  }
+  if (!reason && e.reason) reason = String(e.reason);
+  if (!reason && e.revert?.name) reason = String(e.revert.name);
+  if (!reason) reason = 'no revert data (out of gas or an empty revert)';
+  return reason.replace(/[^\x20-\x7e]/g, '?').slice(0, 200);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -314,26 +352,43 @@ export async function readAtLeast<T>(
   throw lastErr;
 }
 
-/** Gas the inner call needs from the gator; refuses rather than guessing. */
+/**
+ * Gas for the UserOp's call, refusing rather than guessing.
+ *
+ * Estimated exactly as handleOps runs it: EntryPoint calling the gator's
+ * execute(), which then calls the target. Estimating the target call from the
+ * gator address directly skips the gator's own code, and a payout back to the
+ * gator then runs cold there: the DEX router pays ETH out with transfer()'s
+ * 2,300 gas, which the gator's proxy cannot cover cold. Mirror of
+ * lib/gatorExecute.js.
+ *
+ * eth_estimateGas is sent with the block as its second parameter: ethers'
+ * estimateGas() drops blockTag, so the read pin was not applied to estimates.
+ */
 async function estimateInnerCall(
-  provider: ethers.Provider,
-  tx: { from: string; to: string; value: bigint; data: string },
+  provider: ethers.JsonRpcProvider,
+  call: { entryPoint: string; gator: string; target: string; value: bigint; data: string },
   minBlock: number | undefined
 ): Promise<bigint> {
-  const once = () => readAtLeast(provider, minBlock, (blockTag) => provider.estimateGas({ ...tx, blockTag }));
+  const tx = { from: call.entryPoint, to: call.gator, data: encodeExecuteCall(call.target, call.value, call.data) };
+  const at = (blockTag: number | 'latest') => (blockTag === 'latest' ? 'latest' : ethers.toQuantity(blockTag));
+  const once = () =>
+    readAtLeast(provider, minBlock, async (blockTag) => BigInt(await provider.send('eth_estimateGas', [tx, at(blockTag)])));
+  const refuse = (err: unknown) => {
+    const reason = revertReason(err);
+    // The decoded reason and which call it was, never the account's address.
+    console.warn(`[gator] estimate refused: ${String(call.data || '0x').slice(0, 10)} on ${call.target}: ${reason}`);
+    return new GatorExecError('WOULD_REVERT', `Inner call would revert: ${reason}`, { reason });
+  };
   try {
     return await once();
   } catch (err) {
-    if (isRevert(err)) {
-      throw new GatorExecError('WOULD_REVERT', 'Inner call would revert', { reason: revertReason(err) });
-    }
+    if (isRevert(err)) throw refuse(err);
     try {
       await sleep(FRESH_READ_DELAY_MS);
       return await once();
     } catch (again) {
-      if (isRevert(again)) {
-        throw new GatorExecError('WOULD_REVERT', 'Inner call would revert', { reason: revertReason(again) });
-      }
+      if (isRevert(again)) throw refuse(again);
       throw new GatorExecError('ESTIMATE_UNAVAILABLE', 'Gas estimate unavailable');
     }
   }
@@ -561,7 +616,7 @@ export async function executeGatorCall(args: {
 
   const estimate = await estimateInnerCall(
     provider,
-    { from: gator, to: target, value: amount, data: callData },
+    { entryPoint: addrs.entryPointV07, gator, target, value: amount, data: callData },
     lastReceiptBlock.get(gator)
   );
   const callGas = callGasFor(estimate);

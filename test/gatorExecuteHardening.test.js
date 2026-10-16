@@ -57,7 +57,7 @@ const missingBlock = () => new Error('header not found');
  *   receipt(hash)      the receipt waitForTransaction returns (null = none)
  */
 function makeChain(opts = {}) {
-  const state = { head: 100, broadcasts: [], innerCalls: 0, outerCalls: 0, pinnedTags: [], lag: opts.lagReads || 0 };
+  const state = { head: 100, broadcasts: [], innerCalls: 0, outerCalls: 0, pinnedTags: [], estimateTxs: [], lag: opts.lagReads || 0 };
   const pinned = (tag) => {
     if (typeof tag === 'number') state.pinnedTags.push(tag);
     if (state.lag > 0 && typeof tag === 'number') {
@@ -80,6 +80,15 @@ function makeChain(opts = {}) {
     },
     async getTransactionCount() {
       return 7;
+    },
+    // The executor estimates through raw eth_estimateGas with the block as its
+    // second parameter (ethers' estimateGas() drops blockTag), so this is where
+    // inner estimates arrive; they are routed to the same scripted estimate.
+    async send(method, params) {
+      if (method !== 'eth_estimateGas') throw new Error(`unexpected ${method}`);
+      const [tx, tag] = params;
+      state.estimateTxs.push({ tx, tag });
+      return ethers.toQuantity(await provider.estimateGas({ ...tx, blockTag: tag === 'latest' ? 'latest' : Number(tag) }));
     },
     async estimateGas(tx) {
       if (tx.to && ethers.getAddress(tx.to) === ethers.getAddress(EP)) {
@@ -224,7 +233,7 @@ for (const [side] of [['bot'], ['web']]) {
       await assert.rejects(run(m(), chain, { onBroadcast: () => { seen = true; } }), (e) => {
         assert.equal(e.code, 'WOULD_REVERT');
         assert.equal(e.submitted, false);
-        assert.equal(e.reason, '0x8199f5f3');
+        assert.equal(e.reason, 'custom error 0x8199f5f3');
         assert.equal(m().gatorErrorCopy(e), 'This would fail right now, so nothing was sent.');
         return true;
       });
@@ -506,5 +515,172 @@ describe('the receipt-block memory is bounded', () => {
       assert.equal(m.lastReceiptBlock.get(GATOR), 600);
       m.lastReceiptBlock.clear();
     }
+  });
+});
+
+// The estimate is the UserOp's own call: EntryPoint into the gator's execute().
+// Estimating the target from the gator address skipped the gator's code, so a
+// router paying ETH back with transfer()'s 2,300 gas ran cold and reverted out
+// of gas: every token-to-ETH sell was refused while the real UserOp succeeds.
+const EXECUTE = new ethers.Interface(['function execute((address target, uint256 value, bytes callData) _execution)']);
+const ERC20 = new ethers.Interface(['function approve(address,uint256) returns (bool)']);
+const ROUTER_FN = new ethers.Interface(['function swapExactTokensForETH(uint256,uint256,address[],address,uint256) returns (uint256[])']);
+const ERRORS = new ethers.Interface(['error Error(string)', 'error Panic(uint256)']);
+const revertWith = (data) => Object.assign(new Error('execution reverted'), { code: 'CALL_EXCEPTION', data });
+const outOfGas = () => Object.assign(new Error('missing revert data'), { code: 'CALL_EXCEPTION', data: null });
+// Exactly how ethers surfaces a node that has not reached the block on eth_estimateGas.
+const blockNotFound = (tag) =>
+  Object.assign(new Error('missing revert data'), { code: 'CALL_EXCEPTION', info: { error: { code: -32001, message: `block not found: ${tag}` } } });
+const innerCall = (tx) => EXECUTE.decodeFunctionData('execute', tx.data)[0];
+
+for (const [side] of [['bot'], ['web']]) {
+  const m = () => (side === 'bot' ? bot : web);
+
+  describe(`${side}: the estimate is the UserOp's own call`, () => {
+    it('is EntryPoint calling the gator\'s execute(), pinned to a block', async () => {
+      const chain = makeChain();
+      const data = ERC20.encodeFunctionData('approve', [TARGET, 5n]);
+      await run(m(), chain, { data });
+      const { tx, tag } = chain.state.estimateTxs[0];
+      assert.equal(ethers.getAddress(tx.from), ethers.getAddress(EP));
+      assert.equal(ethers.getAddress(tx.to), GATOR);
+      const call = innerCall(tx);
+      assert.equal(ethers.getAddress(call.target), TARGET);
+      assert.equal(call.callData, data);
+      assert.notEqual(tag, 'latest');
+      assert.equal(Number(tag), 100);
+    });
+
+    it('a payout that only fits a warm gator is not refused', async () => {
+      // Old shape (from the gator, straight to the target): out of gas, no data.
+      const chain = makeChain({
+        inner: (tx) => {
+          if (ethers.getAddress(tx.from) === GATOR) throw outOfGas();
+          return 240_000n;
+        },
+      });
+      const res = await run(m(), chain);
+      assert.match(res.txHash, /^0x[0-9a-f]{64}$/);
+      assert.equal(chain.state.broadcasts.length, 1);
+    });
+
+    it('a node behind the requested block is retried, never reported as a revert', async () => {
+      let lagging = 3;
+      const chain = makeChain({
+        inner: () => {
+          if (lagging > 0) {
+            lagging -= 1;
+            throw blockNotFound('0x64');
+          }
+          return 60_000n;
+        },
+      });
+      const res = await run(m(), chain);
+      assert.match(res.txHash, /^0x[0-9a-f]{64}$/);
+    });
+
+    it('a node that never reaches the block is ESTIMATE_UNAVAILABLE, not WOULD_REVERT', async () => {
+      const chain = makeChain({ inner: () => { throw blockNotFound('0x64'); } });
+      await assert.rejects(run(m(), chain), (e) => e.code === 'ESTIMATE_UNAVAILABLE' && e.submitted === false);
+      assert.equal(chain.state.broadcasts.length, 0);
+    });
+  });
+
+  describe(`${side}: a refused estimate carries the decoded reason`, () => {
+    const refused = async (err) => {
+      const chain = makeChain({ inner: () => { throw err; } });
+      let caught;
+      await run(m(), chain).catch((e) => { caught = e; });
+      assert.equal(caught.code, 'WOULD_REVERT');
+      assert.equal(chain.state.broadcasts.length, 0);
+      return caught;
+    };
+    it('Error(string)', async () => {
+      const e = await refused(revertWith(ERRORS.encodeErrorResult('Error', ['FLZ: allowance'])));
+      assert.equal(e.reason, 'FLZ: allowance');
+      assert.equal(e.message, 'Inner call would revert: FLZ: allowance');
+    });
+    it('Panic(uint256)', async () => {
+      assert.equal((await refused(revertWith(ERRORS.encodeErrorResult('Panic', [0x11n])))).reason, 'panic 0x11');
+    });
+    it('no revert data at all (out of gas or an empty revert)', async () => {
+      assert.equal((await refused(outOfGas())).reason, 'no revert data (out of gas or an empty revert)');
+    });
+    it('contract-chosen text is printable and capped', async () => {
+      const e = await refused(revertWith(ERRORS.encodeErrorResult('Error', [`bad\nline\u202e${'x'.repeat(500)}`])));
+      assert.doesNotMatch(e.reason, /[^\x20-\x7e]/);
+      assert.equal(e.reason.length, 200);
+    });
+  });
+}
+
+describe('approve then sell, with the approval not yet visible at estimate time', () => {
+  const FLZ = '0x308be8f71DA695f18E70D2243a446e1fD1566BA6';
+  const APPROVAL_BLOCK = 140;
+  /**
+   * The approval is mined at block 140, but the node the next read reaches is
+   * still at 100. A swap estimated at "latest" (what ethers' estimateGas sent)
+   * or below 140 sees no allowance; at 140 the first node has not got the
+   * block yet, then it has.
+   */
+  const sellChain = () => {
+    let receipts = 0;
+    let lagAt140 = 2;
+    return makeChain({
+      receipt: (hash) => {
+        receipts += 1;
+        return receiptFor(hash, true, receipts === 1 ? APPROVAL_BLOCK : APPROVAL_BLOCK + 1);
+      },
+      inner: (tx) => {
+        const call = innerCall(tx);
+        if (call.callData.startsWith(ERC20.getFunction('approve').selector)) return 50_000n;
+        assert.equal(call.callData.slice(0, 10), ROUTER_FN.getFunction('swapExactTokensForETH').selector);
+        if (tx.blockTag === 'latest' || tx.blockTag < APPROVAL_BLOCK) {
+          throw revertWith(ERRORS.encodeErrorResult('Error', ['FLZ: allowance']));
+        }
+        if (lagAt140 > 0) {
+          lagAt140 -= 1;
+          throw blockNotFound(ethers.toQuantity(APPROVAL_BLOCK));
+        }
+        return 240_000n;
+      },
+    });
+  };
+  const check = (chain, res) => {
+    assert.match(res.txHash, /^0x[0-9a-f]{64}$/);
+    assert.equal(chain.state.broadcasts.length, 2, 'approval, then the swap');
+    const swapTags = chain.state.estimateTxs.slice(1).map((e) => e.tag);
+    assert.ok(swapTags.every((t) => t !== 'latest' && Number(t) >= APPROVAL_BLOCK), JSON.stringify(swapTags));
+  };
+
+  it('bot (lib/dex.js executeSwapViaGator)', async () => {
+    const { executeSwapViaGator } = require('../lib/dex');
+    bot.lastReceiptBlock.clear();
+    const chain = sellChain();
+    const res = await executeSwapViaGator({
+      accountId: ACCOUNT, provider: chain.provider, chainId: 91342, amountIn: 10n ** 19n, tokenIn: FLZ, tokenOut: null,
+      amountOutMinWei: 1n, chainKey: 'giwa_sepolia', recipient: GATOR,
+    });
+    check(chain, res);
+  });
+
+  it('site (the web executor, in web/lib/dexServer.ts executeSwapViaGator\'s order)', async () => {
+    // dexServer.ts is not loadable under node --test (extensionless imports), so
+    // its two steps are driven directly; the order itself is pinned below.
+    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'web', 'lib', 'dexServer.ts'), 'utf8');
+    const body = src.slice(src.indexOf('export async function executeSwapViaGator'), src.indexOf('export async function addLiquidityEthViaGator'));
+    assert.ok(body.indexOf('await executeApprovalCall({') < body.indexOf('return executeGatorCall({'), 'approval is awaited before the swap');
+    web.lastReceiptBlock.clear();
+    const chain = sellChain();
+    const router = '0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC';
+    await web.executeApprovalCall({
+      accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: FLZ, value: 0n,
+      data: ERC20.encodeFunctionData('approve', [router, 10n ** 19n]),
+    });
+    const res = await web.executeGatorCall({
+      accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: router, value: 0n,
+      data: ROUTER_FN.encodeFunctionData('swapExactTokensForETH', [10n ** 19n, 1n, [FLZ, '0x3a13399f2741122B63c7710B2A85346B97C6BFDf'], GATOR, 2_000_000_000n]),
+    });
+    check(chain, res);
   });
 });
