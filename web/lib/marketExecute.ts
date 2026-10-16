@@ -10,7 +10,7 @@
 
 import { ethers } from 'ethers';
 import { deriveAgentWallet } from './dexServer';
-import { executeGatorCall, gatorGasReserveWei } from './gatorExecute.ts';
+import { executeApprovalCall, executeGatorCall, gatorGasReserveWei } from './gatorExecute.ts';
 import { ClientError } from './apiError';
 
 export type MarketCall = { target: string; value: bigint; data: string };
@@ -49,18 +49,27 @@ export async function runMarketCalls(args: {
   chainId: number;
   viaGator: boolean;
   calls: MarketCall[];
+  /**
+   * Called with the last call's tx hash before it is broadcast (persist it).
+   * The calls before it are approvals and move nothing on their own.
+   */
+  onBroadcast?: (txHash: string) => Promise<void> | void;
 }): Promise<string> {
   let txHash = '';
-  for (const call of args.calls) {
+  for (const [i, call] of args.calls.entries()) {
+    const last = i === args.calls.length - 1;
     if (args.viaGator) {
-      const result = await executeGatorCall({
+      const params = {
         accountId: args.accountId,
         provider: args.provider,
         chainId: args.chainId,
         target: call.target,
         value: call.value,
         data: call.data,
-      });
+      };
+      const result = last
+        ? await executeGatorCall({ ...params, onBroadcast: args.onBroadcast })
+        : await executeApprovalCall(params);
       txHash = result.txHash;
     } else {
       const signer = deriveAgentWallet(args.accountId).connect(args.provider);

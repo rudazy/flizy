@@ -29,6 +29,8 @@ const EP_IFACE = new ethers.Interface([
   'function balanceOf(address account) view returns (uint256)',
   'function handleOps((address sender,uint256 nonce,bytes initCode,bytes callData,bytes32 accountGasLimits,uint256 preVerificationGas,bytes32 gasFees,bytes paymasterAndData,bytes signature)[] ops, address payable beneficiary)',
   'event UserOperationEvent(bytes32 indexed userOpHash, address indexed sender, address indexed paymaster, uint256 nonce, bool success, uint256 actualGasCost, uint256 actualGasUsed)',
+  'error FailedOp(uint256 opIndex, string reason)',
+  'error FailedOpWithRevert(uint256 opIndex, string reason, bytes inner)',
 ]);
 
 export const PACKED_USER_OP_TYPEHASH = ethers.keccak256(
@@ -84,15 +86,258 @@ export function userOpSucceeded(
 
 /**
  * Gas the UserOp declares. EntryPoint's required prefund is the sum of these
- * times maxFeePerGas, so the same numbers must drive both the op we submit and
- * the ETH we hold back. Keeping the two apart is exactly how a max-balance send
- * passes the local balance check and then fails validation.
+ * times maxFeePerGas. The reserve pre-checks (gatorGasReserveWei, before the
+ * call exists) use the floor; executeGatorCall then checks the exact prefund
+ * for the call gas it actually declares, and refuses (INSUFFICIENT_GAS_FUNDS)
+ * rather than let a max-balance send fail validation.
  */
 const GATOR_VERIFICATION_GAS = 1_000_000n;
-const GATOR_CALL_GAS = 500_000n;
 const GATOR_PREVERIFICATION_GAS = 80_000n;
+
+/**
+ * Call gas is per call: the inner call's own estimate plus 20%, never below
+ * the floor (the old fixed value, so no existing flow gets less) and never
+ * above the ceiling (refused, nothing sent). The ceiling is a code constant on
+ * purpose: raising it is a reviewed change with a test, not a setting.
+ */
+export const GATOR_CALL_GAS_FLOOR = 500_000n;
+export const GATOR_CALL_GAS_CEILING = 1_000_000n;
+/** The floor. Reserve pre-checks run before the call exists and use it. */
+const GATOR_CALL_GAS = GATOR_CALL_GAS_FLOOR;
 export const GATOR_USEROP_GAS =
   GATOR_VERIFICATION_GAS + GATOR_CALL_GAS + GATOR_PREVERIFICATION_GAS;
+
+/**
+ * Call gas for an estimate: +20% rounded up, in integers, clamped up to the
+ * floor. null when the buffered figure is above the ceiling.
+ */
+export function callGasFor(estimate: bigint): bigint | null {
+  const buffered = (BigInt(estimate) * 12n + 9n) / 10n;
+  if (buffered > GATOR_CALL_GAS_CEILING) return null;
+  return buffered < GATOR_CALL_GAS_FLOOR ? GATOR_CALL_GAS_FLOOR : buffered;
+}
+
+/** Total gas a UserOp declares for a given call gas. */
+export function userOpGasFor(callGas: bigint): bigint {
+  return GATOR_VERIFICATION_GAS + BigInt(callGas) + GATOR_PREVERIFICATION_GAS;
+}
+
+/**
+ * The exact prefund EntryPoint takes for this op, less the existing deposit.
+ * No margin: this is checked with the fee the op is signed with, right
+ * before it is sent.
+ */
+export function prefundRequiredWei(callGas: bigint, maxFeePerGas: bigint, depositWei: bigint): bigint {
+  const required = userOpGasFor(callGas) * BigInt(maxFeePerGas);
+  const have = BigInt(depositWei || 0n);
+  return required > have ? required - have : 0n;
+}
+
+export type GatorErrorCode =
+  | 'WOULD_REVERT'
+  | 'ESTIMATE_UNAVAILABLE'
+  | 'GAS_CEILING'
+  | 'INSUFFICIENT_GAS_FUNDS'
+  | 'HANDLEOPS_REJECTED'
+  | 'RECORD_FAILED'
+  | 'BROADCAST_REJECTED'
+  | 'OUTCOME_UNKNOWN'
+  | 'HANDLEOPS_REVERTED'
+  | 'USEROP_REVERTED'
+  | 'APPROVAL_UNCONFIRMED';
+
+/**
+ * Every failure from executeGatorCall.
+ *
+ * submitted: false  nothing reached the chain, or the receipt shows nothing
+ *                   moved. Safe to release a reservation and say so.
+ * submitted: true   the handleOps transaction was broadcast and its outcome is
+ *                   UNKNOWN. txHash is set. Never release, reopen or say
+ *                   "nothing was sent": reconcile from the receipt by hash.
+ */
+export class GatorExecError extends Error {
+  readonly code: GatorErrorCode;
+  readonly submitted: boolean;
+  readonly txHash: string | null;
+  readonly reason: string | null;
+  constructor(
+    code: GatorErrorCode,
+    message: string,
+    opts: { submitted?: boolean; txHash?: string | null; reason?: string | null } = {}
+  ) {
+    super(message);
+    this.name = 'GatorExecError';
+    this.code = code;
+    this.submitted = opts.submitted ?? false;
+    this.txHash = opts.txHash ?? null;
+    this.reason = opts.reason ?? null;
+  }
+}
+
+/** User copy for the executor's own outcomes; null means keep the caller's copy. */
+export const GATOR_ERROR_COPY: Readonly<Partial<Record<GatorErrorCode, string>>> = Object.freeze({
+  WOULD_REVERT: 'This would fail right now, so nothing was sent.',
+  GAS_CEILING: 'This would fail right now, so nothing was sent.',
+  ESTIMATE_UNAVAILABLE: 'Could not check this with the network right now, so nothing was sent. Try again shortly.',
+  INSUFFICIENT_GAS_FUNDS: 'Not enough ETH to cover the network fee, so nothing was sent.',
+  OUTCOME_UNKNOWN: 'Sent, and still confirming. Check again in a minute before trying again.',
+  BROADCAST_REJECTED: 'The network refused this, so nothing was sent. Try again shortly.',
+  APPROVAL_UNCONFIRMED: 'The approval did not confirm in time, so nothing else was sent. Try again in a minute.',
+});
+
+export function gatorErrorCopy(err: unknown): string | null {
+  if (!(err instanceof Error) || err.name !== 'GatorExecError') return null;
+  return GATOR_ERROR_COPY[(err as GatorExecError).code] || null;
+}
+
+/** True when a gator call's outcome is unknown (broadcast, not confirmed). */
+export function outcomeUnknown(err: unknown): boolean {
+  return err instanceof Error && err.name === 'GatorExecError' && (err as GatorExecError).submitted;
+}
+
+type AnyErr = {
+  code?: string;
+  data?: unknown;
+  reason?: string;
+  revert?: { name?: string };
+  shortMessage?: string;
+  message?: string;
+  info?: { error?: { message?: string; data?: unknown } };
+  error?: { message?: string; data?: unknown };
+};
+
+function errText(err: unknown): string {
+  const e = (err || {}) as AnyErr;
+  return String(e.info?.error?.message || e.error?.message || e.shortMessage || e.message || '');
+}
+
+/** A node that has not seen the block we asked for yet. */
+export function isMissingBlock(err: unknown): boolean {
+  return /header not found|unknown block|block not found|not available|missing trie node|after last accepted block|block number .* (is )?(higher|greater|newer)|invalid block/i.test(
+    errText(err)
+  );
+}
+
+/** The call itself reverts (or cannot be paid for), as opposed to a network failure. */
+function isRevert(err: unknown): boolean {
+  const e = (err || {}) as AnyErr;
+  return e.code === 'CALL_EXCEPTION' || e.code === 'INSUFFICIENT_FUNDS' || /execution reverted|insufficient funds/i.test(errText(err));
+}
+
+/** Node answers that mean the transaction is already in its pool: it was sent. */
+const ALREADY_KNOWN = /already known|known transaction|already imported|already exists|ALREADY_EXISTS/i;
+/** ethers codes for a node that answered and refused the transaction. */
+const REJECTION_CODES = ['NONCE_EXPIRED', 'INSUFFICIENT_FUNDS', 'REPLACEMENT_UNDERPRICED', 'UNSUPPORTED_OPERATION', 'CALL_EXCEPTION', 'INVALID_ARGUMENT', 'BAD_DATA'];
+
+/**
+ * What a failed broadcast means.
+ *   accepted  the node already has it ("already known"): it was sent
+ *   rejected  the node answered and refused it: never sent, settle as not sent
+ *   unknown   no answer from the node (timeout, network, HTTP error): it may
+ *             have been accepted, so the outcome is unknown
+ * A JSON-RPC error response is an answer: ethers maps the common ones to the
+ * codes above and wraps the rest as UNKNOWN_ERROR with the node's { code }.
+ */
+export function classifyBroadcastError(err: unknown): 'accepted' | 'rejected' | 'unknown' {
+  const e = (err || {}) as AnyErr & { error?: { code?: unknown } };
+  if (ALREADY_KNOWN.test(errText(err))) return 'accepted';
+  if (REJECTION_CODES.includes(String(e.code))) return 'rejected';
+  const rpc = (e.error || e.info?.error) as { code?: unknown } | undefined;
+  if (e.code === 'UNKNOWN_ERROR' && rpc && typeof rpc.code === 'number') return 'rejected';
+  return 'unknown';
+}
+
+function revertReason(err: unknown): string | null {
+  const e = (err || {}) as AnyErr;
+  return e.reason || e.revert?.name || (typeof e.data === 'string' ? e.data.slice(0, 10) : null) || null;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * The newest block this process saw a receipt for, per gator. A block number,
+ * never a nonce or a balance: it only makes later reads fresher.
+ */
+export const lastReceiptBlock = new Map<string, number>();
+const LAST_RECEIPT_CAP = 10_000;
+const FRESH_READ_ATTEMPTS = 12;
+const FRESH_READ_DELAY_MS = 500;
+
+/**
+ * Remember a receipt block for this gator. Bounded: the oldest entry is dropped
+ * past the cap, which only means that account's next read starts from the
+ * chain head again.
+ */
+function rememberReceiptBlock(gator: string, blockNumber: number): void {
+  const seen = lastReceiptBlock.get(gator) || 0;
+  if (blockNumber <= seen) return;
+  lastReceiptBlock.delete(gator);
+  lastReceiptBlock.set(gator, blockNumber);
+  if (lastReceiptBlock.size > LAST_RECEIPT_CAP) {
+    const oldest = lastReceiptBlock.keys().next().value;
+    if (oldest !== undefined) lastReceiptBlock.delete(oldest);
+  }
+}
+
+/**
+ * Read state no older than minBlock. GIWA's RPC is load-balanced, so a read
+ * right after a receipt can reach a node that has not seen that block. The
+ * read is pinned to max(head, minBlock); a node that does not have that block
+ * yet answers "not found", and the read is retried (about 6 s at most).
+ */
+export async function readAtLeast<T>(
+  provider: ethers.Provider,
+  minBlock: number | bigint | null | undefined,
+  read: (blockTag: number | 'latest') => Promise<T>,
+  opts: { attempts?: number; delayMs?: number } = {}
+): Promise<T> {
+  const attempts = opts.attempts ?? FRESH_READ_ATTEMPTS;
+  const delayMs = opts.delayMs ?? FRESH_READ_DELAY_MS;
+  let head = 0;
+  try {
+    head = Number(await provider.getBlockNumber());
+  } catch {
+    head = 0;
+  }
+  const tag = Math.max(head || 0, Number(minBlock || 0));
+  if (!tag) return read('latest');
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await read(tag);
+    } catch (err) {
+      if (!isMissingBlock(err)) throw err;
+      lastErr = err;
+      await sleep(delayMs);
+    }
+  }
+  throw lastErr;
+}
+
+/** Gas the inner call needs from the gator; refuses rather than guessing. */
+async function estimateInnerCall(
+  provider: ethers.Provider,
+  tx: { from: string; to: string; value: bigint; data: string },
+  minBlock: number | undefined
+): Promise<bigint> {
+  const once = () => readAtLeast(provider, minBlock, (blockTag) => provider.estimateGas({ ...tx, blockTag }));
+  try {
+    return await once();
+  } catch (err) {
+    if (isRevert(err)) {
+      throw new GatorExecError('WOULD_REVERT', 'Inner call would revert', { reason: revertReason(err) });
+    }
+    try {
+      await sleep(FRESH_READ_DELAY_MS);
+      return await once();
+    } catch (again) {
+      if (isRevert(again)) {
+        throw new GatorExecError('WOULD_REVERT', 'Inner call would revert', { reason: revertReason(again) });
+      }
+      throw new GatorExecError('ESTIMATE_UNAVAILABLE', 'Gas estimate unavailable');
+    }
+  }
+}
 
 /** Headroom for fee movement between the balance check and the submit. */
 const PREFUND_MARGIN_BPS = 12_500n;
@@ -270,8 +515,30 @@ export async function ensureGatorDeployed(
   throw new Error(`HybridDeleGator deploy left no code tx=${tx.hash}`);
 }
 
+/** How long to wait for a broadcast handleOps to be mined before calling it unknown. */
+const RECEIPT_TIMEOUT_MS = 180_000;
+
+/** A handleOps simulation that EntryPoint refused (FailedOp), decoded. */
+function failedOpReason(err: unknown): string | null {
+  const e = (err || {}) as AnyErr;
+  const data = e.data || e.info?.error?.data || e.error?.data;
+  if (typeof data !== 'string' || data.length < 10) return null;
+  try {
+    const parsed = EP_IFACE.parseError(data);
+    return parsed && parsed.args && parsed.args.reason ? String(parsed.args.reason) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Execute a single call from the account's HybridDeleGator.
+ * Execute a single call from the account's HybridDeleGator. Same order and
+ * rules as lib/gatorExecute.js executeGatorCall: estimate (refuse on revert or
+ * no estimate), clamp the call gas, read state no older than this gator's last
+ * receipt, check value plus exact prefund, sign, record the hash through
+ * onBroadcast, broadcast, then wait. A node that answers no is
+ * BROADCAST_REJECTED (not sent); no answer is OUTCOME_UNKNOWN with
+ * submitted: true (classifyBroadcastError).
  */
 export async function executeGatorCall(args: {
   accountId: string;
@@ -280,43 +547,145 @@ export async function executeGatorCall(args: {
   target: string;
   value: bigint;
   data?: string;
-}): Promise<{ txHash: string; receipt: ethers.TransactionReceipt | null; gator: string }> {
-  const { accountId, provider, target, value, data } = args;
+  onBroadcast?: (txHash: string) => Promise<void> | void;
+}): Promise<{ txHash: string; receipt: ethers.TransactionReceipt; gator: string; callGasLimit: bigint }> {
+  const { accountId, provider, target, onBroadcast } = args;
   const addrs = gatorAddresses();
+  const callData = args.data || '0x';
+  const amount = BigInt(args.value || 0n);
   const gator = await ensureGatorDeployed(accountId, provider);
   const owner = deriveAgentWallet(accountId).connect(provider);
   const ops = opsWallet(provider);
   const ep = new ethers.Contract(addrs.entryPointV07, EP_IFACE, ops);
-  const nonce = await ep.getNonce(gator, 0);
-  const fee = await provider.getFeeData();
-  const maxPrio = fee.maxPriorityFeePerGas || ethers.parseUnits('1', 'gwei');
-  const maxFee = fee.maxFeePerGas || maxPrio * 2n;
-  const userOp: UserOp = {
-    sender: gator,
-    nonce,
-    initCode: '0x',
-    callData: encodeExecuteCall(target, value, data || '0x'),
-    accountGasLimits: packU128(GATOR_VERIFICATION_GAS, GATOR_CALL_GAS),
-    preVerificationGas: GATOR_PREVERIFICATION_GAS,
-    gasFees: packU128(maxPrio, maxFee),
-    paymasterAndData: '0x',
-    signature: '0x',
-  };
-  userOp.signature = signUserOp(
-    userOp,
-    owner,
-    args.chainId || Number((await provider.getNetwork()).chainId),
-    addrs.entryPointV07
+  const resolvedChainId = args.chainId || Number((await provider.getNetwork()).chainId);
+
+  const estimate = await estimateInnerCall(
+    provider,
+    { from: gator, to: target, value: amount, data: callData },
+    lastReceiptBlock.get(gator)
   );
-  const tx = await ep.handleOps([userOp], ops.address);
-  const receipt = await tx.wait();
-  if (!receipt || receipt.status !== 1) {
-    throw new Error('HybridDeleGator UserOp failed on-chain');
+  const callGas = callGasFor(estimate);
+  if (callGas === null) {
+    throw new GatorExecError('GAS_CEILING', `Call needs more than ${GATOR_CALL_GAS_CEILING} gas`, {
+      reason: `estimate ${estimate}`,
+    });
+  }
+
+  let signed: string | null = null;
+  let txHash = '';
+  for (let attempt = 0; attempt < 2 && !signed; attempt += 1) {
+    const floor = lastReceiptBlock.get(gator);
+    const [nonce, balance, deposit] = await Promise.all([
+      readAtLeast(provider, floor, (blockTag) => ep.getNonce(gator, 0, { blockTag }) as Promise<bigint>),
+      readAtLeast(provider, floor, (blockTag) => provider.getBalance(gator, blockTag)),
+      readAtLeast(provider, floor, (blockTag) => ep.balanceOf(gator, { blockTag }) as Promise<bigint>),
+    ]);
+    const fee = await provider.getFeeData();
+    const maxPrio = fee.maxPriorityFeePerGas || ethers.parseUnits('1', 'gwei');
+    const maxFee = fee.maxFeePerGas || maxPrio * 2n;
+    if (BigInt(balance) < amount + prefundRequiredWei(callGas, maxFee, deposit)) {
+      throw new GatorExecError('INSUFFICIENT_GAS_FUNDS', 'Not enough ETH for value plus prefund');
+    }
+    const userOp: UserOp = {
+      sender: gator,
+      nonce,
+      initCode: '0x',
+      callData: encodeExecuteCall(target, amount, callData),
+      accountGasLimits: packU128(GATOR_VERIFICATION_GAS, callGas),
+      preVerificationGas: GATOR_PREVERIFICATION_GAS,
+      gasFees: packU128(maxPrio, maxFee),
+      paymasterAndData: '0x',
+      signature: '0x',
+    };
+    userOp.signature = signUserOp(userOp, owner, resolvedChainId, addrs.entryPointV07);
+    try {
+      const request = await ep.handleOps.populateTransaction([userOp], ops.address);
+      const populated = await ops.populateTransaction(request);
+      signed = await ops.signTransaction(populated);
+      // A transaction hash is keccak256 of its signed serialisation.
+      txHash = ethers.keccak256(signed);
+    } catch (err) {
+      const reason = failedOpReason(err);
+      // AA25: the nonce was read from a node behind the one that simulated.
+      // Wait for the head to move and build the op again, once.
+      if (attempt === 0 && reason && /AA25/.test(reason)) {
+        await sleep(FRESH_READ_DELAY_MS * 2);
+        continue;
+      }
+      throw new GatorExecError('HANDLEOPS_REJECTED', 'EntryPoint refused the UserOp', {
+        reason: reason || revertReason(err),
+      });
+    }
+  }
+  if (!signed) {
+    throw new GatorExecError('HANDLEOPS_REJECTED', 'EntryPoint refused the UserOp', { reason: 'AA25 after retry' });
+  }
+
+  if (onBroadcast) {
+    try {
+      await onBroadcast(txHash);
+    } catch (err) {
+      throw new GatorExecError('RECORD_FAILED', 'Could not record the transaction before sending', {
+        reason: errText(err).slice(0, 200),
+      });
+    }
+  }
+
+  try {
+    await provider.broadcastTransaction(signed);
+  } catch (err) {
+    const kind = classifyBroadcastError(err);
+    if (kind === 'rejected') {
+      // The node answered no: it was never sent. Settled now as not sent.
+      throw new GatorExecError('BROADCAST_REJECTED', 'The node refused the transaction', {
+        txHash,
+        reason: errText(err).slice(0, 200),
+      });
+    }
+    if (kind === 'unknown') {
+      throw new GatorExecError('OUTCOME_UNKNOWN', 'Broadcast did not answer', { submitted: true, txHash });
+    }
+    // 'accepted': the node already has it; wait for the receipt as usual.
+  }
+
+  let receipt: ethers.TransactionReceipt | null;
+  try {
+    receipt = await provider.waitForTransaction(txHash, 1, RECEIPT_TIMEOUT_MS);
+  } catch {
+    receipt = null;
+  }
+  if (!receipt) {
+    throw new GatorExecError('OUTCOME_UNKNOWN', 'No receipt yet', { submitted: true, txHash });
+  }
+  rememberReceiptBlock(gator, receipt.blockNumber);
+
+  if (receipt.status !== 1) {
+    throw new GatorExecError('HANDLEOPS_REVERTED', 'HybridDeleGator UserOp failed on-chain', { txHash });
   }
   if (!userOpSucceeded(receipt, addrs.entryPointV07, gator)) {
-    throw new Error('HybridDeleGator UserOp reverted inside handleOps');
+    throw new GatorExecError('USEROP_REVERTED', 'HybridDeleGator UserOp reverted inside handleOps', { txHash });
   }
-  return { txHash: tx.hash, receipt, gator };
+  return { txHash, receipt, gator, callGasLimit: callGas };
+}
+
+/**
+ * An approval (or any call that moves no value on its own) ahead of the call
+ * that does. Unconfirmed, it is reported as not sent (APPROVAL_UNCONFIRMED):
+ * nothing of value moved and the main call was never made.
+ */
+export async function executeApprovalCall(
+  args: Omit<Parameters<typeof executeGatorCall>[0], 'onBroadcast'>
+): ReturnType<typeof executeGatorCall> {
+  try {
+    return await executeGatorCall(args);
+  } catch (err) {
+    if (outcomeUnknown(err)) {
+      throw new GatorExecError('APPROVAL_UNCONFIRMED', 'Approval not confirmed', {
+        txHash: (err as GatorExecError).txHash,
+      });
+    }
+    throw err;
+  }
 }
 
 /** True when the stored pointer is this account's predicted gator. */

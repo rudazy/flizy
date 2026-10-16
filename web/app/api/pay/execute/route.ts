@@ -19,6 +19,8 @@ import {
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 import { fundingWallText } from '../../../../lib/fundingWall.ts';
 import { checkDailyNativeLimit } from '../../../../lib/dailyLimits.ts';
+import { gatorFailure, markTransferSubmitted } from '../../../../lib/gatorOutcome.ts';
+import { outcomeUnknown } from '../../../../lib/gatorExecute.ts';
 import { notifyAllChannels } from '../../../../lib/notifyChannels';
 import { formatPaymentReceived, payerLabel } from '../../../../lib/payNotice.ts';
 import { siteOrigin } from '../../../../lib/siteOrigin';
@@ -155,13 +157,25 @@ export async function POST(req: Request) {
 
       let receipt: ethers.TransactionReceipt | null;
       if (viaGator) {
+        const rowId = logRow?.id;
         const sent = await executeGatorCall({
+          // Recorded before broadcast; with no row to record on, nothing is sent.
+          onBroadcast: async (hash) => {
+            if (!rowId) throw new Error('no transfer row');
+            await markTransferSubmitted(supabase, rowId, hash);
+          },
           accountId: payerId,
           provider,
           chainId: chain.chainId,
           target: to,
           value: amountWei,
           data: '0x',
+        }).catch(async (sendErr: unknown) => {
+          // Unknown outcome: the row stays 'submitted' for the reconciler.
+          if (rowId && !outcomeUnknown(sendErr)) {
+            await supabase.from('transfers').update({ status: 'failed', error: 'not sent' }).eq('id', rowId);
+          }
+          throw sendErr;
         });
         txHash = sent.txHash;
         receipt = sent.receipt;
@@ -242,13 +256,25 @@ export async function POST(req: Request) {
 
       let receipt: ethers.TransactionReceipt | null;
       if (viaGator) {
+        const rowId = logRow?.id;
         const sent = await executeGatorCall({
+          // Recorded before broadcast; with no row to record on, nothing is sent.
+          onBroadcast: async (hash) => {
+            if (!rowId) throw new Error('no transfer row');
+            await markTransferSubmitted(supabase, rowId, hash);
+          },
           accountId: payerId,
           provider,
           chainId: chain.chainId,
           target: tokenAddress,
           value: 0n,
           data: erc20.interface.encodeFunctionData('transfer', [to, amountTok]),
+        }).catch(async (sendErr: unknown) => {
+          // Unknown outcome: the row stays 'submitted' for the reconciler.
+          if (rowId && !outcomeUnknown(sendErr)) {
+            await supabase.from('transfers').update({ status: 'failed', error: 'not sent' }).eq('id', rowId);
+          }
+          throw sendErr;
         });
         txHash = sent.txHash;
         receipt = sent.receipt;
@@ -330,6 +356,10 @@ export async function POST(req: Request) {
       await releaseAccountTxLock(supabase, payerId);
     }
   } catch (err) {
+    // The executor's own outcomes (refused, or sent and still confirming)
+    // carry fixed copy; everything else stays generic.
+    const executorOutcome = gatorFailure(err);
+    if (executorOutcome) return NextResponse.json(executorOutcome.body, { status: executorOutcome.status });
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

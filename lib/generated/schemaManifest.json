@@ -52,6 +52,30 @@
     },
     {
       "kind": "check",
+      "name": "claim_hold_attempts.claim_hold_attempts_amount_check",
+      "providedBy": "20261016130000_executor_reconcile.sql",
+      "requiredBy": "check on claim_hold_attempts"
+    },
+    {
+      "kind": "check",
+      "name": "claim_hold_attempts.claim_hold_attempts_error_check",
+      "providedBy": "20261016130000_executor_reconcile.sql",
+      "requiredBy": "check on claim_hold_attempts"
+    },
+    {
+      "kind": "check",
+      "name": "claim_hold_attempts.claim_hold_attempts_hash_check",
+      "providedBy": "20261016130000_executor_reconcile.sql",
+      "requiredBy": "check on claim_hold_attempts"
+    },
+    {
+      "kind": "check",
+      "name": "claim_hold_attempts.claim_hold_attempts_status_check",
+      "providedBy": "20261016130000_executor_reconcile.sql",
+      "requiredBy": "check on claim_hold_attempts"
+    },
+    {
+      "kind": "check",
       "name": "claims.claims_asset_token_consistency",
       "providedBy": "20260822000000_claim_listed_tokens.sql",
       "requiredBy": "check on claims"
@@ -359,7 +383,7 @@
     {
       "kind": "function",
       "name": "daily_native_sent_eth",
-      "providedBy": "20260930120000_daily_native_sent.sql",
+      "providedBy": "20261016130000_executor_reconcile.sql",
       "requiredBy": "lib/dailyLimits.js"
     },
     {
@@ -456,7 +480,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
     },
     {
       "kind": "table",
@@ -472,9 +496,15 @@
     },
     {
       "kind": "table",
+      "name": "claim_hold_attempts",
+      "providedBy": "20261016130000_executor_reconcile.sql",
+      "requiredBy": "lib/claimHoldAttempts.js, lib/reconcile.js"
+    },
+    {
+      "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "lib/claims.js, lib/escrowWallet.js, lib/history.js"
+      "requiredBy": "lib/claims.js, lib/escrowWallet.js, lib/history.js, lib/reconcile.js"
     },
     {
       "kind": "table",
@@ -522,7 +552,7 @@
       "kind": "table",
       "name": "limit_orders",
       "providedBy": "20261001120000_limit_orders.sql",
-      "requiredBy": "lib/limitOrders.js"
+      "requiredBy": "lib/limitOrders.js, lib/reconcile.js"
     },
     {
       "kind": "table",
@@ -582,7 +612,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/history.js, lib/payCode.js, lib/pots.js, lib/transferLog.js"
+      "requiredBy": "lib/history.js, lib/payCode.js, lib/pots.js, lib/reconcile.js, lib/transferLog.js"
     },
     {
       "kind": "table",
@@ -631,6 +661,12 @@
       "name": "channel_identities_one_phone",
       "providedBy": "20260725100000_channel_identities.sql",
       "requiredBy": "trigger on channel_identities"
+    },
+    {
+      "kind": "trigger",
+      "name": "claim_hold_attempts_set_updated_at",
+      "providedBy": "20261016130000_executor_reconcile.sql",
+      "requiredBy": "trigger on claim_hold_attempts"
     },
     {
       "kind": "trigger",

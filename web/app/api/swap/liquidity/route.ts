@@ -15,6 +15,7 @@ import {
   explorerTxUrl,
 } from '../../../../lib/dexServer';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { gatorFailure } from '../../../../lib/gatorOutcome.ts';
 import { getSupabase } from '../../../../lib/supabase';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
@@ -251,6 +252,10 @@ export async function POST(req: Request) {
   } catch (err) {
     // The deliberate 400s above ("No LP tokens to remove", "Invalid amounts")
     // are user-facing on purpose and are untouched.
+    // No transfers row on this route: an unknown outcome is copy only, the
+    // position is on chain either way. A refusal gets the fixed copy.
+    const executorOutcome = gatorFailure(err);
+    if (executorOutcome) return NextResponse.json(executorOutcome.body, { status: executorOutcome.status });
     return NextResponse.json(apiErrorBody(ROUTE_POST, err), { status: 500 });
   }
 }

@@ -23,6 +23,8 @@ import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountT
 import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 import { requireApproval } from '../../../../lib/stepUp.ts';
+import { gatorFailure, markTransferSubmitted } from '../../../../lib/gatorOutcome.ts';
+import { outcomeUnknown } from '../../../../lib/gatorExecute.ts';
 import { ethToWei, swapTier } from '../../../../lib/tiers.ts';
 import { bindAmountOutMin, isUnverifiedSwap, parseSlippageBps } from '../../../../lib/swapGate.ts';
 
@@ -211,6 +213,11 @@ export async function POST(req: Request) {
             tokenOut,
             amountOutMinWei: floor,
             recipient: walletAddr,
+            // Recorded before broadcast; with no row to record on, nothing is sent.
+            onBroadcast: async (hash) => {
+              if (!logRow?.id) throw new Error('no transfer row');
+              await markTransferSubmitted(supabase, logRow.id, hash);
+            },
           })
         : await executeSwap({
             signer,
@@ -258,7 +265,8 @@ export async function POST(req: Request) {
         disclosure: `All-in ~${allInPct} (protocol ${feePct} + pool 0.30%). Network gas extra.`,
       });
     } catch (swapErr) {
-      if (logRow?.id) {
+      // Unknown outcome: the row stays 'submitted' for the reconciler.
+      if (logRow?.id && !outcomeUnknown(swapErr)) {
         await supabase
           .from('transfers')
           .update({
@@ -274,7 +282,10 @@ export async function POST(req: Request) {
     }
   } catch (err) {
     // Covers the rethrown swap failure above. The full revert reason is written
-    // to the transfers row and the journal; the client is told a swap failed.
+    // to the transfers row and the journal; the client is told a swap failed,
+    // or gets the executor's fixed copy (refused, or sent and still confirming).
+    const executorOutcome = gatorFailure(err);
+    if (executorOutcome) return NextResponse.json(executorOutcome.body, { status: executorOutcome.status });
     return NextResponse.json(apiErrorBody(ROUTE, err), { status: 500 });
   }
 }

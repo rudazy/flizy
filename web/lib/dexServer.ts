@@ -5,7 +5,7 @@
  */
 
 import { ethers } from 'ethers';
-import { executeGatorCall } from './gatorExecute.ts';
+import { executeApprovalCall, executeGatorCall } from './gatorExecute.ts';
 import { getWebChain, type WebChain } from './webChain.ts';
 import { LISTED_TOKENS, listedByAddress, listedBySymbol } from './listedTokens.ts';
 
@@ -287,6 +287,8 @@ export async function executeSwapViaGator(args: {
   tokenOut: string | null;
   amountOutMinWei: bigint;
   recipient: string;
+  /** Called with the tx hash before the main call is broadcast (persist it). */
+  onBroadcast?: (txHash: string) => Promise<void> | void;
 }) {
   const d = getDexAddresses();
   const to = ethers.getAddress(args.recipient);
@@ -304,7 +306,8 @@ export async function executeSwapViaGator(args: {
 
   if (!inIsNative) {
     const token = new ethers.Interface(ERC20_ABI);
-    await executeGatorCall({
+    // Unconfirmed, the swap is never sent (APPROVAL_UNCONFIRMED).
+    await executeApprovalCall({
       accountId: args.accountId,
       provider: args.provider,
       chainId: args.chainId,
@@ -337,6 +340,7 @@ export async function executeSwapViaGator(args: {
     accountId: args.accountId,
     provider: args.provider,
     chainId: args.chainId,
+    onBroadcast: args.onBroadcast,
     target: d.feeRouter,
     value,
     data,
@@ -354,12 +358,14 @@ export async function addLiquidityEthViaGator(args: {
   amountTokenMin: bigint;
   amountEthMin: bigint;
   recipient: string;
+  /** Called with the tx hash before the main call is broadcast (persist it). */
+  onBroadcast?: (txHash: string) => Promise<void> | void;
 }) {
   const d = getDexAddresses();
   const to = ethers.getAddress(args.recipient);
   const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
   const token = new ethers.Interface(ERC20_ABI);
-  await executeGatorCall({
+  await executeApprovalCall({
     accountId: args.accountId,
     provider: args.provider,
     chainId: args.chainId,
@@ -372,6 +378,7 @@ export async function addLiquidityEthViaGator(args: {
     accountId: args.accountId,
     provider: args.provider,
     chainId: args.chainId,
+    onBroadcast: args.onBroadcast,
     target: d.feeRouter,
     value: args.amountEth,
     data: feeRouter.encodeFunctionData('addLiquidityETH', [
@@ -524,6 +531,8 @@ export async function removeLiquidityEthViaGator(args: {
   amountTokenMin?: bigint;
   amountEthMin?: bigint;
   recipient: string;
+  /** Called with the tx hash before the main call is broadcast (persist it). */
+  onBroadcast?: (txHash: string) => Promise<void> | void;
 }) {
   const d = getDexAddresses();
   if (args.liquidityWei <= 0n) throw new Error('Liquidity amount must be greater than 0');
@@ -535,7 +544,7 @@ export async function removeLiquidityEthViaGator(args: {
     throw new Error('Not enough LP tokens in your Flizy wallet');
   }
   const pairIface = new ethers.Interface(PAIR_ABI);
-  await executeGatorCall({
+  await executeApprovalCall({
     accountId: args.accountId,
     provider: args.provider,
     chainId: args.chainId,
@@ -548,6 +557,7 @@ export async function removeLiquidityEthViaGator(args: {
     accountId: args.accountId,
     provider: args.provider,
     chainId: args.chainId,
+    onBroadcast: args.onBroadcast,
     target: d.dexRouter,
     value: 0n,
     data: router.encodeFunctionData('removeLiquidityETH', [

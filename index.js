@@ -37,6 +37,7 @@ const { isBotSelfChat } = require('./lib/whatsappSelfChat');
 const { registerChannelSender, startOutboxDrain } = require('./lib/notify');
 const { startApprovalWatcher } = require('./lib/chatApprovals');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
+const { startReconciler } = require('./lib/reconcile');
 const router = require('./lib/router');
 
 const CHANNEL = CHANNELS.WHATSAPP;
@@ -456,6 +457,9 @@ async function main() {
   // an order is a chain action and needs no chat session. The claim on each
   // order is a conditional update, so a second process could not fill one twice.
   startLimitOrderWatcher({ supabase, provider, chain });
+  // Sends whose outcome was unknown (broadcast, no receipt) are settled from
+  // their receipt here, also from this process only (lib/reconcile.js).
+  startReconciler({ supabase, provider });
   await client.initialize();
 }
 

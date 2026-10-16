@@ -15,6 +15,8 @@ import { requireStepUp } from './stepUp.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from './accountTxLock.ts';
 import { checkDailyNativeLimit } from './dailyLimits.ts';
 import { assertCanPay, runMarketCalls, type MarketCall } from './marketExecute.ts';
+import { gatorFailure, markTransferSubmitted } from './gatorOutcome.ts';
+import { outcomeUnknown } from './gatorExecute.ts';
 import { MARKET_KIND, checkMarketRateLimit } from './marketRateLimit.ts';
 import { ClientError } from './apiError';
 import type { NftContext } from './nftApi.ts';
@@ -97,14 +99,20 @@ export async function runMintTx(args: {
         chainId: ctx.chain.chainId,
         viaGator: viewer.viaGator,
         calls: tx.calls,
+        onBroadcast: (hash) => markTransferSubmitted(supabase, logRow.id, hash),
       });
       await supabase.from('transfers').update({ status: 'confirmed', tx_hash: txHash }).eq('id', logRow.id);
       return { txHash };
     } catch (sendErr) {
-      await supabase
-        .from('transfers')
-        .update({ status: 'failed', error: sendErr instanceof Error ? sendErr.message.slice(0, 500) : 'failed' })
-        .eq('id', logRow.id);
+      // Broadcast with no answer: the row stays 'submitted' for the reconciler.
+      if (!outcomeUnknown(sendErr)) {
+        await supabase
+          .from('transfers')
+          .update({ status: 'failed', error: sendErr instanceof Error ? sendErr.message.slice(0, 500) : 'failed' })
+          .eq('id', logRow.id);
+      }
+      const executorOutcome = gatorFailure(sendErr);
+      if (executorOutcome) throw new MintError(executorOutcome.body.error, executorOutcome.status, executorOutcome.body.code);
       throw sendErr;
     }
   } finally {

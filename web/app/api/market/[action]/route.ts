@@ -13,6 +13,8 @@ import { checkAddress, checkTokenId } from '../../../../lib/nftIndex.ts';
 import { MARKET_ABI, MAX_ROYALTY_BPS } from '../../../../lib/nftMarket.ts';
 import { verifiedCollection } from '../../../../lib/listedNfts';
 import { assertCanPay, runMarketCalls, type MarketCall } from '../../../../lib/marketExecute.ts';
+import { gatorFailure, markTransferSubmitted } from '../../../../lib/gatorOutcome.ts';
+import { outcomeUnknown } from '../../../../lib/gatorExecute.ts';
 import { MARKET_KIND, checkMarketRateLimit } from '../../../../lib/marketRateLimit.ts';
 import { notifyAllChannels } from '../../../../lib/notifyChannels';
 import { formatOfferReceived } from '../../../../lib/offerNotice.ts';
@@ -397,6 +399,7 @@ export async function POST(req: Request, { params }: { params: { action: string 
           chainId: ctx.chain.chainId,
           viaGator: viewer.viaGator,
           calls: plan.calls,
+          onBroadcast: (hash) => markTransferSubmitted(supabase, logRow.id, hash),
         });
         await supabase.from('transfers').update({ status: 'confirmed', tx_hash: txHash }).eq('id', logRow.id);
         if (plan.offerTo) await noticeOffer(supabase, accountId, plan.offerTo);
@@ -413,10 +416,15 @@ export async function POST(req: Request, { params }: { params: { action: string 
         }
         return NextResponse.json({ ok: true, txHash, explorerUrl: explorerTxUrl(ctx.chain, txHash), label: plan.label });
       } catch (sendErr) {
-        await supabase
-          .from('transfers')
-          .update({ status: 'failed', error: sendErr instanceof Error ? sendErr.message.slice(0, 500) : 'failed' })
-          .eq('id', logRow.id);
+        // Broadcast with no answer: the row stays 'submitted' for the reconciler.
+        if (!outcomeUnknown(sendErr)) {
+          await supabase
+            .from('transfers')
+            .update({ status: 'failed', error: sendErr instanceof Error ? sendErr.message.slice(0, 500) : 'failed' })
+            .eq('id', logRow.id);
+        }
+        const executorOutcome = gatorFailure(sendErr);
+        if (executorOutcome) return NextResponse.json(executorOutcome.body, { status: executorOutcome.status });
         throw sendErr;
       }
     } finally {

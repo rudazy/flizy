@@ -203,3 +203,27 @@ describe('prefund reserve: the gator pays its own validation', () => {
     assert.equal(bot.GATOR_USEROP_GAS, 1_580_000n);
   });
 });
+
+describe('bot and site agree on the call-gas rules and the refusals', () => {
+  it('same floor, ceiling and clamp', () => {
+    assert.equal(web.GATOR_CALL_GAS_FLOOR, bot.GATOR_CALL_GAS_FLOOR);
+    assert.equal(web.GATOR_CALL_GAS_CEILING, bot.GATOR_CALL_GAS_CEILING);
+    for (const e of [0n, 1n, 416_667n, 500_000n, 510_730n, 833_333n, 833_334n, 2_000_000n]) {
+      assert.equal(web.callGasFor(e), bot.callGasFor(e), String(e));
+    }
+  });
+
+  it('same error codes and the same user copy', () => {
+    assert.deepEqual(Object.keys(web.GATOR_ERROR_COPY).sort(), Object.keys(bot.GATOR_ERROR_COPY).sort());
+    for (const k of Object.keys(bot.GATOR_ERROR_COPY)) assert.equal(web.GATOR_ERROR_COPY[k], bot.GATOR_ERROR_COPY[k], k);
+  });
+
+  it('both report an unknown outcome as submitted and a refusal as not', () => {
+    const b = new bot.GatorExecError('OUTCOME_UNKNOWN', 'x', { submitted: true, txHash: '0x1' });
+    const w = new web.GatorExecError('OUTCOME_UNKNOWN', 'x', { submitted: true, txHash: '0x1' });
+    assert.equal(bot.outcomeUnknown(b), true);
+    assert.equal(web.outcomeUnknown(w), true);
+    assert.equal(bot.outcomeUnknown(new bot.GatorExecError('WOULD_REVERT', 'x')), false);
+    assert.equal(web.outcomeUnknown(new web.GatorExecError('WOULD_REVERT', 'x')), false);
+  });
+});

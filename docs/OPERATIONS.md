@@ -274,6 +274,8 @@ These are enforced in code review and by tests:
 | `lib/router.js` | Channel-agnostic command router: every command lives here once |
 | `lib/telegram/` | Bot API client and update loop |
 | `lib/notify.js` | Cross-channel notifications and outbox drain |
+| `lib/gatorExecute.js` | Smart-account executor. Per-call gas (estimate + 20%, floor 500,000, ceiling 1,000,000), refuses on a failed estimate, records the tx hash before broadcast. Mirror: `web/lib/gatorExecute.ts` |
+| `lib/reconcile.js` | Runs in the WhatsApp process every minute. Settles sends whose outcome was unknown (broadcast, no receipt) from their receipt: transfers, limit orders, claim holds. No receipt after an hour: flagged and admins notified, and still rechecked, so a late receipt still settles |
 | `lib/runtime.js` | Shared chain, provider, ops and escrow wallets |
 | `lib/` | Identity, claims, phone, engine, dex, chains, agent wallet, escrow |
 | `lib/engine/` | Intent, Policy, Plan, Execute, Receipt |
