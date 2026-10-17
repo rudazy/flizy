@@ -1,7 +1,13 @@
 // From /config, not the package root: the root re-export is deprecated and
 // stops working in v11.
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { withSentryConfig } from '@sentry/nextjs/config';
-import { contentSecurityPolicy } from './lib/contentSecurityPolicy.mjs';
+import {
+  contentSecurityPolicy,
+  permissionsPolicy,
+  privyDoorRequested,
+} from './lib/contentSecurityPolicy.mjs';
 
 /** @type {import('next').NextConfig} */
 
@@ -13,9 +19,12 @@ import { contentSecurityPolicy } from './lib/contentSecurityPolicy.mjs';
  * alternative to a public forwarder on this domain. The host is derived from
  * the DSN, so a deploy with no DSN keeps the previous connect-src.
  */
+const privyDoor = privyDoorRequested(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
+
 const csp = contentSecurityPolicy({
   dev: process.env.NODE_ENV !== 'production',
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN || '',
+  privy: privyDoor,
 });
 
 const securityHeaders = [
@@ -25,10 +34,27 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    value: permissionsPolicy({ privy: privyDoor }),
   },
   // Vercel terminates TLS, so asserting HSTS here is safe.
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+];
+
+// Privy 3.45 statically imports optional peers this app does not use:
+// smart wallets, Farcaster Solana, Abstract, and the Solana memo program.
+// Point those specifiers at an empty module so login can compile.
+const privyOptionalPeer = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'lib/privyOptionalPeer.js'
+);
+const PRIVY_OPTIONAL_PEERS = [
+  '@abstract-foundation/agw-client',
+  '@abstract-foundation/agw-client/actions',
+  '@farcaster/mini-app-solana',
+  '@solana-program/memo',
+  'permissionless',
+  'permissionless/accounts',
+  'permissionless/clients/pimlico',
 ];
 
 const nextConfig = {
@@ -36,6 +62,14 @@ const nextConfig = {
   // Required on Next 14 for instrumentation.ts. Runs the cold start schema
   // check once per server instance, not per request.
   experimental: { instrumentationHook: true },
+  webpack(config) {
+    const alias = config.resolve.alias || {};
+    for (const spec of PRIVY_OPTIONAL_PEERS) {
+      alias[`${spec}$`] = privyOptionalPeer;
+    }
+    config.resolve.alias = alias;
+    return config;
+  },
   async headers() {
     return [
       {

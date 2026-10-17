@@ -7,9 +7,10 @@ import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { track } from '../../lib/analytics';
 import { clearAppearanceCache } from '../../lib/appearanceCache';
 import type { LocaleCode } from '../../lib/locale';
+import { CUSTODY_DOOR_COPY } from '../../lib/custodyDoor';
 import { safeNext } from '../../lib/safeNext.ts';
 
-export function LoginForm() {
+export function LoginForm({ doorHref }: { doorHref?: string }) {
   const router = useRouter();
   const { t, locale, setLocale } = useLocale();
   const [next, setNext] = useState('/dashboard');
@@ -236,6 +237,13 @@ export function LoginForm() {
           </Link>
         </p>
       </form>
+      {doorHref ? (
+        <p className="mt-4 text-center text-sm text-muted">
+          <Link href={doorHref} className="text-lime no-underline hover:text-gold">
+            {CUSTODY_DOOR_COPY.otherWays}
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

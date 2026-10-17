@@ -11,7 +11,9 @@
   "dependencies": {
     "@ammora-protocol/sdk": "0.2.13",
     "@anthropic-ai/sdk": "0.129.0",
+    "@privy-io/react-auth": "3.45.0",
     "@sentry/nextjs": "10.73.0",
+    "@stripe/stripe-js": "1.54.2",
     "@supabase/supabase-js": "^2.110.3",
     "dotenv": "^17.4.2",
     "ethers": "^6.17.0",
