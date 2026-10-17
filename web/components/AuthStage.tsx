@@ -4,7 +4,7 @@
  */
 export function AuthStage({ variant }: { variant: 'login' | 'signup' }) {
   return (
-    <div className="relative mt-4 h-[220px] w-[300px]" aria-hidden>
+    <div className="relative mt-4 h-[140px] w-full max-w-[260px] sm:h-[220px] sm:max-w-[300px]" aria-hidden>
       <svg viewBox="0 0 420 240" className="h-full w-full" fill="none">
         <ellipse cx="150" cy="198" rx="78" ry="8" stroke="#3a3228" />
         <ellipse cx="150" cy="198" rx="46" ry="4" stroke="#f7d047" strokeOpacity="0.45" />

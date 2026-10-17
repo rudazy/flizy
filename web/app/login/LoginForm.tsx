@@ -37,23 +37,23 @@ export function LoginForm() {
     }
   }, []);
 
+  const paneRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const footer = document.querySelector('footer');
+    const header = document.querySelector('header');
     const previous = document.body.style.overflow;
-    const desktop = window.matchMedia('(min-width: 1024px)');
-    const apply = () => {
-      if (!desktop.matches) {
-        footer?.removeAttribute('inert');
-        document.body.style.overflow = previous;
-        return;
-      }
-      footer?.setAttribute('inert', '');
-      document.body.style.overflow = 'hidden';
+    footer?.setAttribute('inert', '');
+    document.body.style.overflow = 'hidden';
+    const place = () => {
+      const pane = paneRef.current;
+      if (!pane) return;
+      const height = header?.getBoundingClientRect().height ?? 69;
+      pane.style.top = `${Math.round(height)}px`;
     };
-    apply();
-    desktop.addEventListener('change', apply);
+    place();
+    window.addEventListener('resize', place);
     return () => {
-      desktop.removeEventListener('change', apply);
+      window.removeEventListener('resize', place);
       footer?.removeAttribute('inert');
       document.body.style.overflow = previous;
     };
@@ -69,11 +69,9 @@ export function LoginForm() {
    *
    * Moving the cursor there says what changed without a word of copy.
    */
-  const codeRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     if (!needsCode) return;
-    const wide = window.matchMedia('(min-width: 1024px)').matches;
-    const target = wide ? document.getElementById('desk-login-code') : codeRef.current;
+    const target = document.getElementById('desk-login-code');
     target?.focus();
     target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [needsCode]);
@@ -147,150 +145,26 @@ export function LoginForm() {
   return (
     <>
     {soonNote}
-    <div className="fade-up mx-auto max-w-md lg:hidden">
-      <p className="text-xs uppercase tracking-[0.18em] text-gold">{t('auth.login.kicker')}</p>
-      <h1 className="mt-3 font-sans text-3xl tracking-wide text-paper">{t('auth.login.title')}</h1>
-      <p className="mt-2 text-sm text-muted">{t('auth.login.blurb')}</p>
-      {accountNote ? (
-        <div className="alert mt-4 text-sm" role="status">
-          {accountNote}
-        </div>
-      ) : null}
-
-      <form onSubmit={onSubmit} className="card mt-8 space-y-5 p-6 md:p-8">
-        <div>
-          <label className="label" htmlFor="locale">
-            {t('auth.signup.language')}
-          </label>
-          <LanguageSelect
-            id="locale"
-            value={locale}
-            onChange={(code: LocaleCode) => setLocale(code)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="email">
-            {t('auth.login.email')}
-          </label>
-          <input
-            id="email"
-            className="input"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="password">
-            {t('auth.login.password')}
-          </label>
-          <input
-            id="password"
-            className="input"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-        </div>
-        {needsCode ? (
-          <div>
-            {/*
-              Stated as a step, in the same place errors appear, so the change of
-              state is visible rather than implied by a relabelled button.
-            */}
-            <div className="alert mb-3 text-sm" role="status">
-              One more step. Enter the code below to finish signing in.
-            </div>
-            <label className="label" htmlFor="login-code">
-              Login code
-            </label>
-            <input
-              ref={codeRef}
-              id="login-code"
-              className="input font-mono"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder="6-digit code"
-              value={code}
-              onChange={(e) => {
-                setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
-                // A new attempt: the last "Incorrect code" no longer applies.
-                if (error) setError('');
-              }}
-              required
-            />
-            {devCode ? (
-              <p className="mt-1.5 font-mono text-xs text-lime">
-                Local build, no mail configured. Your code is {devCode}
-              </p>
-            ) : null}
-            <p className="mt-1.5 text-xs text-muted">
-              We emailed a code because this browser is new to this account, you signed out here,
-              or it has been 30 days. It expires in 15 minutes. Only the newest code works.
-            </p>
-          </div>
-        ) : null}
-        {notice ? (
-          <div className="alert alert-ok text-sm" role="status">
-            {notice}
-          </div>
-        ) : null}
-        {error ? <div className="alert alert-error">{error}</div> : null}
-        <button
-          className="btn btn-primary w-full"
-          type="submit"
-          disabled={loading || (needsCode && code.length !== 6)}
-        >
-          {loading
-            ? t('auth.login.submitting')
-            : needsCode
-              ? 'Verify and sign in'
-              : t('auth.login.submit')}
-        </button>
-        {needsCode ? (
-          <button
-            type="button"
-            className="btn btn-ghost w-full text-sm"
-            disabled={loading}
-            onClick={() => void resendCode()}
-          >
-            Send a new code
-          </button>
-        ) : null}
-        <p className="text-center text-sm text-muted">
-          {t('auth.login.newHere')}{' '}
-          <Link href={signupHref} className="text-lime no-underline hover:text-gold">
-            {t('auth.login.create')}
-          </Link>
-        </p>
-      </form>
-    </div>
-
-    <div className="fixed inset-x-0 bottom-0 top-[69px] z-30 hidden overflow-y-auto bg-[#07060a] font-sans text-paper lg:block">
+    <div ref={paneRef} className="fixed inset-x-0 bottom-0 top-[109px] z-30 overflow-y-auto bg-[#07060a] font-sans text-paper lg:top-[71px]">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div className="absolute left-[6%] top-[6%] h-[520px] w-[520px] rounded-full border border-sun/10" />
         <div className="absolute left-[12%] top-[14%] h-[320px] w-[320px] rounded-full border border-sun/20" />
         <div className="absolute -left-16 top-8 h-[420px] w-[420px] rounded-full bg-sun/[0.06] blur-3xl" />
       </div>
-      <div className="relative mx-auto grid w-full max-w-[1120px] grid-cols-[minmax(0,1fr)_minmax(380px,440px)] items-start gap-12 px-8 py-8">
+      <div className="relative mx-auto grid w-full max-w-[1120px] grid-cols-1 items-start gap-8 px-4 py-6 pb-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(380px,440px)] lg:gap-12 lg:px-8 lg:py-8">
         <div className="max-w-[460px]">
           <p className="inline-flex items-center gap-2 rounded-[4px] border border-sun/40 bg-black/50 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-sun">
             <ShieldMark />
             Chat wallet
           </p>
-          <h1 className="mt-5 font-sans text-[3rem] font-semibold leading-[0.98] tracking-tight text-paper xl:text-[3.4rem]">
+          <h1 className="mt-5 font-sans text-[2.15rem] font-semibold leading-[0.98] tracking-tight text-paper sm:text-[3rem] xl:text-[3.4rem]">
             Your wallet
             <span className="block text-sun">in your chats.</span>
           </h1>
           <p className="mt-4 max-w-sm text-[15px] leading-6 text-[#c8c2b8]">
             Use crypto on Telegram and WhatsApp. Simple, social, and secure.
           </p>
-          <ul className="mt-6 space-y-4">
+          <ul className="mt-6 space-y-3 lg:space-y-4">
             <Feature icon={<BoltMark />} title="Send to friends" note="With a simple username" />
             <Feature icon={<ChatMark />} title="Use where you are" note="Telegram and WhatsApp" />
             <Feature icon={<LockMark />} title="Unlock with a PIN" note="Set it on the dashboard" />
@@ -300,7 +174,7 @@ export function LoginForm() {
 
         <form
           onSubmit={onSubmit}
-          className="relative overflow-hidden rounded-[8px] border border-[#8a7040]/80 bg-[linear-gradient(180deg,#16130e_0%,#0c0b09_42%)] px-6 py-6 shadow-[0_0_0_1px_rgba(247,208,71,0.08),0_30px_80px_rgba(0,0,0,0.5),0_0_64px_rgba(224,184,74,0.12)]"
+          className="relative overflow-hidden rounded-[8px] border border-[#8a7040]/80 bg-[linear-gradient(180deg,#16130e_0%,#0c0b09_42%)] px-4 py-5 shadow-[0_0_0_1px_rgba(247,208,71,0.08),0_30px_80px_rgba(0,0,0,0.5),0_0_64px_rgba(224,184,74,0.12)] sm:px-6 sm:py-6"
         >
           <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-sun to-transparent" aria-hidden />
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-sun">Welcome back</p>

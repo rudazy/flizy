@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthStage } from '../../components/AuthStage';
 import { useComingSoon } from '../../components/ComingSoon';
@@ -62,31 +62,30 @@ export function SignupForm() {
     };
   }, []);
 
+  const paneRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!needsCode) return;
-    const wide = window.matchMedia('(min-width: 1024px)').matches;
-    const target = document.getElementById(wide ? 'desk-code' : 'signup-code');
+    const target = document.getElementById('desk-code');
     target?.focus();
     target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [needsCode]);
 
   useEffect(() => {
     const footer = document.querySelector('footer');
+    const header = document.querySelector('header');
     const previous = document.body.style.overflow;
-    const desktop = window.matchMedia('(min-width: 1024px)');
-    const apply = () => {
-      if (!desktop.matches) {
-        footer?.removeAttribute('inert');
-        document.body.style.overflow = previous;
-        return;
-      }
-      footer?.setAttribute('inert', '');
-      document.body.style.overflow = 'hidden';
+    footer?.setAttribute('inert', '');
+    document.body.style.overflow = 'hidden';
+    const place = () => {
+      const pane = paneRef.current;
+      if (!pane) return;
+      const height = header?.getBoundingClientRect().height ?? 69;
+      pane.style.top = `${Math.round(height)}px`;
     };
-    apply();
-    desktop.addEventListener('change', apply);
+    place();
+    window.addEventListener('resize', place);
     return () => {
-      desktop.removeEventListener('change', apply);
+      window.removeEventListener('resize', place);
       footer?.removeAttribute('inert');
       document.body.style.overflow = previous;
     };
@@ -176,227 +175,26 @@ export function SignupForm() {
   return (
     <>
     {soonNote}
-    <div className="fade-up mx-auto grid max-w-5xl gap-10 lg:hidden">
-      <div>
-        <p className="text-xs uppercase tracking-[0.18em] text-gold">{t('auth.signup.kicker')}</p>
-        <h1 className="mt-3 font-sans text-3xl tracking-wide text-paper md:text-4xl">
-          {t('auth.signup.title')}
-        </h1>
-        <p className="mt-4 text-sm leading-relaxed text-muted">{t('auth.signup.blurb')}</p>
-        <ol className="mt-8 space-y-3 text-sm text-muted">
-          <li className="flex gap-3">
-            <span className="text-lime">1</span> Create with email and password
-          </li>
-          <li className="flex gap-3">
-            <span className="text-lime">2</span> Verify your email with a 6-digit code
-          </li>
-          <li className="flex gap-3">
-            <span className="text-lime">3</span> Choose your @username and optional display name
-          </li>
-        </ol>
-      </div>
-
-      <form onSubmit={onSubmit} className="card space-y-5 p-6 md:p-8">
-        <div>
-          <label className="label" htmlFor="locale">
-            {t('auth.signup.language')}
-          </label>
-          <LanguageSelect
-            id="locale"
-            value={locale}
-            onChange={(code: LocaleCode) => setLocale(code)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="signup-country">
-            Country <span className="font-normal text-muted">(optional)</span>
-          </label>
-          <select
-            id="signup-country"
-            className="input min-h-[44px]"
-            value={countryIso}
-            onChange={(event) => setCountryIso(event.target.value)}
-          >
-            <option value="">Skip for now</option>
-            {SITE_PHONE_COUNTRIES.map((country) => (
-              <option key={country.iso} value={country.iso}>
-                {country.name} (+{country.dial})
-              </option>
-            ))}
-          </select>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted">
-            Pick one country and chat can finish a local number. Korea, then 10 1234 5678, is sent
-            as +82 10 1234 5678. Skip this if you want. You can change it anytime.
-          </p>
-        </div>
-        <div>
-          <label className="label" htmlFor="email">
-            {t('auth.signup.email')}
-          </label>
-          <input
-            id="email"
-            className="input"
-            type="email"
-            required
-            placeholder="you@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            readOnly={needsCode}
-            autoComplete="email"
-          />
-        </div>
-        {/*
-          Honeypot. Positioned off-screen rather than display:none, because a
-          bot that skips hidden inputs would also skip this one. aria-hidden and
-          tabIndex keep it away from screen readers and the tab order, so nobody
-          using the form can reach it by any route. See lib/honeypot.ts for why
-          the field is named the way it is.
-        */}
-        <div className="absolute left-[-9999px] h-px w-px overflow-hidden" aria-hidden="true">
-          <label htmlFor={HONEYPOT_FIELD}>Note</label>
-          <input
-            id={HONEYPOT_FIELD}
-            name={HONEYPOT_FIELD}
-            type="text"
-            tabIndex={-1}
-            autoComplete="off"
-            value={honeypot}
-            onChange={(e) => setHoneypot(e.target.value)}
-          />
-        </div>
-        <PasswordField
-          id="password"
-          label={t('auth.signup.password')}
-          value={password}
-          onChange={setPassword}
-          required
-          minLength={8}
-          placeholder="e.g. MyPass1!"
-          autoComplete="new-password"
-          hint="At least 8 characters, with a letter, a number, and a special character (!@#$%…)."
-        />
-        <PasswordField
-          id="confirm-password"
-          label={t('auth.signup.confirm')}
-          value={confirmPassword}
-          onChange={setConfirmPassword}
-          required
-          minLength={8}
-          placeholder="Type it again"
-          autoComplete="new-password"
-          problem={mismatch ? 'Passwords do not match yet.' : undefined}
-          hint="Both entries must match exactly."
-        />
-        <div>
-          <label className="label" htmlFor="invite-code">
-            Invite <span className="font-normal text-muted">(optional)</span>
-          </label>
-          <input
-            id="invite-code"
-            className="input font-mono"
-            type="text"
-            inputMode="text"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            placeholder="@username"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
-            autoComplete="off"
-          />
-        </div>
-        {needsCode ? (
-          <div>
-            <div className="alert mb-3 text-sm" role="status">
-              Check {email} for a 6-digit code and enter it below to finish.
-            </div>
-            <label className="label" htmlFor="signup-code">
-              Email code
-            </label>
-            <input
-              id="signup-code"
-              className="input font-mono"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder="6-digit code"
-              value={code}
-              onChange={(e) => {
-                setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
-                if (error) setError('');
-              }}
-              required
-            />
-            {devCode ? (
-              <p className="mt-1.5 font-mono text-xs text-lime">
-                Local build, no mail configured. Your code is {devCode}
-              </p>
-            ) : null}
-            <p className="mt-1.5 text-xs text-muted">
-              It expires in 15 minutes. Nothing arrived?{' '}
-              <button
-                type="button"
-                className="text-lime underline-offset-2 hover:text-gold"
-                onClick={() => void resend()}
-                disabled={loading}
-              >
-                Send a new code
-              </button>
-            </p>
-          </div>
-        ) : null}
-        {notice ? (
-          <div className="alert alert-ok text-sm" role="status">
-            {notice}
-          </div>
-        ) : null}
-        {error ? <div className="alert alert-error">{error}</div> : null}
-        <button
-          className="btn btn-primary w-full"
-          type="submit"
-          disabled={loading || mismatch || (needsCode && code.length !== 6)}
-        >
-          {loading ? t('auth.signup.submitting') : needsCode ? 'Finish' : 'Continue'}
-        </button>
-        <p className="text-center text-xs text-muted">
-          Next: we email a code, then you pick your @username.
-        </p>
-        <p className="text-center text-sm text-muted">
-          {t('auth.signup.hasAccount')}{' '}
-          <Link
-            href={
-              next.startsWith('/claim/')
-                ? `/login?next=${encodeURIComponent(next)}`
-                : '/login'
-            }
-            className="text-lime no-underline hover:text-gold"
-          >
-            {t('auth.signup.login')}
-          </Link>
-        </p>
-      </form>
-    </div>
-
-    <div className="fixed inset-x-0 bottom-0 top-[69px] z-30 hidden overflow-y-auto bg-[#07060a] font-sans text-paper lg:block">
+    <div ref={paneRef} className="fixed inset-x-0 bottom-0 top-[109px] z-30 overflow-y-auto bg-[#07060a] font-sans text-paper lg:top-[71px]">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div className="absolute left-[4%] top-[4%] h-[520px] w-[520px] rounded-full border border-sun/10" />
         <div className="absolute left-[10%] top-[12%] h-[300px] w-[300px] rounded-full border border-sun/20" />
         <div className="absolute -left-16 top-0 h-[420px] w-[420px] rounded-full bg-sun/[0.06] blur-3xl" />
       </div>
-      <div className="relative mx-auto grid w-full max-w-[1120px] grid-cols-[minmax(0,1fr)_minmax(380px,440px)] items-start gap-12 px-8 py-8">
+      <div className="relative mx-auto grid w-full max-w-[1120px] grid-cols-1 items-start gap-8 px-4 py-6 pb-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(380px,440px)] lg:gap-12 lg:px-8 lg:py-8">
         <div className="max-w-[460px]">
           <p className="inline-flex items-center gap-2 rounded-[4px] border border-sun/40 bg-black/50 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-sun">
             <ShieldGlyph />
             Chat wallet
           </p>
-          <h1 className="mt-5 font-sans text-[3rem] font-semibold leading-[0.98] tracking-tight text-paper xl:text-[3.4rem]">
+          <h1 className="mt-5 font-sans text-[2.15rem] font-semibold leading-[0.98] tracking-tight text-paper sm:text-[3rem] xl:text-[3.4rem]">
             Create your
             <span className="block text-sun">Flizy account</span>
           </h1>
           <p className="mt-4 max-w-sm text-[15px] leading-6 text-[#c8c2b8]">
             Use crypto on Telegram and WhatsApp. Simple, social, and secure.
           </p>
-          <ol className="mt-6 space-y-4">
+          <ol className="mt-6 space-y-3 lg:space-y-4">
             <Step
               n="1"
               title="Create with email"
@@ -432,7 +230,7 @@ export function SignupForm() {
 
         <form
           onSubmit={onSubmit}
-          className="relative overflow-hidden rounded-[8px] border border-[#8a7040]/80 bg-[linear-gradient(180deg,#16130e_0%,#0c0b09_42%)] px-6 py-6 shadow-[0_0_0_1px_rgba(247,208,71,0.08),0_30px_80px_rgba(0,0,0,0.5),0_0_64px_rgba(224,184,74,0.12)]"
+          className="relative overflow-hidden rounded-[8px] border border-[#8a7040]/80 bg-[linear-gradient(180deg,#16130e_0%,#0c0b09_42%)] px-4 py-5 shadow-[0_0_0_1px_rgba(247,208,71,0.08),0_30px_80px_rgba(0,0,0,0.5),0_0_64px_rgba(224,184,74,0.12)] sm:px-6 sm:py-6"
         >
           <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-sun to-transparent" aria-hidden />
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-sun">Get started</p>
