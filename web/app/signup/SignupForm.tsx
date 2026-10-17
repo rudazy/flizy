@@ -1,18 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { AuthStage } from '../../components/AuthStage';
+import { useComingSoon } from '../../components/ComingSoon';
 import { PasswordField } from '../../components/PasswordField';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { track } from '../../lib/analytics';
 import { clearAppearanceCache } from '../../lib/appearanceCache';
-import { validatePassword } from '../../lib/passwordPolicy';
+import { passwordChecklist, validatePassword } from '../../lib/passwordPolicy';
 import type { LocaleCode } from '../../lib/locale';
 import { safeNext } from '../../lib/safeNext.ts';
 import { HONEYPOT_FIELD } from '../../lib/honeypot.ts';
-import { SITE_PHONE_COUNTRIES, countryFlag } from '../../lib/phoneFormat';
+import { SITE_PHONE_COUNTRIES } from '../../lib/phoneFormat';
 
 /**
  * Stage 1: email and password, then the 6-digit code from the inbox, which is
@@ -37,7 +38,7 @@ export function SignupForm() {
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState('');
   const [notice, setNotice] = useState('');
-  const [soon, setSoon] = useState(false);
+  const [showSoon, soonNote] = useComingSoon();
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -62,6 +63,14 @@ export function SignupForm() {
   }, []);
 
   useEffect(() => {
+    if (!needsCode) return;
+    const wide = window.matchMedia('(min-width: 1024px)').matches;
+    const target = document.getElementById(wide ? 'desk-code' : 'signup-code');
+    target?.focus();
+    target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [needsCode]);
+
+  useEffect(() => {
     const footer = document.querySelector('footer');
     const previous = document.body.style.overflow;
     const desktop = window.matchMedia('(min-width: 1024px)');
@@ -84,9 +93,11 @@ export function SignupForm() {
   }, []);
 
   const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const passwordRules = passwordChecklist(password);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setError('');
 
     const policy = validatePassword(password);
@@ -164,6 +175,7 @@ export function SignupForm() {
 
   return (
     <>
+    {soonNote}
     <div className="fade-up mx-auto grid max-w-5xl gap-10 lg:hidden">
       <div>
         <p className="text-xs uppercase tracking-[0.18em] text-gold">{t('auth.signup.kicker')}</p>
@@ -208,7 +220,7 @@ export function SignupForm() {
             <option value="">Skip for now</option>
             {SITE_PHONE_COUNTRIES.map((country) => (
               <option key={country.iso} value={country.iso}>
-                {countryFlag(country.iso)} {country.name} (+{country.dial})
+                {country.name} (+{country.dial})
               </option>
             ))}
           </select>
@@ -313,7 +325,6 @@ export function SignupForm() {
                 setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
                 if (error) setError('');
               }}
-              autoFocus
               required
             />
             {devCode ? (
@@ -367,101 +378,103 @@ export function SignupForm() {
     </div>
 
     <div className="fixed inset-x-0 bottom-0 top-[69px] z-30 hidden overflow-y-auto bg-[#07060a] font-sans text-paper lg:block">
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
-        <div className="absolute left-[8%] top-[-10%] h-[420px] w-[420px] rounded-full bg-sun/10 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="absolute left-[4%] top-[4%] h-[520px] w-[520px] rounded-full border border-sun/10" />
+        <div className="absolute left-[10%] top-[12%] h-[300px] w-[300px] rounded-full border border-sun/20" />
+        <div className="absolute -left-16 top-0 h-[420px] w-[420px] rounded-full bg-sun/[0.06] blur-3xl" />
       </div>
-      <div className="relative mx-auto grid min-h-full max-w-[1180px] grid-cols-[minmax(0,1.15fr)_minmax(360px,430px)] items-start gap-8 px-8 py-5 xl:items-center">
-        <div>
-          <p className="inline-flex items-center gap-2 rounded-full border border-sun/40 bg-black/40 px-3 py-1 text-[13px] text-sun">
-            <PersonGlyph />
-            Create your account
+      <div className="relative mx-auto grid w-full max-w-[1120px] grid-cols-[minmax(0,1fr)_minmax(380px,440px)] items-start gap-12 px-8 py-8">
+        <div className="max-w-[460px]">
+          <p className="inline-flex items-center gap-2 rounded-[4px] border border-sun/40 bg-black/50 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-sun">
+            <ShieldGlyph />
+            Chat wallet
           </p>
-          <h1 className="mt-3 font-sans text-[2.55rem] font-semibold leading-[0.96] tracking-tight text-paper xl:text-[3.15rem]">
-            One account.
-            <span className="mt-1 block text-sun">Everywhere you are.</span>
+          <h1 className="mt-5 font-sans text-[3rem] font-semibold leading-[0.98] tracking-tight text-paper xl:text-[3.4rem]">
+            Create your
+            <span className="block text-sun">Flizy account</span>
           </h1>
-          <p className="mt-4 max-w-md text-[15px] leading-6 text-[#c8c2b8]">
-            Create your Flizy account to use crypto on Telegram and WhatsApp. It&apos;s simple and social.
+          <p className="mt-4 max-w-sm text-[15px] leading-6 text-[#c8c2b8]">
+            Use crypto on Telegram and WhatsApp. Simple, social, and secure.
           </p>
-          <div className="mt-4 grid grid-cols-[minmax(0,250px)_minmax(160px,1fr)] items-center gap-2">
-            <ol className="space-y-4">
-              <Step
-                n="1"
-                title="Create an account"
-                note="Use your email and set a password."
-                icon={<MailGlyph />}
-              />
-              <Step
-                n="2"
-                title="Verify your email"
-                note="We'll send a 6-digit code."
-                icon={<ShieldGlyph />}
-              />
-              <Step
-                n="3"
-                title="Choose your username"
-                note="Pick a unique @username for sending and receiving."
-                icon={<PersonGlyph />}
-              />
-            </ol>
-            <SignupScene />
-          </div>
-          <ul className="mt-4 grid grid-cols-3 gap-3">
-            <li className="rounded-2xl border border-white/10 bg-black/40 p-3">
-              <img src="/account/tile-telegram.webp" alt="" className="h-9 w-9 rounded-lg" />
-              <p className="mt-3 font-sans text-[14px] text-paper">Telegram</p>
-              <p className="mt-1 text-[12px] leading-4 text-muted">Use your wallet in chat.</p>
-            </li>
-            <li className="rounded-2xl border border-white/10 bg-black/40 p-3">
-              <img src="/account/tile-whatsapp.webp" alt="" className="h-9 w-9 rounded-lg" />
-              <p className="mt-3 font-sans text-[14px] text-paper">WhatsApp</p>
-              <p className="mt-1 text-[12px] leading-4 text-muted">Send and receive crypto easily.</p>
-            </li>
-            <li className="rounded-2xl border border-white/10 bg-black/40 p-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-sun/40 text-sun">
-                <LinkGlyph />
+          <ol className="mt-6 space-y-4">
+            <Step
+              n="1"
+              title="Create with email"
+              note="Set your email and password."
+              icon={<MailGlyph />}
+            />
+            <Step
+              n="2"
+              title="Verify your email"
+              note="We'll send a 6-digit code."
+              icon={<ShieldGlyph />}
+            />
+            <Step
+              n="3"
+              title="Choose your username"
+              note="Pick a unique @username and optional display name."
+              icon={<PersonGlyph />}
+            />
+          </ol>
+          <AuthStage variant="signup" />
+          <div className="flex items-center gap-3 rounded-[6px] border border-[#8a7040]/50 bg-[#100e0b] px-4 py-3 shadow-[inset_0_1px_0_rgba(247,208,71,0.08)]">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-sun/40 text-sun">
+              <LockGlyph />
+            </span>
+            <span>
+              <span className="block font-sans text-[14px] text-paper">One account. Both chats.</span>
+              <span className="mt-0.5 block text-[12px] leading-4 text-muted">
+                Set an unlock PIN, then connect Telegram and WhatsApp from Account.
               </span>
-              <p className="mt-3 font-sans text-[14px] text-paper">Your username</p>
-              <p className="mt-1 text-[12px] leading-4 text-muted">A simple identity across platforms.</p>
-            </li>
-          </ul>
+            </span>
+          </div>
         </div>
 
         <form
           onSubmit={onSubmit}
-          className="rounded-[24px] border border-white/10 bg-[#12110e] px-5 py-4 shadow-[0_30px_80px_rgba(0,0,0,0.45)] [&_.label]:mb-1 [&_.label]:text-[11px] [&_input]:py-2 [&_select]:py-2"
+          className="relative overflow-hidden rounded-[8px] border border-[#8a7040]/80 bg-[linear-gradient(180deg,#16130e_0%,#0c0b09_42%)] px-6 py-6 shadow-[0_0_0_1px_rgba(247,208,71,0.08),0_30px_80px_rgba(0,0,0,0.5),0_0_64px_rgba(224,184,74,0.12)]"
         >
-          <h2 className="font-sans text-[1.45rem] font-semibold tracking-tight text-paper">
+          <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-sun to-transparent" aria-hidden />
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-sun">Get started</p>
+          <h2 className="mt-2 font-sans text-[1.7rem] font-semibold tracking-tight text-paper">
             Create your Flizy account
           </h2>
-          <p className="mt-1 text-sm text-muted">Set up your account in a few steps.</p>
-          <div className="mt-3 space-y-2">
+          <p className="mt-2 text-sm leading-5 text-[#c8c2b8]">
+            After signup you set an unlock PIN, then connect WhatsApp or Telegram from Account.
+          </p>
+          <div className="mt-5 space-y-3.5">
             <div>
-              <label className="label" htmlFor="desk-locale">
+              <label className={deskLabel} htmlFor="desk-locale">
                 {t('auth.signup.language')}
               </label>
-              <LanguageSelect
-                id="desk-locale"
-                value={locale}
-                onChange={(code: LocaleCode) => setLocale(code)}
-              />
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8f877c]">
+                  <GlobeGlyph />
+                </span>
+                <LanguageSelect
+                  id="desk-locale"
+                  className={deskInput}
+                  value={locale}
+                  onChange={(code: LocaleCode) => setLocale(code)}
+                />
+              </div>
             </div>
             <div>
-              <label className="label" htmlFor="desk-country">
+              <label className={deskLabel} htmlFor="desk-country">
                 Country <span className="font-normal text-muted">(optional)</span>
               </label>
               <select
-                id="desk-country"
-                className="input min-h-[44px]"
-                value={countryIso}
-                onChange={(event) => setCountryIso(event.target.value)}
-              >
-                <option value="">Skip for now</option>
-                {SITE_PHONE_COUNTRIES.map((country) => (
-                  <option key={country.iso} value={country.iso}>
-                    {countryFlag(country.iso)} {country.name} (+{country.dial})
-                  </option>
-                ))}
+                  id="desk-country"
+                  className="input min-h-[48px] rounded-[10px] border-[#2c2822] bg-[#0a0908]"
+                  value={countryIso}
+                  onChange={(event) => setCountryIso(event.target.value)}
+                >
+                  <option value="">Skip for now</option>
+                  {SITE_PHONE_COUNTRIES.map((country) => (
+                    <option key={country.iso} value={country.iso}>
+                      {country.name} (+{country.dial})
+                    </option>
+                  ))}
               </select>
               <p className="mt-1.5 text-xs leading-relaxed text-muted">
                 Pick one country and chat can finish a local number if needed. You can change this
@@ -469,20 +482,25 @@ export function SignupForm() {
               </p>
             </div>
             <div>
-              <label className="label" htmlFor="desk-email">
+              <label className={deskLabel} htmlFor="desk-email">
                 {t('auth.signup.email')}
               </label>
-              <input
-                id="desk-email"
-                className="input"
-                type="email"
-                required
-                placeholder="you@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                readOnly={needsCode}
-                autoComplete="email"
-              />
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8f877c]">
+                  <MailGlyph />
+                </span>
+                <input
+                  id="desk-email"
+                  className={deskInput}
+                  type="email"
+                  required
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  readOnly={needsCode}
+                  autoComplete="email"
+                />
+              </div>
             </div>
             {/* Same trap as the phone form: off-screen, not a one-pixel box a bot can skip. */}
             <div className="absolute left-[-9999px] h-px w-px overflow-hidden" aria-hidden="true">
@@ -500,54 +518,82 @@ export function SignupForm() {
             <PasswordField
               id="desk-password"
               label={t('auth.signup.password')}
+              labelClassName={deskLabel}
+              inputClassName="min-h-[48px] rounded-[10px] border-[#2c2822] bg-[#0a0908]"
               value={password}
               onChange={setPassword}
               required
               minLength={8}
-              placeholder="Create a password"
+              placeholder="Create a strong password"
               autoComplete="new-password"
-              hint="At least 8 characters, with a letter, a number, and a special character (e.g. !@#$%)."
+              leading={<LockGlyph />}
+              iconToggle
             />
+            <ul className="space-y-1">
+              {passwordRules.map((rule) => (
+                <li key={rule.label} className="flex items-center gap-2 text-[12px] text-muted">
+                  <span
+                    className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border ${
+                      rule.ok ? 'border-sun text-sun' : 'border-[#5c564c]'
+                    }`}
+                  >
+                    {rule.ok ? <Tick /> : null}
+                  </span>
+                  {rule.label}
+                </li>
+              ))}
+            </ul>
             <PasswordField
               id="desk-confirm"
               label={t('auth.signup.confirm')}
+              labelClassName={deskLabel}
+              inputClassName="min-h-[48px] rounded-[10px] border-[#2c2822] bg-[#0a0908]"
               value={confirmPassword}
               onChange={setConfirmPassword}
               required
               minLength={8}
               placeholder="Type it again"
               autoComplete="new-password"
+              leading={<LockGlyph />}
+              iconToggle
               problem={mismatch ? 'Passwords do not match yet.' : undefined}
+              hint="Both entries must match exactly."
             />
             <div>
-              <label className="label" htmlFor="desk-invite">
+              <label className={deskLabel} htmlFor="desk-invite">
                 Invite code <span className="font-normal text-muted">(optional)</span>
               </label>
-              <input
-                id="desk-invite"
-                className="input font-mono"
-                type="text"
-                inputMode="text"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                placeholder="@username or code"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                autoComplete="off"
-              />
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8f877c]">
+                  <GiftGlyph />
+                </span>
+                <input
+                  id="desk-invite"
+                  className={`${deskInput} font-mono`}
+                  type="text"
+                  inputMode="text"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="@username"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-muted">Enter a referral code or username.</p>
             </div>
             {needsCode ? (
               <div>
                 <div className="alert mb-3 text-sm" role="status">
                   Check {email} for a 6-digit code and enter it below to finish.
                 </div>
-                <label className="label" htmlFor="desk-code">
+                <label className={deskLabel} htmlFor="desk-code">
                   Email code
                 </label>
                 <input
                   id="desk-code"
-                  className="input font-mono"
+                  className="input min-h-[48px] rounded-[10px] border-[#2c2822] bg-[#0a0908] font-mono"
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   maxLength={6}
@@ -584,40 +630,40 @@ export function SignupForm() {
             ) : null}
             {error ? <div className="alert alert-error">{error}</div> : null}
             <button
-              className="btn btn-primary min-h-12 w-full"
+              className="btn-sun flex min-h-12 w-full items-center justify-center gap-2 rounded-[10px] font-sans text-[15px]"
               type="submit"
               disabled={loading || mismatch || (needsCode && code.length !== 6)}
             >
               {loading ? t('auth.signup.submitting') : needsCode ? 'Finish' : 'Continue'}
+              {loading || needsCode ? null : <ArrowGlyph />}
             </button>
-            <div className="flex items-center gap-3 text-xs text-muted">
+            <p className="text-center text-xs text-muted">
+              Next: we email a code, then you pick your @username.
+            </p>
+            <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted">
               <span className="h-px flex-1 bg-white/10" />
               or
               <span className="h-px flex-1 bg-white/10" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setSoon(true)}
-                className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/12 px-2 text-left text-[13px] text-paper hover:border-sun/40"
-              >
-                <GoogleG />
-                <span>Continue with Google</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSoon(true)}
-                className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/12 px-2 text-left text-[13px] text-paper hover:border-sun/40"
-              >
-                <WalletGlyph />
-                <span>Continue with a wallet</span>
-              </button>
-            </div>
-            {soon ? (
-              <p className="text-center text-sm text-sun" role="status">
-                Coming soon
-              </p>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => showSoon('Continue with Google')}
+              className="flex min-h-[52px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#3a3228] bg-[#100e0b] px-4 text-[14px] text-paper shadow-[inset_0_1px_0_rgba(247,208,71,0.06)] hover:border-sun/50"
+            >
+              <GoogleG />
+              <span>Continue with Google</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => showSoon('Continue with a wallet')}
+              className="flex min-h-[52px] w-full items-center gap-3 rounded-[6px] border border-[#3a3228] bg-[#100e0b] px-4 text-left shadow-[inset_0_1px_0_rgba(247,208,71,0.06)] hover:border-sun/50"
+            >
+              <WalletGlyph />
+              <span className="min-w-0 flex-1">
+                <span className="block font-sans text-[14px] text-paper">Continue with a wallet</span>
+                <span className="mt-0.5 block text-[12px] text-muted">MetaMask, WalletConnect and more</span>
+              </span>
+            </button>
             <p className="text-center text-sm text-muted">
               {t('auth.signup.hasAccount')}{' '}
               <Link
@@ -639,6 +685,9 @@ export function SignupForm() {
   );
 }
 
+const deskLabel = 'mb-1.5 block font-sans text-[13px] font-medium normal-case tracking-normal text-paper';
+const deskInput = 'input min-h-[48px] rounded-[10px] border-[#2c2822] bg-[#0a0908] pl-11';
+
 function Step({
   n,
   title,
@@ -652,10 +701,10 @@ function Step({
 }) {
   return (
     <li className="flex items-start gap-3">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-sun/40 font-sans text-sm text-sun">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] border border-sun/50 font-mono text-[12px] text-sun">
         {n}
       </span>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-sun/30 text-sun">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] border border-[#3a3228] text-sun">
         {icon}
       </span>
       <span>
@@ -663,43 +712,6 @@ function Step({
         <span className="mt-0.5 block text-[12px] leading-4 text-muted">{note}</span>
       </span>
     </li>
-  );
-}
-
-function SignupScene() {
-  return (
-    <div className="relative mx-auto h-[280px] w-full max-w-[300px]" aria-hidden>
-      <div className="absolute left-1/2 top-[46%] h-52 w-52 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sun/45 shadow-[0_0_42px_rgba(247,208,71,0.22)]" />
-      <div className="absolute left-1/2 top-[46%] h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sun/15" />
-      <div className="absolute bottom-1 left-1/2 h-12 w-52 -translate-x-1/2 rounded-[50%] bg-[#1c1814]" />
-      <div className="absolute left-1/2 top-2 w-[120px] -translate-x-1/2 rounded-[24px] border border-white/15 bg-[#14120e] p-1.5 shadow-[0_24px_50px_rgba(0,0,0,0.55)]">
-        <div className="flex h-[196px] flex-col items-center justify-center rounded-[18px] bg-black px-2 text-center">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sun font-sans text-lg font-semibold text-sun-ink">
-            F
-          </span>
-          <p className="mt-2 font-sans text-[12px] font-semibold tracking-[0.16em] text-paper">FLIZY</p>
-          <p className="mt-1 text-[10px] leading-3 text-[#b7b1a8]">
-            Your crypto wallet
-            <br />
-            in your chats
-          </p>
-        </div>
-      </div>
-      <img
-        src="/account/tile-telegram.webp"
-        alt=""
-        className="absolute left-1 top-[72px] h-14 w-14 rounded-2xl shadow-[0_12px_28px_rgba(0,0,0,0.45)]"
-      />
-      <img
-        src="/account/tile-whatsapp.webp"
-        alt=""
-        className="absolute bottom-[64px] right-0 h-14 w-14 rounded-2xl shadow-[0_12px_28px_rgba(0,0,0,0.45)]"
-      />
-      <div className="absolute bottom-[108px] left-0 flex items-center gap-2 rounded-full border border-white/10 bg-[#1a1814] px-2.5 py-1 shadow-lg">
-        <PersonGlyph />
-        <span className="font-sans text-[12px] text-paper">@yourname</span>
-      </div>
-    </div>
   );
 }
 
@@ -747,22 +759,50 @@ function ShieldGlyph() {
   );
 }
 
-function LinkGlyph() {
+function LockGlyph() {
   return (
     <Glyph>
+      <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 10V8a4 4 0 0 1 8 0v2" stroke="currentColor" strokeWidth="1.6" />
+    </Glyph>
+  );
+}
+
+function GlobeGlyph() {
+  return (
+    <Glyph>
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.6" />
       <path
-        d="M10 13.5a3.2 3.2 0 0 0 4.6.2l2-2a3.2 3.2 0 0 0-4.5-4.5l-1.1 1.1"
+        d="M4 12h16M12 4c2.2 2.4 3.2 5 3.2 8s-1 5.6-3.2 8c-2.2-2.4-3.2-5-3.2-8s1-5.6 3.2-8Z"
         stroke="currentColor"
         strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="M14 10.5a3.2 3.2 0 0 0-4.6-.2l-2 2a3.2 3.2 0 0 0 4.5 4.5l1.1-1.1"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
       />
     </Glyph>
+  );
+}
+
+function GiftGlyph() {
+  return (
+    <Glyph>
+      <rect x="4" y="10" width="16" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M4 14h16M12 10v9M12 10c-2 0-4-1.2-4-3s2-2 4 3c2-5 4-3.2 4-3s-2 3-4 3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </Glyph>
+  );
+}
+
+function ArrowGlyph() {
+  return (
+    <Glyph>
+      <path d="M5 12h12M13 7l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </Glyph>
+  );
+}
+
+function Tick() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="none" aria-hidden>
+      <path d="m6 12 4 4 8-8" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 

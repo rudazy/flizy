@@ -1,16 +1,10 @@
-import dynamic from 'next/dynamic';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { pageMetadata } from '../../lib/seo';
 import { getAccountIdFromCookie } from '../../lib/cookies';
 import { safeNext } from '../../lib/safeNext.ts';
-import { custodyDoorEnabled, custodyDoorHref } from '../../lib/custodyDoor';
+import { custodyDoorEnabled } from '../../lib/custodyDoor';
 import { LoginForm } from './LoginForm';
-
-const CustodyDoor = dynamic(
-  () => import('../../components/CustodyDoor').then((mod) => mod.CustodyDoor),
-  { ssr: false }
-);
 
 export const metadata: Metadata = pageMetadata({
   title: 'Log in to Flizy',
@@ -26,9 +20,12 @@ export default async function LoginPage({
   searchParams?: { next?: string; door?: string };
 }) {
   if (await getAccountIdFromCookie()) redirect(safeNext(searchParams?.next));
-  const enabled = custodyDoorEnabled();
-  if (!enabled || searchParams?.door === 'password') {
-    return <LoginForm doorHref={enabled ? custodyDoorHref(searchParams?.next) : undefined} />;
+  // Email and password sign in on this page.
+  // door=password is the same form, so an older link still lands here.
+  // Google, a wallet, and a passkey say Coming soon and do not open Privy.
+  // Both branches render this form. The door component is not mounted.
+  if (!custodyDoorEnabled() || searchParams?.door === 'password') {
+    return <LoginForm />;
   }
-  return <CustodyDoor next={searchParams?.next} />;
+  return <LoginForm />;
 }

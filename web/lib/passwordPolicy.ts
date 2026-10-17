@@ -24,3 +24,16 @@ export function validatePassword(password: string): { ok: true } | { ok: false; 
   }
   return { ok: true };
 }
+
+/** One mark per rule in validatePassword. All true means that check accepts. */
+export function passwordChecklist(password: string): { label: string; ok: boolean }[] {
+  const p = String(password || '');
+  return [
+    { label: '8 to 128 characters', ok: p.length >= 8 && p.length <= 128 },
+    {
+      label: 'Include a letter and a number',
+      ok: /[a-zA-Z]/.test(p) && /[0-9]/.test(p),
+    },
+    { label: 'Include a special character (!@#$%)', ok: SPECIAL.test(p) },
+  ];
+}
