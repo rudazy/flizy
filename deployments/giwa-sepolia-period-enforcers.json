@@ -1,0 +1,85 @@
+{
+  "chainId": 91342,
+  "chainName": "GIWA Sepolia",
+  "explorer": "https://sepolia-explorer.giwa.io",
+  "rpc": "https://sepolia-rpc.giwa.io",
+  "note": "Unmodified delegation-framework v1.3.0 enforcers on GIWA Sepolia. Not production custody. Period caps are delegation terms and are not stored in these contracts. This record does not create a delegation and does not change an owner.",
+  "pin": {
+    "repo": "https://github.com/MetaMask/delegation-framework",
+    "tag": "v1.3.0",
+    "commit": "bfbdf9795a976833ed2fa000baf42fbb83958b03",
+    "neverMain": true
+  },
+  "capAmounts": "not stored in these contracts",
+  "pairing": {
+    "native": [
+      "NativeTokenPeriodTransferEnforcer",
+      "ExactCalldataEnforcer"
+    ],
+    "erc20": [
+      "ERC20PeriodTransferEnforcer",
+      "ValueLteEnforcer"
+    ]
+  },
+  "caveatTerms": {
+    "exactCalldataEnforcer": "0x",
+    "exactCalldataMeaning": "Raw expected calldata. Empty terms force empty calldata on a native delegation.",
+    "valueLteEnforcer": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "valueLteMeaning": "uint256 maximum. 32 zero bytes force call value 0 on an ERC-20 delegation. Empty terms are invalid."
+  },
+  "contracts": {
+    "nativeTokenPeriodTransferEnforcer": "0x4AEa7d5c1f46dbBC989bCe6fED1c308969e02B4b",
+    "erc20PeriodTransferEnforcer": "0x5f7e9B1133b40b7fE5898952409f5092291F85e1",
+    "exactCalldataEnforcer": "0x9c2E6f6986eeF48b8E8BD1239EDd231b3e96fe4F",
+    "valueLteEnforcer": "0xCDfF89B4f7D0F44Dc056C33B18f575D7B7fA0505"
+  },
+  "deployTxs": {
+    "nativeTokenPeriodTransferEnforcer": "0x4d011af814f7b725a7670859f9c03b6a818d2bbf28f3867280d2beb9b4453e98",
+    "erc20PeriodTransferEnforcer": "0x65f80be18a00c910054b00dfb22fb059213975c4c900b5d722596503e8d2c6ac",
+    "exactCalldataEnforcer": "0x8892271388909a9cdccbfe877c9bcb30e1045021ce1f12e5a1a03b1bd71d5dd7",
+    "valueLteEnforcer": "0xaa76daae723915e1049719d3171187a152c151488218b0b1d5b052931184aca7"
+  },
+  "bytecode": {
+    "NativeTokenPeriodTransferEnforcer": {
+      "address": "0x4AEa7d5c1f46dbBC989bCe6fED1c308969e02B4b",
+      "tx": "0x4d011af814f7b725a7670859f9c03b6a818d2bbf28f3867280d2beb9b4453e98",
+      "gasUsed": "679953",
+      "deployedBytes": 2903,
+      "deployedKeccak": "0xa7154b218ef65120a6573b9785074631478a2c08e0a9efd9a8f6e103fc84bb0f",
+      "artifactKeccak": "0xa7154b218ef65120a6573b9785074631478a2c08e0a9efd9a8f6e103fc84bb0f",
+      "creationKeccak": "0x3f72d02b416a78839781a6cd2fe2ed3310fb406979968592001816968262af50",
+      "exactRuntimeMatch": true
+    },
+    "ERC20PeriodTransferEnforcer": {
+      "address": "0x5f7e9B1133b40b7fE5898952409f5092291F85e1",
+      "tx": "0x65f80be18a00c910054b00dfb22fb059213975c4c900b5d722596503e8d2c6ac",
+      "gasUsed": "775854",
+      "deployedBytes": 3346,
+      "deployedKeccak": "0xd9a721435a13aaa562f7e6c7f7d062170a725ffdb7dd7c1e30798194ee9e186c",
+      "artifactKeccak": "0xd9a721435a13aaa562f7e6c7f7d062170a725ffdb7dd7c1e30798194ee9e186c",
+      "creationKeccak": "0x85975a60dd93cffb68adbe4128c701fb50826f8c26dd9ab7ee6a2843146cbea2",
+      "exactRuntimeMatch": true
+    },
+    "ExactCalldataEnforcer": {
+      "address": "0x9c2E6f6986eeF48b8E8BD1239EDd231b3e96fe4F",
+      "tx": "0x8892271388909a9cdccbfe877c9bcb30e1045021ce1f12e5a1a03b1bd71d5dd7",
+      "gasUsed": "348920",
+      "deployedBytes": 1369,
+      "deployedKeccak": "0x22eef3e73397f97581331630b2783433d7290d6af7cea46214762283c2c15ab2",
+      "artifactKeccak": "0x22eef3e73397f97581331630b2783433d7290d6af7cea46214762283c2c15ab2",
+      "creationKeccak": "0x57aab35ac97d304f77c588a52c880687afbc1505b53a7b9b8f56a88914508962",
+      "exactRuntimeMatch": true
+    },
+    "ValueLteEnforcer": {
+      "address": "0xCDfF89B4f7D0F44Dc056C33B18f575D7B7fA0505",
+      "tx": "0xaa76daae723915e1049719d3171187a152c151488218b0b1d5b052931184aca7",
+      "gasUsed": "327992",
+      "deployedBytes": 1272,
+      "deployedKeccak": "0x825495cede463ecea97c3c6c2bee85d5a4645906e1f0498a9432b39f43cfad19",
+      "artifactKeccak": "0x825495cede463ecea97c3c6c2bee85d5a4645906e1f0498a9432b39f43cfad19",
+      "creationKeccak": "0x46e2ce7ad67d27fc5275c12be727593058e824fa60593c149ef7242a3ebf0b00",
+      "exactRuntimeMatch": true
+    }
+  },
+  "rejected": {}
+}
