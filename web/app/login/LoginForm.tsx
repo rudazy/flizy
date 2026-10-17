@@ -192,37 +192,27 @@ export function LoginForm() {
               <label className={fieldLabel} htmlFor="desk-locale">
                 {t('auth.signup.language')}
               </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8f877c]">
-                  <GlobeMark />
-                </span>
-                <LanguageSelect
-                  id="desk-locale"
-                  className={fieldInput}
-                  value={locale}
-                  onChange={(code: LocaleCode) => setLocale(code)}
-                />
-              </div>
+              <LanguageSelect
+                id="desk-locale"
+                className={fieldInput}
+                value={locale}
+                onChange={(code: LocaleCode) => setLocale(code)}
+              />
             </div>
             <div>
               <label className={fieldLabel} htmlFor="desk-email">
                 {t('auth.login.email')}
               </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8f877c]">
-                  <MailMark />
-                </span>
-                <input
-                  id="desk-email"
-                  className={fieldInput}
-                  type="email"
-                  required
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                />
-              </div>
+              <input
+                id="desk-email"
+                className={fieldInput}
+                type="email"
+                required
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
             </div>
             <PasswordField
               id="desk-password"
@@ -234,7 +224,6 @@ export function LoginForm() {
               required
               placeholder="Enter your password"
               autoComplete="current-password"
-              leading={<LockMark />}
               iconToggle
             />
             {needsCode ? (
@@ -346,7 +335,7 @@ export function LoginForm() {
 }
 
 const fieldLabel = 'mb-1.5 block font-sans text-[13px] font-medium normal-case tracking-normal text-paper';
-const fieldInput = 'input min-h-[48px] rounded-[10px] border-[#2c2822] bg-[#0a0908] pl-11';
+const fieldInput = 'input min-h-[48px] rounded-[10px] border-[#2c2822] bg-[#0a0908]';
 
 function Feature({ icon, title, note }: { icon: ReactNode; title: string; note: string }) {
   return (
@@ -429,24 +418,6 @@ function LockMark() {
     <Mark>
       <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.6" />
       <path d="M8 10V8a4 4 0 0 1 8 0v2" stroke="currentColor" strokeWidth="1.6" />
-    </Mark>
-  );
-}
-
-function GlobeMark() {
-  return (
-    <Mark>
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M4 12h16M12 4c2.2 2.4 3.2 5 3.2 8s-1 5.6-3.2 8c-2.2-2.4-3.2-5-3.2-8s1-5.6 3.2-8Z" stroke="currentColor" strokeWidth="1.6" />
-    </Mark>
-  );
-}
-
-function MailMark() {
-  return (
-    <Mark>
-      <rect x="4" y="6" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m5 8 7 5 7-5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
     </Mark>
   );
 }

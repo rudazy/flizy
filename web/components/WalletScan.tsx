@@ -236,7 +236,7 @@ export function WalletScan() {
           <div className="absolute -right-10 top-[-18%] h-56 w-56 rounded-full bg-[#e0b84a]/10 blur-3xl" />
         </div>
 
-        <div className="relative flex min-w-0 items-center gap-3 px-4 py-5 md:grid md:grid-cols-[minmax(0,1fr)_240px] md:gap-6 md:px-7 md:py-7 lg:grid-cols-[minmax(0,34rem)_minmax(260px,1fr)] lg:gap-10 lg:py-8">
+        <div className="relative grid min-w-0 grid-cols-[minmax(0,1fr)_112px] items-center gap-3 px-4 py-5 md:grid-cols-[minmax(0,1fr)_180px] md:gap-6 md:px-7 md:py-7 lg:grid-cols-[minmax(0,34rem)_220px] lg:gap-10 lg:py-8">
           <div className="min-w-0 max-w-xl flex-1">
             <p className="m-0 font-mono text-[10px] font-medium uppercase tracking-[0.22em] text-sun">Activity</p>
             <h2 className="m-0 mt-2 bg-gradient-to-br from-[#fff6d8] via-[#f7d047] to-[#c4893f] bg-clip-text font-sans text-[36px] font-semibold leading-none tracking-[0.03em] text-transparent sm:text-[44px] lg:text-[52px]">
@@ -758,10 +758,10 @@ function ChipMark({ id }: { id: ScanChip }) {
 
 function ScanArt() {
   return (
-    <div className="relative h-[104px] w-[116px] shrink-0 md:h-[156px] md:w-full lg:h-[188px]" aria-hidden>
-      <div className="absolute inset-[8%] rounded-[50%] border border-[#e0b84a]/20" />
-      <div className="absolute inset-[18%] rounded-[50%] border border-[#e0b84a]/35" />
-      <div className="absolute inset-[5%] rounded-[50%] border border-dashed border-[#e0b84a]/40" />
+    <div className="relative aspect-square w-full justify-self-end" aria-hidden>
+      <div className="absolute inset-[10%] rounded-full border border-[#e0b84a]/20" />
+      <div className="absolute inset-[20%] rounded-full border border-[#e0b84a]/35" />
+      <div className="absolute inset-[7%] rounded-full border border-dashed border-[#e0b84a]/40" />
       <div className="absolute left-1/2 top-1/2 aspect-square h-[76%] -translate-x-1/2 -translate-y-1/2">
         <div
           className="scan-orbit h-full w-full rounded-full"
@@ -773,23 +773,21 @@ function ScanArt() {
           }}
         />
       </div>
-      <ArtTile className="left-0 top-1 md:left-[6%] md:top-[14%]">
+      <ArtTile className="left-[4%] top-[8%] md:left-[6%] md:top-[14%]">
         <SwapArrowsIcon size={14} />
       </ArtTile>
-      <ArtTile className="right-0 top-0 md:right-[8%] md:top-[10%]">
+      <ArtTile className="right-[4%] top-[4%] md:right-[8%] md:top-[10%]">
         <PlaneGlyph />
       </ArtTile>
-      <ArtTile className="bottom-1 left-1 md:bottom-[12%] md:left-[12%]">
+      <ArtTile className="bottom-[8%] left-[8%] md:bottom-[12%] md:left-[12%]">
         <PoolGlyph />
       </ArtTile>
-      <ArtTile className="bottom-0 right-1 md:bottom-[8%] md:right-[10%]">
+      <ArtTile className="bottom-[4%] right-[6%] md:bottom-[8%] md:right-[10%]">
         <NftsIcon size={14} />
       </ArtTile>
-      <div className="absolute left-1/2 top-1/2 h-[64px] w-[64px] -translate-x-1/2 -translate-y-[54%] md:h-[78px] md:w-[78px]">
-        <div className="flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-sun bg-[#141208] shadow-[0_0_28px_rgba(224,184,74,0.42)] md:h-[64px] md:w-[64px] md:border-[2.5px]">
-          <span className="font-sans text-[22px] font-semibold leading-none text-sun md:text-[28px]">F</span>
-        </div>
-        <span className="absolute bottom-0 right-1 h-[14px] w-[3px] origin-top rotate-45 rounded-full bg-sun md:h-[18px]" />
+      <div className="absolute left-1/2 top-1/2 flex h-[46%] w-[46%] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-sun bg-[#141208] shadow-[0_0_28px_rgba(224,184,74,0.42)] md:border-[2.5px]">
+        <span className="font-sans text-[20px] font-semibold leading-none text-sun md:text-[28px]">F</span>
+        <span className="absolute bottom-[8%] right-[10%] h-[16%] w-[3px] origin-top rotate-45 rounded-full bg-sun" />
       </div>
     </div>
   );

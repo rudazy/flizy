@@ -245,17 +245,12 @@ export function SignupForm() {
               <label className={deskLabel} htmlFor="desk-locale">
                 {t('auth.signup.language')}
               </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8f877c]">
-                  <GlobeGlyph />
-                </span>
-                <LanguageSelect
-                  id="desk-locale"
-                  className={deskInput}
-                  value={locale}
-                  onChange={(code: LocaleCode) => setLocale(code)}
-                />
-              </div>
+              <LanguageSelect
+                id="desk-locale"
+                className={deskInput}
+                value={locale}
+                onChange={(code: LocaleCode) => setLocale(code)}
+              />
             </div>
             <div>
               <label className={deskLabel} htmlFor="desk-country">
@@ -283,24 +278,19 @@ export function SignupForm() {
               <label className={deskLabel} htmlFor="desk-email">
                 {t('auth.signup.email')}
               </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8f877c]">
-                  <MailGlyph />
-                </span>
-                <input
-                  id="desk-email"
-                  className={deskInput}
-                  type="email"
-                  required
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  readOnly={needsCode}
-                  autoComplete="email"
-                />
-              </div>
+              <input
+                id="desk-email"
+                className={deskInput}
+                type="email"
+                required
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                readOnly={needsCode}
+                autoComplete="email"
+              />
             </div>
-            {/* Same trap as the phone form: off-screen, not a one-pixel box a bot can skip. */}
+            {/* Off-screen trap. A bot that fills every field still trips it. */}
             <div className="absolute left-[-9999px] h-px w-px overflow-hidden" aria-hidden="true">
               <label htmlFor="desk-note">Note</label>
               <input
@@ -324,7 +314,6 @@ export function SignupForm() {
               minLength={8}
               placeholder="Create a strong password"
               autoComplete="new-password"
-              leading={<LockGlyph />}
               iconToggle
             />
             <ul className="space-y-1">
@@ -352,7 +341,6 @@ export function SignupForm() {
               minLength={8}
               placeholder="Type it again"
               autoComplete="new-password"
-              leading={<LockGlyph />}
               iconToggle
               problem={mismatch ? 'Passwords do not match yet.' : undefined}
               hint="Both entries must match exactly."
@@ -361,24 +349,19 @@ export function SignupForm() {
               <label className={deskLabel} htmlFor="desk-invite">
                 Invite code <span className="font-normal text-muted">(optional)</span>
               </label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8f877c]">
-                  <GiftGlyph />
-                </span>
-                <input
-                  id="desk-invite"
-                  className={`${deskInput} font-mono`}
-                  type="text"
-                  inputMode="text"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="@username"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
+              <input
+                id="desk-invite"
+                className={`${deskInput} font-mono`}
+                type="text"
+                inputMode="text"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="@username"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                autoComplete="off"
+              />
               <p className="mt-1.5 text-xs text-muted">Enter a referral code or username.</p>
             </div>
             {needsCode ? (
@@ -484,7 +467,7 @@ export function SignupForm() {
 }
 
 const deskLabel = 'mb-1.5 block font-sans text-[13px] font-medium normal-case tracking-normal text-paper';
-const deskInput = 'input min-h-[48px] rounded-[10px] border-[#2c2822] bg-[#0a0908] pl-11';
+const deskInput = 'input min-h-[48px] rounded-[10px] border-[#2c2822] bg-[#0a0908]';
 
 function Step({
   n,
@@ -562,28 +545,6 @@ function LockGlyph() {
     <Glyph>
       <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.6" />
       <path d="M8 10V8a4 4 0 0 1 8 0v2" stroke="currentColor" strokeWidth="1.6" />
-    </Glyph>
-  );
-}
-
-function GlobeGlyph() {
-  return (
-    <Glyph>
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M4 12h16M12 4c2.2 2.4 3.2 5 3.2 8s-1 5.6-3.2 8c-2.2-2.4-3.2-5-3.2-8s1-5.6 3.2-8Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-    </Glyph>
-  );
-}
-
-function GiftGlyph() {
-  return (
-    <Glyph>
-      <rect x="4" y="10" width="16" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M4 14h16M12 10v9M12 10c-2 0-4-1.2-4-3s2-2 4 3c2-5 4-3.2 4-3s-2 3-4 3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
     </Glyph>
   );
 }
