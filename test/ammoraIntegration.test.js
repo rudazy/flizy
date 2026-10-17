@@ -5,9 +5,9 @@
  *
  * Covers: the pinned-code check turning the venue off; AMMORA_ENABLED off
  * meaning no SDK load, no chain read and no database read; the inventory's
- * text caps and Data API failures; the Explore catalog's empty state and
- * sanitizing; chat buy, sell and price; approvals through Flizy's executor
- * (never the SDK's execute()); and the site swap's refusals.
+ * text caps and Data API failures; the Explore catalog falling back to stored
+ * launch status, and sanitizing; chat buy, sell and price; approvals through
+ * Flizy's executor (never the SDK's execute()); and the site swap's refusals.
  *
  * Run: node --test test/ammoraIntegration.test.js
  */
@@ -732,15 +732,108 @@ describe('site: Explore catalog and swap refusals', () => {
 
   const okFetch = (items) => async () => ({ ok: true, json: async () => ({ items, nextCursor: null }) });
 
-  it('Data API down: a clean empty state, not an error', async () => {
+  it('Data API down: stored launch status, and a stored flagged row stays out', async () => {
     const down = async () => {
       throw new Error('ECONNREFUSED');
     };
+    const stored = [
+      ['AIV4C', 'active', true, 'Ammora launch'],
+      ['FLZ', 'active', true, 'Ammora launch'],
+      ['SLEEPY', 'migrated', false, 'Ammora launch'],
+    ];
     const out = await catalog.listAmmoraTokens(fakeSupabase(), fakeProvider(), { fetcher: down });
-    assert.deepEqual(out, { tokens: [], unavailable: true });
+    assert.equal(out.unavailable, false);
+    assert.equal(out.tokens.every((t) => t.image === null), true);
+    assert.deepEqual(out.tokens.map((t) => [t.symbol, t.status, t.tradable, t.source]), stored);
     catalog.resetCatalogCache();
     const bad = async () => ({ ok: false, json: async () => ({}) });
-    assert.deepEqual(await catalog.listAmmoraTokens(fakeSupabase(), fakeProvider(), { fetcher: bad }), { tokens: [], unavailable: true });
+    const badOut = await catalog.listAmmoraTokens(fakeSupabase(), fakeProvider(), { fetcher: bad });
+    assert.equal(badOut.unavailable, false);
+    assert.deepEqual(badOut.tokens.map((t) => [t.symbol, t.status, t.tradable, t.source]), stored);
+    catalog.resetCatalogCache();
+    const flagged = [
+      poolRow(TOKEN, 'AIV4C', { launch_status: 'FLAGGED' }),
+      poolRow(FAKE_FLZ, 'FLZ'),
+      poolRow(SLEEPY, 'SLEEPY', { tradable: false, launch_status: 'MIGRATED' }),
+    ];
+    const hidden = await catalog.listAmmoraTokens(fakeSupabase(flagged), fakeProvider(), { fetcher: down });
+    assert.equal(hidden.unavailable, false);
+    assert.deepEqual(hidden.tokens.map((t) => [t.symbol, t.status, t.tradable]), [
+      ['FLZ', 'active', true],
+      ['SLEEPY', 'migrated', false],
+    ]);
+  });
+
+  it('inventory unread: a clean empty state, not an error', async () => {
+    const out = await catalog.listAmmoraTokens(fakeSupabase(ROWS, { failPools: true }), fakeProvider(), {
+      fetcher: async () => ({ ok: true, json: async () => ({ items: [], nextCursor: null }) }),
+    });
+    assert.deepEqual(out, { tokens: [], unavailable: true });
+  });
+
+  it('shows a logo only when the Data API returns a safe image URL', async () => {
+    const fetcher = async (url) => {
+      if (String(url).includes('/v1/token-assets')) {
+        return {
+          ok: true,
+          json: async () => ({
+            items: [
+              { address: TOKEN, logoUrl: 'https://cdn.example/aiv4c.png' },
+              { address: SLEEPY, logoUrl: 'javascript:alert(1)' },
+              { address: FAKE_FLZ, logoUrl: 'http://cdn.example/flz.png' },
+            ],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          items: [
+            { address: TOKEN, status: 'ACTIVE' },
+            { address: FAKE_FLZ, status: 'ACTIVE', blacklisted: true },
+            { address: SLEEPY, status: 'MIGRATED' },
+          ],
+          nextCursor: null,
+        }),
+      };
+    };
+    const out = await catalog.listAmmoraTokens(fakeSupabase(), fakeProvider(), { fetcher });
+    assert.equal(out.unavailable, false);
+    assert.deepEqual(out.tokens.map((t) => [t.symbol, t.image]), [
+      ['AIV4C', 'https://cdn.example/aiv4c.png'],
+      ['SLEEPY', null],
+    ]);
+  });
+
+  it('reads an image from Ammora media metadata and does not fetch any other host', async () => {
+    const media = 'https://app.ammora.org/api/media/token/6c3beaa4-17b5-4724-b78a-d6044e4f9cb0/metadata';
+    const flaggedMedia = 'https://app.ammora.org/api/media/token/9cf6b58f-b538-4455-b47a-a063ea2e3697/metadata';
+    const calls = [];
+    const fetcher = async (url) => {
+      calls.push(String(url));
+      if (String(url).includes('/v1/token-assets')) return { ok: true, json: async () => ({ items: [] }) };
+      if (String(url) === media) {
+        return { ok: true, json: async () => ({ image: 'https://app.ammora.org/api/media/token/6c3beaa4-17b5-4724-b78a-d6044e4f9cb0/image' }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          items: [
+            { address: TOKEN, status: 'ACTIVE', metadataUri: media },
+            { address: SLEEPY, status: 'MIGRATED', metadataUri: 'https://evil.example/metadata' },
+            { address: FAKE_FLZ, status: 'ACTIVE', blacklisted: true, metadataUri: flaggedMedia },
+          ],
+          nextCursor: null,
+        }),
+      };
+    };
+    const out = await catalog.listAmmoraTokens(fakeSupabase(), fakeProvider(), { fetcher });
+    assert.deepEqual(out.tokens.map((t) => [t.symbol, t.image]), [
+      ['AIV4C', 'https://app.ammora.org/api/media/token/6c3beaa4-17b5-4724-b78a-d6044e4f9cb0/image'],
+      ['SLEEPY', null],
+    ]);
+    assert.equal(calls.some((url) => url.includes('evil.example')), false);
+    assert.equal(calls.includes(flaggedMedia), false);
   });
 
   it('labels Ammora launches, never Verified or Graduated, and leaves flagged ones out', async () => {

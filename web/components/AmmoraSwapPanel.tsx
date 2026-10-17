@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PinField, pinReady } from './PinField';
 import { announceTx } from '../lib/txSignal';
+import { ArrowLeftIcon } from './ExploreIcons';
 
 /**
  * The swap screen on the Ammora venue: buy or sell one Ammora token against
@@ -14,7 +15,8 @@ import { announceTx } from '../lib/txSignal';
  * Ammora's fee with its rate, price impact (unavailable from Ammora, said so
  * rather than guessed), the token's contract and the Ammora source label.
  * Every Ammora swap takes the PIN (never in Flizy's verified set). The swap
- * goes through /api/swap/execute and Flizy's own executor.
+ * goes through /api/swap/execute and Flizy's own executor. Back returns to
+ * the Ammora launches view.
  */
 
 type TokenView = { address: string; symbol: string; name: string; tradable: boolean; label: string };
@@ -127,6 +129,13 @@ export function AmmoraSwapPanel({ initialToken }: { initialToken: string | null 
 
   return (
     <section className="grid gap-[12px]" aria-labelledby="ammora-swap">
+      <Link
+        href="/dashboard/explore?s=tokens&view=ammora"
+        className="hit-y-44 inline-flex h-[36px] w-fit items-center gap-[8px] rounded-[8px] border border-[#2a2b30] bg-[#141416] px-[12px] font-sans text-[12px] font-medium text-white no-underline hover:border-[#6e2c72]"
+      >
+        <ArrowLeftIcon size={14} />
+        Back to Ammora launches
+      </Link>
       <div>
         <h2 id="ammora-swap" className="m-0 font-sans text-[15px] font-bold text-white">
           Swap on Ammora

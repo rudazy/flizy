@@ -11,8 +11,9 @@ const ROUTE = 'GET /api/ammora/tokens';
 
 /**
  * Ammora launches for Explore and the swap token picker. Off (AMMORA_ENABLED)
- * means 404 and no Ammora call. A Data API failure or an unattested venue is a
- * clean empty list with unavailable: true, never an error page.
+ * means 404 and no Ammora call. An unattested venue, or an inventory that
+ * cannot be read, is a clean empty list with unavailable: true. A Data API
+ * failure uses the launch status stored on each pool. Never an error page.
  */
 export async function GET() {
   try {

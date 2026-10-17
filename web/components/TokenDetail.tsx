@@ -54,7 +54,9 @@ import {
  * A token's page: price, chart, trade, the pool's figures, recent trades and
  * holders. FLZ, the listed token, also has its profile, watchlist and theses.
  * Any other token opens the same page by its contract, read from its own ETH
- * pool and without the FLZ-only parts. A listed token Flizy verified carries the
+ * pool and without the FLZ-only parts. An Ammora launch opens this same page
+ * by its contract. The price is a live Ammora quote, and Buy and Sell use the
+ * Ammora venue. A listed token Flizy verified carries the
  * mark, any other listed token carries nothing, and a token Flizy does not list
  * is tagged Not listed (lib/listedTokens.ts).
  *
@@ -136,12 +138,24 @@ function Letter({ name, className = '' }: { name: string; className?: string }) 
 /** A token opened by its contract, as the token route describes it. */
 type HeldInfo = { address: string; symbol: string; decimals: number; balance: string | null; verified?: boolean; listed?: boolean; chainName: string; explorerBaseUrl: string };
 
+/** An image src the page may load. The catalog already filtered this. Anything else is dropped. */
+function httpsImage(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  try {
+    const url = new URL(raw.trim());
+    return url.protocol === 'https:' && !url.username && !url.password ? raw.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function TokenDetail({ symbol }: { symbol: string }) {
   const router = useRouter();
   const listed = symbol.toLowerCase() === 'flz';
   /** A token opened by its contract: the same page, its own pool, no listing. */
   const imported = /^0x[0-9a-fA-F]{40}$/.test(symbol);
   const tokenRef = listed ? 'flz' : symbol;
+  const ammoraUi = process.env.NEXT_PUBLIC_AMMORA_ENABLED === 'true';
   const [comingSoon, comingSoonNote] = useComingSoon();
 
   const [range, setRange] = useState<ChartRange>('1d');
@@ -155,6 +169,18 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const [held, setHeld] = useState<HeldInfo | null>(null);
   /** An imported token the swap router has no ETH pool for: no price, no trade. */
   const [noPool, setNoPool] = useState(false);
+  const [marketSettled, setMarketSettled] = useState(false);
+  /** Set when this contract is an Ammora launch. Null once the list has been read and it is not. */
+  const [ammora, setAmmora] = useState<{
+    address: string;
+    symbol: string;
+    name: string;
+    tradable: boolean;
+    image?: string | null;
+  } | null>(null);
+  const [ammoraChecked, setAmmoraChecked] = useState(false);
+  const [ammoraPrice, setAmmoraPrice] = useState<number | null>(null);
+  const [imageFailed, setImageFailed] = useState(false);
 
   const [profile, setProfile] = useState<TokenProfile | null>(null);
   const [watched, setWatched] = useState(false);
@@ -179,30 +205,119 @@ export function TokenDetail({ symbol }: { symbol: string }) {
 
   /** Which side the trade sheet is open on, or null when it is closed. */
   const [tradeSide, setTradeSide] = useState<'buy' | 'sell' | null>(null);
+  /**
+   * The contract these rows belong to. A new route clears them during render,
+   * before paint, so a sheet opened on the previous token cannot submit it.
+   */
+  const [shownToken, setShownToken] = useState(tokenRef);
+  if (shownToken !== tokenRef) {
+    setShownToken(tokenRef);
+    setMarket(null);
+    setHeld(null);
+    setNoPool(false);
+    setMarketError('');
+    setMarketSettled(false);
+    setAmmora(null);
+    setAmmoraChecked(false);
+    setAmmoraPrice(null);
+    setImageFailed(false);
+    setHolderRows(null);
+    setTopShare(null);
+    setHolderCount(null);
+    setHolderError('');
+    setTradeSide(null);
+  }
 
   useEffect(() => setNow(Math.floor(Date.now() / 1000)), [market]);
 
+  const marketToken = useRef(tokenRef);
+  marketToken.current = tokenRef;
+
   const loadMarket = useCallback(async (which: ChartRange) => {
+    const mine = tokenRef;
     setMarketError('');
     try {
       const res = await fetch(`/api/tokens/${tokenRef}?range=${which}`);
       const body = await res.json().catch(() => ({}));
+      if (marketToken.current !== mine) return;
       if (body.listedSymbol === 'flz') {
         router.replace('/dashboard/explore/tokens/flz');
         return;
       }
       if (!res.ok) {
         setMarketError(body.error || 'Could not load this token.');
+        setMarketSettled(true);
         return;
       }
       if (body.held) setHeld(body.held as HeldInfo);
       setNoPool(imported && !body.market);
       setMarket((body.market ?? null) as TokenSnapshot | null);
       setUsdPerEth(typeof body.usdPerEth === 'number' ? body.usdPerEth : null);
+      setMarketSettled(true);
     } catch {
+      if (marketToken.current !== mine) return;
       setMarketError('Could not load this token.');
+      setMarketSettled(true);
     }
   }, [tokenRef, imported, router]);
+
+  useEffect(() => {
+    if (!imported || !ammoraUi) {
+      setAmmora(null);
+      setAmmoraChecked(true);
+      return;
+    }
+    let cancelled = false;
+    setAmmoraChecked(false);
+    fetch('/api/ammora/tokens', { cache: 'no-store' })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        const rows = Array.isArray(body.tokens) ? body.tokens : [];
+        const hit = rows.find(
+          (row: { address?: string }) => typeof row.address === 'string' && row.address.toLowerCase() === symbol.toLowerCase()
+        );
+        if (!hit || typeof hit.address !== 'string' || typeof hit.symbol !== 'string') {
+          setAmmora(null);
+          return;
+        }
+        setAmmora({
+          address: hit.address,
+          symbol: hit.symbol,
+          name: typeof hit.name === 'string' ? hit.name : '',
+          tradable: hit.tradable === true,
+          image: httpsImage(hit.image),
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setAmmora(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAmmoraChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [imported, ammoraUi, symbol]);
+
+  useEffect(() => {
+    if (!ammora?.tradable) return;
+    let cancelled = false;
+    const q = new URLSearchParams({ venue: 'ammora', side: 'price', token: ammora.address });
+    fetch(`/api/swap/quote?${q}`, { cache: 'no-store' })
+      .then(async (res) => {
+        const body = await res.json().catch(() => ({}));
+        if (cancelled || !res.ok) return;
+        const eth = body?.price?.ethPerToken;
+        if (typeof eth === 'number' && Number.isFinite(eth) && eth > 0) setAmmoraPrice(eth);
+      })
+      .catch(() => {
+        // No quote means the price stays unavailable. Buy still opens.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ammora]);
 
   const loadTheses = useCallback(async () => {
     try {
@@ -244,6 +359,15 @@ export function TokenDetail({ symbol }: { symbol: string }) {
       }
     })();
     void (async () => {
+      // An Ammora launch has no Flizy holder index. Skip the read so a 404 is not shown as a failure.
+      if (imported && ammoraUi && !ammoraChecked) return;
+      if (ammora) {
+        setHolderRows([]);
+        setHolderError('');
+        setHolderCount(null);
+        setTopShare(null);
+        return;
+      }
       try {
         const res = await fetch(`/api/tokens/${tokenRef}/holders`);
         const body = await res.json().catch(() => ({}));
@@ -268,7 +392,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
       }
     })();
     if (listed) void loadTheses();
-  }, [listed, imported, tokenRef, loadTheses]);
+  }, [listed, imported, tokenRef, loadTheses, ammora, ammoraChecked, ammoraUi]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -296,13 +420,15 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const change24 = formatPct(day?.changePct ?? null);
   const changeUp = (day?.changePct ?? 0) >= 0;
   const activity = market?.activity ?? [];
-  const name = listed ? (market?.name && market.name !== 'FLZ' ? market.name : 'Flizy') : market?.name || held?.symbol || 'Token';
+  const name = ammora?.name || (listed ? (market?.name && market.name !== 'FLZ' ? market.name : 'Flizy') : market?.name || held?.symbol || 'Token');
   // An imported token is named by its own contract from the first render, so a
   // trade can never fall back to FLZ while the page is still loading.
-  const ticker = market?.symbol || held?.symbol || (listed ? 'FLZ' : 'Token');
+  const ticker = ammora?.symbol || market?.symbol || held?.symbol || (listed ? 'FLZ' : 'Token');
   const contract = market?.address || held?.address || (imported ? symbol : null);
-  /** Trading needs a pool the page has read; an imported token waits for its own. */
-  const canTrade = listed || (imported && market != null);
+  /** A Flizy pool the page has read. An imported token waits for its own, and never falls back to FLZ. */
+  const poolTrade = listed || (imported && market != null);
+  /** An Ammora launch trades on Ammora. Everything else uses the pool above. */
+  const canTrade = ammora ? ammora.tradable === true : poolTrade;
   /** Opened by its contract and listed by Flizy, with a pool Flizy seeded. */
   const seeded = imported && held?.listed === true;
   /** FLZ, or a listed token Flizy verified: carries the mark. */
@@ -345,9 +471,13 @@ export function TokenDetail({ symbol }: { symbol: string }) {
       mode={chartMode}
       height={fullscreen ? 460 : phone ? 200 : 280}
     />
-  ) : noPool ? (
+  ) : noPool && !ammora ? (
     <div className="flex h-[200px] items-center justify-center rounded-[10px] bg-[#141414] px-6 text-center text-sm text-muted sm:h-[280px]">
       The swap has no ETH pool for this token on GIWA, so there is no price, chart or trade.
+    </div>
+  ) : ammora && marketSettled ? (
+    <div className="flex h-[200px] items-center justify-center rounded-[10px] bg-[#141414] px-6 text-center text-sm text-muted sm:h-[280px]">
+      No chart yet. Flizy does not store this Ammora pool's trades.
     </div>
   ) : (
     <div className="h-[200px] animate-pulse sm:h-[280px] rounded-[10px] bg-[#141414]" aria-label="Loading the chart" />
@@ -358,11 +488,33 @@ export function TokenDetail({ symbol }: { symbol: string }) {
       <div className="grid w-full min-w-0 gap-4 [&>*]:min-w-0">
         {/* Header */}
         <div className="flex items-start gap-3">
-          <Link href="/dashboard/explore?s=tokens" className="hit-y-44 mt-1 text-sun sm:mt-2" aria-label="Back to tokens">
+          <Link
+            href={ammora ? '/dashboard/explore?s=tokens&view=ammora' : '/dashboard/explore?s=tokens'}
+            className="hit-y-44 mt-1 text-sun sm:mt-2"
+            aria-label={ammora ? 'Back to Ammora launches' : 'Back to tokens'}
+          >
             <ArrowLeftIcon size={20} />
           </Link>
           <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:gap-3.5">
-            {profile?.logo ? (
+            {ammora ? (
+              <span className="relative shrink-0">
+                {ammora.image && !imageFailed ? (
+                  <img
+                    src={ammora.image}
+                    alt=""
+                    className="h-14 w-14 rounded-full object-cover sm:h-[76px] sm:w-[76px]"
+                    onError={() => setImageFailed(true)}
+                  />
+                ) : (
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full border border-sun/40 bg-[#0b0b0b] font-sans text-2xl font-bold text-sun sm:h-[76px] sm:w-[76px] sm:text-3xl" aria-hidden>
+                    {name.slice(0, 1).toUpperCase()}.
+                  </span>
+                )}
+                <span className="absolute -bottom-[2px] -right-[2px] flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 border-[#0a0a0a] bg-[#6e2c72] font-sans text-[10px] font-bold text-white sm:h-[22px] sm:w-[22px] sm:text-[12px]" aria-label="Ammora token">
+                  A
+                </span>
+              </span>
+            ) : profile?.logo ? (
               <img src={profile.logo} alt={`${name} logo`} className="h-14 w-14 shrink-0 rounded-[12px] border border-sun/40 object-cover sm:h-[76px] sm:w-[76px] sm:rounded-[16px]" />
             ) : logoSrc ? (
               <img src={logoSrc} alt={`${name} logo`} className="h-14 w-14 shrink-0 rounded-full object-cover sm:h-[76px] sm:w-[76px]" />
@@ -475,7 +627,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
         <div className="flex items-start justify-between gap-3 sm:items-end sm:gap-4">
           <div className="min-w-0">
             <p className="m-0 flex flex-wrap items-baseline gap-x-2 sm:gap-x-3">
-              <span className="font-sans text-[24px] font-bold leading-tight tracking-wide text-[#f5f5f5] sm:text-[36px]">{ethText(market?.priceEth)}</span>
+              <span className="font-sans text-[24px] font-bold leading-tight tracking-wide text-[#f5f5f5] sm:text-[36px]">{ethText(ammora ? ammoraPrice : market?.priceEth)}</span>
               {change24 ? (
                 <span className={`font-mono text-[13px] sm:text-base ${changeUp ? UP : DOWN}`}>
                   {change24}<span className="hidden sm:inline"> (24h)</span>
@@ -483,7 +635,15 @@ export function TokenDetail({ symbol }: { symbol: string }) {
               ) : null}
             </p>
             <p className="m-0 mt-1 text-[11px] text-[#a9a9a9] sm:text-sm">
-              {usdText(market?.priceEth, usdPerEth) ? `${usdText(market?.priceEth, usdPerEth)} · ` : ''}Priced from the ETH pool
+              {ammora ? (
+                <>
+                  {usdText(ammoraPrice, usdPerEth) ? `${usdText(ammoraPrice, usdPerEth)} · ` : ''}Priced from the Ammora pool
+                </>
+              ) : (
+                <>
+                  {usdText(market?.priceEth, usdPerEth) ? `${usdText(market?.priceEth, usdPerEth)} · ` : ''}Priced from the ETH pool
+                </>
+              )}
             </p>
           </div>
           <dl className="m-0 grid shrink-0 grid-cols-[auto_auto] gap-x-3 gap-y-1 font-mono text-[11px] sm:gap-x-6 sm:text-sm">
@@ -496,7 +656,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           </dl>
         </div>
 
-        {marketError ? <p className="alert alert-error">{marketError}</p> : null}
+        {marketError && !(ammora || (imported && ammoraUi && !ammoraChecked)) ? <p className="alert alert-error">{marketError}</p> : null}
 
         {/* Chart */}
         <section className={`${CARD} p-3 min-[640px]:p-4`}>
@@ -539,7 +699,9 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           </div>
           {chart}
           <p className="m-0 mt-2 text-[11px] text-muted">
-            Read from the last 24 hours of the GIWA pool. Longer ranges need trade history Flizy does not store yet.
+            {ammora
+              ? 'The price is a live Ammora quote. Longer ranges need trade history Flizy does not store yet.'
+              : 'Read from the last 24 hours of the GIWA pool. Longer ranges need trade history Flizy does not store yet.'}
           </p>
         </section>
 
@@ -625,7 +787,14 @@ export function TokenDetail({ symbol }: { symbol: string }) {
 
         <div role="tabpanel">
           {tab === 'activity' ? (
-            <ActivityCard rows={allActivity ? activity : activity.slice(0, 4)} now={now} onAll={() => setAllActivity((v) => !v)} showingAll={allActivity} total={activity.length} />
+            <ActivityCard
+              rows={allActivity ? activity : activity.slice(0, 4)}
+              now={now}
+              onAll={() => setAllActivity((v) => !v)}
+              showingAll={allActivity}
+              total={activity.length}
+              empty={ammora ? 'Flizy does not store Ammora trades on this page.' : undefined}
+            />
           ) : tab === 'holders' ? (
             <section className={`${CARD} p-4`}>
               {holderError ? <p className="alert alert-error">{holderError}</p> : null}
@@ -680,13 +849,15 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                 ) : null}
                 {profile?.creatorUsername ? <AboutRow label="Creator">@{profile.creatorUsername}</AboutRow> : null}
                 <AboutRow label="Status">
-                  {listed
-                    ? 'Verified. It can be sent on socials.'
-                    : verifiedMark
-                      ? 'Verified. Only ETH and FLZ can be sent on socials.'
-                      : seeded
-                        ? 'Listed on Flizy. Only ETH and FLZ can be sent on socials.'
-                        : 'Not listed. It cannot be sent on socials.'}
+                  {ammora
+                    ? 'An Ammora launch. Flizy has not reviewed this token.'
+                    : listed
+                      ? 'Verified. It can be sent on socials.'
+                      : verifiedMark
+                        ? 'Verified. Only ETH and FLZ can be sent on socials.'
+                        : seeded
+                          ? 'Listed on Flizy. Only ETH and FLZ can be sent on socials.'
+                          : 'Not listed. It cannot be sent on socials.'}
                 </AboutRow>
               </dl>
             </section>
@@ -724,13 +895,14 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           // Balances and history follow the sheet's announceTx; only the market is this page's.
           onTraded={() => void loadMarket(range)}
           symbol={ticker}
-          logo={logoSrc}
-          priceEth={market?.priceEth == null ? null : Number(market.priceEth)}
+          logo={ammora?.image || logoSrc}
+          priceEth={ammora ? ammoraPrice : market?.priceEth == null ? null : Number(market.priceEth)}
           change24={change24}
           changeUp={changeUp}
           usdPerEth={usdPerEth}
           tokenAddress={imported ? contract : null}
           listed={seeded}
+          venue={ammora ? 'ammora' : null}
         />
       ) : null}
 
@@ -796,12 +968,14 @@ function ActivityCard({
   onAll,
   showingAll,
   total,
+  empty = 'No trades in the last 24 hours.',
 }: {
   rows: ActivityRow[];
   now: number;
   onAll: () => void;
   showingAll: boolean;
   total: number;
+  empty?: string;
 }) {
   return (
     <section className={`${CARD} p-3.5 sm:p-4`}>
@@ -856,7 +1030,7 @@ function ActivityCard({
           </table>
         </div>
       ) : (
-        <p className="m-0 mt-3 text-sm text-muted">No trades in the last 24 hours.</p>
+        <p className="m-0 mt-3 text-sm text-muted">{empty}</p>
       )}
     </section>
   );

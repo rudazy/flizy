@@ -149,7 +149,7 @@ describe('listed tokens on the site', () => {
     assert.match(detail, /\{verifiedMark \? \([\s\S]*?<VerifiedMark \/>[\s\S]*?\) : notListed \? \([\s\S]*?Not listed[\s\S]*?\) : null\}/);
     assert.match(detail, /listed=\{seeded\}/);
     const sheet = read('web/components/TokenTradeSheet.tsx');
-    assert.match(sheet, /\{tokenAddress && !listed \? \(/);
+    assert.match(sheet, /\{tokenAddress && !listed && venue !== 'ammora' \? \(/);
     assert.match(sheet, /\{symbol\} is not listed on Flizy\./);
   });
 

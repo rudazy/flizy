@@ -19,24 +19,44 @@ export const CUSTODY_DOOR_CHAIN = {
 } as const;
 
 export const CUSTODY_DOOR_COPY = {
-  kicker: 'Sign in',
+  kicker: 'Your login',
+  headline: 'Your wallet.',
+  headlineAccent: 'Your sign-in.',
+  blurb: 'Use Flizy across Telegram and WhatsApp, and start using crypto socially.',
+  deskBlurb: 'Use crypto on Telegram and WhatsApp. Simple, social and secure.',
+  cardBlurb:
+    'Use a passkey, email, or Google. Continue as guest to look around this device. Your Flizy account is a separate step.',
+  deskGuestNote: 'Explore Flizy without an account',
+  promo: 'Chat wallet for Telegram and WhatsApp.',
+  passwordInstead: 'Use email and password instead',
+  featurePasskey: 'Passkey',
+  featurePasskeyNote: 'Saved on this device',
+  featureAnywhere: 'Use anywhere',
+  featureAnywhereNote: 'Telegram & WhatsApp',
+  featureFriends: 'Send to friends',
+  featureFriendsNote: 'With a username',
   title: 'Log in or sign up',
-  blurb:
-    'Use a passkey, email, or Google. Continue as guest to look around on this device. Your Flizy account is a separate step.',
-  passkey: 'Passkey',
-  email: 'Email',
-  google: 'Google',
-  waiting: 'Checking sign-in',
+  sheetNote: 'Your Flizy account is a separate step.',
+  passkey: 'Continue with a passkey',
+  passkeyNote: 'The safest and easiest way to log in',
+  recommended: 'Recommended',
+  email: 'Continue with email',
+  emailNote: 'Use your email to sign in',
+  google: 'Continue with Google',
+  googleNote: 'Fast and secure',
   guest: 'Continue as guest',
-  guestBusy: 'Starting guest',
+  guestNote: 'Look around on this device',
   guestTitle: 'Guest',
   guestBody:
     'This is not a Flizy account. It stays on this device. Nothing is linked and nothing has moved.',
   guestUpgrade: 'Add a passkey, email, or Google',
-  guestUpgradeNote: 'That starts a new login. To use an existing one, leave guest first.',
+  guestUpgradeNote: 'Coming soon. Leave guest to use email and password.',
   guestLeave: 'Leave guest',
-  guestUnavailable: 'Guest mode is not available yet.',
+  soon: 'Coming soon',
   password: 'Use email and password',
+  close: 'Close',
+  protected: 'Protected by',
+  privy: 'privy',
   signedInTitle: 'Signed in with Privy',
   signedInBody:
     'This wallet is not your Flizy account yet. Securing it comes next. Your passkey or your own wallet becomes the owner. Flizy keeps only a limited permission. Nothing has moved.',
@@ -47,7 +67,6 @@ export const CUSTODY_DOOR_COPY = {
 
 /**
  * Guest is Privy's guest account, not an external wallet and not a Flizy session.
- * A passkey, email, or Google login is the account path even if a wallet is also linked.
  */
 export function custodyDoorIsGuest(user: { isGuest?: boolean } | null | undefined): boolean {
   return user?.isGuest === true;

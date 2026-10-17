@@ -39,6 +39,8 @@ type Quote = {
   allInPct: string;
   networkFeeEth: string | null;
   disclosure: string;
+  /** Ammora's own impact string, when this quote came from that venue. */
+  priceImpact?: string;
 };
 
 const UP = 'text-[#2fd27a]';
@@ -83,6 +85,7 @@ export function TokenTradeSheet({
   usdPerEth,
   tokenAddress = null,
   listed = false,
+  venue = null,
 }: {
   side: 'buy' | 'sell';
   onSide: (side: 'buy' | 'sell') => void;
@@ -102,6 +105,8 @@ export function TokenTradeSheet({
   tokenAddress?: string | null;
   /** A token Flizy lists with a pool it seeded: traded by contract, without the unverified warning. */
   listed?: boolean;
+  /** Ammora launches quote and settle on that venue. Null uses the Flizy pool. */
+  venue?: 'ammora' | null;
 }) {
   const titleId = useId();
   const tradeId = tokenAddress || symbol;
@@ -164,13 +169,38 @@ export function TokenTradeSheet({
       setError('');
       try {
         const params = new URLSearchParams({ side, amount });
-        if (buying) params.set('tokenOut', tradeId);
+        if (venue === 'ammora') {
+          if (!tokenAddress) return;
+          params.set('venue', 'ammora');
+          params.set('token', tokenAddress);
+          params.set('slippageBps', '100');
+        } else if (buying) params.set('tokenOut', tradeId);
         else params.set('tokenIn', tradeId);
         const res = await fetch(`/api/swap/quote?${params.toString()}`);
         const body = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) {
           setError(body.error || 'Could not quote that amount.');
+          return;
+        }
+        if (venue === 'ammora') {
+          const fee = body.fee && typeof body.fee === 'object' ? body.fee : {};
+          const feeLabel = typeof fee.label === 'string' ? fee.label : 'Ammora fee';
+          const feeRate = typeof fee.rate === 'string' && fee.rate ? ` (${fee.rate})` : '';
+          const feeEth = typeof fee.amountEth === 'string' ? fee.amountEth : '';
+          setQuote({
+            amountIn: amount,
+            amountOut: String(body.amountOut ?? ''),
+            amountOutMin: String(body.amountOutMin ?? ''),
+            tokenIn: buying ? 'ETH' : tradeId,
+            tokenOut: buying ? tradeId : 'ETH',
+            slippagePct: '1%',
+            allInBps: 0,
+            allInPct: feeEth ? `${feeLabel}${feeRate}: ${feeEth} ETH` : `${feeLabel}${feeRate}`,
+            networkFeeEth: null,
+            disclosure: '',
+            priceImpact: typeof body.priceImpact === 'string' ? body.priceImpact : 'unavailable',
+          });
           return;
         }
         setQuote(body as Quote);
@@ -186,13 +216,17 @@ export function TokenTradeSheet({
       // A cancelled request never reaches its finally, so clear the flag here.
       setQuoting(false);
     };
-  }, [side, amount, tradeId, buying, stage, tick]);
+  }, [side, amount, tradeId, buying, stage, tick, venue, tokenAddress]);
 
+  // Flizy quotes come back in a few seconds, so refresh them while the sheet is open.
+  // An Ammora quote often takes longer than that interval. Restarting it would
+  // cancel the request before Review buy can enable, and the server still
+  // refuses a fill below the minimum on screen.
   useEffect(() => {
-    if (stage !== 'edit' || !amount) return;
+    if (stage !== 'edit' || !amount || venue === 'ammora') return;
     const t = window.setInterval(() => setTick((n) => n + 1), REQUOTE_MS);
     return () => window.clearInterval(t);
-  }, [stage, amount]);
+  }, [stage, amount, venue]);
 
   const setByPercent = useCallback(
     (p: number) => {
@@ -209,8 +243,9 @@ export function TokenTradeSheet({
 
   // The pool price says what this amount would buy with no move at all; the
   // gap to the quote, once the fees are taken out, is the price impact.
+  // Ammora reports its own impact. Do not invent one from the probe price.
   let impact: number | null = null;
-  if (quoteReady && priceEth && outNum != null && amountNum > 0) {
+  if (venue !== 'ammora' && quoteReady && priceEth && outNum != null && amountNum > 0) {
     const afterFees = amountNum * (1 - quote.allInBps / 10000);
     const atSpot = buying ? afterFees / priceEth : afterFees * priceEth;
     impact = atSpot > 0 ? Math.max(0, (1 - outNum / atSpot) * 100) : null;
@@ -229,14 +264,26 @@ export function TokenTradeSheet({
       const res = await fetch('/api/swap/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          side,
-          amount,
-          tokenIn: buying ? 'ETH' : tradeId,
-          tokenOut: buying ? tradeId : 'ETH',
-          minOut: quote?.amountOutMin,
-          pin,
-        }),
+        body: JSON.stringify(
+          venue === 'ammora'
+            ? {
+                venue: 'ammora',
+                side,
+                token: tokenAddress,
+                amount,
+                slippageBps: 100,
+                minOut: quote?.amountOutMin,
+                pin,
+              }
+            : {
+                side,
+                amount,
+                tokenIn: buying ? 'ETH' : tradeId,
+                tokenOut: buying ? tradeId : 'ETH',
+                minOut: quote?.amountOutMin,
+                pin,
+              }
+        ),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -255,14 +302,22 @@ export function TokenTradeSheet({
     }
   }
 
-  const logoBox = (size: string, text: string) =>
-    logo ? (
-      <img src={logo} alt="" className={`${size} shrink-0 rounded-[14px] border border-sun/40 object-cover`} />
-    ) : (
-      <span className={`${size} flex shrink-0 items-center justify-center rounded-[14px] border border-sun/40 bg-[#0b0b0b] font-sans font-bold text-sun ${text}`} aria-hidden>
-        {symbol.slice(0, 1)}.
-      </span>
-    );
+  const logoBox = (size: string, text: string) => (
+    <span className="relative shrink-0">
+      {logo ? (
+        <img src={logo} alt="" className={`${size} rounded-[14px] border border-sun/40 object-cover`} />
+      ) : (
+        <span className={`${size} flex items-center justify-center rounded-[14px] border border-sun/40 bg-[#0b0b0b] font-sans font-bold text-sun ${text}`} aria-hidden>
+          {symbol.slice(0, 1)}.
+        </span>
+      )}
+      {venue === 'ammora' ? (
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-[#0c0c0c] bg-[#6e2c72] font-sans text-[9px] font-bold text-white" aria-hidden>
+          A
+        </span>
+      ) : null}
+    </span>
+  );
 
   const ethMark = (
     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#2e2e2e] bg-[#161616] text-[#e6e6e6]">
@@ -328,9 +383,9 @@ export function TokenTradeSheet({
           ) : (
             <>
               <p className="m-0 mt-3 text-[13px] text-[#a9a9a9]">
-                {buying ? `Swap ETH for ${symbol}` : `Swap ${symbol} for ETH`} from your Flizy wallet, priced from the GIWA pool.
+                {buying ? `Swap ETH for ${symbol}` : `Swap ${symbol} for ETH`} from your Flizy wallet, {venue === 'ammora' ? 'priced from the Ammora pool.' : 'priced from the GIWA pool.'}
               </p>
-              {tokenAddress && !listed ? (
+              {tokenAddress && !listed && venue !== 'ammora' ? (
                 <p className="m-0 mt-2 rounded-[10px] border border-[#e0a85a]/40 bg-[#e0a85a]/10 px-3 py-2 text-[12px] leading-relaxed text-[#e0b070]">
                   {symbol} is not listed on Flizy. Anyone can create a token and its pool, and pull the pool later.
                 </p>
@@ -473,8 +528,14 @@ export function TokenTradeSheet({
                     <Figure label={`Price (1 ${symbol})`} value={priceEth ? `${formatEthDisplay(priceEth, 6)} ETH` : '-'} sub={usd(priceEth, usdPerEth)} />
                     <Figure
                       label="Price impact"
-                      value={<span className={impactTone}>{impact == null ? '-' : `${impact.toFixed(2)}%`}</span>}
-                      sub={impact == null ? null : <span className={impactTone}>{impactWord}</span>}
+                      value={
+                        venue === 'ammora' ? (
+                          quote?.priceImpact && quote.priceImpact !== 'unavailable' ? quote.priceImpact : 'Unavailable'
+                        ) : (
+                          <span className={impactTone}>{impact == null ? '-' : `${impact.toFixed(2)}%`}</span>
+                        )
+                      }
+                      sub={venue === 'ammora' || impact == null ? null : <span className={impactTone}>{impactWord}</span>}
                     />
                     <Figure label="Network fee (est.)" value={feeText(feeNum)} sub={usd(feeNum, usdPerEth)} />
                     {buying ? (
@@ -498,7 +559,8 @@ export function TokenTradeSheet({
                         {priceEth ? (buying ? `1 ETH ≈ ${trim(1 / priceEth, 1)} ${symbol}` : `1 ${symbol} ≈ ${formatEthDisplay(priceEth, 6)} ETH`) : '-'}
                       </p>
                       <p className="m-0 text-xs text-[#8f8f8f]">
-                        Priced from the GIWA pool{quoteReady ? ` · slippage limit ${quote.slippagePct}` : ''}
+                        {venue === 'ammora' ? 'Priced from the Ammora pool' : 'Priced from the GIWA pool'}
+                        {quoteReady ? ` · slippage limit ${quote.slippagePct}` : ''}
                       </p>
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#2fd27a]/35 bg-[#2fd27a]/10 px-2.5 py-1 font-sans text-xs font-semibold text-[#2fd27a]">
@@ -519,7 +581,7 @@ export function TokenTradeSheet({
                   <Line label="You pay" value={`${trim(amountNum, 6)} ${payAsset}`} />
                   <Line label="You receive (est.)" value={`${outNum == null ? '-' : trim(outNum, buying ? 2 : 6)} ${getAsset}`} />
                   <Line label="You get at least" value={`${minNum == null ? '-' : trim(minNum, buying ? 2 : 6)} ${getAsset}`} />
-                  <Line label="Fees" value={quoteReady ? `${quote.allInPct} + network fee` : '-'} />
+                  <Line label="Fees" value={quoteReady ? (venue === 'ammora' ? quote.allInPct : `${quote.allInPct} + network fee`) : '-'} />
                   <p className="m-0 text-xs leading-relaxed text-[#8f8f8f]">
                     This sends from your Flizy wallet. If the price moves past your limit, the trade does not go through and nothing is spent but network gas.
                   </p>

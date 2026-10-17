@@ -379,8 +379,10 @@ describe('any token opens like FLZ', () => {
     // A token Flizy does not list gets one small tag, not a warning block.
     assert.match(detail, />\s*Not listed\s*<\/span>/);
     assert.doesNotMatch(detail, /Not verified by Flizy/);
-    // Trading waits for the token's own pool, and never falls back to FLZ.
-    assert.match(detail, /const canTrade = listed \|\| \(imported && market != null\);/);
+    // A Flizy import waits for its own pool, and never falls back to FLZ.
+    // An Ammora launch is the one case that trades without that pool.
+    assert.match(detail, /const poolTrade = listed \|\| \(imported && market != null\);/);
+    assert.match(detail, /const canTrade = ammora \? ammora\.tradable === true : poolTrade;/);
     assert.match(detail, /const contract = market\?\.address \|\| held\?\.address \|\| \(imported \? symbol : null\);/);
     assert.match(detail, /\(listed \? 'FLZ' : 'Token'\)/);
     assert.equal((detail.match(/disabled=\{!canTrade\}/g) || []).length, 2);

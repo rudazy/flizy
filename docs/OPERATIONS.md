@@ -223,7 +223,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `FLIZY_TREASURY` | Treasury passed at DEX deploy time (defaults to ops). The live fee destination is `feeRouter.treasury` on chain, changed with `setTreasury`, not with this variable |
 | `GAS_BUFFER_ETH` | Reserve kept for gas when checking funding |
 | `AMMORA_ENABLED` | Ammora venue, bots and site server. Default off; off loads nothing and reads nothing. See [Ammora venue](#ammora-venue) |
-| `NEXT_PUBLIC_AMMORA_ENABLED` | Vercel only. Shows the Ammora section in Explore and the Ammora swap panel. Default off |
+| `NEXT_PUBLIC_AMMORA_ENABLED` | Vercel only. Shows the Ammora launches view in Explore. Trade opens the token page, where Buy uses the Ammora venue. Default off |
 | `AMMORA_DATA_API_URL` | Ammora Data API for launch status. Defaults to `https://ammora-giwa-sepolia-data.fly.dev` |
 
 Treat `PRIVATE_KEY`, escrow keys and Supabase service keys as production secrets. Rotate

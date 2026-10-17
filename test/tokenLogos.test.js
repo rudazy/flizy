@@ -76,7 +76,7 @@ describe('where tokens are drawn', () => {
     assert.match(read('web/components/WalletBalances.tsx'), /const logoSrc = tokenLogo\(t\.symbol, t\.address\);/);
     const detail = read('web/components/TokenDetail.tsx');
     assert.match(detail, /const logoSrc = profile\?\.logo \|\| \(listed \? tokenLogo\('FLZ'\) : contract \? tokenLogo\(null, contract\) : null\);/);
-    assert.match(detail, /logo=\{logoSrc\}/);
+    assert.match(detail, /logo=\{ammora\?\.image \|\| logoSrc\}/);
   });
 });
 

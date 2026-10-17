@@ -16,7 +16,7 @@ import {
 import { formatEthDisplay } from '../lib/tokenFormat';
 import { useComingSoon } from './ComingSoon';
 import { CopyTradePanel } from './CopyTradePanel';
-import { AmmoraTokens } from './AmmoraTokens';
+import { AmmoraTokens, ammoraUiEnabled } from './AmmoraTokens';
 import { VerifiedMark } from './VerifiedMark';
 import { tokenLogo } from '../lib/tokenLogos';
 import {
@@ -29,17 +29,37 @@ import {
 } from './ExploreIcons';
 
 /**
- * Tokens: the GIWA market, the filtered lists, and copy trade.
+ * Tokens: the GIWA market, the filtered lists, copy trade, and the Ammora
+ * launches view.
  *
  * Discover is the landing: what trades on GIWA today and how to trade it. The
  * filters rank the listed tokens. Every figure is the pool's own, in ETH:
  * there is no dollar price on GIWA Sepolia, so none is shown.
  */
 
-type TabId = 'discover' | 'copy' | TokenFilterId;
+type TabId = 'discover' | 'copy' | 'ammora' | TokenFilterId;
 
 const [DISCOVER, COPY] = TOKEN_VIEWS;
 const TABS: Array<{ id: TabId; label: string }> = [DISCOVER, COPY, ...TOKEN_FILTERS];
+
+/** The launches screen opens on this row, in this order. The rest stay one scroll away. */
+const AMMORA_PILLS: TabId[] = ['trending', 'ammora', 'gainers', 'new', 'discover', 'copy', 'held', 'verified', 'watchlist'];
+
+function sectionTabs(ammoraOn: boolean): TabId[] {
+  const ids: TabId[] = [];
+  for (const item of TABS) {
+    ids.push(item.id);
+    if (ammoraOn && item.id === 'trending') ids.push('ammora');
+  }
+  return ids;
+}
+
+function tabLabel(id: TabId, pills: boolean): string {
+  if (id === 'ammora') return 'Ammora launches';
+  if (pills && id === 'gainers') return 'Top gainers';
+  if (pills && id === 'new') return 'New listings';
+  return TABS.find((item) => item.id === id)?.label || id;
+}
 
 const HERO_SLIDES = 2;
 
@@ -140,14 +160,16 @@ export function ExploreTokens() {
   const [comingSoon, comingSoonNote] = useComingSoon();
   const view = search.get('view');
   const requested = search.get('f') || '';
-  const tab: TabId = view === 'copy' ? 'copy' : isTokenFilter(requested) ? requested : 'discover';
+  const ammoraOn = ammoraUiEnabled();
+  const tab: TabId =
+    view === 'copy' ? 'copy' : view === 'ammora' && ammoraOn ? 'ammora' : isTokenFilter(requested) ? requested : 'discover';
   const [tokens, setTokens] = useState<DiscoveryToken[] | null>(null);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [slide, setSlide] = useState(0);
 
   useEffect(() => {
-    if (tab === 'copy') return;
+    if (tab === 'copy' || tab === 'ammora') return;
     let cancelled = false;
     (async () => {
       setError('');
@@ -172,6 +194,7 @@ export function ExploreTokens() {
     params.delete('view');
     params.delete('f');
     if (next === 'copy') params.set('view', 'copy');
+    else if (next === 'ammora') params.set('view', 'ammora');
     else if (next !== 'discover') params.set('f', next);
     const q = params.toString();
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
@@ -179,6 +202,7 @@ export function ExploreTokens() {
 
   const rows = useMemo(() => {
     if (tab === 'copy') return [];
+    if (tab === 'ammora') return [];
     const list = tokens || [];
     const base = tab === 'discover' ? list.filter((t) => t.priceEth != null) : tokensForFilter(tab, list).tokens;
     const out = base.map((t) => (t.address ? listedRow(t, t.address) : flzRow(t)));
@@ -188,40 +212,19 @@ export function ExploreTokens() {
     return q ? out.filter((r) => r.symbol.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)) : out;
   }, [tokens, tab, query]);
 
-  const filterEmpty = tab !== 'discover' && tab !== 'copy' ? tokensForFilter(tab, []).empty : '';
+  const filterEmpty = tab !== 'discover' && tab !== 'copy' && tab !== 'ammora' ? tokensForFilter(tab, []).empty : '';
 
   return (
     <div className="!mt-[9px] grid w-full grid-cols-[minmax(0,1fr)] gap-[12px]">
-      <div
-        className="-mx-4 flex overflow-x-auto border-b border-[#2a2b30] px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        role="tablist"
-        aria-label="Token section"
-      >
-        {TABS.map((item) => {
-          const active = tab === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(item.id)}
-              className={`hit-y-44 relative -mb-px h-[27px] shrink-0 whitespace-nowrap px-[10px] pb-[4px] font-sans text-[10px] ${
-                active ? 'font-semibold text-sun' : 'text-[#bdbdbd] hover:text-white'
-              }`}
-            >
-              {item.label}
-              {active ? <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-sun" aria-hidden /> : null}
-            </button>
-          );
-        })}
-      </div>
+      <TokenSectionNav tab={tab} ammoraOn={ammoraOn} onSelect={setTab} />
 
       {tab === 'copy' ? <CopyTradePanel /> : null}
 
+      {tab === 'ammora' ? <AmmoraTokens /> : null}
+
       {tab === 'discover' ? <Hero slide={slide} setSlide={setSlide} /> : null}
 
-      {tab !== 'copy' ? (
+      {tab !== 'copy' && tab !== 'ammora' ? (
         <>
           <div className="flex gap-[9px]">
             <label className="flex h-[36px] min-w-0 flex-1 items-center gap-[11px] rounded-[5px] border border-[#2a2b30] bg-[#0d0d0e] px-[11px] focus-within:border-sun/60">
@@ -281,12 +284,63 @@ export function ExploreTokens() {
             ))}
           </div>
 
-          {tab === 'discover' ? <AmmoraTokens /> : null}
-
           {tab === 'discover' ? <GiwaCard /> : null}
         </>
       ) : null}
       {comingSoonNote}
+    </div>
+  );
+}
+
+function TokenSectionNav({
+  tab,
+  ammoraOn,
+  onSelect,
+}: {
+  tab: TabId;
+  ammoraOn: boolean;
+  onSelect: (id: TabId) => void;
+}) {
+  const pills = tab === 'ammora';
+  const items = pills ? AMMORA_PILLS : sectionTabs(ammoraOn);
+  return (
+    <div
+      className={
+        pills
+          ? '-mx-4 flex gap-[8px] overflow-x-auto px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          : '-mx-4 flex overflow-x-auto border-b border-[#2a2b30] px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+      }
+      role="tablist"
+      aria-label="Token section"
+    >
+      {items.map((id) => {
+        const active = tab === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onSelect(id)}
+            className={
+              pills
+                ? `hit-y-44 inline-flex h-[32px] shrink-0 items-center rounded-full border px-[13px] font-sans text-[12px] font-medium ${
+                    active
+                      ? id === 'ammora'
+                        ? 'border-transparent bg-[#6e2c72] text-white'
+                        : 'border-transparent bg-[#f7d043] text-[#1a1405]'
+                      : 'border-[#2a2b30] bg-[#141416] text-[#d4d4d4]'
+                  }`
+                : `hit-y-44 relative -mb-px h-[27px] shrink-0 whitespace-nowrap px-[10px] pb-[4px] font-sans text-[10px] ${
+                    active ? 'font-semibold text-sun' : 'text-[#bdbdbd] hover:text-white'
+                  }`
+            }
+          >
+            {tabLabel(id, pills)}
+            {!pills && active ? <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-sun" aria-hidden /> : null}
+          </button>
+        );
+      })}
     </div>
   );
 }
