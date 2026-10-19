@@ -108,8 +108,8 @@ describe('recentChatEvent', () => {
   const NOW = new Date('2026-10-14T12:00:00Z');
   const minutesAgo = (m) => new Date(NOW.getTime() - m * 60_000).toISOString();
 
-  function db(events) {
-    return createFakeSupabase({ identity_events: events }).client;
+  function db(events, identities = []) {
+    return createFakeSupabase({ identity_events: events, channel_identities: identities }).client;
   }
 
   it('finds a chat unlink from the last ten minutes', async () => {
@@ -120,8 +120,22 @@ describe('recentChatEvent', () => {
       NOW
     );
     assert.equal(ev.channel, 'whatsapp');
-    assert.equal(ev.label, 'ending 2222');
+    // The link is gone, so there is no verified phone, and the id is not one.
+    assert.equal(ev.label, 'no number on file');
     assert.equal(ev.kind, 'unlinked');
+  });
+
+  it('names a newly linked WhatsApp chat by the verified phone on the link, not its id', async () => {
+    const ev = await notice.recentChatEvent(
+      db(
+        [{ account_id: ACC, channel: 'whatsapp', external_id: '178923400512653', display_handle: null, event_type: 'LINKED', created_at: minutesAgo(1) }],
+        [{ id: 'i1', account_id: ACC, channel: 'whatsapp', external_id: '178923400512653', phone_e164: '2348011119434' }]
+      ),
+      ACC,
+      'linked',
+      NOW
+    );
+    assert.equal(ev.label, 'ending 9434');
   });
 
   it('finds nothing older, of another kind, on another account, or on a platform channel', async () => {

@@ -31,6 +31,12 @@ describe('chatLabel', () => {
     assert.equal(notice.chatLabel({ external_id: '112233445566778' }), 'ending 6778');
   });
 
+  it('names a WhatsApp chat by its verified phone only, never its id (often a linked id)', () => {
+    assert.equal(notice.chatLabel({ channel: 'whatsapp', phone_e164: '2348011119434', external_id: '178923400512653' }), 'ending 9434');
+    assert.equal(notice.chatLabel({ channel: 'whatsapp', external_id: '178923400512653' }), 'no number on file');
+    assert.equal(notice.chatLabel({ channel: 'telegram', external_id: '5566778899' }), 'ending 8899');
+  });
+
   it('strips anything from a handle that could add a line to the mail', () => {
     assert.equal(notice.chatLabel({ display_handle: 'eve\nTo: attacker' }), '@eveToattacker');
   });

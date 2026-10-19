@@ -552,7 +552,7 @@
       "kind": "table",
       "name": "channel_identities",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/channelBind.js, lib/discordLookup.js, lib/history.js, lib/identity.js, lib/invite.js, lib/router.js, lib/telegramLookup.js"
+      "requiredBy": "lib/channelBind.js, lib/chatApprovals.js, lib/discordLookup.js, lib/history.js, lib/identity.js, lib/invite.js, lib/router.js, lib/telegramLookup.js"
     },
     {
       "kind": "table",

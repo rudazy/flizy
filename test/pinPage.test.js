@@ -139,8 +139,58 @@ describe('approval links (lib/chatApprovals.js)', () => {
   });
 
   it('labels the chat without giving its number away', () => {
-    assert.equal(approvals.chatLabelFor(ctx), 'WhatsApp ending 2222');
+    assert.equal(approvals.chatLabelFor(ctx, '2348011119434'), 'WhatsApp ending 9434');
     assert.equal(approvals.chatLabelFor({ channel: 'telegram', externalId: '5566778899', displayHandle: '@ada_o' }), 'Telegram @ada_o');
+    assert.equal(approvals.chatLabelFor({ channel: 'telegram', externalId: '5566778899' }), 'Telegram ending 8899');
+  });
+
+  it('never names a WhatsApp chat by its id, which can be a linked id unrelated to the phone', () => {
+    const lid = { channel: 'whatsapp', externalId: '178923400512653', key: 'whatsapp:178923400512653' };
+    assert.equal(approvals.chatLabelFor(lid), 'WhatsApp');
+    assert.equal(approvals.chatLabelFor(lid, null), 'WhatsApp');
+  });
+
+  it('names the WhatsApp chat on the page by the verified phone on its link', async () => {
+    const lid = { channel: 'whatsapp', externalId: '178923400512653', key: 'whatsapp:178923400512653' };
+    fake.db.tables.channel_identities = [
+      { id: 'i1', account_id: 'acc-1', channel: 'whatsapp', external_id: '178923400512653', phone_e164: '2348011119434' },
+    ];
+    await approvals.createApproval({ accountId: 'acc-1', ctx: lid, kind: 'unlock', summary: { title: 'Unlock' } });
+    assert.equal(fake.db.tables.chat_approvals[0].chat_label, 'WhatsApp ending 9434');
+  });
+
+  it('falls back to the phone WhatsApp reports for the sender when the link has none', async () => {
+    const lid = {
+      channel: 'whatsapp',
+      externalId: '178923400512653',
+      key: 'whatsapp:178923400512653',
+      resolveVerifiedPhone: async () => '2348011119434',
+    };
+    fake.db.tables.channel_identities = [];
+    await approvals.createApproval({ accountId: 'acc-1', ctx: lid, kind: 'unlock', summary: { title: 'Unlock' } });
+    assert.equal(fake.db.tables.chat_approvals[0].chat_label, 'WhatsApp ending 9434');
+  });
+
+  it('a failing phone lookup still makes the link, named just WhatsApp', async () => {
+    const lid = {
+      channel: 'whatsapp',
+      externalId: '178923400512653',
+      key: 'whatsapp:178923400512653',
+      resolveVerifiedPhone: async () => {
+        throw new Error('wa client busy');
+      },
+    };
+    await approvals.createApproval({ accountId: 'acc-1', ctx: lid, kind: 'unlock', summary: { title: 'Unlock' } });
+    assert.equal(fake.db.tables.chat_approvals[0].chat_label, 'WhatsApp');
+  });
+
+  it('says just WhatsApp when the link has no verified phone, or belongs to another account', async () => {
+    const lid = { channel: 'whatsapp', externalId: '178923400512653', key: 'whatsapp:178923400512653' };
+    fake.db.tables.channel_identities = [
+      { id: 'i1', account_id: 'acc-other', channel: 'whatsapp', external_id: '178923400512653', phone_e164: '2348011119434' },
+    ];
+    await approvals.createApproval({ accountId: 'acc-1', ctx: lid, kind: 'unlock', summary: { title: 'Unlock' } });
+    assert.equal(fake.db.tables.chat_approvals[0].chat_label, 'WhatsApp');
   });
 
   it('acts on an approval once, even if two passes see it', async () => {

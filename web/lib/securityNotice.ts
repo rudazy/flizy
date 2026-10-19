@@ -31,10 +31,15 @@ const PLATFORM_NAME: Record<string, string> = { github: 'GitHub', discord: 'Disc
 
 /**
  * How a linked chat is named in an email: the Telegram @handle when there is
- * one, otherwise the last four digits of its number or id. Enough for the owner
- * to recognise their own chat, not enough to contact it.
+ * one, otherwise the last four digits of its number. Enough for the owner to
+ * recognise their own chat, not enough to contact it.
+ *
+ * A WhatsApp chat id is often a linked id (LID), a number unrelated to the
+ * phone, so a WhatsApp chat is named by its verified phone only, never its id.
+ * Mirrors chatLabelFor in lib/chatApprovals.js.
  */
 export function chatLabel(row: {
+  channel?: string | null;
   display_handle?: string | null;
   phone_e164?: string | null;
   external_id?: string | null;
@@ -44,7 +49,8 @@ export function chatLabel(row: {
     .replace(/[^A-Za-z0-9_.]/g, '')
     .slice(0, 32);
   if (handle) return `@${handle}`;
-  const digits = String(row.phone_e164 || row.external_id || '').replace(/\D/g, '');
+  const number = row.channel === 'whatsapp' ? row.phone_e164 : row.phone_e164 || row.external_id;
+  const digits = String(number || '').replace(/\D/g, '');
   return digits ? `ending ${digits.slice(-4)}` : 'no number on file';
 }
 
@@ -234,10 +240,23 @@ export async function recentChatEvent(
     .maybeSingle();
   if (error) throw new Error(`could not read chat events: ${error.message}`);
   if (!data) return null;
+  // The event has no phone. A WhatsApp chat is named by its verified phone,
+  // read from the link while it still exists; after an unlink there is none.
+  let phone: string | null = null;
+  if (data.channel === 'whatsapp') {
+    const link = await supabase
+      .from('channel_identities')
+      .select('phone_e164')
+      .eq('account_id', accountId)
+      .eq('channel', 'whatsapp')
+      .eq('external_id', String(data.external_id))
+      .maybeSingle();
+    phone = link.error || !link.data?.phone_e164 ? null : String(link.data.phone_e164);
+  }
   return {
     kind,
     channel: String(data.channel),
-    label: chatLabel(data),
+    label: chatLabel({ ...data, phone_e164: phone }),
     at: new Date(String(data.created_at)),
   };
 }
