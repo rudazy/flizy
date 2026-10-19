@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { HeroVideo } from '../components/HeroVideo';
+import { InstallAppButton } from '../components/InstallAppButton';
 import { PayPeople } from '../components/PayPeople';
 import { ResumeChatLink } from '../components/ResumeChatLink';
 import { hasSessionCookie } from '../lib/cookies';
@@ -239,6 +240,7 @@ export default function HomePage() {
           <Link href="/docs" className="btn btn-ghost min-h-[44px]">
             Open guide
           </Link>
+          <InstallAppButton />
         </div>
       </section>
     </div>

@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-};
+import { promptPwaInstall, usePwaInstall } from './pwaInstall';
 
 /** "Later" holds for this long in this browser. */
 const LATER_MS = 14 * 24 * 3600 * 1000;
@@ -23,52 +19,28 @@ function laterStillHolds(): boolean {
 }
 
 /**
- * Registers the service worker everywhere, and offers to install only inside
- * the signed-in app: not over sign-up, login or a pay link, and not again for
- * two weeks after "Later".
+ * Registers the service worker wherever this component is mounted: every
+ * route outside /dashboard (AppChrome) and the signed-in app (DashboardGate).
+ * The install banner is /dashboard only, so it stays off sign-up, login and
+ * pay links, and it stays hidden for two weeks after "Later". The opening
+ * page has its own Install button. Both use one shared browser install prompt.
  */
 export function PwaRegister() {
   const pathname = usePathname() || '';
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  const { installed, canPrompt } = usePwaInstall();
   const [dismissed, setDismissed] = useState(false);
-  const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setInstalled(true);
-    }
     if (laterStillHolds()) setDismissed(true);
-
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {
         /* silent: SW optional for first paint */
       });
     }
-
-    const onBip = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-    };
-    const onInstalled = () => {
-      setInstalled(true);
-      setDeferred(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', onBip);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBip);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
   }, []);
 
   async function install() {
-    if (!deferred) return;
-    await deferred.prompt();
-    await deferred.userChoice;
-    setDeferred(null);
+    await promptPwaInstall();
   }
 
   function later() {
@@ -80,7 +52,7 @@ export function PwaRegister() {
     }
   }
 
-  if (installed || dismissed || !deferred || !pathname.startsWith('/dashboard')) return null;
+  if (installed || dismissed || !canPrompt || !pathname.startsWith('/dashboard')) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-[calc(var(--app-nav-h)+var(--app-nav-overhang)+0.5rem)] z-[60] px-3 md:bottom-4 md:left-auto md:right-4 md:max-w-sm md:px-0">

@@ -321,10 +321,15 @@ textarea {
   flex-direction: column;
 }
 
-/* Installed PWA: slightly tighter shell */
+/* Installed PWA: slightly tighter shell, and no second install control. */
 @media (display-mode: standalone) {
   body {
     background-attachment: scroll;
+  }
+
+  .install-app-btn,
+  .install-app-note {
+    display: none;
   }
 }
 
