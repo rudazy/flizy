@@ -436,8 +436,7 @@ A listed token:
 - trades on the Swap screen and in chat (`buy 100 IZY`), resolved by symbol;
 - is one of the only tokens Flizy's pools trade, because the pool belongs to Flizy
   (`isUnverifiedSwap` in `lib/dex.js` and `web/lib/swapGate.ts` refuses every other
-  token), and its swaps and liquidity changes skip the PIN while the price check in
-  `lib/priceReference.js` passes.
+  token).
 
 `verified` on a listed token (IZY and MAKI, not DCAT) is display only: it draws the mark.
 Sending on socials is a separate fixed list, ETH and FLZ, in `listedSendSymbols` and

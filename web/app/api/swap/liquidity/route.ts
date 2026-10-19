@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
-import { requireApproval } from '../../../../lib/stepUp.ts';
-import { liquidityTier } from '../../../../lib/tiers.ts';
-import { poolPriceCheck } from '../../../../lib/priceReference.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import {
   getWebChain,
@@ -50,10 +47,7 @@ export async function GET(req: Request) {
     const walletAddr = pointerIsGator(accountId, acct?.agent_wallet_address)
       ? predictGatorAddress(accountId)
       : deriveAgentWallet(accountId).address;
-    const [position, price] = await Promise.all([
-      getLpPosition(provider, walletAddr, pool),
-      poolPriceCheck({ supabase: getSupabase(), provider, chainId: chain.chainId, pool }),
-    ]);
+    const position = await getLpPosition(provider, walletAddr, pool);
 
     return NextResponse.json({
       agentWallet: walletAddr,
@@ -66,8 +60,6 @@ export async function GET(req: Request) {
       tokenShare: position.tokenShare,
       poolShareBps: position.poolShareBps,
       hasPosition: position.lpBalance > 0n,
-      // A hint for the screen: whether adding or removing will ask for the PIN.
-      pinRequired: liquidityTier(price).tier !== 0,
     });
   } catch (err) {
     return NextResponse.json(apiErrorBody(ROUTE_GET, err), { status: 500 });
@@ -92,15 +84,7 @@ export async function POST(req: Request) {
     const pool = liquidityPool(body.token == null ? null : String(body.token));
     if (!pool) return NextResponse.json({ error: NOT_A_POOL }, { status: 400 });
     // The value stays in the account (LP tokens in, or ETH and the token back),
-    // so no PIN when the pool price is within 5% of its reference
-    // (web/lib/priceReference.ts). The 2% minimums below still bound the fill.
-    const chain = getWebChain();
-    const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
-    const price = await poolPriceCheck({ supabase, provider, chainId: chain.chainId, pool });
-    const auth = await requireApproval(supabase, accountId, String(body.pin || ''), 'change liquidity', liquidityTier(price));
-    if (!auth.ok) {
-      return NextResponse.json({ error: auth.error, code: auth.code, attemptsLeft: auth.attemptsLeft }, { status: auth.status });
-    }
+    // so on testnet this takes no PIN. The 2% minimums below bound the fill.
 
     const lock = await tryAccountTxLock(supabase, accountId, 'liquidity');
     if (!lock.ok) {
@@ -109,6 +93,8 @@ export async function POST(req: Request) {
 
     try {
     const action = String(body.action || 'add').toLowerCase();
+    const chain = getWebChain();
+    const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
     const signer = deriveAgentWallet(accountId).connect(provider);
     const { data: acct } = await supabase
       .from('accounts')

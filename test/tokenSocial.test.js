@@ -218,14 +218,11 @@ describe('token trade sheet', () => {
   const ROOT = path.join(__dirname, '..');
   const sheet = fs.readFileSync(path.join(ROOT, 'web/components/TokenTradeSheet.tsx'), 'utf8');
 
-  it('asks for the PIN when the quote or the trade says so, and sends the quote minimum as the limit', () => {
-    // Only a quote that says false skips it; Ammora and PIN_REQUIRED always ask.
-    assert.match(sheet, /const pinNeeded = venue === 'ammora' \|\| pinAsked \|\| quote\?\.pinRequired !== false;/);
-    assert.match(sheet, /if \(body\.code === 'PIN_REQUIRED'\) setPinAsked\(true\);/);
-    assert.match(sheet, /\{pinNeeded \? <PinField value=\{pin\} onChange=\{setPin\} \/> : null\}/);
+  it('takes no PIN on testnet and sends the quote minimum as the limit', () => {
+    assert.doesNotMatch(sheet, /PinField|pinReady|\bpin\b/);
     assert.match(sheet, /fetch\('\/api\/swap\/execute'/);
-    assert.match(sheet, /minOut: quote\?\.amountOutMin,\s*pin: pinNeeded \? pin : '',/);
-    assert.match(sheet, /disabled=\{busy \|\| \(pinNeeded && !pinReady\(pin\)\)\}/);
+    assert.equal((sheet.match(/minOut: quote\?\.amountOutMin,/g) || []).length, 2);
+    assert.match(sheet, /disabled=\{busy\}\n\s*className="hit-y-44 h-12 rounded-\[12px\] bg-sun/);
   });
 
   it('does not claim a best price it cannot prove, and uses no blue', () => {

@@ -188,8 +188,8 @@ Creators keep their royalties (up to 10%) on secondary sales.
 | **Approved destinations** | Sends by name reach the trusted list only. The list is edited on the site behind the account password, never from chat, and a new entry waits 24 hours before it can receive |
 | **Plan, then confirm** | Every money action shows amount, destination, network and fees first. Nothing executes without a confirm |
 | **Quick send** | A small ETH payment (0.005 ETH by default, lower on request) to someone you have paid before or trusted needs only Confirm. A first payment, a token, an NFT or anything larger asks for the PIN. Who you paid is remembered for 180 days, and only counts an hour after the first payment |
-| **Trades that stay in the wallet** | A swap between ETH and FLZ or a listed token, either way and any size, and adding or removing liquidity in those pools, needs only Confirm while the pool price is within 5% of its recent level (the median of four 15 minute snapshots) and the worst fill is too, for up to 4 swaps an hour. Otherwise it asks for the PIN. Slippage is capped at 5% on the server. Other tokens are not traded at all; Ammora launches always ask for the PIN |
-| **PIN and password, by risk** | Payments, mints, marketplace actions, limit orders and Ammora trades ask for the PIN, except a quick send. Account changes (trusted wallets, the PIN, the daily limit, email, username, linking, the password itself) ask for the account password. Each has its own lockout |
+| **Trades that stay in the wallet** | Buying and selling FLZ, a listed token or an Ammora launch, and adding or removing liquidity, needs only Confirm on testnet: what you get lands back in your own wallet. Slippage is capped at 5% on the server, and the minimum you review is enforced. Tokens Flizy has not verified are not traded at all |
+| **PIN and password, by risk** | Payments, mints, marketplace actions and limit orders ask for the PIN, except a quick send. Account changes (trusted wallets, the PIN, the daily limit, email, username, linking, the password itself) ask for the account password. Each has its own lockout |
 | **Per-channel lock** | Lock a chat app instantly. Unlocking takes the PIN on a one-time Flizy link; chat never takes the PIN or the password |
 | **Limits** | A daily ETH cap per account, counted the same way in chat and on the site |
 | **Sessions** | Server-side sessions that can be revoked. Changing the password signs out every other device |
@@ -296,7 +296,7 @@ xychart-beta
 | Test files | 187 Node, 8 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
 | Database | 72 idempotent migrations, each ending in a post-condition check that fails loudly |
-| API surface | Every payment, trade and mint re-checks the PIN, except a quick send, which the server decides on its own; every security setting re-checks the account password |
+| API surface | Every payment, limit order and mint re-checks the PIN, except a quick send, which the server decides on its own; every security setting re-checks the account password |
 | Contracts | 14 deployed on GIWA Sepolia, all source verified as a full match |
 
 ---

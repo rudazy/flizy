@@ -6,9 +6,9 @@
  * email, username, linking, pausing). Money actions ask for the PIN, which is
  * short, typed only on flizy.app, and has its own pause per account
  * (web/lib/pinGate.ts). A stolen session cookie still cannot move value
- * without it, except a small ETH payment to someone the account already pays,
- * or a swap or liquidity change on a verified pool at a checked price
- * (requireApproval below).
+ * without it, except a small ETH payment to someone the account already pays
+ * (requireApproval below). Swaps and liquidity changes pay nobody and take no
+ * PIN on testnet.
  *
  * Same result shape as requirePassword, so a route swaps one call for the
  * other. Codes the site's sheets act on:
@@ -58,9 +58,8 @@ export async function requireStepUp(
 
 /**
  * The approval a tiered money route asks for: nothing more than the session
- * for Tier 0 (a small ETH payment to a known recipient, or a swap or liquidity
- * change on a verified pool at a checked price; web/lib/tiers.ts), the PIN for
- * everything else.
+ * for Tier 0 (a small ETH payment to a known recipient; web/lib/tiers.ts), the
+ * PIN for everything else.
  *
  * tier must come from evaluateTier on this request, worked out on the server
  * from what will actually be sent. Nothing the browser says decides it.

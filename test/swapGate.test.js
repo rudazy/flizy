@@ -51,7 +51,7 @@ describe('bindAmountOutMin', () => {
 
 describe('POST /api/swap/execute', () => {
   // The handler reads a Next request cookie and cannot be imported here, so its
-  // source is checked. The gate itself is exercised in test/pinRouteGate.test.js.
+  // source is checked.
   const fs = require('fs');
   const path = require('path');
   const src = fs.readFileSync(
@@ -59,19 +59,8 @@ describe('POST /api/swap/execute', () => {
     'utf8'
   );
 
-  it('runs the approval on every swap, with the tier worked out on the server', () => {
-    const call = src.indexOf('await requireApproval(');
-    assert.ok(call > 0, 'requireApproval is not called');
-    const before = src.slice(0, call);
-    const lastLine = before.slice(before.lastIndexOf('\n') + 1);
-    // Four spaces is the handler's top level inside its try; anything deeper is
-    // inside a block, which is where a condition would put it.
-    assert.match(lastLine, /^ {4}const auth = $/, 'requireApproval must not sit inside a condition');
-    // The tier comes from the price check on the server's own quote and floor,
-    // never from the body.
-    assert.match(src, /'swap', swapTier\(true, price, swapsThisHour\)\);/);
-    assert.match(src, /const swapsThisHour = await swapsInLastHour\(supabase, accountId\);/);
-    assert.match(src, /const price = await swapPriceCheck\(\{[\s\S]*?amountOutMin: floor,\n\s*\}\);/);
+  it('takes no PIN on testnet, on either venue', () => {
+    assert.doesNotMatch(src, /requireApproval\(|requireStepUp\(|body\.pin/);
   });
 
   it('refuses an unverified token before any chain work or the transaction lock', () => {
@@ -82,15 +71,11 @@ describe('POST /api/swap/execute', () => {
     }
   });
 
-  it('checks the approval on the quote it sends, before any row or transaction', () => {
+  it('holds the fill to the reviewed minimum, on the quote it sends', () => {
     const quote = src.indexOf('const quote = await quoteSwap(');
     const floor = src.indexOf('const floor = bindAmountOutMin(', quote);
-    const gate = src.indexOf('await requireApproval(', floor);
-    const refusal = src.indexOf('if (!auth.ok)', gate);
-    assert.ok(quote > 0 && floor > quote && gate > floor && refusal > gate);
-    for (const later of [".from('transfers').insert(", 'executeSwapViaGator({', 'executeSwap({']) {
-      assert.ok(src.indexOf(later) > refusal, `${later} runs before the PIN is checked`);
-    }
+    assert.ok(quote > 0 && floor > quote);
+    assert.equal((src.match(/amountOutMinWei: floor,/g) || []).length, 2);
   });
 });
 
@@ -107,17 +92,9 @@ describe('GET /api/swap/quote and /api/swap/liquidity', () => {
     assert.ok(src.indexOf('quoteSwap({') > refusal);
   });
 
-  it('the quote hints at the PIN from the same check execute runs, on its own minimum', () => {
-    const src = read('web/app/api/swap/quote/route.ts');
-    assert.match(src, /const price = await swapPriceCheck\(\{[\s\S]*?amountOutMin: quote\.amountOutMin,\n\s*\}\);/);
-    assert.match(src, /pinRequired: swapTier\(true, price, await swapsInLastHour\(getSupabase\(\), accountId\)\)\.tier !== 0,/);
-    // Every Ammora quote says the PIN is needed.
-    assert.match(src, /return NextResponse\.json\(\{ \.\.\.quote, pinRequired: true \}\);/);
-  });
-
-  it('the liquidity read hints at the PIN from the pool check its POST runs', () => {
-    const src = read('web/app/api/swap/liquidity/route.ts');
-    assert.match(src, /pinRequired: liquidityTier\(price\)\.tier !== 0,/);
-    assert.equal((src.match(/poolPriceCheck\(\{/g) || []).length, 2);
+  it('the quote and the liquidity read carry no PIN hint', () => {
+    for (const rel of ['web/app/api/swap/quote/route.ts', 'web/app/api/swap/liquidity/route.ts']) {
+      assert.doesNotMatch(read(rel), /pinRequired/, rel);
+    }
   });
 });

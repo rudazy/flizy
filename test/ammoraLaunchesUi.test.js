@@ -50,7 +50,9 @@ describe('ammora launches view', () => {
     assert.match(sheet, /params\.set\('venue', 'ammora'\)/);
     assert.match(sheet, /venue: 'ammora'/);
     assert.match(sheet, /!amount \|\| venue === 'ammora'\) return;/);
-    assert.match(sheet, /minOut: quote\?\.amountOutMin,\s*pin,/);
+    // The reviewed minimum goes with the trade; on testnet no PIN does.
+    assert.match(sheet, /minOut: quote\?\.amountOutMin,\n\s*\}/);
+    assert.doesNotMatch(sheet, /PinField|\bpin\b/);
   });
 
   it('ships the coin artwork the hero points at', () => {

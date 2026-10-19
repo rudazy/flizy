@@ -766,24 +766,6 @@
     },
     {
       "kind": "check",
-      "name": "token_price_snapshots.token_price_snapshots_pair_check",
-      "providedBy": "20261019100000_token_price_snapshots.sql",
-      "requiredBy": "check on token_price_snapshots"
-    },
-    {
-      "kind": "check",
-      "name": "token_price_snapshots.token_price_snapshots_reserves_check",
-      "providedBy": "20261019100000_token_price_snapshots.sql",
-      "requiredBy": "check on token_price_snapshots"
-    },
-    {
-      "kind": "check",
-      "name": "token_price_snapshots.token_price_snapshots_token_check",
-      "providedBy": "20261019100000_token_price_snapshots.sql",
-      "requiredBy": "check on token_price_snapshots"
-    },
-    {
-      "kind": "check",
       "name": "token_profiles.token_profiles_description_len",
       "providedBy": "20261012120000_token_social.sql",
       "requiredBy": "check on token_profiles"
@@ -1306,12 +1288,6 @@
     },
     {
       "kind": "table",
-      "name": "token_price_snapshots",
-      "providedBy": "20261019100000_token_price_snapshots.sql",
-      "requiredBy": "web/lib/priceReference.ts"
-    },
-    {
-      "kind": "table",
       "name": "token_profiles",
       "providedBy": "20261012120000_token_social.sql",
       "requiredBy": "web/lib/tokenSocial.ts"
@@ -1344,7 +1320,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts, web/lib/tiers.ts"
+      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
     },
     {
       "kind": "table",

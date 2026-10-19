@@ -1,9 +1,9 @@
 /**
  * Rolling-window cap on site swaps.
  *
- * This is a churn limit, not the authority check. A swap takes the PIN
- * (POST /api/swap/execute) unless its price check passes and the account is
- * under its hourly count of PIN-free swaps (web/lib/tiers.ts).
+ * This is a churn limit. On testnet a swap takes no PIN (POST
+ * /api/swap/execute): it pays nobody, and the session, the reviewed minimum
+ * and the 5% slippage cap guard it.
  *
  * A swap cannot name a recipient: the route hardcodes the caller's own wallet.
  * That alone does not keep value on the account, because any token other than

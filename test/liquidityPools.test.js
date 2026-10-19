@@ -65,11 +65,11 @@ describe('liquidityPool', () => {
 describe('POST and GET /api/swap/liquidity', () => {
   const route = read('web/app/api/swap/liquidity/route.ts');
 
-  it('resolves the pool first, before the PIN or the lock', () => {
+  it('resolves the pool first, before the lock, and takes no PIN on testnet', () => {
     const pool = route.indexOf("const pool = liquidityPool(body.token == null ? null : String(body.token));");
     const refused = route.indexOf('if (!pool) return NextResponse.json({ error: NOT_A_POOL }, { status: 400 });', pool);
     assert.ok(pool > 0 && refused > pool);
-    assert.ok(refused < route.indexOf('await requireApproval('));
+    assert.doesNotMatch(route, /requireStepUp\(|requireApproval\(|body\.pin/);
     assert.ok(refused < route.indexOf('await tryAccountTxLock('));
     assert.doesNotMatch(route, /resolveToken\(/);
   });

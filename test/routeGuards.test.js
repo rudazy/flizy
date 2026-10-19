@@ -100,19 +100,23 @@ describe('the tiers hold: account changes take the password, money takes the PIN
     'mints/collections',
     'mints/generated/pay',
     'pay/execute',
-    'swap/execute',
     'swap/limit',
-    'swap/liquidity',
   ];
 
   /**
-   * Tier 0 is possible only here: a small ETH payment to a known recipient, or
-   * a swap or liquidity change on a verified pool whose price check passed
+   * Tier 0 is possible only here: a small ETH payment to a known recipient
    * (web/lib/tiers.ts). These call requireApproval with a tier worked out on
    * the server; every other money route calls requireStepUp and takes the PIN
    * every time.
    */
-  const TIERED_ROUTES = ['pay/execute', 'swap/execute', 'swap/liquidity'];
+  const TIERED_ROUTES = ['pay/execute'];
+
+  /**
+   * Trades whose output lands back in the caller's own wallet: on testnet they
+   * take no PIN. This list is the only place such a route may live, so a new
+   * money route cannot skip the PIN by accident.
+   */
+  const NO_PIN_TRADE_ROUTES = ['swap/execute', 'swap/liquidity'];
 
   const PASSWORD_CHECK = /requirePassword\(/;
   const STEP_UP_CHECK = /requireStepUp\(|requireApproval\(|runMintTx\(/;
@@ -162,15 +166,21 @@ describe('the tiers hold: account changes take the password, money takes the PIN
   it('a tiered route works the tier out itself, from what it will send', () => {
     for (const r of TIERED_ROUTES) {
       const s = src(r);
-      // A payment reads its tier from the database; a swap or liquidity change
-      // from a price check the route runs itself.
-      const fromSend =
-        /const tier = await sendTier\(supabase, payerId, /.test(s) && /requireApproval\([\s\S]{0,200}?,\s*tier\s*\)/.test(s);
-      const fromPrice =
-        /const price = await (swapPriceCheck|poolPriceCheck)\(/.test(s) &&
-        /requireApproval\([\s\S]{0,200}?,\s*(swapTier\(true, price, swapsThisHour\)|liquidityTier\(price\))\)/.test(s);
-      assert.ok(fromSend || fromPrice, r);
-      assert.doesNotMatch(s, /body\.tier|body\.known|body\.quick|body\.price/, r);
+      assert.match(s, /const tier = await sendTier\(supabase, payerId, /, r);
+      assert.match(s, /requireApproval\([\s\S]{0,200}?,\s*tier\s*\)/, r);
+      assert.doesNotMatch(s, /body\.tier|body\.known|body\.quick/, r);
+    }
+  });
+
+  it('a no-PIN trade route pays nobody and keeps the session, same-origin and lock gates', () => {
+    for (const r of NO_PIN_TRADE_ROUTES) {
+      const s = src(r);
+      assert.doesNotMatch(s, /requireStepUp\(|requireApproval\(|requirePassword\(|body\.pin/, r);
+      assert.match(s, /const denied = rejectIfCrossOrigin\(req\);/, r);
+      assert.match(s, /const accountId = await getAccountIdFromCookie\(\);/, r);
+      assert.match(s, /await tryAccountTxLock\(supabase, accountId, /, r);
+      // The output goes to the caller's own wallet, never to an address from the body.
+      assert.doesNotMatch(s, /body\.(to|recipient|address)\b/, r);
     }
   });
 

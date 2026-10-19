@@ -38,7 +38,6 @@ const { registerChannelSender, startOutboxDrain } = require('./lib/notify');
 const { startApprovalWatcher } = require('./lib/chatApprovals');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const { startReconciler } = require('./lib/reconcile');
-const { startPriceSnapshots } = require('./lib/priceSnapshots');
 const { startAmmora } = require('./lib/ammora/boot');
 const router = require('./lib/router');
 
@@ -462,10 +461,6 @@ async function main() {
   // Sends whose outcome was unknown (broadcast, no receipt) are settled from
   // their receipt here, also from this process only (lib/reconcile.js).
   startReconciler({ supabase, provider });
-  // Reference prices for PIN-free swaps (lib/priceSnapshots.js), from this
-  // process only. While it is down the reference goes stale and swaps ask for
-  // the PIN.
-  startPriceSnapshots({ supabase, provider, chain });
   // Ammora venue, only with AMMORA_ENABLED (lib/ammora/boot.js). The pool
   // inventory runs from this process only. Never awaited: a slow RPC must not
   // hold up WhatsApp.

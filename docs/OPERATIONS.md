@@ -245,7 +245,7 @@ swap; the SDK only quotes and builds the call.
   `ammora_pools` every 10 minutes (the SDK only routes pools with on-chain provenance). The
   first scan takes a few minutes. The site and the Telegram bot read that table.
 - **Rules.** Flizy symbols always win: an Ammora token with a Flizy symbol is reached by
-  contract address only. Every Ammora trade takes the PIN, pays no Flizy fee, and does not
+  contract address only. An Ammora trade takes no PIN on testnet, pays no Flizy fee, and does not
   count against the daily send limit. Approvals are for the exact amount, reset to zero
   first when an allowance is already there. Every swap is a call to the pinned aggregation
   router only, and its calldata is decoded and checked before sending: paid to the account's
@@ -309,7 +309,6 @@ These are enforced in code review and by tests:
 | `lib/notify.js` | Cross-channel notifications and outbox drain |
 | `lib/gatorExecute.js` | Smart-account executor. Per-call gas (estimate + 20%, floor 500,000, ceiling 1,000,000), refuses on a failed estimate, records the tx hash before broadcast. Mirror: `web/lib/gatorExecute.ts` |
 | `lib/reconcile.js` | Runs in the WhatsApp process every minute. Settles sends whose outcome was unknown (broadcast, no receipt) from their receipt: transfers, limit orders, claim holds. No receipt after an hour: flagged and admins notified, and still rechecked, so a late receipt still settles |
-| `lib/priceSnapshots.js` | Runs in the WhatsApp process every 5 minutes. Writes one reserves snapshot per verified pool per 15 minute bucket to `token_price_snapshots` and deletes rows older than two days. The median of the newest four is the reference that lets swaps and liquidity changes skip the PIN (`lib/priceReference.js`). While the process is down the reference goes stale after 30 minutes and those trades ask for the PIN |
 | `lib/runtime.js` | Shared chain, provider, ops and escrow wallets |
 | `lib/` | Identity, claims, phone, engine, dex, chains, agent wallet, escrow |
 | `lib/engine/` | Intent, Policy, Plan, Execute, Receipt |

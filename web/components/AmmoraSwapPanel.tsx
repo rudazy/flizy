@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { PinField, pinReady } from './PinField';
 import { announceTx } from '../lib/txSignal';
 import { ArrowLeftIcon } from './ExploreIcons';
 
@@ -14,8 +13,8 @@ import { ArrowLeftIcon } from './ExploreIcons';
  * The plan shows what the server will hold the swap to: the minimum received,
  * Ammora's fee with its rate, price impact (unavailable from Ammora, said so
  * rather than guessed), the token's contract and the Ammora source label.
- * Every Ammora swap takes the PIN (never in Flizy's verified set). The swap
- * goes through /api/swap/execute and Flizy's own executor. Back returns to
+ * On testnet an Ammora swap takes no PIN, like a Flizy swap. The swap goes
+ * through /api/swap/execute and Flizy's own executor. Back returns to
  * the Ammora launches view.
  */
 
@@ -39,7 +38,6 @@ export function AmmoraSwapPanel({ initialToken }: { initialToken: string | null 
   const [amount, setAmount] = useState('0.001');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteFor, setQuoteFor] = useState('');
-  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [explorerUrl, setExplorerUrl] = useState('');
@@ -92,7 +90,7 @@ export function AmmoraSwapPanel({ initialToken }: { initialToken: string | null 
   const symbol = shown?.token.symbol || selected?.symbol || 'token';
 
   async function swap() {
-    if (!shown || !pinReady(pin) || busy) return;
+    if (!shown || busy) return;
     setBusy(true);
     setError('');
     setExplorerUrl('');
@@ -105,7 +103,6 @@ export function AmmoraSwapPanel({ initialToken }: { initialToken: string | null 
           side,
           token,
           amount,
-          pin,
           slippageBps: SLIPPAGE_BPS,
           // The minimum on screen. The server refuses a fill below it.
           minOut: shown.amountOutMin,
@@ -116,7 +113,6 @@ export function AmmoraSwapPanel({ initialToken }: { initialToken: string | null 
         setError(body.error || 'Swap failed');
         return;
       }
-      setPin('');
       setExplorerUrl(body.explorerUrl || '');
       announceTx();
       loadQuote();
@@ -199,7 +195,6 @@ export function AmmoraSwapPanel({ initialToken }: { initialToken: string | null 
         </dl>
       ) : null}
 
-      <PinField id="ammora-pin" value={pin} onChange={setPin} />
       {error ? <p className="alert alert-warn m-0 text-sm">{error}</p> : null}
       {explorerUrl ? (
         <p className="alert alert-ok m-0 text-sm">
@@ -211,7 +206,7 @@ export function AmmoraSwapPanel({ initialToken }: { initialToken: string | null 
       ) : null}
       <button
         type="button"
-        disabled={busy || !shown || !pinReady(pin)}
+        disabled={busy || !shown}
         onClick={() => void swap()}
         className="h-[40px] rounded-[5px] bg-sun font-sans text-[12px] font-semibold text-black disabled:opacity-50"
       >

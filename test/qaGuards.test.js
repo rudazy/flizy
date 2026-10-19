@@ -24,9 +24,10 @@ describe('swap quote follows the inputs', () => {
   });
 
   it('keeps Swap off until that quote is in', () => {
-    assert.match(swap, /<CtaButton disabled=\{busy \|\| quoting \|\| !quote \|\| \(!noPin && !pinReady\(pin\)\)\} onClick=\{runSwap\}>/);
-    // No PIN only on the server's word for this quote, never a guess on the page.
-    assert.match(swap, /\(mode === 'swap' && quote\?\.pinRequired === false\)/);
+    assert.match(swap, /<CtaButton disabled=\{busy \|\| quoting \|\| !quote\} onClick=\{runSwap\}>/);
+    // Only a limit order shows the PIN field; a swap or liquidity change takes none.
+    assert.match(swap, /const pinNeeded = mode === 'limit';/);
+    assert.match(swap, /hidden=\{!pinNeeded\}/);
     assert.match(swap, /minOut: quote\?\.amountOutMin,/);
   });
 

@@ -10,12 +10,10 @@
  * controls leaks the same way in reverse.
  *
  * So Flizy's pools trade only verified tokens: a swap with any other token is
- * refused before anything is read, on the site and in chat. A verified swap
- * then skips the PIN when its price check passes (web/lib/tiers.ts). Ammora
- * launches are a separate venue with their own rules (web/lib/ammora) and
- * always take the PIN. Mirror of isUnverifiedSwap in lib/dex.js, which gates
- * the same trades in chat; test/swapGateDrift.test.js keeps the two verified
- * sets identical.
+ * refused before anything is read, on the site and in chat. Ammora launches
+ * are a separate venue with their own rules (web/lib/ammora). Mirror of
+ * isUnverifiedSwap in lib/dex.js, which gates the same trades in chat;
+ * test/swapGateDrift.test.js keeps the two verified sets identical.
  */
 
 import { listedByAddress } from './listedTokens.ts';

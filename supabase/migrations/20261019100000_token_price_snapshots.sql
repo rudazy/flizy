@@ -1,15 +1,17 @@
--- Reference prices for swaps and liquidity changes that skip the PIN.
+-- Reference prices for a check on swaps and liquidity changes.
 --
 -- A swap between ETH and a verified token keeps the value in the account, so
--- it needs no PIN when its price is fair. "Fair" is measured against these
+-- a fair price is what protects it. "Fair" would be measured against these
 -- rows, not against the pool alone, because a stolen session could move the
 -- pool first and then fire the owner's swap into the moved price.
 --
--- The WhatsApp process (lib/priceSnapshots.js) writes one row per verified
--- pool per 15 minute bucket: the pool's reserves at that moment, in raw units
--- (wei of ETH, smallest token units). The reference is the median of the
--- newest four (lib/priceReference.js, web/lib/priceReference.ts). Rows older
--- than two days are deleted by the same process.
+-- One row per verified pool per 15 minute bucket: the pool's reserves at that
+-- moment, in raw units (wei of ETH, smallest token units). The reference is
+-- the median of the newest four. Read reserves as text: PostgREST returns
+-- numeric as a JSON number, which loses the digits.
+--
+-- Nothing writes or reads this table while trades take no PIN on testnet. It
+-- is kept so the check can return on mainnet without a new migration.
 --
 -- token and pair are stored lower case. One row per (chain, token, bucket):
 -- a second writer or a restart cannot add a second snapshot to a bucket.

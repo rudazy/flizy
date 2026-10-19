@@ -64,8 +64,7 @@ import {
  *
  * Every figure is the pool's own, read from the chain in the last 24 hours
  * (lib/tokenMarketServer.ts). Dollar amounts are marked ≈ and come from one
- * ETH price. Buy and sell use the existing swap. Ammora trades take the PIN;
- * a Flizy trade asks for it when its price check does not pass.
+ * ETH price. Buy and sell use the existing swap, with no PIN on testnet.
  */
 
 const UP = 'text-[#2fd27a]';

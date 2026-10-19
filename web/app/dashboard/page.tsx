@@ -383,7 +383,7 @@ export default function DashboardHomePage() {
               <AppCardHeader
                 icon={<AlertCircleIcon size={15} />}
                 title="Set unlock PIN"
-                subtitle="Chat asks for it to unlock after flizy lock, to trade Ammora tokens, and to accept NFT offers."
+                subtitle="Chat asks for it to unlock after flizy lock, and to accept NFT offers."
                 action={<Badge>Recommended</Badge>}
               />
               <form onSubmit={onQuickPin} className="mt-[11px] grid grid-cols-2 gap-[7px]">

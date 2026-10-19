@@ -38,8 +38,6 @@ type Quote = {
   slippagePct: string;
   tokenIn: string;
   tokenOut: string;
-  /** The server's hint that Swap will ask for the PIN (its price check). */
-  pinRequired?: boolean;
 };
 
 /** One ETH pool's spot price, for the token named by symbol. */
@@ -145,8 +143,6 @@ function SwapPage() {
   const [result, setResult] = useState<{ explorerUrl?: string; note?: string } | null>(null);
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
-  /** The server asked for the PIN on a trade the page thought needed none. */
-  const [pinAsked, setPinAsked] = useState(false);
 
   const [lpMode, setLpMode] = useState<'add' | 'remove'>('add');
   const [lpEth, setLpEth] = useState('0.05');
@@ -158,7 +154,6 @@ function SwapPage() {
     symbol: string;
     tokenShare: string;
     poolShareBps: number;
-    pinRequired: boolean;
   } | null>(null);
 
   const side = tokenIn === 'ETH' ? 'buy' : 'sell';
@@ -176,13 +171,9 @@ function SwapPage() {
   const inputs = `${amountIn}|${tokenIn}|${tokenOut}|${slippageBps}`;
   const quote = quoted && quoted.inputs === inputs ? quoted : null;
 
-  // Display only: a swap or liquidity change on a verified pool needs no PIN when
-  // its price check passes, which the quote and the position read report. The
-  // server decides again (web/lib/tiers.ts) and answers PIN_REQUIRED if the
-  // price has moved since.
-  const noPin =
-    !pinAsked &&
-    ((mode === 'swap' && quote?.pinRequired === false) || (mode === 'liquidity' && lpPosition?.symbol === asset && lpPosition.pinRequired === false));
+  // Only a limit order takes the PIN: it fills later without asking. A swap or
+  // a liquidity change keeps the value in the wallet and takes none on testnet.
+  const pinNeeded = mode === 'limit';
 
   const loadBalances = useCallback(async () => {
     try {
@@ -268,7 +259,6 @@ function SwapPage() {
         symbol: String(data.symbol || ''),
         tokenShare: data.tokenShare || '0',
         poolShareBps: data.poolShareBps || 0,
-        pinRequired: data.pinRequired !== false,
       });
     } catch {
       setLpPosition(null);
@@ -431,20 +421,17 @@ function SwapPage() {
           amount: amountIn,
           tokenIn,
           tokenOut,
-          pin: noPin ? '' : pin,
           slippageBps,
           // The minimum on screen. The server refuses a fill below it.
           minOut: quote?.amountOutMin,
         }),
       });
       const data = await res.json();
-      if (data.code === 'PIN_REQUIRED') setPinAsked(true);
       if (!res.ok) {
         setError(data.error || 'Swap failed');
         return;
       }
       setResult({ explorerUrl: data.explorerUrl });
-      setPin('');
       loadPrice();
       loadQuote();
       loadBalances();
@@ -505,16 +492,14 @@ function SwapPage() {
       const res = await fetch('/api/swap/liquidity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, pin: noPin ? '' : pin }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (data.code === 'PIN_REQUIRED') setPinAsked(true);
       if (!res.ok) {
         setError(data.error || failed);
         return;
       }
       setResult({ explorerUrl: data.explorerUrl });
-      setPin('');
       loadPrice();
       loadLpPosition();
       loadBalances();
@@ -820,12 +805,7 @@ function SwapPage() {
         />
       )}
 
-      {noPin ? (
-        <p className="!mt-[12px] m-0 font-sans text-[11px] text-[#b7b1a8]">
-          No PIN needed: the value stays in your wallet and the pool price matches its recent level.
-        </p>
-      ) : null}
-      <div className="!mt-[12px]" hidden={noPin}>
+      <div className="!mt-[12px]" hidden={!pinNeeded}>
         <label htmlFor="swap-pin" className="mb-[6px] block font-mono text-[9.4px] uppercase tracking-[0.12em] text-[#e6e6e6]">
           Your PIN
         </label>
@@ -867,7 +847,7 @@ function SwapPage() {
       ) : null}
 
       {mode === 'swap' ? (
-        <CtaButton disabled={busy || quoting || !quote || (!noPin && !pinReady(pin))} onClick={runSwap}>
+        <CtaButton disabled={busy || quoting || !quote} onClick={runSwap}>
           {swapCta}
         </CtaButton>
       ) : mode === 'limit' ? (
@@ -876,7 +856,7 @@ function SwapPage() {
         </CtaButton>
       ) : lpMode === 'add' ? (
         <CtaButton
-          disabled={busy || (!noPin && !pinReady(pin)) || !(Number(lpEth) > 0) || !(Number(lpToken) > 0)}
+          disabled={busy || !(Number(lpEth) > 0) || !(Number(lpToken) > 0)}
           onClick={() =>
             runLiquidity({ action: 'add', amountEth: lpEth, amountToken: lpToken, token: asset }, 'Liquidity failed')
           }
@@ -885,7 +865,7 @@ function SwapPage() {
         </CtaButton>
       ) : (
         <CtaButton
-          disabled={busy || (!noPin && !pinReady(pin)) || !position || !(Number(position.lpBalanceFormatted) > 0)}
+          disabled={busy || !position || !(Number(position.lpBalanceFormatted) > 0)}
           onClick={() => runLiquidity({ action: 'remove', percent: lpPercent, token: asset }, 'Remove liquidity failed')}
         >
           {busy ? 'Removing...' : `Remove ${lpPercent}% liquidity`}

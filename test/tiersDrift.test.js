@@ -48,32 +48,17 @@ describe('tiers, chat and site', () => {
   });
 
   it('evaluate every combination identically', () => {
-    for (const action of ['send', 'swap', 'liquidity', 'other']) {
+    for (const action of ['send', 'swap', 'other']) {
       for (const native of [true, false]) {
         for (const amountWei of [0n, 1n, 4n * E15, 5n * E15, 5n * E15 + 1n]) {
           for (const quickSendWei of [0n, 5n * E15]) {
             for (const known of [true, false, undefined]) {
               for (const verified of [true, false, undefined]) {
-                for (const price of [{ ok: true }, { ok: false }, undefined]) {
-                  for (const swapsThisHour of [0, 3, 4, null, undefined]) {
-                    const input = { action, native, amountWei, quickSendWei, known, verified, price, swapsThisHour };
-                    assert.deepEqual(chat.evaluateTier(input), site.evaluateTier(input), JSON.stringify(input, (_, v) => (typeof v === 'bigint' ? String(v) : v)));
-                  }
-                }
+                const input = { action, native, amountWei, quickSendWei, known, verified };
+                assert.deepEqual(chat.evaluateTier(input), site.evaluateTier(input), JSON.stringify(input, (_, v) => (typeof v === 'bigint' ? String(v) : v)));
               }
             }
           }
-        }
-      }
-    }
-  });
-
-  it('tier a swap identically, with the same hourly count', () => {
-    assert.equal(chat.QUICK_SWAPS_PER_HOUR, site.QUICK_SWAPS_PER_HOUR);
-    for (const verified of [true, false]) {
-      for (const price of [{ ok: true }, { ok: false }, null]) {
-        for (const count of [0, 3, 4, null, undefined]) {
-          assert.deepEqual(chat.swapTier(verified, price, count), site.swapTier(verified, price, count), JSON.stringify({ verified, price, count }));
         }
       }
     }

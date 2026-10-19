@@ -48,70 +48,9 @@ describe('evaluateTier', () => {
     assert.equal(send({ amountWei: undefined }).tier, 1);
   });
 
-  it('a swap on a verified pool: Tier 0 at any size or direction once its price check passed', () => {
-    const swap = (extra) =>
-      T.evaluateTier({
-        action: 'swap',
-        native: true,
-        amountWei: Q,
-        quickSendWei: Q,
-        verified: true,
-        price: { ok: true },
-        swapsThisHour: 0,
-        ...extra,
-      });
-    assert.deepEqual(swap({}), { tier: 0, reason: 'value_stays' });
-    // Selling a token, far over quick send, with quick send off: still Tier 0.
-    assert.equal(swap({ native: false, amountWei: Q * 1000n, quickSendWei: 0n }).tier, 0);
-    assert.deepEqual(swap({ verified: false }), { tier: 1, reason: 'unverified_token' });
-    assert.deepEqual(swap({ price: { ok: false } }), { tier: 1, reason: 'price_check' });
-    assert.deepEqual(swap({ price: undefined }), { tier: 1, reason: 'price_check' });
-  });
-
-  it('a liquidity change: Tier 0 only once its price check passed', () => {
-    const liq = (extra) => T.evaluateTier({ action: 'liquidity', native: true, amountWei: 0n, quickSendWei: 0n, ...extra });
-    assert.deepEqual(liq({ price: { ok: true } }), { tier: 0, reason: 'value_stays' });
-    assert.deepEqual(liq({ price: { ok: false } }), { tier: 1, reason: 'price_check' });
-    assert.deepEqual(liq({}), { tier: 1, reason: 'price_check' });
-  });
-
-  it('a swap past the hourly count of PIN-free swaps, or with no count, asks for the PIN', () => {
-    const swap = (swapsThisHour) =>
-      T.evaluateTier({ action: 'swap', native: true, amountWei: Q, quickSendWei: Q, verified: true, price: { ok: true }, swapsThisHour });
-    assert.equal(T.QUICK_SWAPS_PER_HOUR, 4);
-    assert.equal(swap(3).tier, 0);
-    assert.deepEqual(swap(4), { tier: 1, reason: 'swap_limit' });
-    assert.deepEqual(swap(null), { tier: 1, reason: 'swap_limit' });
-    assert.deepEqual(swap(undefined), { tier: 1, reason: 'swap_limit' });
-    assert.deepEqual(swap(1.5), { tier: 1, reason: 'swap_limit' });
-    // A liquidity change has no count.
-    assert.equal(T.evaluateTier({ action: 'liquidity', native: true, amountWei: 0n, quickSendWei: 0n, price: { ok: true } }).tier, 0);
-  });
-
-  it('swapTier: unverified, unchecked or past the count asks for the PIN', () => {
-    assert.equal(T.swapTier(true, { ok: true }, 0).tier, 0);
-    assert.deepEqual(T.swapTier(false, { ok: true }, 0), { tier: 1, reason: 'unverified_token' });
-    assert.deepEqual(T.swapTier(true, null, 0), { tier: 1, reason: 'price_check' });
-    assert.deepEqual(T.swapTier(true, { ok: true }, 4), { tier: 1, reason: 'swap_limit' });
-    assert.deepEqual(T.swapTier(true, { ok: true }), { tier: 1, reason: 'swap_limit' });
-  });
-
-  it('swapsInLastHour counts this account swaps of any status in the last hour, and null when the read fails', async () => {
-    const now = Date.parse('2026-10-19T12:00:00.000Z');
-    const at = (min) => new Date(now - min * 60 * 1000).toISOString();
-    const fake = createFakeSupabase({
-      transfers: [
-        { account_id: 'me', kind: 'swap', status: 'confirmed', created_at: at(5) },
-        { account_id: 'me', kind: 'swap', status: 'failed', created_at: at(59) },
-        { account_id: 'me', kind: 'swap', status: 'confirmed', created_at: at(61) },
-        { account_id: 'me', kind: 'transfer', status: 'confirmed', created_at: at(5) },
-        { account_id: 'other', kind: 'swap', status: 'confirmed', created_at: at(5) },
-      ],
-    });
-    assert.equal(await T.swapsInLastHour(fake.client, 'me', now), 2);
-    assert.equal(await T.swapsInLastHour(fake.client, '', now), null);
-    const broken = { from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ gte: async () => ({ data: null, error: { message: 'down' } }) }) }) }) }) };
-    assert.equal(await T.swapsInLastHour(broken, 'me', now), null);
+  it('trades are not tiered: the module decides payments only', () => {
+    // A swap or liquidity change takes no PIN on testnet and never asks here.
+    for (const name of ['swapTier', 'liquidityTier', 'swapsInLastHour']) assert.equal(T[name], undefined, name);
   });
 
   it('anything else is always the PIN', () => {

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboard } from './DashboardProvider';
-import { PinField, pinReady } from './PinField';
 import { formatEthDisplay, maxSpend } from '../lib/tokenFormat';
 import { announceTx } from '../lib/txSignal';
 import {
@@ -25,8 +24,8 @@ import {
  * price the page already holds; nothing is estimated here except the price
  * impact, which is the quote measured against the pool price with the fees
  * taken out. The trade itself is the existing swap, with the quote's minimum as
- * the limit. The PIN is asked for when the quote says so (an Ammora token, or
- * a price away from its reference) or when the trade answers PIN_REQUIRED.
+ * the limit. A trade keeps the value in the wallet, so on testnet it takes no
+ * PIN.
  */
 
 type Quote = {
@@ -42,8 +41,6 @@ type Quote = {
   disclosure: string;
   /** Ammora's own impact string, when this quote came from that venue. */
   priceImpact?: string;
-  /** The server's hint that the trade will ask for the PIN. */
-  pinRequired?: boolean;
 };
 
 const UP = 'text-[#2fd27a]';
@@ -116,9 +113,6 @@ export function TokenTradeSheet({
   const [quoting, setQuoting] = useState(false);
   const [error, setError] = useState('');
   const [stage, setStage] = useState<'edit' | 'confirm' | 'done'>('edit');
-  const [pin, setPin] = useState('');
-  // Set when the trade answered PIN_REQUIRED after a quote said it was not needed.
-  const [pinAsked, setPinAsked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [explorerUrl, setExplorerUrl] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -157,7 +151,6 @@ export function TokenTradeSheet({
     setQuote(null);
     setError('');
     setStage('edit');
-    setPinAsked(false);
   }, [side]);
 
   // Quote a moment after typing stops, and again every 15 s while it is open,
@@ -203,7 +196,6 @@ export function TokenTradeSheet({
             networkFeeEth: null,
             disclosure: '',
             priceImpact: typeof body.priceImpact === 'string' ? body.priceImpact : 'unavailable',
-            pinRequired: true,
           });
           return;
         }
@@ -241,8 +233,6 @@ export function TokenTradeSheet({
   );
 
   const quoteReady = quote != null && Math.abs(Number(quote.amountIn) - amountNum) <= amountNum * 1e-9;
-  // Only a quote that says false skips the field; a missing hint asks for the PIN.
-  const pinNeeded = venue === 'ammora' || pinAsked || quote?.pinRequired !== false;
   const outNum = quoteReady ? num(quote.amountOut) : null;
   const minNum = quoteReady ? num(quote.amountOutMin) : null;
   const feeNum = quoteReady ? num(quote.networkFeeEth) : null;
@@ -263,7 +253,7 @@ export function TokenTradeSheet({
   const getEth = outNum == null ? null : buying ? (priceEth ? outNum * priceEth : null) : outNum;
 
   async function confirm() {
-    if (!quoteReady || busy || (pinNeeded && !pinReady(pin))) return;
+    if (!quoteReady || busy) return;
     setBusy(true);
     setError('');
     try {
@@ -279,7 +269,6 @@ export function TokenTradeSheet({
                 amount,
                 slippageBps: 100,
                 minOut: quote?.amountOutMin,
-                pin,
               }
             : {
                 side,
@@ -287,18 +276,15 @@ export function TokenTradeSheet({
                 tokenIn: buying ? 'ETH' : tradeId,
                 tokenOut: buying ? tradeId : 'ETH',
                 minOut: quote?.amountOutMin,
-                pin: pinNeeded ? pin : '',
               }
         ),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (body.code === 'PIN_REQUIRED') setPinAsked(true);
         setError(body.error || 'The trade did not go through.');
         return;
       }
       setExplorerUrl(typeof body.explorerUrl === 'string' ? body.explorerUrl : null);
-      setPin('');
       setStage('done');
       announceTx();
       onTraded();
@@ -587,7 +573,6 @@ export function TokenTradeSheet({
                   <p className="m-0 text-xs leading-relaxed text-[#8f8f8f]">
                     This sends from your Flizy wallet. If the price moves past your limit, the trade does not go through and nothing is spent but network gas.
                   </p>
-                  {pinNeeded ? <PinField value={pin} onChange={setPin} /> : null}
                   {error ? (
                     <p className="m-0 text-sm text-[#e0b070]" role="alert">
                       {error}
@@ -614,10 +599,7 @@ export function TokenTradeSheet({
               <div className="grid grid-cols-[auto_1fr] gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setPin('');
-                    setStage('edit');
-                  }}
+                  onClick={() => setStage('edit')}
                   disabled={busy}
                   className="hit-y-44 h-12 rounded-[12px] border border-[#383838] px-5 font-sans text-base text-[#f5f5f5]"
                 >
@@ -626,7 +608,7 @@ export function TokenTradeSheet({
                 <button
                   type="button"
                   onClick={() => void confirm()}
-                  disabled={busy || (pinNeeded && !pinReady(pin))}
+                  disabled={busy}
                   className="hit-y-44 h-12 rounded-[12px] bg-sun font-sans text-base font-bold text-sun-ink transition-opacity disabled:opacity-40"
                 >
                   {busy ? 'Sending...' : buying ? 'Confirm buy' : 'Confirm sell'}
@@ -635,7 +617,7 @@ export function TokenTradeSheet({
             )}
             <p className="m-0 mt-3 flex items-center gap-2 text-xs text-[#8f8f8f]">
               <ShieldCheckIcon size={15} className="shrink-0 text-[#2fd27a]" />
-              {pinNeeded ? 'Sent from your Flizy wallet only after your PIN.' : 'Sent from your Flizy wallet. The value stays in your wallet.'}
+              Sent from your Flizy wallet. What you get lands back in it.
             </p>
           </div>
         ) : null}

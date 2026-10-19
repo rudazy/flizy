@@ -9,7 +9,6 @@ import {
   quoteSwap,
   getPoolPrice,
   readErc20Decimals,
-  verifiedSwapPools,
 } from '../../../../lib/dexServer';
 import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
 import { getSupabase } from '../../../../lib/supabase';
@@ -17,8 +16,6 @@ import { ammoraEnabled } from '../../../../lib/ammora/venue.ts';
 import { ammoraSitePrice, ammoraSiteQuote } from '../../../../lib/ammora/siteSwap.ts';
 import { asSwapQuoteError } from '../../../../lib/swapQuoteError';
 import { UNVERIFIED_REFUSAL, isUnverifiedSwap, parseSlippageBps } from '../../../../lib/swapGate.ts';
-import { poolForToken, swapPriceCheck } from '../../../../lib/priceReference.ts';
-import { swapTier, swapsInLastHour } from '../../../../lib/tiers.ts';
 import { listedBySymbol } from '../../../../lib/listedTokens.ts';
 
 const ROUTE = 'GET /api/swap/quote';
@@ -62,8 +59,7 @@ export async function GET(req: Request) {
         amount,
         slippageBps: parseSlippageBps(url.searchParams.get('slippageBps')),
       });
-      // Ammora tokens are never verified, so every Ammora trade takes the PIN.
-      return NextResponse.json({ ...quote, pinRequired: true });
+      return NextResponse.json(quote);
     }
 
     if (side === 'price' || url.searchParams.get('price') === '1') {
@@ -127,18 +123,6 @@ export async function GET(req: Request) {
       }),
       provider.getFeeData().catch(() => null),
     ]);
-    // Whether Swap will ask for the PIN, by the same check the execute route
-    // runs on its own fresh quote. A hint for the screen only: execute decides,
-    // and answers PIN_REQUIRED if the price has moved since.
-    const price = await swapPriceCheck({
-      supabase: getSupabase(),
-      provider,
-      chainId: chain.chainId,
-      pool: tokenIn === null || tokenOut === null ? poolForToken(verifiedSwapPools(), tokenIn ?? tokenOut) : null,
-      inIsNative: tokenIn === null,
-      amountIn,
-      amountOutMin: quote.amountOutMin,
-    });
     const gasPrice = feeData?.maxFeePerGas ?? feeData?.gasPrice ?? null;
     const networkFeeEth = gasPrice != null ? ethers.formatEther(gasPrice * SWAP_GAS_UNITS) : null;
 
@@ -165,7 +149,6 @@ export async function GET(req: Request) {
       slippagePct: slipPct,
       // An estimate from the current gas price, or null when it could not be read.
       networkFeeEth,
-      pinRequired: swapTier(true, price, await swapsInLastHour(getSupabase(), accountId)).tier !== 0,
       tokenIn: inLabel,
       tokenOut: outLabel,
       feeRouter: quote.feeRouter,

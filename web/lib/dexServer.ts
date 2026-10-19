@@ -9,7 +9,6 @@ import { executeApprovalCall, executeGatorCall } from './gatorExecute.ts';
 import { getWebChain, type WebChain } from './webChain.ts';
 import { LISTED_TOKENS, listedByAddress, listedBySymbol } from './listedTokens.ts';
 import { capSlippageBps } from './swapGate.ts';
-import { verifiedPools, type VerifiedPool } from './priceReference.ts';
 
 export { getWebChain, type WebChain };
 
@@ -424,11 +423,6 @@ export async function addLiquidityEth(args: {
 }
 
 /** An ETH pool the site manages liquidity for. */
-/** FLZ and each listed token, with its WETH pool: what the price check reads. */
-export function verifiedSwapPools(): VerifiedPool[] {
-  return verifiedPools(getDexAddresses(), LISTED_TOKENS);
-}
-
 export type LiquidityPool = { symbol: string; token: string; pair: string; decimals: number };
 
 /**

@@ -16,19 +16,15 @@ import {
   explorerTxUrl,
   assertSwapAllowed,
   tokenLabel,
-  verifiedSwapPools,
 } from '../../../../lib/dexServer';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
 import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
-import { requireApproval } from '../../../../lib/stepUp.ts';
 import { gatorFailure, markTransferSubmitted } from '../../../../lib/gatorOutcome.ts';
 import { outcomeUnknown } from '../../../../lib/gatorExecute.ts';
-import { swapTier, swapsInLastHour } from '../../../../lib/tiers.ts';
 import { UNVERIFIED_REFUSAL, bindAmountOutMin, isUnverifiedSwap, parseSlippageBps } from '../../../../lib/swapGate.ts';
-import { poolForToken, swapPriceCheck } from '../../../../lib/priceReference.ts';
 import { ammoraEnabled } from '../../../../lib/ammora/venue.ts';
 import { ammoraSiteExecute } from '../../../../lib/ammora/siteSwap.ts';
 import { ClientError, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
@@ -49,11 +45,11 @@ export async function POST(req: Request) {
     const body = await req.json();
     const supabase = getSupabase();
 
-    // Flizy's pools trade verified tokens only (web/lib/swapGate.ts). A
-    // verified swap needs no PIN when its price check passes, worked out
-    // below on the same quote that executes (web/lib/tiers.ts); otherwise it
-    // takes the PIN (web/lib/stepUp.ts), the same gate and pause as
-    // pay/execute. The hourly cap stays as a churn limit behind it.
+    // Flizy's pools trade verified tokens only (web/lib/swapGate.ts). A swap
+    // pays nobody: the output lands in this wallet, so on testnet it takes no
+    // PIN, here or on Ammora. What guards it is the session, same-origin, the
+    // reviewed minimum, the 5% slippage cap and the account lock. The hourly
+    // cap stays as a churn limit.
     const rate = await checkSwapRateLimit(supabase, accountId);
     if (!rate.ok) {
       return NextResponse.json({ error: rate.error, code: rate.code }, { status: rate.status });
@@ -156,26 +152,6 @@ export async function POST(req: Request) {
       );
     }
     const floor = bindAmountOutMin(quote.amountOutMin, confirmedMin);
-
-    // The approval, decided on this quote and its floor: no PIN when the pool
-    // price and the worst fill are both within 5% of the reference
-    // (web/lib/priceReference.ts) and the account is under its hourly count
-    // of PIN-free swaps (web/lib/tiers.ts), the PIN otherwise. Under the
-    // lock, so the price checked is the one the swap is sent at.
-    const price = await swapPriceCheck({
-      supabase,
-      provider,
-      chainId: chain.chainId,
-      pool: tokenIn === null || tokenOut === null ? poolForToken(verifiedSwapPools(), tokenIn ?? tokenOut) : null,
-      inIsNative: tokenIn === null,
-      amountIn,
-      amountOutMin: floor,
-    });
-    const swapsThisHour = await swapsInLastHour(supabase, accountId);
-    const auth = await requireApproval(supabase, accountId, String(body.pin || ''), 'swap', swapTier(true, price, swapsThisHour));
-    if (!auth.ok) {
-      return NextResponse.json({ error: auth.error, code: auth.code, attemptsLeft: auth.attemptsLeft }, { status: auth.status });
-    }
 
     // From the resolved sides, so a token picked by address logs as MAKI, not its address.
     const inLabel = tokenLabel(tokenIn);
@@ -309,12 +285,11 @@ export async function POST(req: Request) {
 }
 
 /**
- * An Ammora swap (lib/ammora). Same-origin, the hourly cap above and the
- * account lock, as a Flizy swap, and the PIN on every trade: an Ammora token
- * is never in the verified set, so it is always Tier 1. The venue's own rules
- * (attested code, a tradable token, the reviewed minimum, the pinned router
- * and its decoded calldata) are applied in ammoraSiteExecute before anything
- * is sent.
+ * An Ammora swap (lib/ammora). Same gates as a Flizy swap: same-origin, the
+ * hourly cap above and the account lock, and no PIN on testnet. The venue's
+ * own rules (attested code, a tradable token, the reviewed minimum, the pinned
+ * router and its decoded calldata) are applied in ammoraSiteExecute before
+ * anything is sent.
  */
 async function ammoraSwap(
   supabase: ReturnType<typeof getSupabase>,
@@ -329,12 +304,6 @@ async function ammoraSwap(
     slippageBps = parseSlippageBps(body.slippageBps);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 400 });
-  }
-
-  // Never verified, so never price-checked: always the PIN.
-  const auth = await requireApproval(supabase, accountId, String(body.pin || ''), 'swap on Ammora', swapTier(false, null));
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error, code: auth.code, attemptsLeft: auth.attemptsLeft }, { status: auth.status });
   }
 
   const chain = getWebChain();
