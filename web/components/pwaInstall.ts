@@ -4,8 +4,9 @@ import { useSyncExternalStore } from 'react';
 
 /**
  * One captured browser install prompt for the whole tab. Chromium fires
- * beforeinstallprompt at most once per page load. The opening page and the
- * dashboard banner both read that single event from here.
+ * beforeinstallprompt at most once per page load. The inline script in the
+ * root layout stores that event before hydration. The opening page and the
+ * dashboard banner both read it from here.
  */
 
 type BeforeInstallPromptEvent = Event & {
@@ -44,6 +45,39 @@ function alreadyStandalone(): boolean {
   return nav.standalone === true;
 }
 
+type InstallWindow = Window & {
+  __flizyInstallPrompt?: BeforeInstallPromptEvent | null;
+  __flizyInstallBound?: boolean;
+};
+
+function installWindow(): InstallWindow | null {
+  if (typeof window === 'undefined') return null;
+  return window as InstallWindow;
+}
+
+function stashedEvent(): BeforeInstallPromptEvent | null {
+  return installWindow()?.__flizyInstallPrompt || null;
+}
+
+function clearStash() {
+  const host = installWindow();
+  if (host) host.__flizyInstallPrompt = null;
+}
+
+/** Take the prompt the early script stored, if this tab has not taken it yet. */
+function adopt() {
+  const pending = stashedEvent();
+  if (!pending || pending === deferred) return;
+  deferred = pending;
+  publish();
+}
+
+function onInstalled() {
+  deferred = null;
+  clearStash();
+  emit({ installed: true, canPrompt: false });
+}
+
 /** Start listening. Safe to call more than once, and only in the browser. */
 function startPwaInstallCapture() {
   if (listening || typeof window === 'undefined') return;
@@ -52,15 +86,21 @@ function startPwaInstallCapture() {
     snapshot = { installed: true, canPrompt: false };
   }
 
+  const host = installWindow();
+  if (host?.__flizyInstallBound) {
+    adopt();
+    window.addEventListener('flizy-install-ready', adopt);
+    window.addEventListener('flizy-install-done', onInstalled);
+    return;
+  }
+
+  // The early script did not run. Listen here so Install still has a prompt.
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
-    deferred = event as BeforeInstallPromptEvent;
-    publish();
+    if (host) host.__flizyInstallPrompt = event as BeforeInstallPromptEvent;
+    adopt();
   });
-  window.addEventListener('appinstalled', () => {
-    deferred = null;
-    emit({ installed: true, canPrompt: false });
-  });
+  window.addEventListener('appinstalled', onInstalled);
 }
 
 function subscribePwaInstall(listener: () => void) {
@@ -89,6 +129,7 @@ export function usePwaInstall(): PwaInstallSnapshot {
  */
 export async function promptPwaInstall(): Promise<'accepted' | 'dismissed' | 'unavailable'> {
   startPwaInstallCapture();
+  adopt();
   const pending = deferred;
   if (prompting) return 'dismissed';
   if (!pending) return 'unavailable';
@@ -96,6 +137,7 @@ export async function promptPwaInstall(): Promise<'accepted' | 'dismissed' | 'un
   // must not land before prompt() runs.
   prompting = true;
   deferred = null;
+  clearStash();
   try {
     const opened = pending.prompt();
     publish();

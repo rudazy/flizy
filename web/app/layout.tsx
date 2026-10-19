@@ -10,6 +10,7 @@ import { JsonLd } from '../components/JsonLd';
 import { LocaleProvider } from '../components/LocaleProvider';
 import { CONSENT_COOKIE, readConsent } from '../lib/consent';
 import { hasSessionCookie } from '../lib/cookies';
+import { INSTALL_CAPTURE_JS } from '../lib/installCapture';
 import { OG_IMAGE } from '../lib/seo';
 import './globals.css';
 
@@ -112,6 +113,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <head>
+        {/*
+          Inline and parser-blocking. The listener has to exist before
+          hydration: after an uninstall Chromium fires its one install
+          prompt before React attaches, and a downloaded script can miss it.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: INSTALL_CAPTURE_JS }} />
+      </head>
       <body className="page-shell font-mono antialiased">
         <JsonLd />
         {/*

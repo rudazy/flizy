@@ -5,6 +5,14 @@ import { promptPwaInstall, usePwaInstall } from './pwaInstall';
 
 const FALLBACK =
   'Use the install icon in the address bar, or the browser menu, and choose Install Flizy.';
+const IOS_FALLBACK = 'In Safari, tap Share, then Add to Home Screen.';
+
+function fallbackCopy(): string {
+  if (typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    return IOS_FALLBACK;
+  }
+  return FALLBACK;
+}
 
 /**
  * Opens the browser's install dialog. Shown on the opening page. Hidden once
@@ -24,7 +32,7 @@ export function InstallAppButton() {
 
   async function onClick() {
     const outcome = await promptPwaInstall();
-    setNote(outcome === 'unavailable' ? FALLBACK : '');
+    setNote(outcome === 'unavailable' ? fallbackCopy() : '');
   }
 
   return (

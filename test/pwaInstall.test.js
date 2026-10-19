@@ -50,9 +50,17 @@ describe('opening page install', () => {
 });
 
 describe('one browser install prompt', () => {
-  it('captures beforeinstallprompt in one place', () => {
-    assert.match(STORE, /addEventListener\('beforeinstallprompt'/);
-    assert.match(STORE, /preventDefault\(\)/);
+  it('catches the prompt before hydration, including after an uninstall', () => {
+    const capture = read('web/lib/installCapture.ts');
+    const layout = read('web/app/layout.tsx');
+    assert.match(capture, /beforeinstallprompt/);
+    assert.match(capture, /preventDefault\(\)/);
+    assert.match(capture, /__flizyInstallPrompt=event/);
+    assert.match(capture, /serviceWorker.register\('\/sw.js'\)/);
+    assert.match(layout, /dangerouslySetInnerHTML=\{\{ __html: INSTALL_CAPTURE_JS \}\}/);
+    assert.doesNotMatch(layout, /strategy="beforeInteractive"/);
+    assert.match(STORE, /__flizyInstallPrompt/);
+    assert.match(STORE, /adopt\(\)/);
     assert.match(STORE, /pending\.prompt\(\)/);
     assert.doesNotMatch(BANNER, /addEventListener\('beforeinstallprompt'/);
     assert.doesNotMatch(BUTTON, /addEventListener\('beforeinstallprompt'/);
