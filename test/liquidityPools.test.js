@@ -69,7 +69,7 @@ describe('POST and GET /api/swap/liquidity', () => {
     const pool = route.indexOf("const pool = liquidityPool(body.token == null ? null : String(body.token));");
     const refused = route.indexOf('if (!pool) return NextResponse.json({ error: NOT_A_POOL }, { status: 400 });', pool);
     assert.ok(pool > 0 && refused > pool);
-    assert.ok(refused < route.indexOf('await requireStepUp('));
+    assert.ok(refused < route.indexOf('await requireApproval('));
     assert.ok(refused < route.indexOf('await tryAccountTxLock('));
     assert.doesNotMatch(route, /resolveToken\(/);
   });

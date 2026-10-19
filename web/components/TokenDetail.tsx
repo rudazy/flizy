@@ -10,6 +10,7 @@ import { SearchButton } from './SiteSearch';
 import { formatEthDisplay, formatPct } from '../lib/tokenFormat';
 import { VerifiedMark } from './VerifiedMark';
 import { tokenLogo } from '../lib/tokenLogos';
+import { listedByAddress } from '../lib/listedTokens';
 import { TokenChart } from './TokenChart';
 import { TokenTradeSheet } from './TokenTradeSheet';
 import { LINK_KINDS, LINK_LABEL } from './AccountProjects';
@@ -54,7 +55,8 @@ import {
  * A token's page: price, chart, trade, the pool's figures, recent trades and
  * holders. FLZ, the listed token, also has its profile, watchlist and theses.
  * Any other token opens the same page by its contract, read from its own ETH
- * pool and without the FLZ-only parts. An Ammora launch opens this same page
+ * pool and without the FLZ-only parts. Only FLZ and the listed tokens trade
+ * here; any other token shows its pool with Buy and Sell off. An Ammora launch opens this same page
  * by its contract. The price is a live Ammora quote, and Buy and Sell use the
  * Ammora venue. A listed token Flizy verified carries the
  * mark, any other listed token carries nothing, and a token Flizy does not list
@@ -62,7 +64,8 @@ import {
  *
  * Every figure is the pool's own, read from the chain in the last 24 hours
  * (lib/tokenMarketServer.ts). Dollar amounts are marked ≈ and come from one
- * ETH price. Buy and sell use the existing swap, behind the PIN.
+ * ETH price. Buy and sell use the existing swap. Ammora trades take the PIN;
+ * a Flizy trade asks for it when its price check does not pass.
  */
 
 const UP = 'text-[#2fd27a]';
@@ -425,8 +428,10 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   // trade can never fall back to FLZ while the page is still loading.
   const ticker = ammora?.symbol || market?.symbol || held?.symbol || (listed ? 'FLZ' : 'Token');
   const contract = market?.address || held?.address || (imported ? symbol : null);
+  /** FLZ, or a token Flizy lists with a pool it seeded: the only tokens Flizy's pools trade. */
+  const flizyVerified = listed || (imported && contract != null && listedByAddress(contract) != null);
   /** A Flizy pool the page has read. An imported token waits for its own, and never falls back to FLZ. */
-  const poolTrade = listed || (imported && market != null);
+  const poolTrade = flizyVerified && (listed || market != null);
   /** An Ammora launch trades on Ammora. Everything else uses the pool above. */
   const canTrade = ammora ? ammora.tradable === true : poolTrade;
   /** Opened by its contract and listed by Flizy, with a pool Flizy seeded. */
@@ -724,6 +729,9 @@ export function TokenDetail({ symbol }: { symbol: string }) {
             <SwapArrowsIcon size={20} /> Sell {ticker}
           </button>
         </div>
+        {!ammora && imported && !flizyVerified && (!ammoraUi || ammoraChecked) ? (
+          <p className="m-0 -mt-2 text-[12px] text-muted">Flizy trades verified tokens only.</p>
+        ) : null}
 
         {/* Figures */}
         <section className="grid grid-cols-3 gap-2 sm:gap-2.5">
@@ -857,7 +865,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                         ? 'Verified. Only ETH and FLZ can be sent on socials.'
                         : seeded
                           ? 'Listed on Flizy. Only ETH and FLZ can be sent on socials.'
-                          : 'Not listed. It cannot be sent on socials.'}
+                          : 'Not listed. Flizy does not trade or send it.'}
                 </AboutRow>
               </dl>
             </section>
@@ -901,7 +909,6 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           changeUp={changeUp}
           usdPerEth={usdPerEth}
           tokenAddress={imported ? contract : null}
-          listed={seeded}
           venue={ammora ? 'ammora' : null}
         />
       ) : null}

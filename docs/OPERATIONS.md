@@ -218,7 +218,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `DEFAULT_QUICK_SEND_ETH` | Most one ETH payment to a known recipient may be without the PIN (default 0.005), and the ceiling on an account's own value. Set the same on the VPS and on Vercel |
 | `PENDING_TTL_MS` / `LINK_CODE_TTL_MS` | Plan and link code lifetimes |
 | `SESSION_TTL_MS` / `SESSION_MAX_MS` | Chat unlock: ends after this long without a message (default 30 min), and never later than this after the PIN was entered (default 8 h) |
-| `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes |
+| `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes. Slippage above 500 (5%) is cut to 500 by every quote; an unreadable value is 100 |
 | `CHAIN_GIWA_SEPOLIA_*` | Optional overrides for WETH, routers, FLZ, pair |
 | `FLIZY_TREASURY` | Treasury passed at DEX deploy time (defaults to ops). The live fee destination is `feeRouter.treasury` on chain, changed with `setTreasury`, not with this variable |
 | `GAS_BUFFER_ETH` | Reserve kept for gas when checking funding |
@@ -309,6 +309,7 @@ These are enforced in code review and by tests:
 | `lib/notify.js` | Cross-channel notifications and outbox drain |
 | `lib/gatorExecute.js` | Smart-account executor. Per-call gas (estimate + 20%, floor 500,000, ceiling 1,000,000), refuses on a failed estimate, records the tx hash before broadcast. Mirror: `web/lib/gatorExecute.ts` |
 | `lib/reconcile.js` | Runs in the WhatsApp process every minute. Settles sends whose outcome was unknown (broadcast, no receipt) from their receipt: transfers, limit orders, claim holds. No receipt after an hour: flagged and admins notified, and still rechecked, so a late receipt still settles |
+| `lib/priceSnapshots.js` | Runs in the WhatsApp process every 5 minutes. Writes one reserves snapshot per verified pool per 15 minute bucket to `token_price_snapshots` and deletes rows older than two days. The median of the newest four is the reference that lets swaps and liquidity changes skip the PIN (`lib/priceReference.js`). While the process is down the reference goes stale after 30 minutes and those trades ask for the PIN |
 | `lib/runtime.js` | Shared chain, provider, ops and escrow wallets |
 | `lib/` | Identity, claims, phone, engine, dex, chains, agent wallet, escrow |
 | `lib/engine/` | Intent, Policy, Plan, Execute, Receipt |

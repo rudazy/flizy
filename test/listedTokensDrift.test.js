@@ -147,10 +147,11 @@ describe('listed tokens on the site', () => {
     assert.match(detail, /const verifiedMark = listed \|\| \(seeded && held\?\.verified === true\);/);
     assert.match(detail, /const notListed = imported && held != null && held\.listed !== true;/);
     assert.match(detail, /\{verifiedMark \? \([\s\S]*?<VerifiedMark \/>[\s\S]*?\) : notListed \? \([\s\S]*?Not listed[\s\S]*?\) : null\}/);
-    assert.match(detail, /listed=\{seeded\}/);
+    // A token Flizy does not list is never traded, so the sheet carries no warning for one.
+    assert.match(detail, /const flizyVerified = listed \|\| \(imported && contract != null && listedByAddress\(contract\) != null\);/);
+    assert.match(detail, /Flizy trades verified tokens only\./);
     const sheet = read('web/components/TokenTradeSheet.tsx');
-    assert.match(sheet, /\{tokenAddress && !listed && venue !== 'ammora' \? \(/);
-    assert.match(sheet, /\{symbol\} is not listed on Flizy\./);
+    assert.doesNotMatch(sheet, /is not listed on Flizy/);
   });
 
   it('are read for every wallet with their verified flag, so a bought token shows', () => {

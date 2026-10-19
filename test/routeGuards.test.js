@@ -107,11 +107,12 @@ describe('the tiers hold: account changes take the password, money takes the PIN
 
   /**
    * Tier 0 is possible only here: a small ETH payment to a known recipient, or
-   * a small ETH swap into verified tokens (web/lib/tiers.ts). These call
-   * requireApproval with a tier worked out on the server; every other money
-   * route calls requireStepUp and takes the PIN every time.
+   * a swap or liquidity change on a verified pool whose price check passed
+   * (web/lib/tiers.ts). These call requireApproval with a tier worked out on
+   * the server; every other money route calls requireStepUp and takes the PIN
+   * every time.
    */
-  const TIERED_ROUTES = ['pay/execute', 'swap/execute'];
+  const TIERED_ROUTES = ['pay/execute', 'swap/execute', 'swap/liquidity'];
 
   const PASSWORD_CHECK = /requirePassword\(/;
   const STEP_UP_CHECK = /requireStepUp\(|requireApproval\(|runMintTx\(/;
@@ -161,9 +162,15 @@ describe('the tiers hold: account changes take the password, money takes the PIN
   it('a tiered route works the tier out itself, from what it will send', () => {
     for (const r of TIERED_ROUTES) {
       const s = src(r);
-      assert.match(s, /const tier = await (sendTier|swapTier)\(supabase, (payerId|accountId), /, r);
-      assert.match(s, /requireApproval\([\s\S]{0,200}?,\s*tier\s*\)/, r);
-      assert.doesNotMatch(s, /body\.tier|body\.known|body\.quick/, r);
+      // A payment reads its tier from the database; a swap or liquidity change
+      // from a price check the route runs itself.
+      const fromSend =
+        /const tier = await sendTier\(supabase, payerId, /.test(s) && /requireApproval\([\s\S]{0,200}?,\s*tier\s*\)/.test(s);
+      const fromPrice =
+        /const price = await (swapPriceCheck|poolPriceCheck)\(/.test(s) &&
+        /requireApproval\([\s\S]{0,200}?,\s*(swapTier\(true, price, swapsThisHour\)|liquidityTier\(price\))\)/.test(s);
+      assert.ok(fromSend || fromPrice, r);
+      assert.doesNotMatch(s, /body\.tier|body\.known|body\.quick|body\.price/, r);
     }
   });
 

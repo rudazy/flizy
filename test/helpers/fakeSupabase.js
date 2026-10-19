@@ -186,6 +186,8 @@ class Query {
   upsert(row, options = {}) {
     this.op = 'upsert';
     this.payload = row;
+    // ignoreDuplicates: a conflicting row is left exactly as it was.
+    this.ignoreDuplicates = options.ignoreDuplicates === true;
     this.conflictCols = String(options.onConflict || 'id')
       .split(',')
       .map((c) => c.trim())
@@ -236,6 +238,7 @@ class Query {
         const existing = this.rows.find((r) =>
           this.conflictCols.every((c) => String(r[c] ?? '') === String(row[c] ?? ''))
         );
+        if (existing && this.ignoreDuplicates) continue;
         if (existing) {
           Object.assign(existing, row);
           out.push(existing);

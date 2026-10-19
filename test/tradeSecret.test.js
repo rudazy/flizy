@@ -1,11 +1,12 @@
 /**
- * A chat trade of a token Flizy has not verified is approved with the PIN on
- * flizy.app after CONFIRM, every time. The PIN is never typed in the chat.
+ * Chat trades: a token Flizy has not verified is refused outright. A verified
+ * trade is a plain CONFIRM when its price check passes (lib/priceReference.js),
+ * at any size or direction, and otherwise is approved with the PIN on
+ * flizy.app after CONFIRM. The PIN is never typed in the chat.
  *
- * Any token other than ETH, WETH and FLZ trades against a pool whoever deployed
- * it can seed and drain. The output lands in this wallet, but the ETH put in can
- * still be taken, so a stolen phone must not be able to do it with CONFIRM
- * alone. ETH/FLZ trades are unchanged.
+ * Any token other than ETH, WETH, FLZ and the listed tokens trades against a
+ * pool whoever deployed it can seed and drain. The output lands in this
+ * wallet, but the ETH put in can still be taken, so chat does not trade them.
  *
  * Run: node --test test/tradeSecret.test.js
  */
@@ -92,6 +93,26 @@ require.cache[enginePath] = {
   },
 };
 
+// The price check is stubbed: its own logic is tested in
+// test/priceReference.test.js. Each call is recorded so the inputs the router
+// hands it can be checked.
+let priceResult = { ok: true, reason: 'in_band' };
+const priceCalls = [];
+const realPrice = require('../lib/priceReference');
+const pricePath = require.resolve('../lib/priceReference');
+require.cache[pricePath] = {
+  id: pricePath,
+  filename: pricePath,
+  loaded: true,
+  exports: {
+    ...realPrice,
+    swapPriceCheck: async (args) => {
+      priceCalls.push(args);
+      return priceResult;
+    },
+  },
+};
+
 const router = require('../lib/router');
 
 const TG = '778899126';
@@ -115,8 +136,10 @@ function ctxFor(sent) {
   };
 }
 
-function seed({ pin = true } = {}) {
+function seed({ pin = true, price = { ok: true, reason: 'in_band' } } = {}) {
   executed = 0;
+  priceResult = price;
+  priceCalls.length = 0;
   fake = createFakeSupabase({
     accounts: [
       {
@@ -142,14 +165,15 @@ function seed({ pin = true } = {}) {
   });
 }
 
-async function planUnverifiedBuy(ctx, sent) {
-  await router.handle(ctx, `/buy 0.01 eth of ${UNVERIFIED}`);
+/** A FLZ buy whose price check fails, so it takes the PIN. */
+async function planPinnedBuy(ctx, sent) {
+  await router.handle(ctx, '/buy 0.01 eth of FLZ');
   const text = sent.join('\n');
   assert.match(text, /Swap plan/, `expected a plan, got:\n${text}`);
-  assert.match(text, /has not verified this token/);
+  assert.match(text, /The pool price is away from its recent level, or could not be checked\. After CONFIRM you approve it with your PIN/);
 }
 
-describe('chat trade of an unverified token', () => {
+describe('chat trade that takes the PIN (price check failed)', () => {
   const { pollApprovals } = require('../lib/chatApprovals');
   const approvals = () => fake.db.tables.chat_approvals || [];
   const notices = () => (fake.db.tables.notifications || []).map((n) => n.body).join('\n');
@@ -166,10 +190,10 @@ describe('chat trade of an unverified token', () => {
   });
 
   it('CONFIRM sends a PIN link instead of sending, and asks for no PIN in chat', async () => {
-    seed();
+    seed({ price: { ok: false, reason: 'price_moved' } });
     const sent = [];
     const ctx = ctxFor(sent);
-    await planUnverifiedBuy(ctx, sent);
+    await planPinnedBuy(ctx, sent);
 
     sent.length = 0;
     await router.handle(ctx, 'confirm');
@@ -183,10 +207,10 @@ describe('chat trade of an unverified token', () => {
   });
 
   it('CONFIRM again sends the same link, not a second approval', async () => {
-    seed();
+    seed({ price: { ok: false, reason: 'price_moved' } });
     const sent = [];
     const ctx = ctxFor(sent);
-    await planUnverifiedBuy(ctx, sent);
+    await planPinnedBuy(ctx, sent);
     await router.handle(ctx, 'confirm');
     const first = sent[sent.length - 1];
     await router.handle(ctx, 'confirm');
@@ -195,10 +219,10 @@ describe('chat trade of an unverified token', () => {
   });
 
   it('a PIN typed into the chat approves nothing', async () => {
-    seed();
+    seed({ price: { ok: false, reason: 'price_moved' } });
     const sent = [];
     const ctx = ctxFor(sent);
-    await planUnverifiedBuy(ctx, sent);
+    await planPinnedBuy(ctx, sent);
     await router.handle(ctx, 'confirm');
     await router.handle(ctx, PIN);
     await router.handle(ctx, PASSWORD);
@@ -208,10 +232,10 @@ describe('chat trade of an unverified token', () => {
   });
 
   it('runs once the page approves it, and only once', async () => {
-    seed();
+    seed({ price: { ok: false, reason: 'price_moved' } });
     const sent = [];
     const ctx = ctxFor(sent);
-    await planUnverifiedBuy(ctx, sent);
+    await planPinnedBuy(ctx, sent);
     await router.handle(ctx, 'confirm');
     approveOnPage();
     await pollApprovals();
@@ -222,10 +246,10 @@ describe('chat trade of an unverified token', () => {
   });
 
   it('a pause on the page drops the plan and says so in the chat', async () => {
-    seed();
+    seed({ price: { ok: false, reason: 'price_moved' } });
     const sent = [];
     const ctx = ctxFor(sent);
-    await planUnverifiedBuy(ctx, sent);
+    await planPinnedBuy(ctx, sent);
     await router.handle(ctx, 'confirm');
     approvals()[0].cancelled_at = new Date().toISOString();
     await pollApprovals();
@@ -235,10 +259,10 @@ describe('chat trade of an unverified token', () => {
   });
 
   it('cancel drops the plan and withdraws its link', async () => {
-    seed();
+    seed({ price: { ok: false, reason: 'price_moved' } });
     const sent = [];
     const ctx = ctxFor(sent);
-    await planUnverifiedBuy(ctx, sent);
+    await planPinnedBuy(ctx, sent);
     await router.handle(ctx, 'confirm');
     await router.handle(ctx, 'cancel');
     assert.equal(router.pendingFlowFor(KEY).send, false);
@@ -248,17 +272,30 @@ describe('chat trade of an unverified token', () => {
     assert.equal(executed, 0);
   });
 
-  it('with no PIN on the account, the trade is refused before a plan exists', async () => {
-    seed({ pin: false });
-    const sent = [];
-    const ctx = ctxFor(sent);
-    await router.handle(ctx, `/buy 0.01 eth of ${UNVERIFIED}`);
-    const text = sent.join('\n');
-    assert.doesNotMatch(text, /Swap plan/);
-    assert.match(text, /Set an unlock PIN on the site first: \S+\/dashboard\/account/);
-    assert.equal(router.pendingFlowFor(KEY).send, false);
-    assert.equal(executed, 0);
+});
+
+describe('chat trade of an unverified token', () => {
+  beforeEach(() => {
+    router.discardPendingFlows(KEY);
   });
+
+  for (const pin of [true, false]) {
+    for (const command of [`/buy 0.01 eth of ${UNVERIFIED}`, `/sell 5 ${UNVERIFIED}`]) {
+      it(`is refused before a plan exists (${command.split(' ')[0]}, ${pin ? 'with' : 'without'} a PIN)`, async () => {
+        seed({ pin });
+        const sent = [];
+        const ctx = ctxFor(sent);
+        await router.handle(ctx, command);
+        const text = sent.join('\n');
+        assert.doesNotMatch(text, /Swap plan/);
+        assert.match(text, /Flizy only trades tokens it has verified\. This token is not one of them\./);
+        assert.equal(router.pendingFlowFor(KEY).send, false);
+        assert.equal((fake.db.tables.chat_approvals || []).length, 0);
+        assert.equal(priceCalls.length, 0);
+        assert.equal(executed, 0);
+      });
+    }
+  }
 });
 
 describe('chat trade of FLZ', () => {
@@ -266,23 +303,78 @@ describe('chat trade of FLZ', () => {
     router.discardPendingFlows(KEY);
   });
 
-  it('confirms without a PIN link at or under the quick-send amount', async () => {
+  it('confirms without a PIN link at any size while the price check passes', async () => {
     seed();
     const sent = [];
     const ctx = ctxFor(sent);
-    await router.handle(ctx, '/buy 0.005 eth of FLZ');
+    // A hundred times the quick-send amount.
+    await router.handle(ctx, '/buy 0.5 eth of FLZ');
     assert.doesNotMatch(sent.join('\n'), /has not verified|PIN/);
+    await router.handle(ctx, 'confirm');
+    assert.equal(executed, 1);
+    assert.equal((fake.db.tables.chat_approvals || []).length, 0);
+  });
+
+  it('after four swaps in the hour, chat or site, the next one takes the PIN', async () => {
+    seed();
+    const recent = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    for (let i = 0; i < 4; i += 1) {
+      fake.db.tables.transfers.push({ id: `s${i}`, account_id: 'acc-trader', kind: 'swap', status: 'confirmed', created_at: recent });
+    }
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, '/buy 0.01 eth of FLZ');
+    assert.match(sent.join('\n'), /That is 4 swaps in the last hour, so this one takes the PIN\. After CONFIRM you approve it with your PIN/);
+    await router.handle(ctx, 'confirm');
+    assert.equal(executed, 0);
+  });
+
+  it('a sell back to ETH is a plain CONFIRM too', async () => {
+    seed();
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, '/sell 500 FLZ');
+    assert.doesNotMatch(sent.join('\n'), /PIN/);
     await router.handle(ctx, 'confirm');
     assert.equal(executed, 1);
   });
 
-  it('above the quick-send amount, CONFIRM sends a PIN link and the page approves it', async () => {
-    const { pollApprovals } = require('../lib/chatApprovals');
+  it('checks the FLZ pool with the plan minimum as the worst fill, at plan and again at CONFIRM', async () => {
     seed();
     const sent = [];
     const ctx = ctxFor(sent);
+    await router.handle(ctx, '/buy 0.5 eth of FLZ');
+    await router.handle(ctx, 'confirm');
+    assert.equal(priceCalls.length, 2);
+    const flz = realDex.resolveToken('FLZ', 'giwa_sepolia').toLowerCase();
+    for (const call of priceCalls) {
+      assert.equal(call.pool.token, flz);
+      assert.equal(call.inIsNative, true);
+      assert.equal(call.amountIn, 5n * 10n ** 17n);
+      // quoteSwap is stubbed to a minimum of 99 per unit in.
+      assert.equal(call.amountOutMin, 5n * 10n ** 17n * 99n);
+    }
+  });
+
+  it('a price that moves while the plan waits turns CONFIRM into a PIN link', async () => {
+    seed();
+    const sent = [];
+    const ctx = ctxFor(sent);
+    await router.handle(ctx, '/buy 0.5 eth of FLZ');
+    assert.doesNotMatch(sent.join('\n'), /PIN/);
+    priceResult = { ok: false, reason: 'price_moved' };
+    await router.handle(ctx, 'confirm');
+    assert.equal(executed, 0);
+    assert.match(sent.join('\n'), /Approve with your PIN on Flizy: \S+\/a\//);
+  });
+
+  it('when the price check fails, CONFIRM sends a PIN link and the page approves it', async () => {
+    const { pollApprovals } = require('../lib/chatApprovals');
+    seed({ price: { ok: false, reason: 'no_reference' } });
+    const sent = [];
+    const ctx = ctxFor(sent);
     await router.handle(ctx, '/buy 0.01 eth of FLZ');
-    assert.match(sent.join('\n'), /above your quick send amount\. After CONFIRM you approve it with your PIN/);
+    assert.match(sent.join('\n'), /The pool price is away from its recent level, or could not be checked\. After CONFIRM you approve it with your PIN/);
     await router.handle(ctx, 'confirm');
     assert.equal(executed, 0);
     assert.match(sent.join('\n'), /Approve with your PIN on Flizy: \S+\/a\//);

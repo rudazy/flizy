@@ -9,6 +9,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createPublicClient, http, defineChain } from 'viem';
 import { AMMORA_CHAIN_ID, NATIVE } from './venue.ts';
+import { capSlippageBps } from '../swapGate.ts';
+
+/** Used when a caller names none, mirrors lib/ammora/routes.js. */
+const DEFAULT_SLIPPAGE_BPS = 100;
 
 const ROUTE_TTL_MS = 10 * 60_000;
 const TABLE = 'ammora_pools';
@@ -197,7 +201,9 @@ export async function quoteAmmora(
       tokenIn: (args.tokenIn || NATIVE) as `0x${string}`,
       tokenOut: (args.tokenOut || NATIVE) as `0x${string}`,
       amountIn: BigInt(args.amountIn),
-      slippageBps: args.slippageBps,
+      // Held to the same 5% cap as Flizy's own quotes; a missing figure is 1%,
+      // so the SDK's own default never applies.
+      slippageBps: capSlippageBps(args.slippageBps ?? DEFAULT_SLIPPAGE_BPS),
       recipient: args.recipient as `0x${string}` | undefined,
     });
   } catch (err) {

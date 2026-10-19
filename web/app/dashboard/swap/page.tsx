@@ -12,7 +12,6 @@ import { announceTx } from '../../../lib/txSignal';
 import { AmmoraSwapPanel } from '../../../components/AmmoraSwapPanel';
 import { ammoraUiEnabled } from '../../../components/AmmoraTokens';
 import { pinReady } from '../../../components/PinField';
-import { withinQuickSend } from '../../../lib/quickSend';
 import {
   ArrowRightIcon,
   ChartLineIcon,
@@ -39,6 +38,8 @@ type Quote = {
   slippagePct: string;
   tokenIn: string;
   tokenOut: string;
+  /** The server's hint that Swap will ask for the PIN (its price check). */
+  pinRequired?: boolean;
 };
 
 /** One ETH pool's spot price, for the token named by symbol. */
@@ -144,9 +145,7 @@ function SwapPage() {
   const [result, setResult] = useState<{ explorerUrl?: string; note?: string } | null>(null);
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
-  /** The most an ETH swap may be without the PIN (GET /api/limits). */
-  const [quickSendEth, setQuickSendEth] = useState('0');
-  /** The server asked for the PIN on a swap the page thought was quick. */
+  /** The server asked for the PIN on a trade the page thought needed none. */
   const [pinAsked, setPinAsked] = useState(false);
 
   const [lpMode, setLpMode] = useState<'add' | 'remove'>('add');
@@ -159,6 +158,7 @@ function SwapPage() {
     symbol: string;
     tokenShare: string;
     poolShareBps: number;
+    pinRequired: boolean;
   } | null>(null);
 
   const side = tokenIn === 'ETH' ? 'buy' : 'sell';
@@ -167,10 +167,6 @@ function SwapPage() {
   // A price read for another token is not this pair's price.
   const price = priceInfo && priceInfo.symbol === asset ? priceInfo : null;
   const slippageBps = Math.round(Number(slippagePct) * 100);
-  // Display only: a small ETH swap into a listed token needs no PIN. The server
-  // decides again (web/lib/tiers.ts) and answers PIN_REQUIRED if it disagrees.
-  const quickSwap = mode === 'swap' && tokenIn === 'ETH' && !pinAsked && withinQuickSend(amountIn, quickSendEth);
-
   // A quote request that has been overtaken must not overwrite a newer one.
   const quoteSeq = useRef(0);
 
@@ -179,6 +175,14 @@ function SwapPage() {
   // a fresh one, so the figures shown and the minimum sent always match.
   const inputs = `${amountIn}|${tokenIn}|${tokenOut}|${slippageBps}`;
   const quote = quoted && quoted.inputs === inputs ? quoted : null;
+
+  // Display only: a swap or liquidity change on a verified pool needs no PIN when
+  // its price check passes, which the quote and the position read report. The
+  // server decides again (web/lib/tiers.ts) and answers PIN_REQUIRED if the
+  // price has moved since.
+  const noPin =
+    !pinAsked &&
+    ((mode === 'swap' && quote?.pinRequired === false) || (mode === 'liquidity' && lpPosition?.symbol === asset && lpPosition.pinRequired === false));
 
   const loadBalances = useCallback(async () => {
     try {
@@ -264,6 +268,7 @@ function SwapPage() {
         symbol: String(data.symbol || ''),
         tokenShare: data.tokenShare || '0',
         poolShareBps: data.poolShareBps || 0,
+        pinRequired: data.pinRequired !== false,
       });
     } catch {
       setLpPosition(null);
@@ -288,16 +293,6 @@ function SwapPage() {
     loadBalances();
     loadOrders();
   }, [loadPrice, loadBalances, loadOrders]);
-
-  useEffect(() => {
-    fetch('/api/limits', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        const eth = data?.quickSend?.effectiveEth;
-        if (typeof eth === 'string') setQuickSendEth(eth);
-      })
-      .catch(() => {});
-  }, []);
 
   // The quote follows the inputs, and refreshes on its own while the page is
   // open, so the figure on screen is the pool as it is now.
@@ -436,7 +431,7 @@ function SwapPage() {
           amount: amountIn,
           tokenIn,
           tokenOut,
-          pin: quickSwap ? '' : pin,
+          pin: noPin ? '' : pin,
           slippageBps,
           // The minimum on screen. The server refuses a fill below it.
           minOut: quote?.amountOutMin,
@@ -510,9 +505,10 @@ function SwapPage() {
       const res = await fetch('/api/swap/liquidity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, pin }),
+        body: JSON.stringify({ ...body, pin: noPin ? '' : pin }),
       });
       const data = await res.json();
+      if (data.code === 'PIN_REQUIRED') setPinAsked(true);
       if (!res.ok) {
         setError(data.error || failed);
         return;
@@ -824,12 +820,12 @@ function SwapPage() {
         />
       )}
 
-      {quickSwap ? (
+      {noPin ? (
         <p className="!mt-[12px] m-0 font-sans text-[11px] text-[#b7b1a8]">
-          Quick swap: no PIN for up to {quickSendEth} ETH into a listed token.
+          No PIN needed: the value stays in your wallet and the pool price matches its recent level.
         </p>
       ) : null}
-      <div className="!mt-[12px]" hidden={quickSwap}>
+      <div className="!mt-[12px]" hidden={noPin}>
         <label htmlFor="swap-pin" className="mb-[6px] block font-mono text-[9.4px] uppercase tracking-[0.12em] text-[#e6e6e6]">
           Your PIN
         </label>
@@ -871,7 +867,7 @@ function SwapPage() {
       ) : null}
 
       {mode === 'swap' ? (
-        <CtaButton disabled={busy || quoting || !quote || (!quickSwap && !pinReady(pin))} onClick={runSwap}>
+        <CtaButton disabled={busy || quoting || !quote || (!noPin && !pinReady(pin))} onClick={runSwap}>
           {swapCta}
         </CtaButton>
       ) : mode === 'limit' ? (
@@ -880,7 +876,7 @@ function SwapPage() {
         </CtaButton>
       ) : lpMode === 'add' ? (
         <CtaButton
-          disabled={busy || !pinReady(pin) || !(Number(lpEth) > 0) || !(Number(lpToken) > 0)}
+          disabled={busy || (!noPin && !pinReady(pin)) || !(Number(lpEth) > 0) || !(Number(lpToken) > 0)}
           onClick={() =>
             runLiquidity({ action: 'add', amountEth: lpEth, amountToken: lpToken, token: asset }, 'Liquidity failed')
           }
@@ -889,7 +885,7 @@ function SwapPage() {
         </CtaButton>
       ) : (
         <CtaButton
-          disabled={busy || !pinReady(pin) || !position || !(Number(position.lpBalanceFormatted) > 0)}
+          disabled={busy || (!noPin && !pinReady(pin)) || !position || !(Number(position.lpBalanceFormatted) > 0)}
           onClick={() => runLiquidity({ action: 'remove', percent: lpPercent, token: asset }, 'Remove liquidity failed')}
         >
           {busy ? 'Removing...' : `Remove ${lpPercent}% liquidity`}

@@ -364,6 +364,24 @@
     },
     {
       "kind": "check",
+      "name": "token_price_snapshots.token_price_snapshots_pair_check",
+      "providedBy": "20261019100000_token_price_snapshots.sql",
+      "requiredBy": "check on token_price_snapshots"
+    },
+    {
+      "kind": "check",
+      "name": "token_price_snapshots.token_price_snapshots_reserves_check",
+      "providedBy": "20261019100000_token_price_snapshots.sql",
+      "requiredBy": "check on token_price_snapshots"
+    },
+    {
+      "kind": "check",
+      "name": "token_price_snapshots.token_price_snapshots_token_check",
+      "providedBy": "20261019100000_token_price_snapshots.sql",
+      "requiredBy": "check on token_price_snapshots"
+    },
+    {
+      "kind": "check",
       "name": "transfers.transfers_amount_eth_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on transfers"
@@ -676,9 +694,15 @@
     },
     {
       "kind": "table",
+      "name": "token_price_snapshots",
+      "providedBy": "20261019100000_token_price_snapshots.sql",
+      "requiredBy": "lib/priceReference.js, lib/priceSnapshots.js"
+    },
+    {
+      "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/history.js, lib/payCode.js, lib/pots.js, lib/reconcile.js, lib/transferLog.js"
+      "requiredBy": "lib/history.js, lib/payCode.js, lib/pots.js, lib/reconcile.js, lib/tiers.js, lib/transferLog.js"
     },
     {
       "kind": "table",

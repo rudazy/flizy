@@ -1,8 +1,8 @@
 /**
  * Tokens Flizy lists beside FLZ: each trades against an ETH pool that Flizy
  * seeded and whose liquidity Flizy holds (deployments/giwa-sepolia.json,
- * "listings"). That is what puts them in Explore and lets them trade without
- * the unverified-token warning.
+ * "listings"). That is what puts them in Explore and lets them trade at all:
+ * Flizy's pools refuse any other token (web/lib/swapGate.ts).
  *
  * IZY and MAKI are Flizy's own tokens and carry the verified mark; DCAT is a
  * third-party token and does not. Either way only ETH and FLZ can be sent on

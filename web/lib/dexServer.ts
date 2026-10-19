@@ -8,6 +8,8 @@ import { ethers } from 'ethers';
 import { executeApprovalCall, executeGatorCall } from './gatorExecute.ts';
 import { getWebChain, type WebChain } from './webChain.ts';
 import { LISTED_TOKENS, listedByAddress, listedBySymbol } from './listedTokens.ts';
+import { capSlippageBps } from './swapGate.ts';
+import { verifiedPools, type VerifiedPool } from './priceReference.ts';
 
 export { getWebChain, type WebChain };
 
@@ -196,7 +198,7 @@ export async function quoteSwap(args: {
 }) {
   const d = getDexAddresses();
   const feeBps = await readFeeBps(args.provider);
-  const slip = args.slippageBps ?? d.slippageBpsDefault;
+  const slip = capSlippageBps(args.slippageBps ?? d.slippageBpsDefault);
   const inIsNative = args.tokenIn === null;
   const outIsNative = args.tokenOut === null;
   const path: string[] = [];
@@ -422,6 +424,11 @@ export async function addLiquidityEth(args: {
 }
 
 /** An ETH pool the site manages liquidity for. */
+/** FLZ and each listed token, with its WETH pool: what the price check reads. */
+export function verifiedSwapPools(): VerifiedPool[] {
+  return verifiedPools(getDexAddresses(), LISTED_TOKENS);
+}
+
 export type LiquidityPool = { symbol: string; token: string; pair: string; decimals: number };
 
 /**

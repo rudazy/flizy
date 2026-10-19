@@ -100,3 +100,33 @@ describe('verified swap tokens, chat and site', () => {
     }
   });
 });
+
+describe('swap refusal and slippage cap, chat and site', () => {
+  it('refuse an unverified token in the same words', () => {
+    assert.equal(chat.UNVERIFIED_SWAP_REFUSAL, site.UNVERIFIED_REFUSAL);
+  });
+
+  it('cap slippage at 5% the same way, cutting rather than refusing', () => {
+    for (const bps of [0, 1, 100, 499, 500, 501, 1000, 10000, -1, NaN, Infinity, 100.7, '250', '9999']) {
+      assert.equal(chat.capSlippageBps(bps), site.capSlippageBps(bps), String(bps));
+    }
+    assert.equal(chat.capSlippageBps(100), 100);
+    assert.equal(chat.capSlippageBps(10000), 500);
+    // Unreadable falls back to the 1% default, never to the loosest cap.
+    assert.equal(chat.capSlippageBps(-1), 100);
+    assert.equal(chat.capSlippageBps(NaN), 100);
+    assert.equal(site.capSlippageBps(Number('abc')), 100);
+    assert.equal(site.SLIPPAGE_BPS_MAX, 500);
+  });
+
+  it('every quote applies the cap, whatever the env default says', () => {
+    const chatSrc = fs.readFileSync(path.join(ROOT, 'lib', 'dex.js'), 'utf8');
+    const siteSrc = fs.readFileSync(path.join(ROOT, 'web', 'lib', 'dexServer.ts'), 'utf8');
+    assert.match(chatSrc, /const slip = capSlippageBps\(slippageBps \?\? d\.slippageBpsDefault\);/);
+    assert.match(siteSrc, /const slip = capSlippageBps\(args\.slippageBps \?\? d\.slippageBpsDefault\);/);
+    const chatAmmora = fs.readFileSync(path.join(ROOT, 'lib', 'ammora', 'routes.js'), 'utf8');
+    const siteAmmora = fs.readFileSync(path.join(ROOT, 'web', 'lib', 'ammora', 'routes.ts'), 'utf8');
+    assert.match(chatAmmora, /slippageBps: capSlippageBps\(slippageBps \?\? DEFAULT_SLIPPAGE_BPS\),/);
+    assert.match(siteAmmora, /slippageBps: capSlippageBps\(args\.slippageBps \?\? DEFAULT_SLIPPAGE_BPS\),/);
+  });
+});

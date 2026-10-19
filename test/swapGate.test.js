@@ -67,17 +67,57 @@ describe('POST /api/swap/execute', () => {
     // Four spaces is the handler's top level inside its try; anything deeper is
     // inside a block, which is where a condition would put it.
     assert.match(lastLine, /^ {4}const auth = $/, 'requireApproval must not sit inside a condition');
-    // Only an ETH input can skip the PIN, and the tier is never taken from the body.
-    assert.match(src, /const ethInWei = tokenIn === null \? \(ethToWei\(amount\) \?\? 0n\) : 0n;/);
-    assert.match(src, /const tier = await swapTier\(supabase, accountId, tokenIn === null, ethInWei, !unverified\);/);
+    // The tier comes from the price check on the server's own quote and floor,
+    // never from the body.
+    assert.match(src, /'swap', swapTier\(true, price, swapsThisHour\)\);/);
+    assert.match(src, /const swapsThisHour = await swapsInLastHour\(supabase, accountId\);/);
+    assert.match(src, /const price = await swapPriceCheck\(\{[\s\S]*?amountOutMin: floor,\n\s*\}\);/);
   });
 
-  it('refuses before any chain work or the transaction lock', () => {
-    const gate = src.indexOf('await requireApproval(');
-    const refusal = src.indexOf('if (!auth.ok)', gate);
-    assert.ok(refusal > gate);
+  it('refuses an unverified token before any chain work or the transaction lock', () => {
+    const refusal = src.indexOf('if (isUnverifiedSwap([tokenIn, tokenOut], dex)) {');
+    assert.ok(refusal > 0);
     for (const later of ['readErc20Decimals(provider', 'tryAccountTxLock(', 'quoteSwap(', 'executeSwap(']) {
+      assert.ok(src.indexOf(later) > refusal, `${later} runs before an unverified token is refused`);
+    }
+  });
+
+  it('checks the approval on the quote it sends, before any row or transaction', () => {
+    const quote = src.indexOf('const quote = await quoteSwap(');
+    const floor = src.indexOf('const floor = bindAmountOutMin(', quote);
+    const gate = src.indexOf('await requireApproval(', floor);
+    const refusal = src.indexOf('if (!auth.ok)', gate);
+    assert.ok(quote > 0 && floor > quote && gate > floor && refusal > gate);
+    for (const later of [".from('transfers').insert(", 'executeSwapViaGator({', 'executeSwap({']) {
       assert.ok(src.indexOf(later) > refusal, `${later} runs before the PIN is checked`);
     }
+  });
+});
+
+describe('GET /api/swap/quote and /api/swap/liquidity', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
+
+  it('the quote refuses an unverified token before reading the chain', () => {
+    const src = read('web/app/api/swap/quote/route.ts');
+    const refusal = src.indexOf('if (isUnverifiedSwap([tokenIn, tokenOut], dex)) {');
+    assert.ok(refusal > 0);
+    assert.ok(src.indexOf('readErc20Decimals(provider, tokenIn)') > refusal);
+    assert.ok(src.indexOf('quoteSwap({') > refusal);
+  });
+
+  it('the quote hints at the PIN from the same check execute runs, on its own minimum', () => {
+    const src = read('web/app/api/swap/quote/route.ts');
+    assert.match(src, /const price = await swapPriceCheck\(\{[\s\S]*?amountOutMin: quote\.amountOutMin,\n\s*\}\);/);
+    assert.match(src, /pinRequired: swapTier\(true, price, await swapsInLastHour\(getSupabase\(\), accountId\)\)\.tier !== 0,/);
+    // Every Ammora quote says the PIN is needed.
+    assert.match(src, /return NextResponse\.json\(\{ \.\.\.quote, pinRequired: true \}\);/);
+  });
+
+  it('the liquidity read hints at the PIN from the pool check its POST runs', () => {
+    const src = read('web/app/api/swap/liquidity/route.ts');
+    assert.match(src, /pinRequired: liquidityTier\(price\)\.tier !== 0,/);
+    assert.equal((src.match(/poolPriceCheck\(\{/g) || []).length, 2);
   });
 });

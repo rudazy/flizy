@@ -1,14 +1,15 @@
 /**
  * Rolling-window cap on site swaps.
  *
- * This is a churn limit, not the authority check. Every swap also takes the
- * PIN (POST /api/swap/execute), the same gate as pay/execute.
+ * This is a churn limit, not the authority check. A swap takes the PIN
+ * (POST /api/swap/execute) unless its price check passes and the account is
+ * under its hourly count of PIN-free swaps (web/lib/tiers.ts).
  *
  * A swap cannot name a recipient: the route hardcodes the caller's own wallet.
  * That alone does not keep value on the account, because any token other than
- * ETH, WETH or FLZ trades against a pool someone else can seed and drain
- * (web/lib/swapGate.ts). The PIN is what stops a stolen session; this cap
- * bounds how often even the account holder can swap in an hour.
+ * ETH, WETH, FLZ and the listed tokens trades against a pool someone else can
+ * seed and drain, so those are refused (web/lib/swapGate.ts). This cap bounds
+ * how often even the account holder can swap in an hour.
  *
  * Database-backed, like web/lib/callbackLimiter.ts and for the same reason: a
  * Map in module scope enforces nothing on Vercel, where every serverless
