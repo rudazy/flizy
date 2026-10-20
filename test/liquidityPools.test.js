@@ -97,7 +97,10 @@ describe('Liquidity panel', () => {
   const page = read('web/app/dashboard/swap/page.tsx');
 
   it('lets the person pick the pool, and works in the one they picked', () => {
-    assert.match(page, /<div className="grid grid-cols-4 gap-\[5px\]" role="radiogroup" aria-label="Pool">/);
+    assert.match(page, /label="Amount token"/);
+    assert.match(page, /label="Paired token"/);
+    assert.match(page, /aria-label=\{label\}/);
+    assert.match(page, /No \$\{amountToken\}\/\$\{pairedToken\} pool/);
     assert.match(page, /assets=\{\[\.\.\.SWAP_ASSETS\]\}\n\s*onAsset=\{chooseAsset\}/);
     assert.match(page, /fetch\(`\/api\/swap\/liquidity\?token=\$\{encodeURIComponent\(asset\)\}`\)/);
     assert.match(page, /const position = lpPosition && lpPosition\.symbol === asset \? lpPosition : null;/);
@@ -107,5 +110,23 @@ describe('Liquidity panel', () => {
 
   it('refills the token amount at the new pool price when the pool changes', () => {
     assert.match(page, /if \(mode !== 'liquidity' \|\| !price \|\| lpFilledFor\.current === asset\) return;/);
+  });
+
+  it('caps the amount slider at the balance of the token on top', () => {
+    assert.match(page, /This wallet holds no \{activeToken\}, so this slider stays at 0\./);
+    assert.match(page, /!covers\(lpEth, balanceFor\('ETH'\), true\)/);
+    assert.match(page, /!covers\(lpToken, balanceFor\(asset\), false\)/);
+    assert.doesNotMatch(page, /-my-\[16px\]/);
+  });
+
+  it('lists every pool and removes a share from a dialog', () => {
+    assert.match(page, /Manage pools/);
+    assert.match(page, /aria-haspopup="menu"/);
+    assert.match(page, /role="dialog"/);
+    assert.match(page, /aria-modal="true"/);
+    assert.match(page, /setLpPercent\(50\)/);
+    assert.match(page, /createPortal\(/);
+    assert.match(page, /Share of your position to remove/);
+    assert.doesNotMatch(page, /\$\d|USD/);
   });
 });

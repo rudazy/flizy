@@ -40,6 +40,8 @@ describe('opening page install', () => {
     assert.doesNotMatch(BUTTON, /href=/);
     assert.doesNotMatch(BUTTON, /download=/);
     assert.match(BUTTON, /address bar/);
+    assert.match(BUTTON, /chrome:\/\/apps/);
+    assert.match(BUTTON, /edge:\/\/apps/);
   });
 
   it('hides once the browser is already running Flizy installed', () => {
@@ -61,7 +63,13 @@ describe('one browser install prompt', () => {
     assert.doesNotMatch(layout, /strategy="beforeInteractive"/);
     assert.match(STORE, /__flizyInstallPrompt/);
     assert.match(STORE, /adopt\(\)/);
+    assert.match(STORE, /waitForInstallEvent\(PROMPT_WAIT_MS\)/);
+    assert.match(STORE, /if \(!hadPrompt\) return 'retry'/);
     assert.match(STORE, /pending\.prompt\(\)/);
+    assert.match(STORE, /return 'opened'/);
+    assert.doesNotMatch(STORE, /await pending\.userChoice/);
+    assert.match(STORE, /flizy-install-failed/);
+    assert.match(BUTTON, /flizy-install-failed/);
     assert.doesNotMatch(BANNER, /addEventListener\('beforeinstallprompt'/);
     assert.doesNotMatch(BUTTON, /addEventListener\('beforeinstallprompt'/);
     assert.match(BANNER, /promptPwaInstall\(\)/);

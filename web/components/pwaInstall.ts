@@ -99,6 +99,7 @@ function startPwaInstallCapture() {
     event.preventDefault();
     if (host) host.__flizyInstallPrompt = event as BeforeInstallPromptEvent;
     adopt();
+    window.dispatchEvent(new Event('flizy-install-ready'));
   });
   window.addEventListener('appinstalled', onInstalled);
 }
@@ -124,33 +125,106 @@ export function usePwaInstall(): PwaInstallSnapshot {
 }
 
 /**
- * Open the browser install dialog. Call this from a click.
- * "unavailable" means this browser has not offered a dialog yet.
+ * After a cleared visit Chrome often withholds its one install prompt until
+ * the service worker is active, a few seconds after load. The wait only
+ * listens. prompt() stays on a later click, because a click's gesture does
+ * not survive the wait.
  */
-export async function promptPwaInstall(): Promise<'accepted' | 'dismissed' | 'unavailable'> {
-  startPwaInstallCapture();
-  adopt();
-  const pending = deferred;
-  if (prompting) return 'dismissed';
-  if (!pending) return 'unavailable';
-  // Call prompt() before notifying subscribers. A re-render in this turn
-  // must not land before prompt() runs.
-  prompting = true;
-  deferred = null;
-  clearStash();
-  try {
-    const opened = pending.prompt();
+const PROMPT_WAIT_MS = 4000;
+
+function iosDevice(): boolean {
+  return typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+function waitForInstallEvent(ms: number): Promise<void> {
+  if (deferred || stashedEvent()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('flizy-install-ready', finish);
+      resolve();
+    };
+    const timer = window.setTimeout(finish, ms);
+    window.addEventListener('flizy-install-ready', finish);
+  });
+}
+
+/**
+ * prompt() consumes the event. The reader's choice settles later. The click
+ * must return without waiting for it, or Install stays disabled for as long
+ * as that choice is pending. Later clicks stay quiet until the choice
+ * arrives or the open itself fails.
+ */
+function settleChoice(pending: BeforeInstallPromptEvent, opened: Promise<void>) {
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    prompting = false;
+  };
+  void opened.catch(() => {
+    // The click may already have returned. Tell the button the dialog did not open.
+    window.dispatchEvent(new Event('flizy-install-failed'));
     publish();
-    await opened;
-    const choice = await pending.userChoice;
-    if (choice.outcome === 'accepted') {
-      emit({ installed: true, canPrompt: false });
+    release();
+  });
+  void pending.userChoice.then(
+    (choice) => {
+      if (choice.outcome === 'accepted') {
+        emit({ installed: true, canPrompt: false });
+      }
+      release();
+    },
+    () => {
+      publish();
+      release();
+    },
+  );
+}
+
+/**
+ * Open the browser install dialog. Call this from a click.
+ * When a dialog was already offered, prompt() runs in this click and the
+ * choice is applied when the dialog closes.
+ * "unavailable" means this browser has not offered a dialog.
+ * "retry" means a dialog is offered, but this click could not open it.
+ * "opened" means the dialog was asked to open.
+ * "dismissed" means a dialog is already in progress.
+ */
+export async function promptPwaInstall(): Promise<'dismissed' | 'unavailable' | 'retry' | 'opened'> {
+  if (prompting) return 'dismissed';
+  prompting = true;
+  let tracking = false;
+  try {
+    startPwaInstallCapture();
+    adopt();
+    // prompt() has to run before any await, or this click's gesture is gone
+    // and Chrome will not open the dialog. A prompt that arrives during the
+    // wait is kept for the next click.
+    const hadPrompt = Boolean(deferred);
+    if (!hadPrompt && !iosDevice()) {
+      await waitForInstallEvent(PROMPT_WAIT_MS);
+      adopt();
     }
-    return choice.outcome;
+    const pending = deferred;
+    if (!pending) return 'unavailable';
+    if (!hadPrompt) return 'retry';
+    let opened: Promise<void>;
+    try {
+      opened = pending.prompt();
+    } catch {
+      return 'retry';
+    }
+    deferred = null;
+    clearStash();
+    publish();
+    tracking = true;
+    settleChoice(pending, opened);
+    return 'opened';
   } catch {
     publish();
     return 'unavailable';
   } finally {
-    prompting = false;
+    if (!tracking) prompting = false;
   }
 }
