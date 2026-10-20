@@ -94,7 +94,8 @@ describe('opening page', () => {
     assert.match(page, /<PayPeople \/>/);
     assert.match(pay, /Country code included automatically/);
     assert.match(pay, /Phone numbers must include the country code/);
-    assert.match(pay, /flizy send 0\.01 ETH to /);
+    assert.match(pay, /send 0\.01 ETH to /);
+    assert.doesNotMatch(pay, /flizy send /);
     assert.doesNotMatch(pay, /Recipient found/);
   });
 });

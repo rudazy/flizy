@@ -337,6 +337,14 @@ describe('end to end: what a user actually types becomes a parsed command', () =
     }
   });
 
+  it('the same commands work on WhatsApp without flizy', () => {
+    for (const [typed, expected] of cases) {
+      const bare = typed.replace(/^flizy /, '');
+      assert.equal(isFlizyCommand(wa, bare), true, `${bare} should wake the bot`);
+      assert.equal(normalizeInput(wa, bare).text, expected);
+    }
+  });
+
   it('each resolved command reaches a parser', () => {
     for (const [, expected] of cases) {
       assert.equal(isFlizyCommandBody(expected), true, `${expected} has no parser`);

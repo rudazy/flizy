@@ -35,7 +35,7 @@ testnet with source-verified contracts.
 
 ## Channels
 
-- WhatsApp: commands are prefixed, for example `flizy send 0.01 to john`, then `confirm`.
+- WhatsApp: type the command, for example `send 0.01 to john`, then `confirm`. A leading `flizy` still works.
 - Telegram: slash commands, for example `/send 0.01 to john`, confirm by button or by typing.
 - Listed NFT identity send uses the same escrow: `nft send giwaforge 1842 to @bob on telegram`. Collections studio is a separate site and is not this command.
 - One site link code binds either channel. Identity is proven by that code, because only a

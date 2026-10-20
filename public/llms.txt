@@ -4,7 +4,7 @@
 
 ## Product
 
-Flizy is a WhatsApp + web system for sending crypto only to trusted destinations. Users create an account on the site, receive a permanent agent wallet, link WhatsApp with a one-time code, fund the agent wallet, and send via flizy commands.
+Flizy is a WhatsApp + web system for sending crypto only to trusted destinations. Users create an account on the site, receive a permanent agent wallet, link WhatsApp with a one-time code, fund the agent wallet, and send with a chat command. A leading flizy is optional.
 
 ## Site
 
@@ -23,7 +23,7 @@ Flizy is a WhatsApp + web system for sending crypto only to trusted destinations
 
 ## Bot (WhatsApp)
 
-Shared bot number. Friends message that number. Commands use the flizy prefix. After link, flizy me shows the same agent wallet as the dashboard. Sends are signed from the user agent wallet on GIWA Sepolia (more EVM soon via chain registry).
+Shared bot number. Friends message that number. A recognised command works on its own. A leading flizy still works. After link, me (or flizy me) shows the same agent wallet as the dashboard. Sends are signed from the user agent wallet on GIWA Sepolia (more EVM soon via chain registry).
 
 ## When to read
 

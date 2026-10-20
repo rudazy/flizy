@@ -201,12 +201,18 @@ describe('every advertised Telegram command works as a bare slash command', () =
   });
 });
 
-describe('WhatsApp input normalization is unchanged', () => {
+describe('WhatsApp accepts a normal command with or without flizy', () => {
   const ctx = whatsappCtx();
 
-  it('requires the flizy prefix for ordinary commands', () => {
-    assert.equal(router.normalizeInput(ctx, 'balance'), null);
+  it('accepts a bare command and the flizy prefix alike', () => {
+    assert.equal(router.normalizeInput(ctx, 'balance').text, 'balance');
     assert.equal(router.normalizeInput(ctx, 'flizy balance').text, 'balance');
+    assert.equal(router.normalizeInput(ctx, 'send 0.01 to john').text, 'send 0.01 to john');
+    assert.equal(router.normalizeInput(ctx, 'flizy send 0.01 to john').text, 'send 0.01 to john');
+    assert.equal(router.normalizeInput(ctx, 'lock').text, 'lock');
+    assert.equal(router.isFlizyCommand(ctx, 'balance'), true);
+    assert.equal(router.isFlizyCommand(ctx, 'send 0.01 to john'), true);
+    assert.equal(router.isFlizyCommand(ctx, 'lock'), true);
   });
 
   it('still lets bare confirm and cancel through', () => {
@@ -220,6 +226,7 @@ describe('WhatsApp input normalization is unchanged', () => {
 
   it('does not wake on a greeting', () => {
     assert.equal(router.isFlizyCommand(ctx, 'hello'), false);
+    assert.equal(router.normalizeInput(ctx, 'hello'), null);
     assert.equal(router.isFlizyCommand(ctx, 'flizy help'), true);
   });
 });

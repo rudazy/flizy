@@ -213,7 +213,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `ENFORCE_CREDIT` | Require internal credit before a send |
 | `REQUIRE_UNLOCK` | Chat moves money only after a PIN unlock. Keep `true`; the bots report `false` to Sentry at startup in production |
 | `SECURITY_MAIL_SECRET` | Same value on the VPS and on Vercel. Lets a bot ask the site to email the owner when a chat is linked or unlinked. Unset: no email, reported at startup in production |
-| `REQUIRE_FLIZY_PREFIX` | Require the `flizy` prefix on WhatsApp |
+| `REQUIRE_FLIZY_PREFIX` | Retired. A recognised command works with or without a leading `flizy`. The bots warn at startup if it is still set |
 | `MAX_SEND_ETH` / `DEFAULT_DAILY_SEND_LIMIT_ETH` | Per-transaction and per-day caps |
 | `DEFAULT_QUICK_SEND_ETH` | Most one ETH payment to a known recipient may be without the PIN (default 0.005), and the ceiling on an account's own value. Set the same on the VPS and on Vercel |
 | `PENDING_TTL_MS` / `LINK_CODE_TTL_MS` | Plan and link code lifetimes |

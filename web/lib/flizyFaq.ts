@@ -12,7 +12,7 @@ export const FLIZY_FAQ: Array<{ question: string; answer: string }> = [
   {
     question: 'How do I send crypto from WhatsApp or Telegram?',
     answer:
-      'Create a free account on flizy.app, fund your Flizy wallet, add trusted people on the dashboard, link the chat with a one-time code, then send with flizy send (WhatsApp) or /send (Telegram) and confirm.',
+      'Create a free account on flizy.app, fund your Flizy wallet, add trusted people on the dashboard, link the chat with a one-time code, then send (WhatsApp: send 0.01 to name, a leading flizy still works; Telegram: /send) and confirm.',
   },
   {
     question: 'Who can I pay?',
@@ -22,17 +22,17 @@ export const FLIZY_FAQ: Array<{ question: string; answer: string }> = [
   {
     question: 'How do I send to a phone number?',
     answer:
-      'Use the international format, for example flizy send 0.01 ETH to +234 708 043 7343. Spaces and dashes are fine. A number without a country code is not guessed. You can pick one country when you sign up, on Account, or in chat with country korea. That choice is optional and you can change it anytime. With Korea saved, 10 1234 5678 is sent as +82 10 1234 5678. On the website the country is selected for you, and Flizy stores the number in one form.',
+      'Use the international format, for example send 0.01 ETH to +234 708 043 7343. Spaces and dashes are fine. A number without a country code is not guessed. You can pick one country when you sign up, on Account, or in chat with country korea. That choice is optional and you can change it anytime. With Korea saved, 10 1234 5678 is sent as +82 10 1234 5678. On the website the country is selected for you, and Flizy stores the number in one form.',
   },
   {
     question: 'How do phone claims work?',
     answer:
-      'If someone sends to your phone number, the funds sit in escrow until you claim. Phone holds show on the web dashboard, but you claim only in WhatsApp or Telegram after that number is proven on that chat (flizy claim).',
+      'If someone sends to your phone number, the funds sit in escrow until you claim. Phone holds show on the web dashboard, but you claim only in WhatsApp or Telegram after that number is proven on that chat (claim, or flizy claim).',
   },
   {
     question: 'How do I unlink WhatsApp or Telegram?',
     answer:
-      'In chat send flizy unlink (or /unlink on Telegram). On the site go to Account → Chat, enter your password, and Unlink. Unlinking drops phone proof for that app until you link again.',
+      'In chat send unlink (a leading flizy still works, or /unlink on Telegram). On the site go to Account → Chat, enter your password, and Unlink. Unlinking drops phone proof for that app until you link again.',
   },
   {
     question: 'What chains does Flizy support?',

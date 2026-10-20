@@ -148,14 +148,16 @@ export default function HomePage() {
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-gold">See it in action</p>
           <h2 className="mt-2 font-sans text-3xl tracking-wide text-paper">Simple commands.</h2>
-          <p className="mt-2 text-sm text-muted">The same experience on WhatsApp and Telegram.</p>
+          <p className="mt-2 text-sm text-muted">
+            The same experience on WhatsApp and Telegram. A leading flizy is optional.
+          </p>
         </div>
         <div className="card overflow-hidden">
           <div className="grid md:grid-cols-2">
             <div className="border-b border-border p-6 md:border-b-0 md:border-r md:p-8">
               <div className="space-y-3 font-mono text-sm">
                 <p className="text-muted">You</p>
-                <p className="mono-box text-paper">flizy send 0.01 ETH to +234 708 043 7343</p>
+                <p className="mono-box text-paper">send 0.01 ETH to +234 708 043 7343</p>
                 <p className="text-muted">Flizy</p>
                 <p className="mono-box text-lime">Pending. Reply CONFIRM</p>
                 <p className="text-muted">You</p>
@@ -165,11 +167,11 @@ export default function HomePage() {
               </div>
             </div>
             <div className="flex flex-col justify-center gap-3 p-6 md:p-8">
-              <p className="font-mono text-sm text-paper">flizy send 0.01 to @ada</p>
+              <p className="font-mono text-sm text-paper">send 0.01 to @ada</p>
               <p className="text-xs text-muted">A Flizy username</p>
-              <p className="font-mono text-sm text-paper">flizy send 0.01 ETH to +234 708 043 7343</p>
+              <p className="font-mono text-sm text-paper">send 0.01 ETH to +234 708 043 7343</p>
               <p className="text-xs text-muted">A phone number, country code included</p>
-              <p className="font-mono text-sm text-paper">flizy send 0.01 to ada@email.com</p>
+              <p className="font-mono text-sm text-paper">send 0.01 to ada@email.com</p>
               <p className="text-xs text-muted">An email, held until they claim</p>
               <Link href="/docs" className="mt-2 text-sm text-lime no-underline hover:text-gold">
                 Every command

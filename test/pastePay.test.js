@@ -60,10 +60,10 @@ describe('a pay code pasted on its own', () => {
     }
   });
 
-  it('wakes the bot, so it works prefixed on WhatsApp and bare on Telegram', () => {
-    // WhatsApp keeps the flizy prefix, so the gesture there is
-    // "flizy 622412799"; Telegram takes the bare paste. Both route through the
-    // same gate, and this is what puts a bare code through it.
+  it('wakes the bot on the code itself, with or without flizy', () => {
+    // The gesture is the nine digits. "622412799" and "flizy 622412799" are
+    // the same command on either channel. A number that is not a pay code
+    // must not wake the bot.
     assert.equal(isFlizyCommandBody('622412799'), true);
     assert.equal(isFlizyCommandBody('622 412 799'), true);
     assert.equal(isFlizyCommandBody('62241279'), false, 'a non-code number must not wake it');

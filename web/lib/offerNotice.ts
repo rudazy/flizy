@@ -3,7 +3,7 @@
  *
  * Written to the outbox, which sends the body untouched, so there is no
  * {{cmd:}} marker: the command is written out in full, in the form both
- * WhatsApp and Telegram accept (Telegram takes the flizy prefix too), and the
+ * WhatsApp and Telegram accept, with or without a leading flizy, and the
  * NFT is named by its absolute URL (see web/lib/notifyChannels.ts). The command
  * is handled by handleAcceptOffer in lib/router.js. Same shape as
  * web/lib/payNotice.ts.

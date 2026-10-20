@@ -13,7 +13,7 @@ export function PayPeople() {
   const dial = SITE_PHONE_COUNTRIES.find((country) => country.iso === iso)?.dial || '234';
   const e164 = composePhoneE164(dial, local);
   const grouped = groupPhoneLocal(local);
-  const command = `flizy send 0.01 ETH to +${dial}${grouped ? ` ${grouped}` : ''}`;
+  const command = `send 0.01 ETH to +${dial}${grouped ? ` ${grouped}` : ''}`;
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">

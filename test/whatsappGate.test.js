@@ -163,6 +163,30 @@ describe('an open pay question answers on WhatsApp, prefixed or not', () => {
   });
 });
 
+describe('a normal command wakes on WhatsApp with or without flizy', () => {
+  beforeEach(() => {
+    seed();
+    router.discardPendingFlows(WA_KEY);
+  });
+
+  it('wakes and routes the command itself', () => {
+    const ctx = waCtx();
+    for (const text of ['balance', 'lock', 'help', 'send 0.01 to john', 'claim']) {
+      assert.equal(wakesOnWhatsApp(ctx, text), true, `"${text}" must wake the bot`);
+      assert.equal(router.normalizeInput(ctx, text).text, text, `"${text}" must route`);
+      assert.equal(wakesOnWhatsApp(ctx, `flizy ${text}`), true, `"flizy ${text}" must wake the bot`);
+      assert.equal(router.normalizeInput(ctx, `flizy ${text}`).text, text);
+    }
+  });
+
+  it('still ignores a greeting', () => {
+    const ctx = waCtx();
+    assert.equal(wakesOnWhatsApp(ctx, 'hello'), false);
+    assert.equal(router.normalizeInput(ctx, 'hello'), null);
+    assert.equal(wakesOnWhatsApp(ctx, 'ok thanks'), false);
+  });
+});
+
 describe('with no question open, a bare amount is not input', () => {
   beforeEach(() => {
     seed();

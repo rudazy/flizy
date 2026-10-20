@@ -85,7 +85,7 @@ The `ctx` an adapter must supply:
 | --- | --- | --- |
 | Process | `node index.js` (`flizy.service`) | `node telegram.js` (`flizy-telegram.service`) |
 | Transport | whatsapp-web.js plus headless Chromium | Bot API long polling, no browser |
-| Invocation | `flizy <command>` | `/command` (the `flizy ` prefix also works) |
+| Invocation | `<command>` (a leading `flizy ` also works) | `/command` (the `flizy ` prefix also works) |
 | Confirm | type `confirm` | inline button, or type `confirm` |
 | Phone for claims | read from WhatsApp contact metadata | one-tap contact share (`/phone`) |
 

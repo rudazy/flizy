@@ -82,6 +82,15 @@ describe('checkSecuritySettings', () => {
     assert.doesNotMatch(r.warned.join('\n'), /old-secret|2348000000000/);
   });
 
+  it('warns that the prefix switch is retired, without echoing its value', () => {
+    const r = run(SAFE, { ...SAFE_ENV, REQUIRE_FLIZY_PREFIX: 'true' });
+    assert.equal(r.found, false);
+    assert.equal(r.reported.length, 0);
+    assert.match(r.warned.join('\n'), /REQUIRE_FLIZY_PREFIX is set but retired/);
+    assert.match(r.warned.join('\n'), /leading flizy/);
+    assert.doesNotMatch(r.warned.join('\n'), /=true/);
+  });
+
   it('is silent when everything is on', () => {
     const r = run(SAFE, SAFE_ENV);
     assert.deepEqual(r, { found: false, warned: [], reported: [] });
@@ -112,6 +121,7 @@ describe('wiring', () => {
       assert.match(src, /^REQUIRE_UNLOCK=true\r?$/m, file);
       assert.match(src, /^ENFORCE_TRUSTED=true\r?$/m, file);
       assert.doesNotMatch(src, /^REQUIRE_UNLOCK=false/m, file);
+      assert.doesNotMatch(src, /^REQUIRE_FLIZY_PREFIX=/m, file);
     }
   });
 });

@@ -23,22 +23,22 @@ const CMD_GROUPS: Array<{
       'send, pay, transfer and give all mean the same thing, and the name can come first.',
     rows: [
       {
-        wa: 'flizy send 0.01 to john',
+        wa: 'send 0.01 to john',
         tg: '/send 0.01 to john',
         meaning: 'Pay a trusted name you saved on the site',
       },
       {
-        wa: 'flizy pay john 0.01',
+        wa: 'pay john 0.01',
         tg: '/pay john 0.01',
         meaning: 'Same thing — name first also works, with send, pay, transfer or give',
       },
       {
-        wa: 'flizy pay 0.01 to @ludarep',
+        wa: 'pay 0.01 to @ludarep',
         tg: '/pay 0.01 to @ludarep',
         meaning: 'Pay a Flizy account by @username (same as scanning their QR)',
       },
       {
-        wa: 'flizy pay 0.01 for coffee',
+        wa: 'pay 0.01 for coffee',
         tg: '/pay 0.01 for coffee',
         meaning: 'Then send their @username or the number under their QR, then confirm',
       },
@@ -48,49 +48,49 @@ const CMD_GROUPS: Array<{
         meaning: 'After a first Flizy pay succeeds, save that person as a trusted contact (or skip)',
       },
       {
-        wa: 'flizy send 0.01 ETH to +234 708 043 7343',
+        wa: 'send 0.01 ETH to +234 708 043 7343',
         tg: '/send 0.01 ETH to +234 708 043 7343',
         meaning:
           'Hold for a phone until they claim. The country code is required. Spaces and dashes are fine, and all three forms are the same number. A saved country code is optional and fills one in on a send.',
       },
       {
-        wa: 'flizy send 0.01 to @user on github',
+        wa: 'send 0.01 to @user on github',
         tg: '/send 0.01 to @user on github',
         meaning: 'Hold for that GitHub account until they claim',
       },
       {
-        wa: 'flizy send 0.01 to 123… on discord',
+        wa: 'send 0.01 to 123… on discord',
         tg: '/send 0.01 to 123… on discord',
         meaning:
           'Hold for Discord. Prefer user id (Settings → Advanced → Developer Mode → right-click → Copy User ID). Handles work only after they link Discord on Flizy — Discord has no public name lookup.',
       },
       {
-        wa: 'flizy send 0.01 to @user on x',
+        wa: 'send 0.01 to @user on x',
         tg: '/send 0.01 to @user on x',
         meaning: 'Hold for that X account until they claim',
       },
       {
-        wa: 'flizy send 10 FLZ to john',
+        wa: 'send 10 FLZ to john',
         tg: '/send 10 FLZ to john',
         meaning: 'Send FLZ to a trusted name (when you hold FLZ)',
       },
       {
-        wa: 'flizy send 10 FLZ to @user on telegram',
+        wa: 'send 10 FLZ to @user on telegram',
         tg: '/send 10 FLZ to @user on telegram',
         meaning: 'Hold FLZ for that Telegram account until they claim (same as ETH holds)',
       },
       {
-        wa: 'flizy nft send giwaforge 1842 to @bob on telegram',
+        wa: 'nft send giwaforge 1842 to @bob on telegram',
         tg: '/nft send giwaforge 1842 to @bob on telegram',
         meaning: 'Hold a listed NFT until they claim (same escrow as ETH/FLZ). Collections studio is not this command.',
       },
       {
-        wa: 'flizy mint 1 giwaforge',
+        wa: 'mint 1 giwaforge',
         tg: '/mint 1 giwaforge',
         meaning: 'Mint one test NFT to your Flizy wallet. One per wallet. No ETH needed in chat. "mint 1 giwaforge nft" is the same.',
       },
       {
-        wa: 'flizy accept offer',
+        wa: 'accept offer',
         tg: '/accept offer',
         meaning:
           'List the open offers on your NFTs, numbered. Reply with a number to see the price, the 2% Flizy fee, the royalty and what you receive, then CONFIRM, and approve with your PIN on the Flizy page the chat links to.',
@@ -104,27 +104,27 @@ const CMD_GROUPS: Array<{
     blurb: 'Claims and requests use phone or linked platforms — not random addresses from chat.',
     rows: [
       {
-        wa: 'flizy claim',
+        wa: 'claim',
         tg: '/claim',
         meaning: 'Receive money held for your phone or linked GitHub',
       },
       {
-        wa: 'flizy cancel claims',
+        wa: 'cancel claims',
         tg: '/claims or cancel claims',
         meaning: 'Cancel holds you sent (while still pending)',
       },
       {
-        wa: 'flizy request 0.01 from +234 708 043 7343',
+        wa: 'request 0.01 from +234 708 043 7343',
         tg: '/request 0.01 from +234 708 043 7343',
         meaning: 'Ask someone for money. A phone needs its country code.',
       },
       {
-        wa: 'flizy pay',
+        wa: 'pay',
         tg: '/pay',
         meaning: 'Pay a request addressed to you. On its own, pay always means this — with an amount it is a send',
       },
       {
-        wa: 'flizy requests',
+        wa: 'requests',
         tg: '/requests',
         meaning: 'See or cancel open requests you made',
       },
@@ -144,23 +144,23 @@ const CMD_GROUPS: Array<{
       'arrives; nothing is held.',
     rows: [
       {
-        wa: 'flizy split 30 with @ada @kemi for dinner',
+        wa: 'split 30 with @ada @kemi for dinner',
         tg: '/split 30 with @ada @kemi for dinner',
         meaning:
           'Three ways including you: two requests go out at 10 each, and your 10 is simply yours to cover',
       },
       {
-        wa: 'flizy requests',
+        wa: 'requests',
         tg: '/requests',
         meaning: 'How the bill stands — who has paid, who declined, who is still open',
       },
       {
-        wa: 'flizy remind',
+        wa: 'remind',
         tg: '/remind',
         meaning: 'Nudge whoever still owes. Once every few hours per person, not more',
       },
       {
-        wa: 'flizy decline',
+        wa: 'decline',
         tg: '/decline',
         meaning: 'Refuse a request addressed to you. The person who asked is told; no money moves',
       },
@@ -170,17 +170,17 @@ const CMD_GROUPS: Array<{
         meaning: 'Reply with an amount instead of confirm to pay part of a request now',
       },
       {
-        wa: 'flizy collect 5 for rent',
+        wa: 'collect 5 for rent',
         tg: '/collect 5 for rent',
         meaning: 'Open a pot with a goal and share the code. Leave the amount out for no goal',
       },
       {
-        wa: 'flizy pay pot k7m2q4 1.5',
+        wa: 'pay pot k7m2q4 1.5',
         tg: '/pay pot k7m2q4 1.5',
         meaning: "Pay into someone else's pot using the code they shared",
       },
       {
-        wa: 'flizy pots',
+        wa: 'pots',
         tg: '/pots',
         meaning: 'Your pots and what has landed in each. Close one with: close pot CODE',
       },
@@ -191,50 +191,50 @@ const CMD_GROUPS: Array<{
     blurb: 'Link once. Lock freezes this chat only — your other apps stay as they are.',
     rows: [
       {
-        wa: 'flizy link CODE',
+        wa: 'link CODE',
         tg: '/link CODE',
         meaning: 'Connect this chat to your site account (code from dashboard)',
       },
       {
-        wa: 'flizy unlink',
+        wa: 'unlink',
         tg: '/unlink',
         meaning: 'Disconnect this chat from Flizy (phone claims stop matching here)',
       },
-      { wa: 'flizy me', tg: '/me', meaning: 'Your linked account summary' },
-      { wa: 'flizy balance', tg: '/balance', meaning: 'What you have' },
-      { wa: 'flizy history', tg: '/history', meaning: 'Recent activity' },
+      { wa: 'me', tg: '/me', meaning: 'Your linked account summary' },
+      { wa: 'balance', tg: '/balance', meaning: 'What you have' },
+      { wa: 'history', tg: '/history', meaning: 'Recent activity' },
       {
-        wa: 'flizy deposit',
+        wa: 'deposit',
         tg: '/deposit',
         meaning: 'How to add funds (full steps on the dashboard)',
       },
-      { wa: 'flizy lock', tg: '/lock', meaning: 'Freeze Flizy on this chat' },
+      { wa: 'lock', tg: '/lock', meaning: 'Freeze Flizy on this chat' },
       {
-        wa: 'flizy unlock',
+        wa: 'unlock',
         tg: '/unlock',
         meaning: 'Sends a link: enter your PIN on Flizy, never in the chat',
       },
-      { wa: 'flizy help', tg: '/help', meaning: 'Short guide in chat' },
+      { wa: 'help', tg: '/help', meaning: 'Short guide in chat' },
     ],
   },
   {
     title: 'Optional — trade FLZ',
     blurb: 'Power tools. Fees appear in the plan before you confirm. Liquidity is site-only.',
     rows: [
-      { wa: 'flizy buy 100 FLZ', tg: '/buy 100 FLZ', meaning: 'Buy about 100 FLZ — the amount is the token you receive' },
+      { wa: 'buy 100 FLZ', tg: '/buy 100 FLZ', meaning: 'Buy about 100 FLZ — the amount is the token you receive' },
       {
-        wa: 'flizy buy 0.01 ETH of FLZ',
+        wa: 'buy 0.01 ETH of FLZ',
         tg: '/buy 0.01 ETH of FLZ',
         meaning: 'Spend exactly 0.01 ETH on FLZ',
       },
-      { wa: 'flizy sell 10 FLZ', tg: '/sell 10 FLZ', meaning: 'Sell FLZ for ETH' },
+      { wa: 'sell 10 FLZ', tg: '/sell 10 FLZ', meaning: 'Sell FLZ for ETH' },
       {
-        wa: 'flizy swap 0.01 ETH for FLZ',
+        wa: 'swap 0.01 ETH for FLZ',
         tg: '/swap 0.01 ETH for FLZ',
         meaning: 'Same idea, explicit pair',
       },
-      { wa: 'flizy trade 100 FLZ', tg: '/trade 100 FLZ', meaning: 'Asks whether you mean buy or sell' },
-      { wa: 'flizy price FLZ', tg: '/price FLZ', meaning: 'Current FLZ price — "flizy FLZ price" works too' },
+      { wa: 'trade 100 FLZ', tg: '/trade 100 FLZ', meaning: 'Asks whether you mean buy or sell' },
+      { wa: 'price FLZ', tg: '/price FLZ', meaning: 'Current FLZ price — "flizy FLZ price" works too' },
     ],
   },
 ];
@@ -297,8 +297,8 @@ export default function DocsPage() {
         <h2 className="font-sans text-xl tracking-wide text-paper">Why trusted people</h2>
         <p className="text-base leading-relaxed text-muted">
           Raw wallet addresses only work once you&apos;ve saved them on the site with your password,
-          and a new one waits 24 hours before it can receive. In chat, flizy add wallet gives you a
-          link, and you finish on the site with your password.
+          and a new one waits 24 hours before it can receive. In chat, add wallet gives you a
+          link, and you finish on the site with your password. A leading flizy still works.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="card p-5">
@@ -371,8 +371,8 @@ export default function DocsPage() {
         <div>
           <h2 className="font-sans text-xl tracking-wide text-paper">All chat commands</h2>
           <p className="mt-2 text-sm text-muted">
-            WhatsApp: prefix with <span className="text-paper">flizy</span>. Telegram: use a slash
-            or the same words. Type <span className="text-paper">flizy help</span> or{' '}
+            WhatsApp: type the command. A leading flizy still works. Telegram: use a slash
+            or the same words. Type <span className="text-paper">help</span> or{' '}
             <span className="text-paper">
               <TgCommand command="/help" />
             </span> in chat for a short everyday guide.

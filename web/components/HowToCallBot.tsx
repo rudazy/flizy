@@ -68,8 +68,8 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-gold">WhatsApp</p>
-            <p className="mt-1.5 font-mono text-xs text-lime">flizy send 0.001 to john</p>
-            <p className="mt-1.5 text-xs">Then reply confirm. Commands start with flizy.</p>
+            <p className="mt-1.5 font-mono text-xs text-lime">send 0.001 to john</p>
+            <p className="mt-1.5 text-xs">Then reply confirm. A leading flizy still works.</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-gold">Telegram</p>
@@ -86,7 +86,7 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
         <div className="mt-4 border-t border-border pt-3">
           <p className="font-sans text-sm text-paper">Send to a phone number</p>
           <p className="mt-1.5 font-mono text-xs text-lime">
-            flizy send 0.01 ETH to +234 708 043 7343
+            send 0.01 ETH to +234 708 043 7343
           </p>
           <p className="mt-1.5 text-xs">
             Phone numbers must include the country code. You can pick one country when you sign up,
@@ -196,15 +196,15 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
       {!compact ? (
         <div className="border-t border-border pt-6">
           <p className="text-xs text-muted">
-            Quick commands (WhatsApp form shown, Telegram uses the same words with a slash)
+            Quick commands. WhatsApp takes these words. A leading flizy still works. Telegram uses a slash.
           </p>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {[
-              ['flizy help', '/help'],
-              ['flizy me', '/me'],
-              ['flizy balance', '/balance'],
-              ['flizy add wallet 0x…', '/add wallet 0x…'],
-              ['flizy send 0.0001 to john', '/send 0.0001 to john'],
+              ['help', '/help'],
+              ['me', '/me'],
+              ['balance', '/balance'],
+              ['add wallet 0x…', '/add wallet 0x…'],
+              ['send 0.0001 to john', '/send 0.0001 to john'],
               ['confirm', 'confirm or the button'],
             ].map(([wa, tg]) => (
               <div key={wa} className="mono-box py-2 text-xs text-lime sm:text-sm">
