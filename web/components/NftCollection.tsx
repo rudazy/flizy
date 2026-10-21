@@ -23,7 +23,7 @@ import {
   TagIcon,
 } from './ExploreIcons';
 import { NftTradeSheet, type TradeIntent } from './NftTradeSheet';
-import { useWalletMode } from './WalletModeBits';
+import { useTradeWallet, useWalletMode } from './WalletModeBits';
 import { MintPanel, MintStatusPill, type MintDrop } from './MintPanel';
 import { FloorChartSheet, FloorSparkline, type SalePoint } from './NftFloorChart';
 import { bpsLabel, compactCount, ethFromWei, monthYear, shortAddr, timeAgo, usdLabel } from '../lib/nftFormat';
@@ -264,7 +264,10 @@ export function NftCollection({ address }: { address: string }) {
   const [intent, setIntent] = useState<TradeIntent | null>(null);
   const [chartOpen, setChartOpen] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const walletViewer = useWalletMode()?.address ?? null;
+  // Whose NFTs "mine" means: the wallet this account trades from.
+  const walletViewer = useTradeWallet()?.address ?? null;
+  /** Wallet mode: no Flizy account, so no favorites to read or save. */
+  const noAccount = useWalletMode() != null;
   const [compact, setCompact] = useState(false);
   const [copied, setCopied] = useState(false);
   const nameRef = useRef<HTMLDivElement | null>(null);
@@ -327,7 +330,7 @@ export function NftCollection({ address }: { address: string }) {
   }, [loadItems]);
 
   useEffect(() => {
-    if (walletViewer) return;
+    if (noAccount) return;
     let cancelled = false;
     getJson<{ favorites: Array<{ collection: string; tokenId: string }> }>(`/api/nfts/favorites?collection=${address}`)
       .then((r) => {
@@ -337,7 +340,7 @@ export function NftCollection({ address }: { address: string }) {
     return () => {
       cancelled = true;
     };
-  }, [address, walletViewer]);
+  }, [address, noAccount]);
 
   // The header shrinks to the compact form once the name scrolls under it.
   useEffect(() => {
@@ -358,7 +361,7 @@ export function NftCollection({ address }: { address: string }) {
 
   async function toggleFavorite(tokenId: string) {
     // Favorites belong to a Flizy account; wallet mode has none to save to.
-    if (walletViewer) return;
+    if (noAccount) return;
     const on = !favorites.has(tokenId);
     setFavorites((prev) => {
       const next = new Set(prev);

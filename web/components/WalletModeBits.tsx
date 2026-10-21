@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useExternalWallet } from './ExternalWalletProvider';
 import { useDashboard } from './DashboardProvider';
 import { isWalletModePath, WALLET_MODE_HOME } from '../lib/walletMode';
@@ -122,11 +122,104 @@ export function NeedsAccount() {
 /**
  * The visitor's own wallet, when the app is in wallet mode: no Flizy session
  * and a wallet connected. Null for a signed-in account, whose trades run from
- * the Flizy wallet as before.
+ * the Flizy wallet as before. For what a signed-in account trades from, see
+ * useTradeWallet.
  */
-export function useWalletMode(): { address: `0x${string}`; provider: () => Promise<import('viem').EIP1193Provider | null> } | null {
+export function useWalletMode(): OutsideWallet | null {
   const { signedOut, data } = useDashboard();
   const wallet = useExternalWallet();
   if (!signedOut || data || !wallet?.address) return null;
   return { address: wallet.address, provider: wallet.provider };
+}
+
+type OutsideWallet = { address: `0x${string}`; provider: () => Promise<import('viem').EIP1193Provider | null> };
+
+/**
+ * Whether a signed-in account trades from its connected wallet instead of the
+ * Flizy wallet. Kept in this browser only, like the connection itself, and
+ * shared by every trade screen through a small store.
+ */
+const TRADE_FROM_KEY = 'flizy.wallet.tradeFrom';
+const tradeFromListeners = new Set<() => void>();
+/** The last choice, for a browser whose storage is blocked. */
+let tradeFromOwnFallback = false;
+
+function readTradeFromOwn(): boolean {
+  try {
+    return window.localStorage.getItem(TRADE_FROM_KEY) === 'own';
+  } catch {
+    return false;
+  }
+}
+
+function subscribeTradeFrom(listener: () => void) {
+  tradeFromListeners.add(listener);
+  return () => {
+    tradeFromListeners.delete(listener);
+  };
+}
+
+/** Trade from the connected wallet (true) or the Flizy wallet (false). */
+export function setTradeFromOwnWallet(own: boolean) {
+  try {
+    if (own) window.localStorage.setItem(TRADE_FROM_KEY, 'own');
+    else window.localStorage.removeItem(TRADE_FROM_KEY);
+  } catch {
+    // Storage can be blocked; the choice then lasts until the page reloads.
+  }
+  tradeFromOwnFallback = own;
+  tradeFromListeners.forEach((listener) => listener());
+}
+
+
+function useTradeFromOwn(): boolean {
+  return useSyncExternalStore(
+    subscribeTradeFrom,
+    () => readTradeFromOwn() || tradeFromOwnFallback,
+    () => false
+  );
+}
+
+/**
+ * The outside wallet that signs this screen's trades, or null when they run
+ * from the Flizy wallet. That is the connected wallet in wallet mode, and for a
+ * signed-in account only when it chose its connected wallet (TradeWalletSwitch).
+ * Chat sends, payments and claims never use it.
+ */
+export function useTradeWallet(): OutsideWallet | null {
+  const { signedOut, data } = useDashboard();
+  const wallet = useExternalWallet();
+  const own = useTradeFromOwn();
+  if (!wallet?.address) return null;
+  if (signedOut && !data) return { address: wallet.address, provider: wallet.provider };
+  if (data && own) return { address: wallet.address, provider: wallet.provider };
+  return null;
+}
+
+/**
+ * For a signed-in account with a connected wallet: pick which wallet trades.
+ * Nothing shows without both.
+ */
+export function TradeWalletSwitch({ disabled = false, className = '' }: { disabled?: boolean; className?: string }) {
+  const { data } = useDashboard();
+  const wallet = useExternalWallet();
+  const own = useTradeFromOwn();
+  if (!data || !wallet?.address) return null;
+  const option = (active: boolean) =>
+    `flex-1 rounded-[8px] px-3 py-2 font-sans text-[12.5px] transition-colors ${
+      active ? 'bg-[#f7d047] font-semibold text-[#141414]' : 'text-[#b7b1a8] hover:text-white'
+    }`;
+  return (
+    <div className={`grid gap-1 ${className}`}>
+      <span className="font-sans text-[11px] uppercase tracking-[0.16em] text-[#8d867c]">Trade from</span>
+      <div className="flex gap-1 rounded-[10px] border border-[#2a2b30] bg-[#0f0f10] p-1" role="group" aria-label="Trade from">
+        <button type="button" className={option(!own)} aria-pressed={!own} disabled={disabled} onClick={() => setTradeFromOwnWallet(false)}>
+          Flizy wallet
+        </button>
+        <button type="button" className={option(own)} aria-pressed={own} disabled={disabled} onClick={() => setTradeFromOwnWallet(true)}>
+          <span className="font-mono">{shortAddress(wallet.address)}</span>
+        </button>
+      </div>
+    </div>
+  );
 }

@@ -140,7 +140,7 @@ aggregates only, and writes nothing.
 
 ### Connect wallet
 
-"Continue with a wallet" and Account > Wallets use Privy when
+"Continue with a wallet" and the Flizy Wallet card on Account use Privy when
 `NEXT_PUBLIC_PRIVY_APP_ID` is set on Vercel, otherwise the browser's injected wallet. In the
 Privy dashboard, enable external wallets and add the site's origin to the allowed origins.
 Wallet-mode NFT notices need the `market_tx_notices` table

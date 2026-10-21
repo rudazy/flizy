@@ -359,12 +359,13 @@ and use Explore, token pages, NFT collections and Swap with no account
 (`web/lib/walletMode.ts` lists the pages). Nothing about that wallet is
 stored; it never touches a Flizy-held key.
 
-- Reads that were session-only take the wallet's address as `?viewer=`
-  (`routeViewer` in `web/lib/nftApi.ts`), validated as an address.
+- NFT reads take the trading wallet's address as `?viewer=` (`routeViewer`
+  in `web/lib/nftApi.ts`), validated as an address. It only shapes what the
+  page offers; account data such as declined offers stays keyed on the session.
 - NFT trades: `POST /api/market/[action]?plan=1` runs the same chain checks
-  and returns the calls; the wallet signs them (`web/lib/walletTrade.ts`). A
-  signed-in caller is refused there with 409, so one person never has two
-  wallets in play. The hash then goes to `POST /api/market/notice`, which
+  and returns the calls; the wallet signs them (`web/lib/walletTrade.ts`).
+  The plan never reads the session, so it never involves a Flizy wallet. The
+  hash then goes to `POST /api/market/notice`, which
   reads the marketplace's own events from the receipt and tells the Flizy
   accounts involved. `market_tx_notices` makes every transaction announce
   once, from either path.
@@ -377,10 +378,14 @@ stored; it never touches a Flizy-held key.
 - Limit orders, chat payments, requests, claims, mint creation and theses
   stay behind an account.
 
-A signed-in account can connect its own wallet beside the Flizy wallet
-(Account → Wallets) to deposit. Money goes back only the existing way: save
-the wallet as a trusted address, wait 24 hours, send from chat. Site
-withdraw stays disabled.
+A signed-in account can connect its own wallet beside the Flizy wallet (the
+Flizy Wallet card on Account) as a second wallet. "Trade from" on that card,
+Swap and the trade sheets picks which wallet signs swaps and NFT trades
+(`useTradeWallet` in `web/components/WalletModeBits.tsx`, remembered in the
+browser); limit orders, liquidity, chat sends, payments and claims stay on the
+Flizy wallet. The card also deposits from the connected wallet in one
+signature. Money goes back only the existing way: save the wallet as a trusted
+address, wait 24 hours, send from chat. Site withdraw stays disabled.
 
 ---
 

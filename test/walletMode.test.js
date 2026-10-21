@@ -112,6 +112,18 @@ describe('money never leaves a Flizy wallet from wallet mode', () => {
     const src = read('web', 'components', 'OwnWalletPanel.tsx');
     assert.match(src, /const to = flizyAddress as `0x\$\{string\}`;/);
     assert.match(src, /onTrust\(own\)/);
+    // Max on ETH keeps enough back to pay for the deposit itself.
+    assert.match(src, /asset === 'ETH' \? Math\.max\(0, balance - ETH_GAS_RESERVE\) : balance/);
+  });
+
+  it('connecting and depositing sit in the Flizy Wallet card, and Add as trusted opens the Trusted slide', () => {
+    const profile = read('web', 'components', 'AccountProfile.tsx');
+    const card = profile.slice(profile.indexOf('title="Flizy Wallet"'), profile.indexOf('title="Stats & Social"'));
+    assert.ok(card.includes('{ownWallet}'));
+    const page = read('web', 'app', 'dashboard', 'account', 'page.tsx');
+    assert.ok(page.includes('ownWallet={'));
+    assert.match(page, /onTrust=\{\(address\) => \{\s+setAddr\(address\);[\s\S]*?setSlide\('trusted'\);/);
+    assert.doesNotMatch(page, /'wallets'/, 'no separate Wallets slide');
   });
 });
 
@@ -120,10 +132,10 @@ describe('the market route plans for a wallet without sending', () => {
   const plan = ROUTE.slice(ROUTE.indexOf('async function planForWallet'), ROUTE.indexOf('export async function POST'));
   const post = ROUTE.slice(ROUTE.indexOf('export async function POST'));
 
-  it('refuses a signed-in caller first, so one person never has two wallets in play', () => {
-    const refuse = plan.indexOf('{ status: 409 }');
-    assert.ok(refuse > 0);
-    assert.ok(refuse < plan.indexOf('buildPlan('));
+  it('never reads the session: a signed-in account may trade from its connected wallet, and the Flizy wallet is never planned for', () => {
+    assert.match(plan, /^async function planForWallet\(req: Request, rawAction: string\) \{/);
+    assert.ok(!plan.includes('accountId'));
+    assert.ok(post.includes("return await planForWallet(req, params.action);"));
   });
 
   it('takes the plan branch after the origin check and before the session gate', () => {
@@ -143,13 +155,53 @@ describe('the market route plans for a wallet without sending', () => {
   });
 });
 
+describe('a signed-in account can trade from its connected wallet', () => {
+  const BITS = read('web', 'components', 'WalletModeBits.tsx');
+  const hook = BITS.slice(BITS.indexOf('export function useTradeWallet'), BITS.indexOf('export function TradeWalletSwitch'));
+
+  it('uses the connected wallet only in wallet mode, or when the account chose it', () => {
+    assert.ok(hook.includes('if (!wallet?.address) return null;'));
+    assert.ok(hook.includes('if (signedOut && !data) return { address: wallet.address, provider: wallet.provider };'));
+    assert.ok(hook.includes('if (data && own) return { address: wallet.address, provider: wallet.provider };'));
+    assert.match(hook, /return null;\s*\}$/m, 'otherwise the Flizy wallet');
+    assert.ok(BITS.includes("return window.localStorage.getItem(TRADE_FROM_KEY) === 'own';"));
+  });
+
+  it('the switch shows only for a signed-in account with a wallet connected', () => {
+    const sw = BITS.slice(BITS.indexOf('export function TradeWalletSwitch'));
+    assert.ok(sw.includes('if (!data || !wallet?.address) return null;'));
+  });
+
+  it('every trade screen signs with the chosen wallet and offers the switch', () => {
+    for (const parts of [
+      ['web', 'components', 'NftTradeSheet.tsx'],
+      ['web', 'components', 'TokenTradeSheet.tsx'],
+      ['web', 'app', 'dashboard', 'swap', 'page.tsx'],
+    ]) {
+      const src = read(...parts);
+      assert.ok(src.includes('const tradeWallet = useTradeWallet();'), parts.join('/'));
+      assert.ok(src.includes('<TradeWalletSwitch'), parts.join('/'));
+      assert.ok(!src.includes('useWalletMode'), parts.join('/'));
+    }
+    // Limit orders and liquidity run from the Flizy wallet, so choosing the connected one returns to Swap.
+    assert.match(read('web', 'app', 'dashboard', 'swap', 'page.tsx'), /if \(walletAddress\) setMode\('swap'\);/);
+  });
+
+  it('account features still follow the session, not the trading wallet', () => {
+    assert.ok(read('web', 'components', 'TokenDetail.tsx').includes('const walletMode = useWalletMode();'));
+    const col = read('web', 'components', 'NftCollection.tsx');
+    assert.ok(col.includes('const noAccount = useWalletMode() != null;'));
+    assert.ok(col.includes('const walletViewer = useTradeWallet()?.address ?? null;'));
+  });
+});
+
 describe('the plan is capped per caller', () => {
   it('counts the call after the cheap refusals and before any chain read', () => {
     const ROUTE = read('web', 'app', 'api', 'market', '[action]', 'route.ts');
     const plan = ROUTE.slice(ROUTE.indexOf('async function planForWallet'), ROUTE.indexOf('export async function POST'));
     const cap = plan.indexOf("takeCallerAttempt(getSupabase(), req.headers, 'plan')");
     assert.ok(cap > 0);
-    assert.ok(plan.indexOf('{ status: 409 }') < cap);
+    assert.ok(plan.indexOf("{ error: 'Unknown action' }") < cap);
     assert.ok(cap < plan.indexOf('buildPlan('));
     assert.ok(cap < plan.indexOf('marketContract.paused()'));
   });
@@ -362,12 +414,16 @@ describe('NFT reads for a wallet', () => {
   const API = read('web', 'lib', 'nftApi.ts');
   const fn = API.slice(API.indexOf('export async function routeViewer'), API.indexOf('export function walletForAccount'));
 
-  it('a signed-in viewer is always their own Flizy wallet', () => {
-    assert.ok(fn.indexOf('if (accountId) return') >= 0);
-    assert.ok(fn.indexOf('if (accountId) return') < fn.indexOf("searchParams.get('viewer')"));
+  it('a valid ?viewer= is the wallet the page trades from, otherwise the Flizy wallet, otherwise nobody', () => {
+    const named = fn.indexOf('if (/^0x[0-9a-fA-F]{40}$/.test(raw)) return { address: ethers.getAddress(raw), viaGator: false');
+    const flizy = fn.indexOf('if (accountId) return { ...(await viewerWallet(accountId)), signedIn: true };');
+    const nobody = fn.indexOf('return { address: ethers.ZeroAddress, viaGator: false, signedIn: false };');
+    assert.ok(named > 0 && flizy > named && nobody > flizy);
   });
 
-  it('?viewer= is checked as an address and otherwise means nobody', () => {
-    assert.ok(fn.includes('/^0x[0-9a-fA-F]{40}$/.test(raw) ? ethers.getAddress(raw) : ethers.ZeroAddress'));
+  it('the viewer authorises nothing: account-only data stays keyed on the session', () => {
+    const item = read('web', 'app', 'api', 'nfts', 'collections', '[address]', 'tokens', '[tokenId]', 'route.ts');
+    assert.ok(!/viewer\.signedIn/.test(item));
+    assert.ok(item.includes('accountId && view.address ? await declinedOfferIds(accountId, view.address)'));
   });
 });

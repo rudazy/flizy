@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { parseEther } from 'ethers';
 import { PinField, pinReady } from './PinField';
 import { txPin } from '../lib/txPin';
-import { useWalletMode } from './WalletModeBits';
+import { TradeWalletSwitch, useTradeWallet } from './WalletModeBits';
 import { walletMarketTrade } from '../lib/walletTrade';
 import { walletErrorText } from '../lib/walletChain';
 import { useDashboard } from './DashboardProvider';
@@ -88,8 +88,8 @@ export function NftTradeSheet({
   onDone: () => void;
 }) {
   const { refreshAll } = useDashboard();
-  // Wallet mode: the visitor's own wallet signs; no PIN, since no Flizy wallet is involved.
-  const walletMode = useWalletMode();
+  // From an outside wallet (wallet mode, or the account's connected wallet): it signs; no PIN, since no Flizy wallet is involved.
+  const tradeWallet = useTradeWallet();
   const [amount, setAmount] = useState(() =>
     intent.action === 'list' && intent.currentWei ? ethFromWei(intent.currentWei)?.replace(/,/g, '') || '' : ''
   );
@@ -125,7 +125,7 @@ export function NftTradeSheet({
   const royaltyValid = intent.action !== 'royalty' || (/^[0-9]{1,2}(\.[0-9]{1,2})?$/.test(bps.trim()) && royaltyInput <= 10);
 
   const needsAmount = intent.action === 'list' || intent.action === 'offer';
-  const ready = !busy && (walletMode != null || !txPin.required || pinReady(pin)) && (!needsAmount || typed != null) && royaltyValid;
+  const ready = !busy && (tradeWallet != null || !txPin.required || pinReady(pin)) && (!needsAmount || typed != null) && royaltyValid;
 
   async function submit() {
     if (!ready) return;
@@ -142,12 +142,12 @@ export function NftTradeSheet({
     }
     if (intent.action === 'offer-cancel') Object.assign(body, { offerId: intent.offerId });
     if (intent.action === 'royalty') Object.assign(body, { collection: intent.collection, bps: Math.round(royaltyInput * 100) });
-    if (walletMode) {
+    if (tradeWallet) {
       try {
-        const provider = await walletMode.provider();
+        const provider = await tradeWallet.provider();
         if (!provider) throw new Error('Connect your wallet again.');
         delete body.pin;
-        const result = await walletMarketTrade(provider, walletMode.address, intent.action, body);
+        const result = await walletMarketTrade(provider, tradeWallet.address, intent.action, body);
         setDone({ explorerUrl: result.explorerUrl, label: result.label });
         onDone();
       } catch (err) {
@@ -331,8 +331,9 @@ export function NftTradeSheet({
               </>
             ) : null}
 
-            {txPin.required && !walletMode ? <PinField value={pin} onChange={setPin} /> : null}
-            {walletMode ? <p className="m-0 font-sans text-[12px] text-[#9a958c]">Your wallet will ask you to sign. Network gas is paid from your wallet.</p> : null}
+            <TradeWalletSwitch disabled={busy} />
+            {txPin.required && !tradeWallet ? <PinField value={pin} onChange={setPin} /> : null}
+            {tradeWallet ? <p className="m-0 font-sans text-[12px] text-[#9a958c]">Your wallet will ask you to sign. Network gas is paid from your wallet.</p> : null}
             {error ? <p className="alert alert-error m-0">{error}</p> : null}
             <button type="button" onClick={submit} disabled={!ready} className="btn-sun h-[44px] rounded-[6px] font-sans text-[13.5px] disabled:opacity-50">
               {busy ? 'Confirming...' : `Confirm ${TITLES[intent.action].toLowerCase()}`}

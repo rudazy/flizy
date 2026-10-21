@@ -37,6 +37,8 @@ type Props = {
   emailPanel: ReactNode;
   usernamePanel: ReactNode;
   namePanel: ReactNode;
+  /** Under the Flizy wallet address: the visitor's own connected wallet and its deposit. */
+  ownWallet?: ReactNode;
   onEmail: () => void;
   onUsername: () => void;
   onName: () => void;
@@ -270,6 +272,7 @@ export function AccountProfile({
   emailPanel,
   usernamePanel,
   namePanel,
+  ownWallet,
   onEmail,
   onUsername,
   onName,
@@ -531,6 +534,7 @@ export function AccountProfile({
             <ChevronRightIcon size={16} className="text-[#6f6a62]" />
           </button>
         </div>
+        {ownWallet}
       </Card>
 
       <Card dropdown icon={<BarsGlyph />} title="Stats & Social" hint="Your activity, followers and community.">

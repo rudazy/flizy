@@ -14,7 +14,7 @@ import { AmmoraSwapPanel } from '../../../components/AmmoraSwapPanel';
 import { ammoraUiEnabled } from '../../../components/AmmoraTokens';
 import { pinReady } from '../../../components/PinField';
 import { txPin } from '../../../lib/txPin';
-import { useWalletMode } from '../../../components/WalletModeBits';
+import { TradeWalletSwitch, useTradeWallet } from '../../../components/WalletModeBits';
 import { walletBalances, walletSwap, type WalletSwapQuote } from '../../../lib/walletTrade';
 import { FLZ_TOKEN, WETH_TOKEN, walletErrorText } from '../../../lib/walletChain';
 import {
@@ -137,10 +137,14 @@ export default function SwapRoute() {
 
 function SwapPage() {
   const [mode, setMode] = useState<Mode>('swap');
-  // Wallet mode swaps with the visitor's own wallet. Limit orders and liquidity
-  // run from a Flizy wallet, so they are not offered there.
-  const walletMode = useWalletMode();
-  const walletAddress = walletMode?.address ?? null;
+  // An outside wallet (wallet mode, or an account that chose its connected
+  // wallet) swaps by signing itself. Limit orders and liquidity run from a
+  // Flizy wallet, so they are not offered then.
+  const tradeWallet = useTradeWallet();
+  const walletAddress = tradeWallet?.address ?? null;
+  useEffect(() => {
+    if (walletAddress) setMode('swap');
+  }, [walletAddress]);
   // A Trade button elsewhere opens this screen on its pair: ?from=FLZ&to=ETH or
   // ?from=ETH&to=IZY. Anything else falls back to buying FLZ.
   const search = useSearchParams();
@@ -454,15 +458,15 @@ function SwapPage() {
     setBusy(true);
     setError('');
     setResult(null);
-    if (walletMode) {
+    if (tradeWallet) {
       try {
         const route = quote as unknown as Partial<WalletSwapQuote> | null;
         if (!route?.feeRouter || !Array.isArray(route.path) || !route.amountInUnits || !route.amountOutMinUnits) {
           throw new Error('Quote again, then swap.');
         }
-        const provider = await walletMode.provider();
+        const provider = await tradeWallet.provider();
         if (!provider) throw new Error('Connect your wallet again.');
-        const done = await walletSwap(provider, walletMode.address, route as WalletSwapQuote, WETH_TOKEN);
+        const done = await walletSwap(provider, tradeWallet.address, route as WalletSwapQuote, WETH_TOKEN);
         setResult({ explorerUrl: done.explorerUrl });
         loadPrice();
         loadQuote();
@@ -618,11 +622,11 @@ function SwapPage() {
       <div className="!-mt-[17px] flex items-stretch gap-[10.5px]">
         <div className="flex h-[36px] flex-1 rounded-[5px] border border-chrome-line bg-[#0e0f11]" role="tablist" aria-label="Trade type">
           <ModeTab active={mode === 'swap'} onClick={() => changeMode('swap')} icon={<SwapArrowsIcon size={15} />} label="Swap" />
-          {walletMode ? null : (
+          {tradeWallet ? null : (
             <ModeTab active={mode === 'limit'} onClick={() => changeMode('limit')} icon={<ChartLineIcon size={15} />} label="Limit" />
           )}
         </div>
-        {walletMode ? null : (
+        {tradeWallet ? null : (
         <button
           type="button"
           onClick={() => changeMode(mode === 'liquidity' ? 'swap' : 'liquidity')}
@@ -636,6 +640,7 @@ function SwapPage() {
         </button>
         )}
       </div>
+      <TradeWalletSwitch className="mt-3" />
 
       {mode !== 'liquidity' ? (
         <>

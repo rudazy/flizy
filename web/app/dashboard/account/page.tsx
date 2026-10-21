@@ -35,7 +35,6 @@ const SLIDES = [
   'profile',
   'projects',
   'pay',
-  'wallets',
   'language',
   'country',
   'chat',
@@ -549,7 +548,6 @@ export default function AccountPage() {
           },
           { id: 'projects', label: 'Projects' },
           { id: 'pay', label: 'Pay me', badge: data.pay?.username ? `@${data.pay.username}` : undefined },
-          { id: 'wallets', label: 'Wallets' },
           { id: 'language', label: t('account.language') },
           {
             id: 'country',
@@ -586,6 +584,17 @@ export default function AccountPage() {
           onUsername={() => setProfileEditor((cur) => (cur === 'username' ? null : 'username'))}
           onName={() => setProfileEditor((cur) => (cur === 'name' ? null : 'name'))}
           onWallet={() => router.push('/dashboard/wallet')}
+          ownWallet={
+            <OwnWalletPanel
+              flizyAddress={data.account.agent_wallet_address || ''}
+              trusted={data.trusted}
+              onTrust={(address) => {
+                setAddr(address);
+                setLabel((current) => current || 'My wallet');
+                setSlide('trusted');
+              }}
+            />
+          }
           onSecurity={() => setSlide('security')}
           onSoon={comingSoon}
           onOpen={setSlide}
@@ -958,18 +967,6 @@ export default function AccountPage() {
       ) : null}
 
       {slide === 'platforms' ? <LinkedAccounts /> : null}
-
-      {slide === 'wallets' ? (
-        <OwnWalletPanel
-          flizyAddress={data.account.agent_wallet_address || ''}
-          trusted={data.trusted}
-          onTrust={(address) => {
-            setAddr(address);
-            setLabel((current) => current || 'My wallet');
-            setSlide('trusted');
-          }}
-        />
-      ) : null}
 
       {slide === 'trusted' ? (
         <TrustedPanel

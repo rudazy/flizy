@@ -55,20 +55,21 @@ export async function viewerWallet(accountId: string): Promise<{ address: string
 }
 
 /**
- * Who is looking at an NFT page: the Flizy wallet when there is a session,
- * otherwise the outside wallet named by ?viewer= (wallet mode), otherwise
+ * Who is looking at an NFT page: the outside wallet named by ?viewer= when the
+ * page trades from one (wallet mode, or an account that chose its connected
+ * wallet), otherwise the Flizy wallet when there is a session, otherwise
  * nobody. The viewer only shapes what the page offers ("you own this", "your
- * offer"); it authorises nothing. A wallet-mode action is signed by the
- * wallet itself and the marketplace contract checks who sent it.
+ * offer"); it authorises nothing. An outside wallet signs its own actions and
+ * the marketplace contract checks who sent them.
  */
 export async function routeViewer(
   req: Request,
   accountId: string | null
 ): Promise<{ address: string; viaGator: boolean; signedIn: boolean }> {
-  if (accountId) return { ...(await viewerWallet(accountId)), signedIn: true };
   const raw = new URL(req.url).searchParams.get('viewer') || '';
-  const address = /^0x[0-9a-fA-F]{40}$/.test(raw) ? ethers.getAddress(raw) : ethers.ZeroAddress;
-  return { address, viaGator: false, signedIn: false };
+  if (/^0x[0-9a-fA-F]{40}$/.test(raw)) return { address: ethers.getAddress(raw), viaGator: false, signedIn: Boolean(accountId) };
+  if (accountId) return { ...(await viewerWallet(accountId)), signedIn: true };
+  return { address: ethers.ZeroAddress, viaGator: false, signedIn: false };
 }
 
 /** viewerWallet for an account row already in hand (agent_wallet_address as stored). */

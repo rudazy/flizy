@@ -323,7 +323,8 @@ async function noticeOffer(
 }
 
 /**
- * Wallet mode: the plan for a trade the visitor's own wallet will sign.
+ * The plan for a trade an outside wallet will sign: wallet mode, or a signed-in
+ * account that chose to trade from its connected wallet.
  *
  * buildPlan is the same one a Flizy-wallet trade runs, with the connected
  * wallet as the viewer, so the checks (ownership, a price or offer that has not
@@ -332,13 +333,10 @@ async function noticeOffer(
  * only when that wallet sends them, because the marketplace checks msg.sender.
  * No PIN, lock, daily limit or transfer row: no Flizy wallet is involved and
  * nothing is sent here, but the checks read the chain, so plans are capped per
- * caller per hour (web/lib/callerLimit.ts). Refused with a session, where
- * trades run from the Flizy wallet, so one person never has two wallets in play.
+ * caller per hour (web/lib/callerLimit.ts). A session changes nothing here:
+ * the Flizy wallet is never part of the plan.
  */
-async function planForWallet(req: Request, rawAction: string, accountId: string | null) {
-  if (accountId) {
-    return NextResponse.json({ error: 'You are signed in, so trades run from your Flizy wallet.' }, { status: 409 });
-  }
+async function planForWallet(req: Request, rawAction: string) {
   if (!ACTIONS.includes(rawAction as Action)) return NextResponse.json({ error: 'Unknown action' }, { status: 404 });
   const action = rawAction as Action;
   const ctx = nftContext();
@@ -380,9 +378,10 @@ export async function POST(req: Request, { params }: { params: { action: string 
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;
     const accountId = await getAccountIdFromCookie();
-    // Wallet mode: ?plan=1 runs the same checks and returns the calls for the
-    // visitor's own wallet to sign. Nothing is sent from here.
-    if (new URL(req.url).searchParams.get('plan') === '1') return await planForWallet(req, params.action, accountId);
+    // ?plan=1 runs the same checks and returns the calls for an outside wallet
+    // to sign (wallet mode, or an account trading from its connected wallet).
+    // Nothing is sent from here.
+    if (new URL(req.url).searchParams.get('plan') === '1') return await planForWallet(req, params.action);
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     if (!ACTIONS.includes(params.action as Action)) return NextResponse.json({ error: 'Unknown action' }, { status: 404 });
     const action = params.action as Action;

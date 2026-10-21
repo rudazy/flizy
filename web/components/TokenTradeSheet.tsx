@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboard } from './DashboardProvider';
-import { useWalletMode } from './WalletModeBits';
+import { TradeWalletSwitch, useTradeWallet } from './WalletModeBits';
 import { listedByAddress } from '../lib/listedTokens';
 import { walletBalances, walletSwap, type WalletSwapQuote } from '../lib/walletTrade';
 import { FLZ_TOKEN, WETH_TOKEN, walletErrorText } from '../lib/walletChain';
@@ -112,22 +112,22 @@ export function TokenTradeSheet({
   const titleId = useId();
   const tradeId = tokenAddress || symbol;
   const { holdings } = useDashboard();
-  // Wallet mode: balances and the trade come from the visitor's own wallet.
-  const walletMode = useWalletMode();
+  // From an outside wallet (wallet mode, or the account's connected wallet): balances and the trade come from it.
+  const tradeWallet = useTradeWallet();
   const [walletHeld, setWalletHeld] = useState<{ eth: string; token: string | null } | null>(null);
   const [walletReads, setWalletReads] = useState(0);
   const walletToken = tokenAddress || (symbol.toUpperCase() === 'FLZ' ? FLZ_TOKEN : null);
   const walletDecimals = (walletToken && listedByAddress(walletToken)?.decimals) || 18;
   useEffect(() => {
-    if (!walletMode) return;
+    if (!tradeWallet) return;
     let live = true;
-    walletBalances(walletMode.address, walletToken ? [{ address: walletToken, decimals: walletDecimals }] : [])
+    walletBalances(tradeWallet.address, walletToken ? [{ address: walletToken, decimals: walletDecimals }] : [])
       .then((b) => live && setWalletHeld({ eth: b.eth, token: walletToken ? b.tokens[walletToken.toLowerCase()] ?? null : null }))
       .catch(() => live && setWalletHeld(null));
     return () => {
       live = false;
     };
-  }, [walletMode?.address, walletToken, walletDecimals, walletReads]);
+  }, [tradeWallet?.address, walletToken, walletDecimals, walletReads]);
   const [amount, setAmount] = useState('');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
@@ -140,13 +140,13 @@ export function TokenTradeSheet({
   const buying = side === 'buy';
   const payAsset = buying ? 'ETH' : symbol;
   const getAsset = buying ? symbol : 'ETH';
-  const ethBalance = walletMode ? walletHeld?.eth ?? null : holdings?.holdings?.native?.balance ?? null;
+  const ethBalance = tradeWallet ? walletHeld?.eth ?? null : holdings?.holdings?.native?.balance ?? null;
   const tokenRow = (holdings?.holdings?.tokens || []).find((t) =>
     tokenAddress
       ? String(t.address || '').toLowerCase() === tokenAddress.toLowerCase()
       : String(t.symbol || '').toUpperCase() === symbol.toUpperCase()
   );
-  const balance = buying ? ethBalance : walletMode ? walletHeld?.token ?? null : tokenRow?.balance ?? null;
+  const balance = buying ? ethBalance : tradeWallet ? walletHeld?.token ?? null : tokenRow?.balance ?? null;
   const spendMax = maxSpend(balance, buying);
   const maxNum = num(spendMax) ?? 0;
   const amountNum = num(amount) ?? 0;
@@ -276,16 +276,16 @@ export function TokenTradeSheet({
     if (!quoteReady || busy) return;
     setBusy(true);
     setError('');
-    if (walletMode) {
+    if (tradeWallet) {
       try {
         if (venue === 'ammora') throw new Error('Ammora trades need a Flizy account.');
         const route = quote as unknown as Partial<WalletSwapQuote>;
         if (!route.feeRouter || !Array.isArray(route.path) || !route.amountInUnits || !route.amountOutMinUnits) {
           throw new Error('Quote again, then confirm.');
         }
-        const provider = await walletMode.provider();
+        const provider = await tradeWallet.provider();
         if (!provider) throw new Error('Connect your wallet again.');
-        const result = await walletSwap(provider, walletMode.address, route as WalletSwapQuote, WETH_TOKEN);
+        const result = await walletSwap(provider, tradeWallet.address, route as WalletSwapQuote, WETH_TOKEN);
         setWalletReads((n) => n + 1);
         setExplorerUrl(result.explorerUrl);
         setStage('done');
@@ -442,6 +442,7 @@ export function TokenTradeSheet({
 
               {stage === 'edit' ? (
                 <>
+                  <TradeWalletSwitch className="mt-3" />
                   {/* You pay */}
                   <section className="relative mt-3 rounded-[16px] border border-sun/25 bg-[#101010] p-3.5">
                     <div className="flex items-center justify-between gap-2">

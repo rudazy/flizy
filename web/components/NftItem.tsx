@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, CartIcon, CheckIcon, ExternalLinkIcon, TagIcon } from './ExploreIcons';
 import { NftTradeSheet, type TradeIntent } from './NftTradeSheet';
-import { useWalletMode } from './WalletModeBits';
+import { useTradeWallet } from './WalletModeBits';
 import { NftArt, PriceBlock } from './NftCollection';
 import { bpsLabel, ethFromWei, shortAddr, timeAgo, usdLabel } from '../lib/nftFormat';
 
@@ -53,7 +53,7 @@ export function NftItem({ address, tokenId }: { address: string; tokenId: string
   const [error, setError] = useState('');
   const [intent, setIntent] = useState<TradeIntent | null>(null);
   // In wallet mode the page is seen from the connected wallet, so "you own this" is about it.
-  const viewer = useWalletMode()?.address ?? null;
+  const viewer = useTradeWallet()?.address ?? null;
 
   const load = useCallback(async () => {
     try {
