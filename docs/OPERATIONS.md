@@ -145,6 +145,9 @@ aggregates only, and writes nothing.
 Privy dashboard, enable external wallets and add the site's origin to the allowed origins.
 Wallet-mode NFT notices need the `market_tx_notices` table
 (`supabase/migrations/20261022120000_market_tx_notices.sql`); apply it before deploying.
+Connected-wallet transactions on Scan need the `transfers_wallet_tx_once` index
+(`supabase/migrations/20261023120000_wallet_scan_rows.sql`); without it a hash handed over
+twice can show twice, so apply it before deploying too.
 
 ### Transaction PIN
 

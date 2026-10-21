@@ -356,8 +356,8 @@ above. A visitor can instead connect a wallet of their own
 (`web/components/ExternalWalletProvider.tsx`: Privy when
 `NEXT_PUBLIC_PRIVY_APP_ID` is set, otherwise the browser's injected wallet)
 and use Explore, token pages, NFT collections and Swap with no account
-(`web/lib/walletMode.ts` lists the pages). Nothing about that wallet is
-stored; it never touches a Flizy-held key.
+(`web/lib/walletMode.ts` lists the pages). No account is made for that
+wallet; it never touches a Flizy-held key.
 
 - NFT reads take the trading wallet's address as `?viewer=` (`routeViewer`
   in `web/lib/nftApi.ts`), validated as an address. It only shapes what the
@@ -371,10 +371,20 @@ stored; it never touches a Flizy-held key.
   once, from either path.
 - Swaps are built in the browser against the fee router from a server quote,
   with an approval for the swapped amount only.
-- Without a session, reads, plans and notices are capped per caller per hour
+- Scan: once a swap, NFT trade or deposit into a Flizy wallet lands, the page
+  hands its hash to `POST /api/scan/record` (`web/lib/walletScanRecord.ts`).
+  The server reads the transaction, its receipt and the logs of Flizy's own
+  contracts, and writes one `transfers` row with no account and channel key
+  `wallet` ("Outside wallet"). Hashes Flizy already logged (its own sends,
+  faucet drips, claim payouts and refunds) and anything sent by a Flizy wallet
+  are skipped, and the unique index `transfers_wallet_tx_once` keeps each
+  transaction to one row. With no account on the row, spending limits and the
+  account's own history never see it; a deposit shows in the receiving
+  account's history, as any payment to its wallet does.
+- Without a session, reads, plans, notices and Scan records are capped per caller per hour
   (`web/lib/callerLimit.ts`, keyed on a hashed client address), and a notice
-  is accepted only for a trade from the last hour, so old trades cannot be
-  replayed into chat.
+  or a Scan record is accepted only for a transaction from the last hour, so
+  old trades cannot be replayed into chat or backfilled onto Scan.
 - Limit orders, chat payments, requests, claims, mint creation and theses
   stay behind an account.
 
@@ -383,8 +393,11 @@ Flizy Wallet card on Account) as a second wallet. "Trade from" on that card,
 Swap and the trade sheets picks which wallet signs swaps and NFT trades
 (`useTradeWallet` in `web/components/WalletModeBits.tsx`, remembered in the
 browser); limit orders, liquidity, chat sends, payments and claims stay on the
-Flizy wallet. The card also deposits from the connected wallet in one
-signature. Money goes back only the existing way: save the wallet as a trusted
+Flizy wallet. Deposit on the card opens `web/components/DepositSheet.tsx`:
+ETH or tUSD, a share of the connected wallet's balance (ETH keeps a gas
+reserve at 100%), one approval in that wallet. Amounts are bigint units
+throughout (`web/lib/tokenUnits.ts`), so what shows is what is signed.
+Money goes back only the existing way: save the wallet as a trusted
 address, wait 24 hours, send from chat. Site withdraw stays disabled.
 
 ---

@@ -10,9 +10,23 @@ import { GIWA } from './walletChain';
  * the hash goes back so the Flizy accounts it touched hear about it
  * (POST /api/market/notice). Swaps: built here against the fee router from a
  * server quote, so the fee and the slippage limit are the same as on the site.
+ * Every trade, and every deposit into a Flizy wallet, is handed to Scan once it
+ * lands (recordOnScan).
  */
 
 type PlannedCall = { to: string; value: string; data: string };
+
+/**
+ * Hand a landed transaction to Scan (POST /api/scan/record), which reads what
+ * it did from the chain. Best effort: the transaction has happened either way.
+ */
+export function recordOnScan(txHash: string): void {
+  fetch('/api/scan/record', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ txHash }),
+  }).catch(() => undefined);
+}
 
 /** Send planned calls one after another, each waiting for its receipt. Returns the last hash. */
 async function sendCalls(provider: EIP1193Provider, account: `0x${string}`, calls: PlannedCall[]): Promise<string> {
@@ -55,6 +69,7 @@ export async function walletMarketTrade(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ txHash }),
   }).catch(() => undefined);
+  recordOnScan(txHash);
   return { txHash, explorerUrl: `${GIWA.explorerUrl}/tx/${txHash}`, label: String(plan.label || 'Done') };
 }
 
@@ -137,6 +152,7 @@ export async function walletSwap(
   }
   const receipt = await reader.waitForTransactionReceipt({ hash });
   if (receipt.status !== 'success') throw new Error('The swap failed on chain.');
+  recordOnScan(hash);
   return { txHash: hash, explorerUrl: `${GIWA.explorerUrl}/tx/${hash}` };
 }
 

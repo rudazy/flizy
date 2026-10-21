@@ -23,6 +23,8 @@ export const CALLER_CAPS = {
   plan: 60,
   /** Wallet-mode trade notices: each one reads a receipt and may message accounts. */
   notice: 30,
+  /** Connected-wallet transactions handed over for Scan: each one reads a transaction, its receipt and a block. */
+  record: 30,
 } as const;
 
 type CallerBucket = keyof typeof CALLER_CAPS;
@@ -33,9 +35,9 @@ const KEEP_MS = 24 * HOUR_MS;
 /**
  * Count this call and say whether it is within the bucket's hourly cap.
  *
- * Plans and notices refuse when the counter cannot be read, like the pay
- * route. Reads are public chain data the page needs to render, so an
- * unreadable counter lets them through rather than blanking every page.
+ * Plans, notices and Scan records refuse when the counter cannot be read,
+ * like the pay route. Reads are public chain data the page needs to render,
+ * so an unreadable counter lets them through rather than blanking every page.
  */
 export async function takeCallerAttempt(
   supabase: Db,

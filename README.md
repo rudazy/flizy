@@ -111,7 +111,7 @@ another adapter, not a second product.
 | **Requests** | `request 50 tusd from @ada for design work`. The payer sees who asks, for what, and a warning when they have never paid that person. At most 20 requests an hour per account | Live |
 | **Receipts** | Every confirmed payment can be shared as a receipt page with a link preview. Chat sends reply with the link. Each person is named only if they chose to be named on Scan | Live |
 | **Pay from any wallet** | Off by default. When the owner turns it on, someone without Flizy can pay their pay link from their own browser wallet through FlizyPaymentReceiver; Flizy records it only after reading the payment from the chain | Live |
-| **Connect a wallet** | Sign in with MetaMask, Coinbase Wallet or any WalletConnect wallet and use Explore, token pages, NFT collections and Swap without a Flizy account. The wallet signs its own trades; the server plans NFT trades with the same checks and stores nothing about the wallet. A Flizy account can connect its own wallet as a second wallet: pick it under "Trade from" to swap and trade NFTs with it, deposit from it in one signature, and save it as a trusted wallet to send back from chat | Live |
+| **Connect a wallet** | Sign in with MetaMask, Coinbase Wallet or any WalletConnect wallet and use Explore, token pages, NFT collections and Swap without a Flizy account. The wallet signs its own trades; the server plans NFT trades with the same checks and keeps nothing about the wallet beyond its transactions on Scan. A Flizy account can connect its own wallet as a second wallet: pick it under "Trade from" to swap and trade NFTs with it, deposit ETH or tUSD from it with a share slider and one approval, and save it as a trusted wallet to send back from chat | Live |
 | **Pay with ETH** | Pay a tUSD or FLZ amount with ETH in one swap that delivers to the payee. They receive at least the amount asked; the ETH counts toward the daily limit | Live |
 | **Get paid** | Payments received over 30, 90 or 365 days, totals per asset, a CSV export, and refunds back through the pay page | Live |
 | **Swap and liquidity** | Trade ETH against FLZ, IZY, MAKI or DCAT, and add liquidity to any of those pools, with fees and slippage shown before confirm | Live |
@@ -122,7 +122,7 @@ another adapter, not a second product.
 | **Mints** | Launch a drop with public and allowlist phases, prices, limits and schedule; bring an existing collection | Live |
 | **Collection creator** | Build a collection from artwork layers: traits, rarity weights, rules, unique combinations, standard metadata | Built: the creator runs today; launching switches on once the updated factory and storage are configured |
 | **Generate with AI** | Describe a collection; AI plans the traits and draws each layer, then the creator takes over | Built: switches on once AI and storage keys are configured |
-| **Scan** | A public ledger of Flizy activity. Recipients show as the payment rail, and each person chooses whether their username appears | Live |
+| **Scan** | A public ledger of Flizy activity, including swaps, NFT trades and deposits signed by a connected wallet. Recipients show as the payment rail, and each person chooses whether their username appears | Live |
 | **Tasks and projects** | Publish tasks with a declared reward, category, level and steps; participants submit, the creator picks winners. Filter by category, save tasks, see saved, joined and published tasks under My tasks; Flizy features tasks at the top of Explore | Live (reward escrow comes later) |
 | **Copy trade** | Choose wallets to follow and set dollar rules | Settings only; nothing copies yet |
 | **Account and security** | Trusted wallets, unlock PIN, daily ETH limit, password change that signs out other devices, chat links, platform identities, privacy controls | Live |
@@ -299,7 +299,7 @@ xychart-beta
 
 | Quality measure | Today |
 | --- | --- |
-| Automated tests | 3,075 Node tests and 194 Foundry contract tests, all passing |
+| Automated tests | 3,107 Node tests and 194 Foundry contract tests, all passing |
 | Test files | 222 Node, 10 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
 | Database | 90 idempotent migrations, each ending in a post-condition check that fails loudly |

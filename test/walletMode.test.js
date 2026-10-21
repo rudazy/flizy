@@ -91,6 +91,7 @@ describe('money never leaves a Flizy wallet from wallet mode', () => {
     ['web', 'components', 'ExternalWalletProvider.tsx'],
     ['web', 'components', 'WalletModeBits.tsx'],
     ['web', 'components', 'OwnWalletPanel.tsx'],
+    ['web', 'components', 'DepositSheet.tsx'],
   ];
 
   it('site withdraw is still refused', () => {
@@ -109,11 +110,13 @@ describe('money never leaves a Flizy wallet from wallet mode', () => {
   });
 
   it('the own-wallet panel only deposits into the Flizy wallet, and sends back through the trusted list', () => {
-    const src = read('web', 'components', 'OwnWalletPanel.tsx');
-    assert.match(src, /const to = flizyAddress as `0x\$\{string\}`;/);
-    assert.match(src, /onTrust\(own\)/);
-    // Max on ETH keeps enough back to pay for the deposit itself.
-    assert.match(src, /asset === 'ETH' \? Math\.max\(0, balance - ETH_GAS_RESERVE\) : balance/);
+    // The deposit itself lives in the dialog the panel opens.
+    const sheet = read('web', 'components', 'DepositSheet.tsx');
+    assert.match(sheet, /const to = flizyAddress as `0x\$\{string\}`;/);
+    assert.match(read('web', 'components', 'OwnWalletPanel.tsx'), /onTrust\(own\)/);
+    // 100% of ETH keeps enough back to pay for the deposit itself.
+    assert.match(sheet, /choice === 'ETH' \? \(balance > ETH_GAS_RESERVE \? balance - ETH_GAS_RESERVE : 0n\) : balance/);
+    assert.match(sheet, /const tooMuch = units != null && max != null && units > max;/);
   });
 
   it('connecting and depositing sit in the Flizy Wallet card, and Add as trusted opens the Trusted slide', () => {

@@ -200,14 +200,18 @@ export default function PrivacyPage() {
             CoinGecko, and nothing about you is sent with that request.
           </p>
           <p>
-            You can also connect a wallet of your own, with or without a Flizy account. Its
-            address stays in your browser: we do not save it, and no account is made for it.
-            Our servers see it only when a page asks for something on its behalf, such as
-            which NFTs it owns or the steps of a trade it is about to sign, and the address is
-            not saved from those requests. To stop those pages being overused, we count requests
-            per network address, kept as a hash; counts older than a day are cleared as new
-            requests come in. After a trade, we keep its transaction hash so the
-            Flizy accounts it touched are told once. The wallet signs its own transactions, and
+            You can also connect a wallet of your own, with or without a Flizy account. No
+            account is made for it. Our servers see its address when a page asks for something
+            on its behalf, such as which NFTs it owns or the steps of a trade it is about to
+            sign, and the address is not saved from those requests. To stop those pages being
+            overused, we count requests per network address, kept as a hash; counts older than
+            a day are cleared as new requests come in. After a swap, an NFT trade or a deposit
+            into a Flizy wallet, we keep its transaction hash so the Flizy accounts it touched
+            are told once, and we add it to Scan. That Scan entry shows what the transaction
+            did and the wallet&apos;s address, both already public on the chain, and is not
+            filed under any Flizy account. A deposit also shows the Flizy wallet it reached,
+            named only if that account shows its username on Scan. The wallet signs its own
+            transactions, and
             Flizy never holds its keys. Connecting goes through Privy and, for wallets on another device,
             WalletConnect; your wallet app and those services see the connection under their
             own terms. If you later save that wallet as a trusted address on your account, it

@@ -69,6 +69,7 @@ export default function AccountPage() {
     setUsername,
     setAccountLocale,
     setDefaultCallingCode,
+    historyUsdPerEth,
   } = useDashboard();
   const [localeDraft, setLocaleDraft] = useState<LocaleCode>(locale);
   const [countryIso, setCountryIso] = useState('');
@@ -588,6 +589,7 @@ export default function AccountPage() {
             <OwnWalletPanel
               flizyAddress={data.account.agent_wallet_address || ''}
               trusted={data.trusted}
+              usdPerEth={historyUsdPerEth}
               onTrust={(address) => {
                 setAddr(address);
                 setLabel((current) => current || 'My wallet');
