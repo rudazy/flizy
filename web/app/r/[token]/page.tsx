@@ -28,12 +28,21 @@ function when(iso: string): string {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const r = await readReceipt(params.token);
-  return pageMetadata({
+  const base = pageMetadata({
     title: r ? `Paid ${r.amount} ${r.unit} on Flizy` : 'Receipt on Flizy',
     description: r ? `A payment of ${r.amount} ${r.unit} on ${r.network}, ${when(r.at)}.` : 'A payment receipt on Flizy.',
     path: `/r/${params.token}`,
     noindex: true,
   });
+  // pageMetadata names the site-wide card; a receipt shows its own, with the
+  // amount on it (./opengraph-image.tsx). Set here because an explicit image
+  // in metadata wins over the file-based one.
+  const card = { url: `/r/${params.token}/opengraph-image`, width: 1200, height: 630, alt: 'Payment receipt on Flizy' };
+  return {
+    ...base,
+    openGraph: { ...base.openGraph, images: [card] },
+    twitter: { ...base.twitter, images: [card.url] },
+  };
 }
 
 export default async function ReceiptPage({ params }: Props) {

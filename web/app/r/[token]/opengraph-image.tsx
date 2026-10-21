@@ -12,11 +12,14 @@ export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export default async function Image({ params }: { params: { token: string } }) {
-  let line = 'Payment receipt';
+  // A link that opens no receipt says so plainly; "confirmed" is said only of a real payment.
+  let kicker = 'RECEIPT';
+  let line = 'Flizy receipt';
   let network = 'Flizy';
   try {
     const r = await loadReceipt(params.token, getWebChain().name);
     if (r) {
+      kicker = 'PAYMENT CONFIRMED';
       line = `${r.amount} ${r.unit}`;
       network = r.network;
     }
@@ -41,7 +44,7 @@ export default async function Image({ params }: { params: { token: string } }) {
       >
         <div style={{ display: 'flex', fontSize: 34, letterSpacing: 8, color: '#f7d047' }}>FLIZY</div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', fontSize: 30, color: '#9a958c', letterSpacing: 4 }}>PAYMENT CONFIRMED</div>
+          <div style={{ display: 'flex', fontSize: 30, color: '#9a958c', letterSpacing: 4 }}>{kicker}</div>
           <div style={{ display: 'flex', fontSize: 120, fontWeight: 700, marginTop: 12 }}>{line}</div>
         </div>
         <div style={{ display: 'flex', fontSize: 28, color: '#666666' }}>{network}</div>

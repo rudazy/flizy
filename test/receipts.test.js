@@ -142,3 +142,18 @@ describe('the receipt route', () => {
     assert.doesNotMatch(card, /r\.from|r\.to\b|r\.note/);
   });
 });
+
+describe('the receipt link preview', () => {
+  const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
+  it('points at the receipt card, not the site-wide one', () => {
+    const page = read('web/app/r/[token]/page.tsx');
+    assert.match(page, /url: `\/r\/\$\{params\.token\}\/opengraph-image`/);
+    assert.match(page, /openGraph: \{ \.\.\.base\.openGraph, images: \[card\] \}/);
+  });
+
+  it('says confirmed only of a real payment', () => {
+    const card = read('web/app/r/[token]/opengraph-image.tsx');
+    assert.match(card, /let kicker = 'RECEIPT';/);
+    assert.match(card, /if \(r\) \{\s*kicker = 'PAYMENT CONFIRMED';/);
+  });
+});
