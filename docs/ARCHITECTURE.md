@@ -268,7 +268,7 @@ flowchart LR
 ```
 
 The pool is FLZ or a listed token (`liquidityPool` in `web/lib/dexServer.ts`). The route
-refuses any other token before it asks for the PIN.
+refuses any other token before it does anything else.
 
 ---
 
@@ -349,6 +349,39 @@ wired into the engine.
 P-256 / WebAuthn verification on GIWA Sepolia is measured in
 [PASSKEY-P256-GIWA.md](PASSKEY-P256-GIWA.md).
 
+### Connected wallets (wallet mode)
+
+There are two ways into the site. A Flizy account uses its agent wallet as
+above. A visitor can instead connect a wallet of their own
+(`web/components/ExternalWalletProvider.tsx`: Privy when
+`NEXT_PUBLIC_PRIVY_APP_ID` is set, otherwise the browser's injected wallet)
+and use Explore, token pages, NFT collections and Swap with no account
+(`web/lib/walletMode.ts` lists the pages). Nothing about that wallet is
+stored; it never touches a Flizy-held key.
+
+- Reads that were session-only take the wallet's address as `?viewer=`
+  (`routeViewer` in `web/lib/nftApi.ts`), validated as an address.
+- NFT trades: `POST /api/market/[action]?plan=1` runs the same chain checks
+  and returns the calls; the wallet signs them (`web/lib/walletTrade.ts`). A
+  signed-in caller is refused there with 409, so one person never has two
+  wallets in play. The hash then goes to `POST /api/market/notice`, which
+  reads the marketplace's own events from the receipt and tells the Flizy
+  accounts involved. `market_tx_notices` makes every transaction announce
+  once, from either path.
+- Swaps are built in the browser against the fee router from a server quote,
+  with an approval for the swapped amount only.
+- Without a session, reads, plans and notices are capped per caller per hour
+  (`web/lib/callerLimit.ts`, keyed on a hashed client address), and a notice
+  is accepted only for a trade from the last hour, so old trades cannot be
+  replayed into chat.
+- Limit orders, chat payments, requests, claims, mint creation and theses
+  stay behind an account.
+
+A signed-in account can connect its own wallet beside the Flizy wallet
+(Account → Wallets) to deposit. Money goes back only the existing way: save
+the wallet as a trusted address, wait 24 hours, send from chat. Site
+withdraw stays disabled.
+
 ---
 
 ## HTTP API (web)
@@ -397,7 +430,7 @@ Until then, do not grow ad-hoc server actions that bypass Policy.
 ## Security (technical)
 
 - Trusted destinations mutated only with password on web; chat cannot expand allowlist
-- PIN on every route that moves value (pay, swap, liquidity, limit orders, marketplace, mints), except a quick send on pay and swap (web/lib/tiers.ts); password on every route that widens authority (trusted, pin, limits, identity, linking)
+- Every route that moves value (pay, pay with ETH, limit orders, marketplace, mints) runs the step-up check (web/lib/stepUp.ts). It asks for the PIN only while the transaction PIN is on (`txPin` in web/lib/txPin.ts and lib/tiers.js); on testnet it is off and the session is the gate, with the chat unlock still taking the PIN. Password on every route that widens authority (trusted, pin, limits, identity, linking)
 - Swap needs none: output is fixed to the caller's own wallet and slippage is server-set, so the route cannot re-target funds — rate-capped per account instead
 - Session lock per `(account, channel, external_id)`; PIN ladder / lockout tables
 - Daily and per-tx limits in Policy
@@ -424,7 +457,7 @@ Contract addresses and the verification record live in
 ### Listed tokens
 
 Besides FLZ, Flizy lists tokens that trade against an ETH pool Flizy seeded and holds the
-liquidity of: IZY, MAKI and DCAT today. The list exists twice, `lib/listedTokens.js` for
+liquidity of: IZY, MAKI, DCAT and TUSD (Flizy Test USD) today. The list exists twice, `lib/listedTokens.js` for
 chat and `web/lib/listedTokens.ts` for the site (web cannot import root `lib/` on Vercel),
 and `test/listedTokensDrift.test.js` keeps both equal to each other and to `listings` in
 the deployments file.
@@ -443,3 +476,21 @@ Sending on socials is a separate fixed list, ETH, FLZ and every listed token mar
 `sendable` (today only TUSD, Flizy Test USD), in `listedSendSymbols` and
 `web/lib/payAsset.ts`. Site liquidity works for every listed pool; limit orders remain FLZ
 only.
+
+## Payments
+
+Payments are the product; everything below sits on the same engine, Policy and
+transfer log as a chat send.
+
+| Piece | What it does | Where |
+| --- | --- | --- |
+| Test dollar | Flizy Test USD (tUSD): six decimals, fixed supply, no owner. A listed token marked `sendable`, so chat, pay links and claims take it like ETH and FLZ. "usd" resolves to it for lookups only; `symbolLabel` never applies that alias, so another token named USD is never printed as tUSD | `contracts/src/dex/FlizyTestUSD.sol`, `lib/listedTokens.js` |
+| Faucet | One drop per asset, each with its own wait: 0.02 ETH per 72 hours, 100 tUSD per 24 hours, from one dispenser wallet under one signer lock | `web/lib/faucet.ts`, `try_faucet_claim` |
+| Pay links | `/pay/{name}?amount=&asset=&for=` opens with the ask filled in. Every field is re-checked on the server; the note is flattened and capped at 80 characters, and never put in the link preview | `web/lib/payLink.ts` |
+| Requests | `request AMOUNT [TOKEN] from name [for NOTE]`. The payer's notice names the requester, warns when they have never paid them (`is_known_recipient`), and is paid in the asset asked. At most 20 requests an hour per account, splits included | `lib/paymentRequests.js` |
+| Receipts | A confirmed payment can be shared as `/r/{token}`: a random 22-character token made on first share by the sender or the payee, never derived from the id. Each person is named only with `scan_show_username` | `web/lib/receipts.ts`, `lib/receipts.js` |
+| Outside wallets | Off by default (`accounts.accept_outside_pay`). A browser wallet pays through FlizyPaymentReceiver, which forwards to the payee in the same transaction. The server records a payment only after reading the receiver's `PaymentReceived` event from the receipt and matching payee, token and amount, once per `(tx, log)`. The note is kept only when it hashes, with a nonce, to the on-chain invoice id | `contracts/src/pay/FlizyPaymentReceiver.sol`, `web/lib/externalPay.ts` |
+| Pay with ETH | A tUSD or FLZ amount paid in ETH: one exact-in swap whose recipient is the payee and whose minimum out is the full amount asked, padded by 0.5%. The ETH spent is stored in `transfers.eth_in` and counted by `daily_native_sent_eth` | `web/lib/swapPay.ts`, `web/app/api/pay/swap` |
+| Get paid | Confirmed payments into the wallet over 30, 90 or 365 days, totals in each asset's smallest unit, a CSV with formula cells neutralised, and refunds back through the pay page | `web/lib/merchant.ts` |
+| Metrics | Weekly and monthly active payers, repeat payer pairs, outside-wallet payments. Aggregates only | `lib/paymentMetrics.js`, `scripts/payment-metrics.js` |
+

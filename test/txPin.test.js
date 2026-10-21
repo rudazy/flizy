@@ -65,7 +65,8 @@ describe('with it off', () => {
   it('the pay, mint, NFT and limit screens hide the PIN field', () => {
     assert.match(read('web/components/PayLanding.tsx'), /const needsPin =\s*txPin\.required &&/);
     assert.match(read('web/components/MintActionSheet.tsx'), /\{txPin\.required \? <PinField value=\{pin\} onChange=\{setPin\} \/> : null\}/);
-    assert.match(read('web/components/NftTradeSheet.tsx'), /\{txPin\.required \? <PinField value=\{pin\} onChange=\{setPin\} \/> : null\}/);
+    // A wallet-mode trade is signed in the visitor's own wallet, which never takes a Flizy PIN.
+    assert.match(read('web/components/NftTradeSheet.tsx'), /\{txPin\.required && !walletMode \? <PinField value=\{pin\} onChange=\{setPin\} \/> : null\}/);
     assert.match(read('web/app/dashboard/swap/page.tsx'), /const pinNeeded = txPin\.required && mode === 'limit';/);
   });
 });

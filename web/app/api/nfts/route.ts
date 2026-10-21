@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { ethers } from 'ethers';
-import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { apiErrorBody } from '../../../lib/apiError';
 import { listedNfts, loadCollectionStats } from '../../../lib/listedNfts';
 import { getWebChain } from '../../../lib/dexServer';
+import { anonymousReadLimit } from '../../../lib/readLimit';
 
 const ROUTE = 'GET /api/nfts';
 
@@ -17,8 +17,9 @@ const ROUTE = 'GET /api/nfts';
  */
 export async function GET() {
   try {
-    const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    // Public chain data, open without a Flizy session for wallet mode, capped per caller.
+    const limited = await anonymousReadLimit();
+    if (limited) return limited;
 
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);

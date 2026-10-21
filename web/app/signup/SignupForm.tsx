@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthStage } from '../../components/AuthStage';
 import { useComingSoon } from '../../components/ComingSoon';
+import { useWalletDoor } from '../../components/WalletModeBits';
 import { PasswordField } from '../../components/PasswordField';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
 import { track } from '../../lib/analytics';
@@ -25,6 +26,7 @@ export function SignupForm() {
   const router = useRouter();
   const { t, locale, setLocale } = useLocale();
   const [next, setNext] = useState('/dashboard?welcome=1');
+  const walletDoor = useWalletDoor(next);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -436,15 +438,23 @@ export function SignupForm() {
             </button>
             <button
               type="button"
-              onClick={() => showSoon('Continue with a wallet')}
+              onClick={() => void walletDoor.go()}
+              disabled={walletDoor.busy}
               className="flex min-h-[52px] w-full items-center gap-3 rounded-[6px] border border-[#3a3228] bg-[#100e0b] px-4 text-left shadow-[inset_0_1px_0_rgba(247,208,71,0.06)] hover:border-sun/50"
             >
               <WalletGlyph />
               <span className="min-w-0 flex-1">
-                <span className="block font-sans text-[14px] text-paper">Continue with a wallet</span>
-                <span className="mt-0.5 block text-[12px] text-muted">MetaMask, WalletConnect and more</span>
+                <span className="block font-sans text-[14px] text-paper">
+                  {walletDoor.busy ? 'Connecting...' : 'Continue with a wallet'}
+                </span>
+                <span className="mt-0.5 block text-[12px] text-muted">Explore, swap and trade NFTs. No account needed</span>
               </span>
             </button>
+            {walletDoor.error ? (
+              <p className="m-0 text-xs text-[#e0b070]" role="alert">
+                {walletDoor.error}
+              </p>
+            ) : null}
             <p className="text-center text-sm text-muted">
               {t('auth.signup.hasAccount')}{' '}
               <Link

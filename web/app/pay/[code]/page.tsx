@@ -5,6 +5,7 @@ import { resolvePayRef } from '../../../lib/payCode.ts';
 import { decodeRouteParam } from '../../../lib/routeParam.ts';
 import { pageMetadata } from '../../../lib/seo';
 import { PayLanding } from '../../../components/PayLanding';
+import { ExternalWalletProvider } from '../../../components/ExternalWalletProvider';
 import { parsePayPreset } from '../../../lib/payLink.ts';
 import { symbolLabel } from '../../../lib/listedTokens';
 
@@ -55,6 +56,7 @@ export default async function PayCodePage({ params, searchParams }: Props) {
   }
 
   return (
+    <ExternalWalletProvider>
     <PayLanding
       refSlug={found.username || found.code || raw}
       username={found.username}
@@ -62,5 +64,6 @@ export default async function PayCodePage({ params, searchParams }: Props) {
       preset={parsePayPreset(searchParams)}
       outsidePay={outsidePay}
     />
+    </ExternalWalletProvider>
   );
 }

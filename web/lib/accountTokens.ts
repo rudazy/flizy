@@ -208,6 +208,43 @@ export async function removeAccountToken(accountId: string, raw: string, deps: D
   return { address };
 }
 
+/**
+ * A token page for a visitor with no Flizy account (wallet mode): listed tokens
+ * only, with no balance, because there is no Flizy wallet to read. Anything
+ * else is "not listed", whatever the visitor's own wallet holds.
+ */
+export function describeListedToken(
+  raw: string,
+  deps: Pick<Deps, 'flzAddress'> = {}
+): { listedSymbol: 'flz' } | { missing: string } | { held: HeldToken } {
+  let address: string;
+  try {
+    address = checksum(raw);
+  } catch {
+    return { missing: 'This token is not listed.' };
+  }
+  if (address === flzAddress(deps)) return { listedSymbol: 'flz' };
+  const listed = listedByAddress(address);
+  if (!listed) return { missing: 'This token is not listed.' };
+  const explorer = (
+    process.env.GIWA_EXPLORER ||
+    process.env.CHAIN_GIWA_SEPOLIA_EXPLORER ||
+    'https://sepolia-explorer.giwa.io'
+  ).replace(/\/$/, '');
+  return {
+    held: {
+      address,
+      symbol: listed.symbol,
+      decimals: listed.decimals,
+      balance: null,
+      verified: listed.verified === true,
+      listed: true,
+      chainName: 'GIWA Sepolia',
+      explorerBaseUrl: explorer,
+    },
+  };
+}
+
 export async function describeHeldToken(
   accountId: string,
   raw: string,

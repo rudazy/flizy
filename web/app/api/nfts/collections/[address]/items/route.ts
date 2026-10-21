@@ -1,3 +1,4 @@
+import { ethers } from 'ethers';
 import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../../../../lib/cookies';
 import { apiErrorBody } from '../../../../../../lib/apiError';
@@ -7,11 +8,12 @@ import {
   nftContext,
   routeAddress,
   toCard,
-  viewerWallet,
+  routeViewer,
   type NftCard,
 } from '../../../../../../lib/nftApi.ts';
 import { checkCursor, checkTokenId, type NftItem } from '../../../../../../lib/nftIndex.ts';
 import { verifiedCollection } from '../../../../../../lib/listedNfts';
+import { anonymousReadLimit } from '../../../../../../lib/readLimit';
 
 const ROUTE = 'GET /api/nfts/collections/[address]/items';
 const FILTERS = ['all', 'listed', 'mine'] as const;
@@ -56,8 +58,10 @@ function sortCards(cards: NftCard[], sort: Sort): NftCard[] {
  */
 export async function GET(req: Request, { params }: { params: { address: string } }) {
   try {
+    // Open without a Flizy session for wallet mode; "mine" then reads ?viewer=.
     const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    const limited = await anonymousReadLimit(accountId);
+    if (limited) return limited;
     const address = routeAddress(params.address);
     if (!address) return NextResponse.json({ error: 'Not a collection address' }, { status: 400 });
 
@@ -77,7 +81,7 @@ export async function GET(req: Request, { params }: { params: { address: string 
     const [collection, view, viewer] = await Promise.all([
       ctx.index.collection(address),
       marketView(ctx, address),
-      viewerWallet(accountId),
+      routeViewer(req, accountId),
     ]);
     if (!collection) return NextResponse.json({ error: 'No NFT collection at this address' }, { status: 404 });
     const fallback = verifiedCollection(address)?.profile?.avatar ?? null;
@@ -105,7 +109,7 @@ export async function GET(req: Request, { params }: { params: { address: string 
 
     let items: NftCard[] = [];
     let next: string | null = null;
-    if (filter === 'mine') {
+    if (filter === 'mine' && viewer.address !== ethers.ZeroAddress) {
       const page = await ctx.index.walletNfts(viewer.address, cursor);
       items = page.items.filter((n) => n.collection === address).map(card).filter((c) => matches(c, q));
       next = page.next;

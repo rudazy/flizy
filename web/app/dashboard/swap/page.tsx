@@ -14,6 +14,9 @@ import { AmmoraSwapPanel } from '../../../components/AmmoraSwapPanel';
 import { ammoraUiEnabled } from '../../../components/AmmoraTokens';
 import { pinReady } from '../../../components/PinField';
 import { txPin } from '../../../lib/txPin';
+import { useWalletMode } from '../../../components/WalletModeBits';
+import { walletBalances, walletSwap, type WalletSwapQuote } from '../../../lib/walletTrade';
+import { FLZ_TOKEN, WETH_TOKEN, walletErrorText } from '../../../lib/walletChain';
 import {
   ArrowRightIcon,
   ChartLineIcon,
@@ -134,6 +137,10 @@ export default function SwapRoute() {
 
 function SwapPage() {
   const [mode, setMode] = useState<Mode>('swap');
+  // Wallet mode swaps with the visitor's own wallet. Limit orders and liquidity
+  // run from a Flizy wallet, so they are not offered there.
+  const walletMode = useWalletMode();
+  const walletAddress = walletMode?.address ?? null;
   // A Trade button elsewhere opens this screen on its pair: ?from=FLZ&to=ETH or
   // ?from=ETH&to=IZY. Anything else falls back to buying FLZ.
   const search = useSearchParams();
@@ -190,6 +197,21 @@ function SwapPage() {
   const pinNeeded = txPin.required && mode === 'limit';
 
   const loadBalances = useCallback(async () => {
+    if (walletAddress) {
+      try {
+        const read = await walletBalances(walletAddress, [
+          { address: FLZ_TOKEN, decimals: 18 },
+          ...LISTED_TOKENS.map((t) => ({ address: t.address, decimals: t.decimals })),
+        ]);
+        const next: Balances = { ETH: read.eth, FLZ: read.tokens[FLZ_TOKEN.toLowerCase()] ?? '0' };
+        for (const listed of LISTED_TOKENS) next[listed.symbol] = read.tokens[listed.address.toLowerCase()] ?? '0';
+        setBalances(next);
+        setBalancesReady(true);
+      } catch {
+        /* balances stay as they were */
+      }
+      return;
+    }
     try {
       const res = await fetch('/api/holdings');
       const data = await res.json();
@@ -209,7 +231,7 @@ function SwapPage() {
     } catch {
       /* balances stay as they were */
     }
-  }, []);
+  }, [walletAddress]);
 
   const loadPrice = useCallback(async () => {
     try {
@@ -251,6 +273,7 @@ function SwapPage() {
   }, [amountIn, side, tokenIn, tokenOut, slippageBps]);
 
   const loadOrders = useCallback(async () => {
+    if (walletAddress) return;
     try {
       const res = await fetch('/api/swap/limit');
       const data = await res.json();
@@ -258,7 +281,7 @@ function SwapPage() {
     } catch {
       /* the list waits for the next refresh */
     }
-  }, []);
+  }, [walletAddress]);
 
   const loadLpPosition = useCallback(async () => {
     try {
@@ -431,6 +454,26 @@ function SwapPage() {
     setBusy(true);
     setError('');
     setResult(null);
+    if (walletMode) {
+      try {
+        const route = quote as unknown as Partial<WalletSwapQuote> | null;
+        if (!route?.feeRouter || !Array.isArray(route.path) || !route.amountInUnits || !route.amountOutMinUnits) {
+          throw new Error('Quote again, then swap.');
+        }
+        const provider = await walletMode.provider();
+        if (!provider) throw new Error('Connect your wallet again.');
+        const done = await walletSwap(provider, walletMode.address, route as WalletSwapQuote, WETH_TOKEN);
+        setResult({ explorerUrl: done.explorerUrl });
+        loadPrice();
+        loadQuote();
+        loadBalances();
+      } catch (err) {
+        setError(walletErrorText(err, 'Swap failed'));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     try {
       const res = await fetch('/api/swap/execute', {
         method: 'POST',
@@ -575,8 +618,11 @@ function SwapPage() {
       <div className="!-mt-[17px] flex items-stretch gap-[10.5px]">
         <div className="flex h-[36px] flex-1 rounded-[5px] border border-chrome-line bg-[#0e0f11]" role="tablist" aria-label="Trade type">
           <ModeTab active={mode === 'swap'} onClick={() => changeMode('swap')} icon={<SwapArrowsIcon size={15} />} label="Swap" />
-          <ModeTab active={mode === 'limit'} onClick={() => changeMode('limit')} icon={<ChartLineIcon size={15} />} label="Limit" />
+          {walletMode ? null : (
+            <ModeTab active={mode === 'limit'} onClick={() => changeMode('limit')} icon={<ChartLineIcon size={15} />} label="Limit" />
+          )}
         </div>
+        {walletMode ? null : (
         <button
           type="button"
           onClick={() => changeMode(mode === 'liquidity' ? 'swap' : 'liquidity')}
@@ -588,6 +634,7 @@ function SwapPage() {
           <PlusIcon size={11} strokeWidth={2} />
           Add liquidity
         </button>
+        )}
       </div>
 
       {mode !== 'liquidity' ? (

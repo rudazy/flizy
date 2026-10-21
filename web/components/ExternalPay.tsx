@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import type { EIP1193Provider } from 'viem';
+import { useEffect, useState } from 'react';
 import { PAYMENT_RECEIVER, PAYMENT_RECEIVER_CHAIN } from '../lib/paymentReceiver';
+import { useExternalWallet } from './ExternalWalletProvider';
+import { giwaClients, walletErrorText } from '../lib/walletChain';
 import { listedBySymbol, symbolLabel } from '../lib/listedTokens';
 import { PAY_ASSETS, type PayAsset } from '../lib/payAsset';
 
 /**
- * Pay a Flizy account from a wallet outside Flizy: a browser extension, or a
- * wallet app's own browser. Uses the wallet the page finds (EIP-1193) and
- * nothing else; no keys or sessions pass through Flizy.
+ * Pay a Flizy account from a wallet outside Flizy, connected through the
+ * site's one wallet connector (components/ExternalWalletProvider.tsx):
+ * WalletConnect, a browser extension, or a wallet app's own browser. No keys
+ * or sessions pass through Flizy.
  *
  * The payment goes through FlizyPaymentReceiver, which hands the money straight
  * to the payee. The page then asks the server to read the result from the
@@ -47,33 +49,6 @@ const RECEIVER_ABI = [
 /** FLZ is not a listed token, so its contract comes with the payee lookup. */
 type Payee = { payee: `0x${string}`; flz: `0x${string}` | null };
 
-function injected(): EIP1193Provider | null {
-  if (typeof window === 'undefined') return null;
-  const eth = (window as unknown as { ethereum?: EIP1193Provider }).ethereum;
-  return eth ?? null;
-}
-
-async function onGiwa(provider: EIP1193Provider) {
-  try {
-    await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: PAYMENT_RECEIVER_CHAIN.hexId }] });
-  } catch (err) {
-    // 4902: the wallet does not know the chain yet, so it is added, which also switches.
-    if ((err as { code?: number })?.code !== 4902) throw err;
-    await provider.request({
-      method: 'wallet_addEthereumChain',
-      params: [
-        {
-          chainId: PAYMENT_RECEIVER_CHAIN.hexId,
-          chainName: PAYMENT_RECEIVER_CHAIN.name,
-          nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-          rpcUrls: [PAYMENT_RECEIVER_CHAIN.rpcUrl],
-          blockExplorerUrls: [PAYMENT_RECEIVER_CHAIN.explorerUrl],
-        },
-      ],
-    });
-  }
-}
-
 function randomNonce(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -100,7 +75,11 @@ export function ExternalPay({
   const [msg, setMsg] = useState('');
   const [explorer, setExplorer] = useState('');
   const unit = symbolLabel(asset);
-  const provider = injected();
+  const wallet = useExternalWallet();
+  // Privy can always offer WalletConnect; the browser fallback needs a wallet in this browser.
+  const [browserWallet, setBrowserWallet] = useState(false);
+  useEffect(() => setBrowserWallet(Boolean((window as unknown as { ethereum?: unknown }).ethereum)), []);
+  const canPay = wallet != null && (wallet.via === 'privy' || browserWallet);
 
   async function confirm(txHash: string, nonce: string) {
     for (let i = 0; i < 20; i += 1) {
@@ -122,29 +101,23 @@ export function ExternalPay({
   }
 
   async function pay() {
-    if (!provider || !(Number(amount) > 0)) return;
+    if (!wallet || !canPay || !(Number(amount) > 0)) return;
     setMsg('');
     try {
       setStep('connecting');
       const lookup = await fetch(`/api/pay/external?ref=${encodeURIComponent(refSlug)}`);
       const info = (await lookup.json().catch(() => ({}))) as Partial<Payee> & { error?: string };
       if (!lookup.ok || !info.payee) throw new Error(info.error || 'Could not find who to pay.');
-      const [account] = (await provider.request({ method: 'eth_requestAccounts' })) as `0x${string}`[];
-      if (!account) throw new Error('No wallet account was shared.');
-      await onGiwa(provider);
+      const account = wallet.address ?? (await wallet.connect());
+      if (!account) throw new Error('No wallet was connected.');
+      const provider = await wallet.provider();
+      if (!provider) throw new Error('Connect your wallet again.');
 
-      const [{ createPublicClient, createWalletClient, custom, defineChain, erc20Abi, http, parseUnits }, { invoiceIdFor }] =
-        await Promise.all([import('viem'), import('../lib/invoiceId')]);
-      const chain = defineChain({
-        id: PAYMENT_RECEIVER_CHAIN.id,
-        name: PAYMENT_RECEIVER_CHAIN.name,
-        nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-        rpcUrls: { default: { http: [PAYMENT_RECEIVER_CHAIN.rpcUrl] } },
-        blockExplorers: { default: { name: 'GIWA explorer', url: PAYMENT_RECEIVER_CHAIN.explorerUrl } },
-        testnet: true,
-      });
-      const wallet = createWalletClient({ account, chain, transport: custom(provider) });
-      const reader = createPublicClient({ chain, transport: http(PAYMENT_RECEIVER_CHAIN.rpcUrl) });
+      const [{ wallet: signer, reader, viem }, { invoiceIdFor }] = await Promise.all([
+        giwaClients(provider, account),
+        import('../lib/invoiceId'),
+      ]);
+      const { erc20Abi, parseUnits } = viem;
       const nonce = randomNonce();
       const invoiceId = invoiceIdFor(note, nonce);
       const receiver = PAYMENT_RECEIVER as `0x${string}`;
@@ -152,7 +125,7 @@ export function ExternalPay({
       let txHash: `0x${string}`;
       if (asset === 'ETH') {
         setStep('paying');
-        txHash = await wallet.writeContract({
+        txHash = await signer.writeContract({
           address: receiver,
           abi: RECEIVER_ABI,
           functionName: 'payNative',
@@ -168,11 +141,11 @@ export function ExternalPay({
         if (allowed < units) {
           // Approves this one amount only, never an open-ended allowance.
           setStep('approving');
-          const approval = await wallet.writeContract({ address: token, abi: erc20Abi, functionName: 'approve', args: [receiver, units] });
+          const approval = await signer.writeContract({ address: token, abi: erc20Abi, functionName: 'approve', args: [receiver, units] });
           await reader.waitForTransactionReceipt({ hash: approval });
         }
         setStep('paying');
-        txHash = await wallet.writeContract({
+        txHash = await signer.writeContract({
           address: receiver,
           abi: RECEIVER_ABI,
           functionName: 'payToken',
@@ -184,9 +157,7 @@ export function ExternalPay({
       await confirm(txHash, nonce);
       setStep('done');
     } catch (err) {
-      const text = err instanceof Error ? err.message : '';
-      // A wallet's own refusal reads plainly; anything else stays short.
-      setMsg(/reject|denied|cancel/i.test(text) ? 'Cancelled in your wallet. Nothing was paid.' : text.split('\n')[0].slice(0, 200) || 'Could not pay.');
+      setMsg(walletErrorText(err, 'Could not pay.'));
       setStep('error');
     }
   }
@@ -219,7 +190,7 @@ export function ExternalPay({
   return (
     <div className="card space-y-3 p-6">
       <p className="m-0 text-xs uppercase tracking-[0.18em] text-muted">No Flizy account?</p>
-      {provider && !presetAmount ? (
+      {canPay && !presetAmount ? (
         <div className="grid gap-2">
           <div className="flex gap-2" role="group" aria-label="Asset">
             {PAY_ASSETS.map((opt) => (
@@ -245,7 +216,7 @@ export function ExternalPay({
           />
         </div>
       ) : null}
-      {provider ? (
+      {canPay ? (
         <>
           <button type="button" className="btn btn-ghost w-full py-3" disabled={busy || !(Number(amount) > 0)} onClick={() => void pay()}>
             {label}

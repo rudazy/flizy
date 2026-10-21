@@ -22,6 +22,8 @@ import { noticeSales } from '../../../../lib/saleNotice.ts';
 import { payerLabel } from '../../../../lib/payNotice.ts';
 import { siteOrigin } from '../../../../lib/siteOrigin';
 import { ethFromWei } from '../../../../lib/nftFormat.ts';
+import { claimNotice } from '../../../../lib/walletMarket.ts';
+import { CALLER_LIMITED, takeCallerAttempt } from '../../../../lib/callerLimit.ts';
 
 const ACTIONS = ['list', 'cancel', 'buy', 'offer', 'offer-cancel', 'offer-accept', 'royalty', 'withdraw'] as const;
 type Action = (typeof ACTIONS)[number];
@@ -321,6 +323,52 @@ async function noticeOffer(
 }
 
 /**
+ * Wallet mode: the plan for a trade the visitor's own wallet will sign.
+ *
+ * buildPlan is the same one a Flizy-wallet trade runs, with the connected
+ * wallet as the viewer, so the checks (ownership, a price or offer that has not
+ * changed, ERC-721 only, the listing still valid) and the calldata are
+ * identical. The wallet named in the body only shapes the plan: the calls work
+ * only when that wallet sends them, because the marketplace checks msg.sender.
+ * No PIN, lock, daily limit or transfer row: no Flizy wallet is involved and
+ * nothing is sent here, but the checks read the chain, so plans are capped per
+ * caller per hour (web/lib/callerLimit.ts). Refused with a session, where
+ * trades run from the Flizy wallet, so one person never has two wallets in play.
+ */
+async function planForWallet(req: Request, rawAction: string, accountId: string | null) {
+  if (accountId) {
+    return NextResponse.json({ error: 'You are signed in, so trades run from your Flizy wallet.' }, { status: 409 });
+  }
+  if (!ACTIONS.includes(rawAction as Action)) return NextResponse.json({ error: 'Unknown action' }, { status: 404 });
+  const action = rawAction as Action;
+  const ctx = nftContext();
+  if (!ctx.market) return NextResponse.json({ error: 'Trading is not live yet.' }, { status: 503 });
+  if (!(await takeCallerAttempt(getSupabase(), req.headers, 'plan'))) {
+    return NextResponse.json(CALLER_LIMITED, { status: 429 });
+  }
+  const raw = await req.json().catch(() => null);
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
+  const body = raw as Record<string, unknown>;
+  const wallet = checkAddress(field(body, 'wallet'));
+  if (!wallet) return NextResponse.json({ error: 'Connect a wallet first.' }, { status: 400 });
+
+  const marketContract = new ethers.Contract(ctx.market.address, MARKET_ABI, ctx.provider);
+  const paused = await marketContract.paused().catch(() => false);
+  const exits = action === 'cancel' || action === 'offer-cancel' || action === 'withdraw';
+  if (paused && !exits) return NextResponse.json({ error: 'Trading is paused right now.' }, { status: 503 });
+
+  const plan = await buildPlan(action, body, ctx, ctx.market.address, wallet);
+  return NextResponse.json({
+    calls: plan.calls.map((c) => ({ to: c.target, value: c.value.toString(), data: c.data })),
+    value: plan.value.toString(),
+    label: plan.label,
+    market: ctx.market.address,
+  });
+}
+
+/**
  * Every marketplace action from the site. Each one is read and checked against
  * the chain first, then takes the PIN, the daily ETH limit (for
  * buys and offers, which send ETH to someone else), the account lock, and is
@@ -332,6 +380,9 @@ export async function POST(req: Request, { params }: { params: { action: string 
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;
     const accountId = await getAccountIdFromCookie();
+    // Wallet mode: ?plan=1 runs the same checks and returns the calls for the
+    // visitor's own wallet to sign. Nothing is sent from here.
+    if (new URL(req.url).searchParams.get('plan') === '1') return await planForWallet(req, params.action, accountId);
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     if (!ACTIONS.includes(params.action as Action)) return NextResponse.json({ error: 'Unknown action' }, { status: 404 });
     const action = params.action as Action;
@@ -402,10 +453,13 @@ export async function POST(req: Request, { params }: { params: { action: string 
           onBroadcast: (hash) => markTransferSubmitted(supabase, logRow.id, hash),
         });
         await supabase.from('transfers').update({ status: 'confirmed', tx_hash: txHash }).eq('id', logRow.id);
-        if (plan.offerTo) await noticeOffer(supabase, accountId, plan.offerTo);
+        // Claimed once per transaction, shared with wallet-mode notices
+        // (web/lib/walletMarket.ts), so a hash handed over later announces nothing twice.
+        const announce = await claimNotice(supabase, txHash).catch(() => true);
+        if (announce && plan.offerTo) await noticeOffer(supabase, accountId, plan.offerTo);
         // A sale tells the other side: the seller when someone buys, the buyer
         // when their offer is accepted. Figures come from the Sold event.
-        if (action === 'buy' || action === 'offer-accept') {
+        if (announce && (action === 'buy' || action === 'offer-accept')) {
           await noticeSales({
             provider: ctx.provider,
             txHash,

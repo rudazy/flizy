@@ -61,7 +61,7 @@ describe('formatOfferReceived', () => {
 describe('route wiring', () => {
   it('notices only after the offer is confirmed on chain', () => {
     const confirmed = ROUTE.indexOf("update({ status: 'confirmed', tx_hash: txHash })");
-    const notice = ROUTE.indexOf('if (plan.offerTo) await noticeOffer(supabase, accountId, plan.offerTo);');
+    const notice = ROUTE.indexOf('if (announce && plan.offerTo) await noticeOffer(supabase, accountId, plan.offerTo);');
     assert.ok(confirmed > 0 && notice > confirmed);
   });
 

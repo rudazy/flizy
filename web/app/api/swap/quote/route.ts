@@ -12,6 +12,7 @@ import {
 } from '../../../../lib/dexServer';
 import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
 import { getSupabase } from '../../../../lib/supabase';
+import { anonymousReadLimit } from '../../../../lib/readLimit';
 import { ammoraEnabled } from '../../../../lib/ammora/venue.ts';
 import { ammoraSitePrice, ammoraSiteQuote } from '../../../../lib/ammora/siteSwap.ts';
 import { asSwapQuoteError } from '../../../../lib/swapQuoteError';
@@ -32,9 +33,11 @@ const SWAP_GAS_UNITS = 350_000n;
 
 export async function GET(req: Request) {
   try {
+    // Prices and quotes are public pool reads, so wallet mode can quote without
+    // a Flizy session, capped per caller. The Ammora venue stays an account feature.
     const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
-
+    const limited = await anonymousReadLimit(accountId);
+    if (limited) return limited;
     const url = new URL(req.url);
     const amount = url.searchParams.get('amount') || '';
     const tokenInRaw = url.searchParams.get('tokenIn') || 'ETH';
@@ -48,6 +51,7 @@ export async function GET(req: Request) {
     // Ammora venue (lib/ammora). Off: the request is refused before any Ammora call.
     if (url.searchParams.get('venue') === 'ammora') {
       if (!ammoraEnabled()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
       const token = url.searchParams.get('token') || '';
       if (side === 'price' || url.searchParams.get('price') === '1') {
         return NextResponse.json({ price: await ammoraSitePrice(getSupabase(), provider, token) });
@@ -152,6 +156,10 @@ export async function GET(req: Request) {
       tokenIn: inLabel,
       tokenOut: outLabel,
       feeRouter: quote.feeRouter,
+      // Raw figures and the route, for a wallet-mode swap the visitor's own wallet signs.
+      path: quote.path,
+      amountInUnits: amountIn.toString(),
+      amountOutMinUnits: quote.amountOutMin.toString(),
       chain: { id: chain.chainId, name: chain.name },
       disclosure: `All-in ~${allInPct}: protocol ${feePct} + pool 0.30%. Protocol takes ~${ethers.formatUnits(quote.feeAmount, inDecimals)} ${inLabel} before the swap. Network gas is extra.`,
     });

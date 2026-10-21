@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '15 October 2026';
+const UPDATED = '21 October 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -198,6 +198,20 @@ export default function PrivacyPage() {
             host sees your IP address and browser, as with any image on the web; we send it no
             page address. The dollar estimate next to ETH prices is fetched by our servers from
             CoinGecko, and nothing about you is sent with that request.
+          </p>
+          <p>
+            You can also connect a wallet of your own, with or without a Flizy account. Its
+            address stays in your browser: we do not save it, and no account is made for it.
+            Our servers see it only when a page asks for something on its behalf, such as
+            which NFTs it owns or the steps of a trade it is about to sign, and the address is
+            not saved from those requests. To stop those pages being overused, we count requests
+            per network address, kept as a hash; counts older than a day are cleared as new
+            requests come in. After a trade, we keep its transaction hash so the
+            Flizy accounts it touched are told once. The wallet signs its own transactions, and
+            Flizy never holds its keys. Connecting goes through Privy and, for wallets on another device,
+            WalletConnect; your wallet app and those services see the connection under their
+            own terms. If you later save that wallet as a trusted address on your account, it
+            is stored like any other trusted address.
           </p>
         </section>
 

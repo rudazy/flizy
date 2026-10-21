@@ -93,7 +93,7 @@ describe('every trade shows its split before the PIN', () => {
   });
 
   it('cannot submit without the PIN and posts to the market route', () => {
-    assert.match(SHEET, /const ready = !busy && \(!txPin\.required \|\| pinReady\(pin\)\)/);
+    assert.match(SHEET, /const ready = !busy && \(walletMode != null \|\| !txPin\.required \|\| pinReady\(pin\)\)/);
     assert.match(SHEET, /fetch\(`\/api\/market\/\$\{intent\.action\}`/);
   });
 

@@ -111,6 +111,7 @@ another adapter, not a second product.
 | **Requests** | `request 50 tusd from @ada for design work`. The payer sees who asks, for what, and a warning when they have never paid that person. At most 20 requests an hour per account | Live |
 | **Receipts** | Every confirmed payment can be shared as a receipt page with a link preview. Chat sends reply with the link. Each person is named only if they chose to be named on Scan | Live |
 | **Pay from any wallet** | Off by default. When the owner turns it on, someone without Flizy can pay their pay link from their own browser wallet through FlizyPaymentReceiver; Flizy records it only after reading the payment from the chain | Live |
+| **Connect a wallet** | Sign in with MetaMask, Coinbase Wallet or any WalletConnect wallet and use Explore, token pages, NFT collections and Swap without a Flizy account. The wallet signs its own trades; the server plans NFT trades with the same checks and stores nothing about the wallet. A Flizy account can also connect its own wallet to deposit, and save it as a trusted wallet to send back from chat | Live |
 | **Pay with ETH** | Pay a tUSD or FLZ amount with ETH in one swap that delivers to the payee. They receive at least the amount asked; the ETH counts toward the daily limit | Live |
 | **Get paid** | Payments received over 30, 90 or 365 days, totals per asset, a CSV export, and refunds back through the pay page | Live |
 | **Swap and liquidity** | Trade ETH against FLZ, IZY, MAKI or DCAT, and add liquidity to any of those pools, with fees and slippage shown before confirm | Live |
@@ -298,10 +299,10 @@ xychart-beta
 
 | Quality measure | Today |
 | --- | --- |
-| Automated tests | 3,042 Node tests and 194 Foundry contract tests, all passing |
-| Test files | 221 Node, 10 Foundry |
+| Automated tests | 3,070 Node tests and 194 Foundry contract tests, all passing |
+| Test files | 222 Node, 10 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
-| Database | 89 idempotent migrations, each ending in a post-condition check that fails loudly |
+| Database | 90 idempotent migrations, each ending in a post-condition check that fails loudly |
 | API surface | Every payment, limit order and mint runs the server's step-up check, which on testnet passes on the signed-in session; every security setting re-checks the account password |
 | Contracts | 17 deployed on GIWA Sepolia, all source verified as a full match |
 
@@ -384,7 +385,7 @@ WhatsApp uses the `flizy` prefix. Telegram uses `/command` and also accepts the 
 | [/dashboard/wallet](https://flizy.app/dashboard/wallet) | Balances, tokens, NFTs, offers and Scan |
 | [/dashboard/swap](https://flizy.app/dashboard/swap) | Swap and add liquidity for any listed token against ETH; FLZ limit orders |
 | [/dashboard/explore](https://flizy.app/dashboard/explore) | Tokens, NFTs, mints and tasks |
-| [/dashboard/account](https://flizy.app/dashboard/account) | Profile, projects, Pay me, language, country, chat, platforms, trusted wallets, PIN, limits, security |
+| [/dashboard/account](https://flizy.app/dashboard/account) | Profile, projects, Pay me, language, country, chat, platforms, wallets, trusted wallets, PIN, limits, security |
 | `/pay/[username]` · `/claim/[token]` · `/i/[username]` | Pay link, public claim, personal invite |
 
 Swap fee mechanics: [docs/swap-fees.md](docs/swap-fees.md). Trusted wallets in depth:

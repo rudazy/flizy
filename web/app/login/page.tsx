@@ -3,8 +3,8 @@ import { redirect } from 'next/navigation';
 import { pageMetadata } from '../../lib/seo';
 import { getAccountIdFromCookie } from '../../lib/cookies';
 import { safeNext } from '../../lib/safeNext.ts';
-import { custodyDoorEnabled } from '../../lib/custodyDoor';
 import { LoginForm } from './LoginForm';
+import { ExternalWalletProvider } from '../../components/ExternalWalletProvider';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Log in to Flizy',
@@ -22,10 +22,12 @@ export default async function LoginPage({
   if (await getAccountIdFromCookie()) redirect(safeNext(searchParams?.next));
   // Email and password sign in on this page.
   // door=password is the same form, so an older link still lands here.
-  // Google, a wallet, and a passkey say Coming soon and do not open Privy.
-  // Both branches render this form. The door component is not mounted.
-  if (!custodyDoorEnabled() || searchParams?.door === 'password') {
-    return <LoginForm />;
-  }
-  return <LoginForm />;
+  // Google and a passkey say Coming soon. "Continue with a wallet" connects the
+  // visitor's own wallet for wallet mode (components/ExternalWalletProvider.tsx);
+  // it signs nobody in. The Privy login door is not mounted.
+  return (
+    <ExternalWalletProvider>
+      <LoginForm />
+    </ExternalWalletProvider>
+  );
 }

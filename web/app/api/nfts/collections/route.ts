@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { marketStats, marketView, nftContext } from '../../../../lib/nftApi.ts';
 import { checkCursor, type CollectionSummary } from '../../../../lib/nftIndex.ts';
 import { verifiedCollection } from '../../../../lib/listedNfts';
+import { anonymousReadLimit } from '../../../../lib/readLimit';
 
 const ROUTE = 'GET /api/nfts/collections';
 
@@ -14,8 +14,9 @@ const ROUTE = 'GET /api/nfts/collections';
  */
 export async function GET(req: Request) {
   try {
-    const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    // Public chain data, open without a Flizy session for wallet mode, capped per caller.
+    const limited = await anonymousReadLimit();
+    if (limited) return limited;
     const url = new URL(req.url);
     const q = (url.searchParams.get('q') || '').trim().slice(0, 64);
     const rawCursor = url.searchParams.get('cursor');

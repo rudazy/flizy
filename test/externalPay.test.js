@@ -168,7 +168,10 @@ describe('the receiver address', () => {
     const comp = fs.readFileSync(path.join(ROOT, 'web/components/ExternalPay.tsx'), 'utf8');
     // A type-only import is erased at build; any other would put viem in the page bundle.
     assert.doesNotMatch(comp, /^import (?!type )[^;]* from 'viem';/m);
-    assert.match(comp, /import\('viem'\)/);
+    // The shared chain helper loads viem only inside its functions.
+    const chain = fs.readFileSync(path.join(ROOT, 'web/lib/walletChain.ts'), 'utf8');
+    assert.doesNotMatch(chain, /^import (?!type )[^;]* from 'viem';/m);
+    assert.match(chain, /await import\('viem'\)/);
   });
 
   it('is the one deployed and verified', () => {

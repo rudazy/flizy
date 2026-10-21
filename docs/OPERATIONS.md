@@ -123,6 +123,36 @@ already exists. To list another token:
    (the token's own art, or a mark drawn in the palette), and run `node --test test/listedTokensDrift.test.js test/tokenLogos.test.js`.
 4. Pull and restart the chat services so chat resolves the new symbol.
 
+### Refilling the tUSD faucet
+
+The faucet's dispenser wallet sends both drops: test ETH from its own balance, and tUSD by
+transfer. It needs ETH for the gas of every drop, and a tUSD balance of at least one drop
+(100 tUSD). When either runs short the Fund screen says the faucet is empty and logs a
+`[faucet] dispenser ...` line. Refill tUSD by transferring from the deployer, which holds
+the unseeded supply (`deployments/giwa-sepolia.json`, `listings.tokens.TUSD`), and record
+the transfer in that file's notes.
+
+### Payment metrics
+
+`node scripts/payment-metrics.js` prints weekly and monthly active payers, repeat payer
+pairs and payment counts. It reads whichever database the root `.env` points at, prints
+aggregates only, and writes nothing.
+
+### Connect wallet
+
+"Continue with a wallet" and Account > Wallets use Privy when
+`NEXT_PUBLIC_PRIVY_APP_ID` is set on Vercel, otherwise the browser's injected wallet. In the
+Privy dashboard, enable external wallets and add the site's origin to the allowed origins.
+Wallet-mode NFT notices need the `market_tx_notices` table
+(`supabase/migrations/20261022120000_market_tx_notices.sql`); apply it before deploying.
+
+### Transaction PIN
+
+On testnet no transaction asks for the PIN: `txPin.required` is `false` in both
+`lib/tiers.js` and `web/lib/txPin.ts`. The chat unlock still takes the PIN and account
+changes still take the password. Before mainnet, set both to `true`;
+`test/txPin.test.js` will then need its "ships off" case updated, which is the point.
+
 ### Featuring a task
 
 A Flizy admin (`accounts.is_admin`) sees **Feature on Explore** at the bottom of any task
@@ -235,7 +265,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `SECURITY_MAIL_SECRET` | Same value on the VPS and on Vercel. Lets a bot ask the site to email the owner when a chat is linked or unlinked. Unset: no email, reported at startup in production |
 | `REQUIRE_FLIZY_PREFIX` | Retired. A recognised command works with or without a leading `flizy`. The bots warn at startup if it is still set |
 | `MAX_SEND_ETH` / `DEFAULT_DAILY_SEND_LIMIT_ETH` | Per-transaction and per-day caps |
-| `DEFAULT_QUICK_SEND_ETH` | Most one ETH payment to a known recipient may be without the PIN (default 0.005), and the ceiling on an account's own value. Set the same on the VPS and on Vercel |
+| `DEFAULT_QUICK_SEND_ETH` | Most one ETH payment to a known recipient may be without the PIN (default 0.005), and the ceiling on an account's own value. Only applies while the transaction PIN is on (`txPin` in `lib/tiers.js` and `web/lib/txPin.ts`; off on testnet). Set the same on the VPS and on Vercel |
 | `PENDING_TTL_MS` / `LINK_CODE_TTL_MS` | Plan and link code lifetimes |
 | `SESSION_TTL_MS` / `SESSION_MAX_MS` | Chat unlock: ends after this long without a message (default 30 min), and never later than this after the PIN was entered (default 8 h) |
 | `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes. Slippage above 500 (5%) is cut to 500 by every quote; an unreadable value is 100 |

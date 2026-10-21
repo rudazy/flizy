@@ -1,6 +1,7 @@
 /**
- * NFT routes: every one needs a session, and the trading route checks in the
- * right order (origin, session, chain checks, PIN, daily limit, balance,
+ * NFT routes: reads are open to wallet mode except the account's own list,
+ * trading needs a session unless it only plans for a visitor's own wallet
+ * (test/walletMode.test.js), and the trading route checks in the right order (origin, session, chain checks, PIN, daily limit, balance,
  * lock, log, send) and always releases the lock.
  *
  * Route handlers need a Next runtime, so the order is read from their source,
@@ -30,11 +31,18 @@ const READ_ROUTES = [
   ['nfts', 'mine', 'route.ts'],
 ];
 
+/** The viewer's own NFTs: a Flizy wallet only. Wallet mode reads its wallet through ?viewer= on the others. */
+const ACCOUNT_ONLY = new Set(['nfts/mine/route.ts']);
+
 describe('read routes', () => {
   for (const parts of READ_ROUTES) {
-    it(`${parts.join('/')} requires a session and hides internal errors`, () => {
+    const name = parts.join('/');
+    const rule = ACCOUNT_ONLY.has(name) ? 'requires a session' : 'is open for wallet mode';
+    it(`${name} ${rule} and hides internal errors`, () => {
       const src = read(...parts);
-      assert.match(src, /if \(!accountId\) return NextResponse\.json\(\{ error: 'Not logged in' \}, \{ status: 401 \}\)/);
+      const gate = /if \(!accountId\) return NextResponse\.json\(\{ error: 'Not logged in' \}, \{ status: 401 \}\)/;
+      if (ACCOUNT_ONLY.has(name)) assert.match(src, gate);
+      else assert.doesNotMatch(src, gate);
       assert.match(src, /apiErrorBody\(ROUTE, err\)/);
       assert.doesNotMatch(src, /err\.message/);
     });

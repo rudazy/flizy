@@ -8,7 +8,9 @@
 
 import { safeNext } from './safeNext.ts';
 
-const APP_ID = /^[A-Za-z0-9_-]{8,128}$/;
+// Privy refuses any app id that is not 25 characters, and the provider then
+// throws while rendering. Anything else is treated as unset.
+const APP_ID = /^[A-Za-z0-9]{25}$/;
 
 /** Public GIWA Sepolia endpoint. Client code must not read a keyed RPC from the environment. */
 export const CUSTODY_DOOR_CHAIN = {

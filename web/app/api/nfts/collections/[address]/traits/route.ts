@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getAccountIdFromCookie } from '../../../../../../lib/cookies';
 import { apiErrorBody } from '../../../../../../lib/apiError';
 import { nftContext, routeAddress } from '../../../../../../lib/nftApi.ts';
+import { anonymousReadLimit } from '../../../../../../lib/readLimit';
 
 const ROUTE = 'GET /api/nfts/collections/[address]/traits';
 /** Traits are counted over at most this many explorer pages (50 tokens each). */
@@ -13,8 +13,9 @@ const MAX_PAGES = 4;
  */
 export async function GET(_req: Request, { params }: { params: { address: string } }) {
   try {
-    const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    // Public chain data, open without a Flizy session for wallet mode, capped per caller.
+    const limited = await anonymousReadLimit();
+    if (limited) return limited;
     const address = routeAddress(params.address);
     if (!address) return NextResponse.json({ error: 'Not a collection address' }, { status: 400 });
 

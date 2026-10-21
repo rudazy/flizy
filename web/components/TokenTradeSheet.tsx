@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboard } from './DashboardProvider';
+import { useWalletMode } from './WalletModeBits';
+import { listedByAddress } from '../lib/listedTokens';
+import { walletBalances, walletSwap, type WalletSwapQuote } from '../lib/walletTrade';
+import { FLZ_TOKEN, WETH_TOKEN, walletErrorText } from '../lib/walletChain';
 import { formatEthDisplay, maxSpend } from '../lib/tokenFormat';
 import { announceTx } from '../lib/txSignal';
 import {
@@ -108,6 +112,22 @@ export function TokenTradeSheet({
   const titleId = useId();
   const tradeId = tokenAddress || symbol;
   const { holdings } = useDashboard();
+  // Wallet mode: balances and the trade come from the visitor's own wallet.
+  const walletMode = useWalletMode();
+  const [walletHeld, setWalletHeld] = useState<{ eth: string; token: string | null } | null>(null);
+  const [walletReads, setWalletReads] = useState(0);
+  const walletToken = tokenAddress || (symbol.toUpperCase() === 'FLZ' ? FLZ_TOKEN : null);
+  const walletDecimals = (walletToken && listedByAddress(walletToken)?.decimals) || 18;
+  useEffect(() => {
+    if (!walletMode) return;
+    let live = true;
+    walletBalances(walletMode.address, walletToken ? [{ address: walletToken, decimals: walletDecimals }] : [])
+      .then((b) => live && setWalletHeld({ eth: b.eth, token: walletToken ? b.tokens[walletToken.toLowerCase()] ?? null : null }))
+      .catch(() => live && setWalletHeld(null));
+    return () => {
+      live = false;
+    };
+  }, [walletMode?.address, walletToken, walletDecimals, walletReads]);
   const [amount, setAmount] = useState('');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
@@ -120,13 +140,13 @@ export function TokenTradeSheet({
   const buying = side === 'buy';
   const payAsset = buying ? 'ETH' : symbol;
   const getAsset = buying ? symbol : 'ETH';
-  const ethBalance = holdings?.holdings?.native?.balance ?? null;
+  const ethBalance = walletMode ? walletHeld?.eth ?? null : holdings?.holdings?.native?.balance ?? null;
   const tokenRow = (holdings?.holdings?.tokens || []).find((t) =>
     tokenAddress
       ? String(t.address || '').toLowerCase() === tokenAddress.toLowerCase()
       : String(t.symbol || '').toUpperCase() === symbol.toUpperCase()
   );
-  const balance = buying ? ethBalance : tokenRow?.balance ?? null;
+  const balance = buying ? ethBalance : walletMode ? walletHeld?.token ?? null : tokenRow?.balance ?? null;
   const spendMax = maxSpend(balance, buying);
   const maxNum = num(spendMax) ?? 0;
   const amountNum = num(amount) ?? 0;
@@ -256,6 +276,27 @@ export function TokenTradeSheet({
     if (!quoteReady || busy) return;
     setBusy(true);
     setError('');
+    if (walletMode) {
+      try {
+        if (venue === 'ammora') throw new Error('Ammora trades need a Flizy account.');
+        const route = quote as unknown as Partial<WalletSwapQuote>;
+        if (!route.feeRouter || !Array.isArray(route.path) || !route.amountInUnits || !route.amountOutMinUnits) {
+          throw new Error('Quote again, then confirm.');
+        }
+        const provider = await walletMode.provider();
+        if (!provider) throw new Error('Connect your wallet again.');
+        const result = await walletSwap(provider, walletMode.address, route as WalletSwapQuote, WETH_TOKEN);
+        setWalletReads((n) => n + 1);
+        setExplorerUrl(result.explorerUrl);
+        setStage('done');
+        onTraded();
+      } catch (err) {
+        setError(walletErrorText(err, 'The trade did not go through.'));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     try {
       const res = await fetch('/api/swap/execute', {
         method: 'POST',

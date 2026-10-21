@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getAccountIdFromCookie } from '../../../../../lib/cookies';
 import { apiErrorBody } from '../../../../../lib/apiError';
 import {
   collectionHeader,
@@ -11,14 +10,16 @@ import {
   usdRate,
 } from '../../../../../lib/nftApi.ts';
 import { FEE_BPS } from '../../../../../lib/nftMarket.ts';
+import { anonymousReadLimit } from '../../../../../lib/readLimit';
 
 const ROUTE = 'GET /api/nfts/collections/[address]';
 
 /** Collection header and market figures: everything above the tabs. */
 export async function GET(_req: Request, { params }: { params: { address: string } }) {
   try {
-    const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    // Public chain data, open without a Flizy session for wallet mode, capped per caller.
+    const limited = await anonymousReadLimit();
+    if (limited) return limited;
     const address = routeAddress(params.address);
     if (!address) return NextResponse.json({ error: 'Not a collection address' }, { status: 400 });
 

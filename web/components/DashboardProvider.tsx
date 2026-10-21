@@ -33,6 +33,8 @@ type DashboardContextValue = {
   historyUsdPerEth: number | null;
   holdings: HoldingsData | null;
   error: string;
+  /** No Flizy session (the account read said 401). Wallet mode keys off this. */
+  signedOut: boolean;
   msg: string;
   setMsg: (m: string) => void;
   busy: string;
@@ -83,6 +85,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [linkCode, setLinkCode] = useState<LinkCode | null>(null);
   const [holdings, setHoldings] = useState<HoldingsData | null>(null);
   const [error, setError] = useState('');
+  const [signedOut, setSignedOut] = useState(false);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -98,10 +101,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const json = await res.json();
     if (!res.ok) {
       setError(json.error || 'Not logged in');
+      setSignedOut(res.status === 401);
       setData(null);
       return null;
     }
     setError('');
+    setSignedOut(false);
     setData(json);
     if (json?.account?.locale) {
       setLocale(normalizeLocale(json.account.locale));
@@ -465,6 +470,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       historyUsdPerEth,
       holdings,
       error,
+      signedOut,
       msg,
       setMsg,
       busy,
@@ -494,6 +500,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       historyUsdPerEth,
       holdings,
       error,
+      signedOut,
       msg,
       busy,
       refreshing,

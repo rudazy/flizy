@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '../../lib/seo';
 import { SignupForm } from './SignupForm';
+import { ExternalWalletProvider } from '../../components/ExternalWalletProvider';
 
 /**
  * Server shell so this route can own its metadata. The form itself stays a
@@ -15,5 +16,9 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default function SignupPage() {
-  return <SignupForm />;
+  return (
+    <ExternalWalletProvider>
+      <SignupForm />
+    </ExternalWalletProvider>
+  );
 }

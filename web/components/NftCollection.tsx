@@ -23,6 +23,7 @@ import {
   TagIcon,
 } from './ExploreIcons';
 import { NftTradeSheet, type TradeIntent } from './NftTradeSheet';
+import { useWalletMode } from './WalletModeBits';
 import { MintPanel, MintStatusPill, type MintDrop } from './MintPanel';
 import { FloorChartSheet, FloorSparkline, type SalePoint } from './NftFloorChart';
 import { bpsLabel, compactCount, ethFromWei, monthYear, shortAddr, timeAgo, usdLabel } from '../lib/nftFormat';
@@ -263,6 +264,7 @@ export function NftCollection({ address }: { address: string }) {
   const [intent, setIntent] = useState<TradeIntent | null>(null);
   const [chartOpen, setChartOpen] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const walletViewer = useWalletMode()?.address ?? null;
   const [compact, setCompact] = useState(false);
   const [copied, setCopied] = useState(false);
   const nameRef = useRef<HTMLDivElement | null>(null);
@@ -280,6 +282,7 @@ export function NftCollection({ address }: { address: string }) {
   const loadItems = useCallback(
     async (cursor: string | null) => {
       const params = new URLSearchParams({ filter, sort });
+      if (walletViewer) params.set('viewer', walletViewer);
       if (debounced) params.set('q', debounced);
       if (cursor) params.set('cursor', cursor);
       try {
@@ -292,7 +295,7 @@ export function NftCollection({ address }: { address: string }) {
         setItemsError(e instanceof Error ? e.message : 'Could not load items.');
       }
     },
-    [address, filter, sort, debounced]
+    [address, filter, sort, debounced, walletViewer]
   );
 
   useEffect(() => {
@@ -324,6 +327,7 @@ export function NftCollection({ address }: { address: string }) {
   }, [loadItems]);
 
   useEffect(() => {
+    if (walletViewer) return;
     let cancelled = false;
     getJson<{ favorites: Array<{ collection: string; tokenId: string }> }>(`/api/nfts/favorites?collection=${address}`)
       .then((r) => {
@@ -333,7 +337,7 @@ export function NftCollection({ address }: { address: string }) {
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [address, walletViewer]);
 
   // The header shrinks to the compact form once the name scrolls under it.
   useEffect(() => {
@@ -353,6 +357,8 @@ export function NftCollection({ address }: { address: string }) {
   }
 
   async function toggleFavorite(tokenId: string) {
+    // Favorites belong to a Flizy account; wallet mode has none to save to.
+    if (walletViewer) return;
     const on = !favorites.has(tokenId);
     setFavorites((prev) => {
       const next = new Set(prev);

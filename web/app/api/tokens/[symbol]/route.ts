@@ -5,20 +5,26 @@ import { isChartRange } from '../../../../lib/tokenMarket';
 import { snapshotFor } from '../../../../lib/tokenMarketServer';
 import { cachedFlzDay, cachedTokenDay } from '../../../../lib/flzMarketCache';
 import { ethUsd } from '../../../../lib/ethUsd';
-import { describeHeldToken } from '../../../../lib/accountTokens';
+import { describeHeldToken, describeListedToken } from '../../../../lib/accountTokens';
+import { anonymousReadLimit } from '../../../../lib/readLimit';
 
 const ROUTE = 'GET /api/tokens/[symbol]';
 
 
-/** FLZ is the verified market. A contract address is a listed or wallet token, read from its own pool. */
+/**
+ * FLZ is the verified market. A contract address is a listed or wallet token,
+ * read from its own pool. Without a Flizy session (wallet mode) only FLZ and
+ * listed tokens open; a token only a Flizy wallet holds needs the account.
+ */
 export async function GET(req: Request, { params }: { params: { symbol: string } }) {
   try {
     const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    const limited = await anonymousReadLimit(accountId);
+    if (limited) return limited;
 
     const raw = String(params.symbol || '').trim();
     if (/^0x[0-9a-fA-F]{40}$/.test(raw)) {
-      const described = await describeHeldToken(accountId, raw);
+      const described = accountId ? await describeHeldToken(accountId, raw) : describeListedToken(raw);
       if ('listedSymbol' in described) {
         return NextResponse.json({ listedSymbol: described.listedSymbol });
       }

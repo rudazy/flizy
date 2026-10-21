@@ -8,6 +8,9 @@ import { AppBottomNav } from './AppBottomNav';
 import { PwaRegister } from './PwaRegister';
 import { EmailVerifyGate } from './EmailVerifyGate';
 import { ProfileCompleteGate } from './ProfileCompleteGate';
+import { useExternalWallet } from './ExternalWalletProvider';
+import { ContinueWithWallet, NeedsAccount, WalletModeBar } from './WalletModeBits';
+import { isWalletModePath } from '../lib/walletMode';
 
 function hasUsername(data: { account?: { username?: string | null } }): boolean {
   const u = String(data.account?.username || '').trim();
@@ -15,11 +18,36 @@ function hasUsername(data: { account?: { username?: string | null } }): boolean 
 }
 
 export function DashboardGate({ children }: { children: ReactNode }) {
-  const { data, error, msg } = useDashboard();
+  const { data, error, msg, signedOut } = useDashboard();
+  const wallet = useExternalWallet();
   const pathname = usePathname() || '/dashboard';
   const search = useSearchParams();
   const nextPath = `${pathname}${search.toString() ? `?${search.toString()}` : ''}`;
   const loginHref = `/login?next=${encodeURIComponent(nextPath.startsWith('/') ? nextPath : '/dashboard')}`;
+
+  // Wallet mode: no Flizy session, but the visitor's own wallet is connected.
+  // Only the pages lib/walletMode.ts names open; the rest say they need an account.
+  if (signedOut && !data && wallet?.address) {
+    if (!isWalletModePath(pathname)) return <NeedsAccount />;
+    return (
+      <div className="app-shell app-shell-tabbed">
+        <div className="fade-up flex flex-1 flex-col">
+          <WalletModeBar />
+          {children}
+        </div>
+        <AppBottomNav />
+        <PwaRegister />
+      </div>
+    );
+  }
+  // A wallet that may already be connected is still being checked: wait rather than flash the login.
+  if (signedOut && !data && wallet && !wallet.ready && isWalletModePath(pathname)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-sm text-muted">Checking your wallet...</p>
+      </div>
+    );
+  }
 
   if (error && !data) {
     return (
@@ -34,6 +62,12 @@ export function DashboardGate({ children }: { children: ReactNode }) {
             Create account
           </Link>
         </div>
+        {signedOut && isWalletModePath(pathname) ? (
+          <div className="space-y-2 border-t border-[var(--border)] pt-4">
+            <p className="text-sm text-muted">Or explore, swap and trade NFTs with your own wallet. No account needed.</p>
+            <ContinueWithWallet next={nextPath} className="btn btn-ghost w-full" />
+          </div>
+        ) : null}
       </div>
     );
   }

@@ -13,6 +13,7 @@ import { tokenLogo } from '../lib/tokenLogos';
 import { listedByAddress } from '../lib/listedTokens';
 import { TokenChart } from './TokenChart';
 import { TokenTradeSheet } from './TokenTradeSheet';
+import { useWalletMode } from './WalletModeBits';
 import { LINK_KINDS, LINK_LABEL } from './AccountProjects';
 import { shrinkProjectImage } from '../lib/projectImage';
 import type { HolderView } from '../lib/tokenHolders';
@@ -158,6 +159,9 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const imported = /^0x[0-9a-fA-F]{40}$/.test(symbol);
   const tokenRef = listed ? 'flz' : symbol;
   const ammoraUi = process.env.NEXT_PUBLIC_AMMORA_ENABLED === 'true';
+  /** Theses and the watchlist belong to a Flizy account, so wallet mode leaves them out. */
+  const walletMode = useWalletMode();
+  const social = listed && walletMode == null;
   const [comingSoon, comingSoonNote] = useComingSoon();
 
   const [range, setRange] = useState<ChartRange>('1d');
@@ -557,7 +561,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
             <button type="button" className={`${SQUARE_BUTTON} relative`} aria-label="Notifications" onClick={() => comingSoon('Notifications')}>
               <BellIcon size={18} />
             </button>
-            {listed ? (
+            {social ? (
               <button
                 type="button"
                 className={`${SQUARE_BUTTON} ${watched ? 'border-sun/60 text-sun' : 'text-sun'}`}
@@ -763,7 +767,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
         </section>
 
         {/* Tabs */}
-        <div role="tablist" aria-label="Token" className={`grid border-b border-[#232323] ${listed ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <div role="tablist" aria-label="Token" className={`grid border-b border-[#232323] ${social ? 'grid-cols-4' : 'grid-cols-3'}`}>
           {(
             [
               ['activity', 'Activity'],
@@ -772,7 +776,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
               ['about', 'About'],
             ] as const
           )
-            .filter(([id]) => listed || id !== 'thesis')
+            .filter(([id]) => social || id !== 'thesis')
             .map(([id, label]) => (
             <button
               key={id}
@@ -871,7 +875,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           )}
         </div>
 
-        {listed && tab !== 'thesis' ? (
+        {social && tab !== 'thesis' ? (
           <ThesisCard theses={theses ? theses.slice(0, 2) : null} total={thesisTotal} onWrite={() => setWriting(true)} onChanged={() => void loadTheses()} />
         ) : null}
       </div>

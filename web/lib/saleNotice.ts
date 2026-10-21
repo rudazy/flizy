@@ -13,14 +13,15 @@ const NAME_ABI = ['function name() view returns (string)'];
 
 /**
  * Tell the seller and the buyer of every sale in `txHash`, on all their chats,
- * except `actorAccountId`, who already saw the result on the site. Never throws:
+ * except `actorAccountId`, who already saw the result on the site (null in
+ * wallet mode, where no Flizy account acted). Never throws:
  * the sale has happened, and a notice that fails is only logged.
  */
 export async function noticeSales(args: {
   provider: ethers.Provider;
   txHash: string;
   marketAddress: string;
-  actorAccountId: string;
+  actorAccountId: string | null;
   siteUrl: string;
 }): Promise<void> {
   try {

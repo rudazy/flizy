@@ -25,23 +25,37 @@ export function sentryIngestOrigin(dsn) {
 }
 
 /**
- * Hosts for passkey, email, Google, and guest accounts.
- * The door does not connect an external wallet, so WalletConnect and
- * WalletLink are not allowed. No captcha, Telegram, or funding hosts.
- * No script host: the SDK is bundled.
+ * Hosts Privy needs, from its guide:
  * https://docs.privy.io/security/implementation-guide/content-security-policy
+ *
+ * Privy connects the visitor's own wallet for wallet mode
+ * (components/ExternalWalletProvider.tsx): WalletConnect (relay, wallet list,
+ * verify frame) and Coinbase Wallet (walletlink relay). No captcha, Telegram,
+ * or funding hosts: nobody logs in through Privy and nothing is bought. No
+ * script host: the SDK is bundled.
  */
-const PRIVY_FRAMES = ['https://auth.privy.io'];
+const PRIVY_FRAMES = ['https://auth.privy.io', 'https://verify.walletconnect.com', 'https://verify.walletconnect.org'];
+
+/**
+ * The chain's public RPC, which the browser reads directly whenever a
+ * visitor's own wallet is in use: balances and receipts in wallet mode, Account
+ * > Wallets, and outside-wallet pay. Needed with or without Privy, since the
+ * browser-wallet fallback reads it too (web/lib/walletChain.ts).
+ */
+const CHAIN_RPC = 'https://sepolia-rpc.giwa.io';
 
 const PRIVY_CONNECT = [
   'https://auth.privy.io',
   'https://*.rpc.privy.systems',
-  'https://sepolia-rpc.giwa.io',
+  'wss://relay.walletconnect.com',
+  'wss://relay.walletconnect.org',
+  'wss://www.walletlink.org',
+  'https://explorer-api.walletconnect.com',
 ];
 
 /** Same shape as custodyDoorAppId. A junk value must not open the policy. */
 export function privyDoorRequested(value) {
-  return /^[A-Za-z0-9_-]{8,128}$/.test(String(value || '').trim());
+  return /^[A-Za-z0-9]{25}$/.test(String(value || '').trim());
 }
 
 export function contentSecurityPolicy({ dev, dsn, privy = false }) {
@@ -54,7 +68,7 @@ export function contentSecurityPolicy({ dev, dsn, privy = false }) {
     .filter(Boolean)
     .join(' ');
 
-  const connectExtra = [sentryOrigin, privy ? PRIVY_CONNECT.join(' ') : ''].filter(Boolean).join(' ');
+  const connectExtra = [CHAIN_RPC, sentryOrigin, privy ? PRIVY_CONNECT.join(' ') : ''].filter(Boolean).join(' ');
 
   return [
     "default-src 'self'",
@@ -73,8 +87,9 @@ export function contentSecurityPolicy({ dev, dsn, privy = false }) {
     `connect-src 'self' https://www.google-analytics.com https://*.clarity.ms${
       connectExtra ? ` ${connectExtra}` : ''
     }`,
-    // Absent unless the door is on, so default-src 'self' still blocks frames.
+    // Absent unless Privy is on, so default-src 'self' still blocks frames.
     privy ? `frame-src ${PRIVY_FRAMES.join(' ')}` : '',
+    privy ? `child-src ${PRIVY_FRAMES.join(' ')}` : '',
     "manifest-src 'self'",
     "worker-src 'self'",
     'upgrade-insecure-requests',

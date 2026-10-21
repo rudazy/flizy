@@ -5,6 +5,7 @@ import { snapshotFor, type TokenDay } from '../../../lib/tokenMarketServer';
 import { cachedFlzDay, cachedListedDay } from '../../../lib/flzMarketCache';
 import { listWatched } from '../../../lib/tokenSocial';
 import { LISTED_TOKENS } from '../../../lib/listedTokens';
+import { anonymousReadLimit } from '../../../lib/readLimit';
 
 const ROUTE = 'GET /api/tokens';
 
@@ -30,16 +31,18 @@ function row(day: TokenDay) {
 /**
  * Listed tokens for discovery: FLZ, then each token Flizy seeded a pool for,
  * every one priced from its own pool. A listed pool that cannot be read is
- * left out rather than failing the list.
+ * left out rather than failing the list. Open without a Flizy session for
+ * wallet mode; the watchlist is an account feature and is empty then.
  */
 export async function GET() {
   try {
     const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    const limited = await anonymousReadLimit(accountId);
+    if (limited) return limited;
 
     const [day, watched, listedDays] = await Promise.all([
       cachedFlzDay(),
-      listWatched(accountId),
+      accountId ? listWatched(accountId) : Promise.resolve([] as string[]),
       Promise.all(LISTED_TOKENS.map((token) => cachedListedDay(token.address).catch(() => null))),
     ]);
     const listed = LISTED_TOKENS.flatMap((token, i) => {

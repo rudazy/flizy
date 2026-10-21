@@ -11,11 +11,13 @@ import { track } from '../../lib/analytics';
 import { clearAppearanceCache } from '../../lib/appearanceCache';
 import type { LocaleCode } from '../../lib/locale';
 import { safeNext } from '../../lib/safeNext.ts';
+import { useWalletDoor } from '../../components/WalletModeBits';
 
 export function LoginForm() {
   const router = useRouter();
   const { t, locale, setLocale } = useLocale();
   const [next, setNext] = useState('/dashboard');
+  const walletDoor = useWalletDoor(next);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
@@ -310,10 +312,15 @@ export function LoginForm() {
             />
             <SoonRow
               icon={<WalletMark />}
-              title="Continue with a wallet"
-              note="MetaMask, WalletConnect and more"
-              onClick={() => showSoon('Continue with a wallet')}
+              title={walletDoor.busy ? 'Connecting...' : 'Continue with a wallet'}
+              note="Explore, swap and trade NFTs. No account needed"
+              onClick={() => void walletDoor.go()}
             />
+            {walletDoor.error ? (
+              <p className="m-0 text-xs text-[#e0b070]" role="alert">
+                {walletDoor.error}
+              </p>
+            ) : null}
             <SoonRow
               icon={<PasskeyMark />}
               title="Continue with a passkey"

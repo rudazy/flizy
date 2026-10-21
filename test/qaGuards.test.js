@@ -391,9 +391,12 @@ describe('any token opens like FLZ', () => {
     assert.match(detail, /\(listed \? 'FLZ' : 'Token'\)/);
     assert.equal((detail.match(/disabled=\{!canTrade\}/g) || []).length, 2);
     assert.match(detail, /tokenAddress=\{imported \? contract : null\}/);
-    assert.match(detail, /\.filter\(\(\[id\]\) => listed \|\| id !== 'thesis'\)/);
+    // Theses are FLZ only and need a Flizy account, so wallet mode has no Thesis tab.
+    assert.match(detail, /const social = listed && walletMode == null;/);
+    assert.match(detail, /\.filter\(\(\[id\]\) => social \|\| id !== 'thesis'\)/);
     const route = read('web/app/api/tokens/[symbol]/route.ts');
-    assert.match(route, /const described = await describeHeldToken\(accountId, raw\);/);
+    // Without a session (wallet mode) only listed tokens open; a held token needs the account.
+    assert.match(route, /const described = accountId \? await describeHeldToken\(accountId, raw\) : describeListedToken\(raw\);/);
     assert.match(route, /cachedTokenDay\(held\.address, held\.symbol, held\.decimals\)/);
   });
 

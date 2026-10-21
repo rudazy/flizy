@@ -22,7 +22,7 @@
 
 import { createHash } from 'crypto';
 
-export function clientIpKey(headers: Headers): string {
+export function clientIpKey(headers: Pick<Headers, 'get'>): string {
   const real = (headers.get('x-real-ip') || '').trim();
   let ip = real;
 

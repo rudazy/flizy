@@ -94,7 +94,7 @@ describe('soldEvents', () => {
 describe('wiring', () => {
   it('the site notices after a buy or an accepted offer is confirmed', () => {
     const confirmed = ROUTE.indexOf("update({ status: 'confirmed', tx_hash: txHash })");
-    const notice = ROUTE.indexOf("if (action === 'buy' || action === 'offer-accept') {");
+    const notice = ROUTE.indexOf("if (announce && (action === 'buy' || action === 'offer-accept')) {");
     assert.ok(confirmed > 0 && notice > confirmed);
     assert.match(ROUTE, /await noticeSales\(\{[\s\S]{0,200}actorAccountId: accountId,/);
   });

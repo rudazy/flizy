@@ -11,11 +11,12 @@ import {
   routeAddress,
   toCard,
   usdRate,
-  viewerWallet,
+  routeViewer,
 } from '../../../../../../../lib/nftApi.ts';
 import { checkTokenId, type NftItem } from '../../../../../../../lib/nftIndex.ts';
 import { FEE_BPS, MARKET_ABI } from '../../../../../../../lib/nftMarket.ts';
 import { declinedOfferIds } from '../../../../../../../lib/offerBook.ts';
+import { anonymousReadLimit } from '../../../../../../../lib/readLimit';
 
 const ROUTE = 'GET /api/nfts/collections/[address]/tokens/[tokenId]';
 const NFT_ABI = [
@@ -26,10 +27,12 @@ const NFT_ABI = [
  * One token: art, traits, owner (read from the chain), its listing if live,
  * open offers that can buy it, royalty, history, and what the viewer can do.
  */
-export async function GET(_req: Request, { params }: { params: { address: string; tokenId: string } }) {
+export async function GET(req: Request, { params }: { params: { address: string; tokenId: string } }) {
   try {
+    // Open without a Flizy session for wallet mode; the viewer is then ?viewer=.
     const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    const limited = await anonymousReadLimit(accountId);
+    if (limited) return limited;
     const address = routeAddress(params.address);
     const tokenId = checkTokenId(params.tokenId);
     if (!address || !tokenId) return NextResponse.json({ error: 'Not a token' }, { status: 400 });
@@ -42,7 +45,7 @@ export async function GET(_req: Request, { params }: { params: { address: string
       nft.ownerOf(tokenId).then((o: string) => ethers.getAddress(o)).catch(() => null),
       marketView(ctx, address),
       royaltyInfo(ctx, address),
-      viewerWallet(accountId),
+      routeViewer(req, accountId),
       usdRate(),
       ctx.index.tokenTransfers(address, tokenId).catch(() => ({ items: [], next: null })),
     ]);
@@ -64,7 +67,9 @@ export async function GET(_req: Request, { params }: { params: { address: string
 
     const nowSec = Math.floor(Date.now() / 1000);
     // Offers this viewer declined stay off their view of the NFT, as on My NFTs.
-    const declined = view.address ? await declinedOfferIds(accountId, view.address).catch(() => new Set<string>()) : new Set<string>();
+    // Declining is an account feature, so wallet mode has none.
+    const declined =
+      accountId && view.address ? await declinedOfferIds(accountId, view.address).catch(() => new Set<string>()) : new Set<string>();
     const offers = [...(view.state?.offers.values() ?? [])]
       .filter((o) => !declined.has(o.offerId))
       // An expired offer cannot be accepted, but its maker still has to see it to

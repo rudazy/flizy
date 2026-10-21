@@ -17,6 +17,7 @@ import { clearAppearanceCache } from '../../../lib/appearanceCache';
 import { useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { PayIdentity } from '../../../components/PayIdentity';
+import { OwnWalletPanel } from '../../../components/OwnWalletPanel';
 import { CountryPanel, LanguagePanel } from '../../../components/AccountPrefs';
 import { ChatAppsPanel, SecretInput, TrustedPanel } from '../../../components/AccountConnections';
 import { LimitsPanel, PinPanel, QuickSendPanel, SecurityPanel } from '../../../components/AccountSecurity';
@@ -34,6 +35,7 @@ const SLIDES = [
   'profile',
   'projects',
   'pay',
+  'wallets',
   'language',
   'country',
   'chat',
@@ -547,6 +549,7 @@ export default function AccountPage() {
           },
           { id: 'projects', label: 'Projects' },
           { id: 'pay', label: 'Pay me', badge: data.pay?.username ? `@${data.pay.username}` : undefined },
+          { id: 'wallets', label: 'Wallets' },
           { id: 'language', label: t('account.language') },
           {
             id: 'country',
@@ -955,6 +958,18 @@ export default function AccountPage() {
       ) : null}
 
       {slide === 'platforms' ? <LinkedAccounts /> : null}
+
+      {slide === 'wallets' ? (
+        <OwnWalletPanel
+          flizyAddress={data.account.agent_wallet_address || ''}
+          trusted={data.trusted}
+          onTrust={(address) => {
+            setAddr(address);
+            setLabel((current) => current || 'My wallet');
+            setSlide('trusted');
+          }}
+        />
+      ) : null}
 
       {slide === 'trusted' ? (
         <TrustedPanel

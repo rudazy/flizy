@@ -35,15 +35,16 @@ describe('custody door flag', () => {
     else process.env.NEXT_PUBLIC_PRIVY_APP_ID = previous;
   });
 
-  it('stays off unless the public app id is a plain token', () => {
-    for (const value of [undefined, null, '', '   ', 'short', 'bad id', 'https://evil.example', 'id.with.dots']) {
+  it('stays off unless the public app id has the shape Privy accepts', () => {
+    // Privy throws on any id that is not 25 characters, which would break every page that mounts it.
+    for (const value of [undefined, null, '', '   ', 'short', 'bad id', 'https://evil.example', 'id.with.dots', 'clabc1234567', 'not-a-privy-id', 'clabc1234567890abcdefghij_', 'clabc1234567890abcdefghi-']) {
       assert.equal(door.custodyDoorAppId(value), '');
       assert.equal(door.custodyDoorEnabled(value), false);
       assert.equal(policy.privyDoorRequested(value), false);
     }
-    assert.equal(door.custodyDoorAppId('clabc1234567'), 'clabc1234567');
-    assert.equal(door.custodyDoorEnabled('clabc1234567'), true);
-    assert.equal(policy.privyDoorRequested('clabc1234567'), true);
+    assert.equal(door.custodyDoorAppId('clabc1234567890abcdefghij'), 'clabc1234567890abcdefghij');
+    assert.equal(door.custodyDoorEnabled('clabc1234567890abcdefghij'), true);
+    assert.equal(policy.privyDoorRequested('clabc1234567890abcdefghij'), true);
   });
 
   it('reads the public env and ignores a blank one', () => {
@@ -51,8 +52,8 @@ describe('custody door flag', () => {
     assert.equal(door.custodyDoorEnabled(), false);
     process.env.NEXT_PUBLIC_PRIVY_APP_ID = '  ';
     assert.equal(door.custodyDoorEnabled(), false);
-    process.env.NEXT_PUBLIC_PRIVY_APP_ID = 'clabc1234567';
-    assert.equal(door.custodyDoorAppId(), 'clabc1234567');
+    process.env.NEXT_PUBLIC_PRIVY_APP_ID = 'clabc1234567890abcdefghij';
+    assert.equal(door.custodyDoorAppId(), 'clabc1234567890abcdefghij');
   });
 
   it('keeps the password form reachable and refuses an off-site next', () => {
@@ -108,8 +109,9 @@ describe('custody door source', () => {
   it('keeps the password form, and the client never names a server wallet', () => {
     const page = read('web/app/login/page.tsx');
     const door = read('web/components/CustodyDoor.tsx');
-    assert.match(page, /<LoginForm/);
-    assert.match(page, /searchParams\?\.door === 'password'/);
+    // door=password from older links still lands on this same form.
+    assert.match(page, /<LoginForm \/>/);
+    assert.doesNotMatch(page, /CustodyDoor/);
     assert.match(door, /createOnLogin: 'users-without-wallets'/);
     assert.match(door, /Coming soon/);
     assert.doesNotMatch(door, /createGuestAccount|useGuestAccounts/);
@@ -139,26 +141,32 @@ describe('custody door policy', () => {
     policy = await import('../web/lib/contentSecurityPolicy.mjs');
   });
 
-  it('leaves the policy unchanged when the door is off', () => {
+  it('adds nothing for Privy when the door is off', () => {
     const header = policy.contentSecurityPolicy({ dev: false, dsn: '' });
     assert.doesNotMatch(header, /privy|walletconnect|walletlink/i);
+    // The browser-wallet fallback still reads the chain, so its RPC stays open.
+    assert.match(header, /connect-src[^;]*https:\/\/sepolia-rpc\.giwa\.io/);
     assert.equal(
       policy.permissionsPolicy(),
       'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
     );
   });
 
-  it('names only the hosts this door uses when the door is on', () => {
+  it('names only the hosts Privy needs for connecting a wallet when it is on', () => {
     const header = policy.contentSecurityPolicy({ dev: false, dsn: '', privy: true });
     for (const host of [
       'https://auth.privy.io',
       'https://*.rpc.privy.systems',
       'https://sepolia-rpc.giwa.io',
+      'wss://relay.walletconnect.com',
+      'wss://relay.walletconnect.org',
+      'wss://www.walletlink.org',
+      'https://explorer-api.walletconnect.com',
     ]) {
       assert.ok(header.includes(host), host);
     }
-    assert.match(header, /frame-src https:\/\/auth\.privy\.io/);
-    assert.doesNotMatch(header, /walletconnect|walletlink/i);
+    assert.match(header, /frame-src https:\/\/auth\.privy\.io https:\/\/verify\.walletconnect\.com https:\/\/verify\.walletconnect\.org/);
+    assert.match(header, /child-src https:\/\/auth\.privy\.io/);
     assert.doesNotMatch(header, /script-src[^;]*privy/);
     assert.doesNotMatch(header, /challenges\.cloudflare\.com|oauth\.telegram\.org|api\.relay\.link/);
     const permissions = policy.permissionsPolicy({ privy: true });
