@@ -15,6 +15,10 @@ const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupaba
 const { unlockAllChats, confirmWithPin } = require('./helpers/unlockedChat');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
 
+// The transaction PIN is off in the app (web/lib/txPin.ts); this suite turns
+// it on so the PIN path stays proven for when it comes back.
+require('../lib/tiers').txPin.required = true;
+
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
 
 let fake = createFakeSupabase();

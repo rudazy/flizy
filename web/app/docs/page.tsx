@@ -93,7 +93,7 @@ const CMD_GROUPS: Array<{
         wa: 'accept offer',
         tg: '/accept offer',
         meaning:
-          'List the open offers on your NFTs, numbered. Reply with a number to see the price, the 2% Flizy fee, the royalty and what you receive, then CONFIRM, and approve with your PIN on the Flizy page the chat links to.',
+          'List the open offers on your NFTs, numbered. Reply with a number to see the price, the 2% Flizy fee, the royalty and what you receive, then CONFIRM to sell.',
       },
       { wa: 'confirm', tg: 'confirm or tap Confirm', meaning: 'Approve the plan' },
       { wa: 'cancel', tg: 'cancel', meaning: 'Abort the pending plan' },

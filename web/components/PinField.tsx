@@ -3,8 +3,9 @@
 import { useId } from 'react';
 
 /**
- * The PIN that approves a payment. Money actions on the site ask for the PIN,
- * not the account password (web/lib/stepUp.ts); the password stays for account
+ * The PIN that approves a payment. While the transaction PIN is on
+ * (web/lib/txPin.ts), money actions on the site ask for the PIN, not the
+ * account password (web/lib/stepUp.ts); the password stays for account
  * changes. Digits only, masked, and never offered to a password manager.
  */
 export function PinField({

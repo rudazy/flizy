@@ -160,6 +160,6 @@ describe('chat list', () => {
   it('a picked number opens the sale preview, which still needs CONFIRM and the PIN', () => {
     assert.match(ROUTER, /if \(choice\.kind === 'acceptOffer' && picked\.offer\) \{\s*await previewAcceptOffer\(ctx, user, choice, picked\);/);
     const preview = ROUTER.slice(ROUTER.indexOf('async function previewAcceptOffer'));
-    assert.match(preview, /pendingSends\.set\(ctx\.key, \{ plan, createdAt: Date\.now\(\), needsApproval: true \}\);/);
+    assert.match(preview, /pendingSends\.set\(ctx\.key, \{ plan, createdAt: Date\.now\(\), needsApproval: txPin\.required \}\);/);
   });
 });

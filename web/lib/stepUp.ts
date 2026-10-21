@@ -2,6 +2,10 @@
  * Step-up for actions that move value: the PIN (a passkey too, from a later
  * slice), never the account password.
  *
+ * While txPin.required (web/lib/txPin.ts) is off, as it is on testnet, every
+ * step-up passes on the session alone and no PIN is read. The routes keep
+ * calling this, so turning the PIN back on is that one switch.
+ *
  * Tiers: the password guards account changes (trusted list, limits, PIN,
  * email, username, linking, pausing). Money actions ask for the PIN, which is
  * short, typed only on flizy.app, and has its own pause per account
@@ -22,6 +26,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // Explicit extension: this module is also loaded straight by node --test.
 import { checkPin } from './pinGate.ts';
 import type { TierResult } from './tiers.ts';
+import { txPin } from './txPin.ts';
 
 export type StepUpResult =
   | { ok: true }
@@ -39,6 +44,7 @@ export async function requireStepUp(
   pin: string,
   action: string
 ): Promise<StepUpResult> {
+  if (!txPin.required) return { ok: true };
   if (!pin) {
     return { ok: false, status: 400, error: `Enter your PIN to ${action}.`, code: 'PIN_REQUIRED' };
   }

@@ -87,7 +87,7 @@ One account, one balance, one approved list, one history, reachable from three p
 | Send to a phone, email or handle | `flizy send 0.01 to +234...` | `/send 0.01 to @name on telegram` | Claim a hold sent to you |
 | Swap | `flizy swap 0.1 ETH for FLZ` | `/swap 0.1 ETH for FLZ` | Swap, liquidity, limit orders |
 | NFTs | `flizy send giwaforge to john` | `/send giwaforge to john` | Marketplace, mints, creator |
-| Confirm | reply `confirm`, then a PIN link unless it is a quick send | tap Confirm, then a PIN link unless it is a quick send | your PIN, unless it is a quick send |
+| Confirm | reply `confirm` (the chat must be unlocked) | tap Confirm (the chat must be unlocked) | tap Confirm |
 | Lock this device | `flizy lock` | `/lock` | sign out |
 
 The site deliberately cannot send to an arbitrary address: funds leave only through a linked
@@ -193,9 +193,9 @@ Creators keep their royalties (up to 10%) on secondary sales.
 | --- | --- |
 | **Approved destinations** | Sends by name reach the trusted list only. The list is edited on the site behind the account password, never from chat, and a new entry waits 24 hours before it can receive |
 | **Plan, then confirm** | Every money action shows amount, destination, network and fees first. Nothing executes without a confirm |
-| **Quick send** | A small ETH payment (0.005 ETH by default, lower on request) to someone you have paid before or trusted needs only Confirm. A first payment, a token, an NFT or anything larger asks for the PIN. Who you paid is remembered for 180 days, and only counts an hour after the first payment |
+| **No PIN per transaction on testnet** | Payments, mints, marketplace actions and limit orders go on Confirm. The guard is the session: a chat moves money only after it is unlocked with the PIN on flizy.app (30 minutes idle, 8 hours at most), and the site needs a signed-in session. One switch (`txPin` in `lib/tiers.js` and `web/lib/txPin.ts`) brings the per-transaction PIN back for mainnet, with quick send for small payments to people you already pay |
 | **Trades that stay in the wallet** | Buying and selling FLZ, a listed token or an Ammora launch, and adding or removing liquidity, needs only Confirm on testnet: what you get lands back in your own wallet. Slippage is capped at 5% on the server, and the minimum you review is enforced. Tokens Flizy has not verified are not traded at all |
-| **PIN and password, by risk** | Payments, mints, marketplace actions and limit orders ask for the PIN, except a quick send. Account changes (trusted wallets, the PIN, the daily limit, email, username, linking, the password itself) ask for the account password. Each has its own lockout |
+| **PIN and password, by risk** | The PIN unlocks chat. Account changes (trusted wallets, the PIN, the daily limit, email, username, linking, the password itself) ask for the account password. Each has its own lockout |
 | **Per-channel lock** | Lock a chat app instantly. Unlocking takes the PIN on a one-time Flizy link; chat never takes the PIN or the password |
 | **Limits** | A daily ETH cap per account, counted the same way in chat and on the site |
 | **Sessions** | Server-side sessions that can be revoked. Changing the password signs out every other device |
@@ -298,12 +298,12 @@ xychart-beta
 
 | Quality measure | Today |
 | --- | --- |
-| Automated tests | 2,438 Node tests and 169 Foundry contract tests, all passing |
-| Test files | 187 Node, 8 Foundry |
+| Automated tests | 3,042 Node tests and 194 Foundry contract tests, all passing |
+| Test files | 221 Node, 10 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
-| Database | 72 idempotent migrations, each ending in a post-condition check that fails loudly |
-| API surface | Every payment, limit order and mint re-checks the PIN, except a quick send, which the server decides on its own; every security setting re-checks the account password |
-| Contracts | 14 deployed on GIWA Sepolia, all source verified as a full match |
+| Database | 89 idempotent migrations, each ending in a post-condition check that fails loudly |
+| API surface | Every payment, limit order and mint runs the server's step-up check, which on testnet passes on the signed-in session; every security setting re-checks the account password |
+| Contracts | 17 deployed on GIWA Sepolia, all source verified as a full match |
 
 ---
 

@@ -93,7 +93,7 @@ describe('router wiring', () => {
 
   it('refuses without an unlock PIN, and always sends a PIN link after CONFIRM', () => {
     assert.match(handler, /if \(!siteAcc\.unlock_pin_hash\) \{/);
-    assert.match(handler, /pendingSends\.set\(ctx\.key, \{ plan, createdAt: Date\.now\(\), needsApproval: true \}\);/);
+    assert.match(handler, /pendingSends\.set\(ctx\.key, \{ plan, createdAt: Date\.now\(\), needsApproval: txPin\.required \}\);/);
   });
 
   it('shows the fee, the royalty and what the seller receives before anything is sent', () => {

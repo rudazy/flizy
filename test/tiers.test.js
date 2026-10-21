@@ -124,6 +124,9 @@ describe('isKnownRecipient and sendTier', () => {
 describe("the site's approval gate", () => {
   let stepUp;
   before(async () => {
+    // The transaction PIN is off in the app (web/lib/txPin.ts); this suite turns
+    // it on so the PIN path stays proven for when it comes back.
+    (await import('../web/lib/txPin.ts')).txPin.required = true;
     stepUp = await import('../web/lib/stepUp.ts');
   });
 

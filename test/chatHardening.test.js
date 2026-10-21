@@ -17,11 +17,15 @@
  * Run: node --test test/chatHardening.test.js
  */
 
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
+
+// The transaction PIN is off in the app (web/lib/txPin.ts); this suite turns
+// it on so the PIN path stays proven for when it comes back.
+require('../lib/tiers').txPin.required = true;
 const { PIN_HASH_PRESENT, unlockedSession } = require('./helpers/unlockedChat');
 
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
@@ -342,6 +346,44 @@ describe('quick send: a plain CONFIRM, or the PIN on flizy.app', () => {
     approveOnPage();
     await pollApprovals();
     assert.equal(moved, 1);
+  });
+});
+
+describe('with the transaction PIN off, as the app ships on testnet', () => {
+  const tiers = require('../lib/tiers');
+  const approvals = () => tables().chat_approvals || [];
+
+  beforeEach(() => {
+    tiers.txPin.required = false;
+    seed();
+    router.discardPendingFlows(TG_KEY);
+  });
+  after(() => {
+    tiers.txPin.required = true;
+  });
+
+  for (const [label, text] of [
+    ['a first payment to a Flizy account', '/send 0.001 to @accother'],
+    ['a payment above the quick-send amount', `/send 0.006 to ${FRIEND}`],
+    ['money held for a phone number', '/send 0.001 to 2348099999999'],
+  ]) {
+    it(`sends ${label} on CONFIRM, with no PIN link`, async () => {
+      const sent = [];
+      const ctx = ctxFor(sent);
+      await router.handle(ctx, text);
+      assert.doesNotMatch(sent.join('\n'), /PIN/, sent.join('\n'));
+      await router.handle(ctx, 'confirm');
+      assert.equal(moved, 1, sent.join('\n'));
+      assert.equal(approvals().length, 0);
+    });
+  }
+
+  it('still needs the chat unlocked first', async () => {
+    seed({ unlocked: false });
+    const sent = [];
+    await router.handle(ctxFor(sent), '/send 0.001 to @accother');
+    await router.handle(ctxFor(sent), 'confirm');
+    assert.equal(moved, 0);
   });
 });
 

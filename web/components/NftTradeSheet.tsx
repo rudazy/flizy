@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { parseEther } from 'ethers';
 import { PinField, pinReady } from './PinField';
+import { txPin } from '../lib/txPin';
 import { useDashboard } from './DashboardProvider';
 import { CloseIcon, EthDiamondIcon } from './ExploreIcons';
 import { bpsLabel, ethFromWei, usdLabel } from '../lib/nftFormat';
@@ -119,7 +120,7 @@ export function NftTradeSheet({
   const royaltyValid = intent.action !== 'royalty' || (/^[0-9]{1,2}(\.[0-9]{1,2})?$/.test(bps.trim()) && royaltyInput <= 10);
 
   const needsAmount = intent.action === 'list' || intent.action === 'offer';
-  const ready = !busy && pinReady(pin) && (!needsAmount || typed != null) && royaltyValid;
+  const ready = !busy && (!txPin.required || pinReady(pin)) && (!needsAmount || typed != null) && royaltyValid;
 
   async function submit() {
     if (!ready) return;
@@ -310,7 +311,7 @@ export function NftTradeSheet({
               </>
             ) : null}
 
-            <PinField value={pin} onChange={setPin} />
+            {txPin.required ? <PinField value={pin} onChange={setPin} /> : null}
             {error ? <p className="alert alert-error m-0">{error}</p> : null}
             <button type="button" onClick={submit} disabled={!ready} className="btn-sun h-[44px] rounded-[6px] font-sans text-[13.5px] disabled:opacity-50">
               {busy ? 'Confirming...' : `Confirm ${TITLES[intent.action].toLowerCase()}`}

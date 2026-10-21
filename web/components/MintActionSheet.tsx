@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { PinField, pinReady } from './PinField';
+import { txPin } from '../lib/txPin';
 import { useDashboard } from './DashboardProvider';
 import { CloseIcon, EthDiamondIcon } from './ExploreIcons';
 import { ethFromWei } from '../lib/nftFormat';
@@ -70,7 +71,7 @@ export function MintActionSheet({
   }, [busy, onClose]);
 
   async function submit() {
-    if (busy || !pinReady(pin)) return;
+    if (busy || (txPin.required && !pinReady(pin))) return;
     setBusy(true);
     setError('');
     try {
@@ -132,12 +133,12 @@ export function MintActionSheet({
         ) : (
           <div className="mt-[16px] grid gap-[14px]">
             {children}
-            <PinField value={pin} onChange={setPin} />
+            {txPin.required ? <PinField value={pin} onChange={setPin} /> : null}
             {error ? <p className="alert alert-error m-0">{error}</p> : null}
             <button
               type="button"
               onClick={submit}
-              disabled={busy || !pinReady(pin)}
+              disabled={busy || (txPin.required && !pinReady(pin))}
               className="btn-sun h-[44px] rounded-[6px] font-sans text-[13.5px] disabled:opacity-50"
             >
               {busy ? 'Confirming...' : confirmLabel}

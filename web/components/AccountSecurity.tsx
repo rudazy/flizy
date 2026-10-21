@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { validatePassword } from '../lib/passwordPolicy';
 import { HeroArt, PREF_CARD, PrefHero } from './AccountPrefs';
+import { txPin } from '../lib/txPin';
 import {
   ChevronGlyph,
   FieldLabel,
@@ -70,7 +71,11 @@ export function PinPanel({
         eyebrow="Security"
         title={`${verb} your`}
         accent="PIN"
-        text="Your PIN approves payments, trades and mints on the site, and unlocks chat through a Flizy link. Type it only on flizy.app, never in a chat. Choose 4 to 12 digits and never share it."
+        text={
+          txPin.required
+            ? 'Your PIN approves payments, trades and mints on the site, and unlocks chat through a Flizy link. Type it only on flizy.app, never in a chat. Choose 4 to 12 digits and never share it.'
+            : 'Your PIN unlocks chat through a Flizy link, so a chat app someone else gets into cannot spend. On testnet, payments, trades and mints need no PIN. Type it only on flizy.app, never in a chat. Choose 4 to 12 digits and never share it.'
+        }
         art={<HeroArt src="/account/pin-hero.webp" />}
       />
 
@@ -384,7 +389,9 @@ export function QuickSendPanel({
         <div className="grid gap-1">
           <FieldLabel>Quick send (ETH)</FieldLabel>
           <p className="m-0 font-sans text-[13px] leading-[1.55] text-[#d9d4ca]">
-            {Number(effective) > 0 ? (
+            {!txPin.required ? (
+              <>On testnet no payment asks for your PIN, so this does nothing yet. What you save here applies when the PIN returns.</>
+            ) : Number(effective) > 0 ? (
               <>
                 ETH payments up to <span className="font-semibold text-white">{effective} ETH</span> to someone you
                 have paid before, or on your trusted list, need no PIN. Everything else asks for it.

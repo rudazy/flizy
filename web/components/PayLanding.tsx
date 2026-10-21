@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PinField, pinReady } from './PinField';
+import { txPin } from '../lib/txPin';
 import { withinQuickSend } from '../lib/quickSend';
 import { PAY_ASSETS, type PayAsset } from '../lib/payAsset';
 import { symbolLabel } from '../lib/listedTokens';
@@ -68,8 +69,10 @@ export function PayLanding({
   /** Pay a token amount with ETH (POST /api/pay/swap). Off until the payer asks for it. */
   const [withEth, setWithEth] = useState(false);
   const [ethQuote, setEthQuote] = useState<{ maxEth: string } | null>(null);
-  // Paying with ETH is a swap, and a swap always takes the PIN.
-  const needsPin = withEth || pinAsked || !(asset === 'ETH' && known && withinQuickSend(amount, quickSendEth));
+  // With the transaction PIN off (web/lib/txPin.ts) no payment asks for it.
+  // With it on, paying with ETH always does, and so does anything past quick send.
+  const needsPin =
+    txPin.required && (withEth || pinAsked || !(asset === 'ETH' && known && withinQuickSend(amount, quickSendEth)));
 
   async function quoteWithEth() {
     setMsg('');
@@ -285,11 +288,11 @@ export function PayLanding({
           ) : null}
           {needsPin ? (
             <PinField id="pay-pin" value={pin} onChange={setPin} />
-          ) : (
+          ) : txPin.required ? (
             <p className="text-sm text-muted">
               Quick send: no PIN for up to {quickSendEth} ETH to someone you have paid before.
             </p>
-          )}
+          ) : null}
           {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
           <div className="grid grid-cols-[auto_1fr] gap-2">
             <button

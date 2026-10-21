@@ -13,6 +13,7 @@ import { announceTx } from '../../../lib/txSignal';
 import { AmmoraSwapPanel } from '../../../components/AmmoraSwapPanel';
 import { ammoraUiEnabled } from '../../../components/AmmoraTokens';
 import { pinReady } from '../../../components/PinField';
+import { txPin } from '../../../lib/txPin';
 import {
   ArrowRightIcon,
   ChartLineIcon,
@@ -183,9 +184,10 @@ function SwapPage() {
   const inputs = `${amountIn}|${tokenIn}|${tokenOut}|${slippageBps}`;
   const quote = quoted && quoted.inputs === inputs ? quoted : null;
 
-  // Only a limit order takes the PIN: it fills later without asking. A swap or
-  // a liquidity change keeps the value in the wallet and takes none on testnet.
-  const pinNeeded = mode === 'limit';
+  // Only a limit order can take the PIN: it fills later without asking. A swap
+  // or a liquidity change keeps the value in the wallet and takes none on
+  // testnet, and with the transaction PIN off (web/lib/txPin.ts) neither does it.
+  const pinNeeded = txPin.required && mode === 'limit';
 
   const loadBalances = useCallback(async () => {
     try {
@@ -876,7 +878,7 @@ function SwapPage() {
           {swapCta}
         </CtaButton>
       ) : mode === 'limit' ? (
-        <CtaButton disabled={busy || !(Number(amountIn) > 0) || !(Number(limitPrice) > 0) || !pinReady(pin)} onClick={placeOrder}>
+        <CtaButton disabled={busy || !(Number(amountIn) > 0) || !(Number(limitPrice) > 0) || (pinNeeded && !pinReady(pin))} onClick={placeOrder}>
           {busy ? 'Placing...' : 'Place limit order'}
         </CtaButton>
       ) : lpMode === 'add' ? (
