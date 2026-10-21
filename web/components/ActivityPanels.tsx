@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AppSection } from './AppSection';
 import { useDashboard } from './DashboardProvider';
+import { ShareReceiptButton } from './ShareReceiptButton';
 import {
   ArrowDownIcon,
   ChevronRightIcon,
@@ -327,10 +328,18 @@ function HistoryCard({
               View on explorer <ExternalLinkIcon size={12} />
             </a>
           ) : null}
+          {receiptable(row) ? <ShareReceiptButton transferId={row.id} className="justify-self-start text-left text-sun disabled:opacity-60" /> : null}
         </div>
       ) : null}
     </article>
   );
+}
+
+const TRANSFER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A confirmed payment either way has a receipt; swaps, claims and faucet rows do not. */
+function receiptable(row: ActivityItem): boolean {
+  return (row.type === 'transfer' || row.type === 'receive') && row.status === 'confirmed' && TRANSFER_ID_RE.test(row.id);
 }
 
 function Detail({ label, value }: { label: string; value: ReactNode }) {

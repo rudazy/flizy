@@ -240,6 +240,124 @@ describe('what frees a claim and what keeps it', () => {
   });
 });
 
+describe('test USD', () => {
+  const TUSD_ADDRESS = '0x4F28C18600c312Bfa8e8281D882e0EC306F82446';
+  const TUSD_UNITS = 100n * 10n ** 6n;
+
+  beforeEach(() => seed());
+
+  /** A dispenser that holds tokens as well as ETH, and records token sends apart. */
+  function usdSender({ eth = 10n ** 18n, held = 10n ** 12n, sendError = null, outcome = 'confirmed' } = {}) {
+    const s = sender({ balance: eth });
+    s.tokenSends = [];
+    s.tokenBalance = async () => held;
+    s.sendToken = async (token, to, units) => {
+      if (sendError) throw sendError;
+      s.tokenSends.push({ token, to, units });
+      return { hash: HASH(100 + s.tokenSends.length), wait: async () => outcome };
+    };
+    return s;
+  }
+
+  it('reads usd and tusd as tUSD, nothing as ETH, and refuses anything else', () => {
+    assert.equal(F.normalizeFaucetAsset('tusd'), 'TUSD');
+    assert.equal(F.normalizeFaucetAsset('USD'), 'TUSD');
+    assert.equal(F.normalizeFaucetAsset(null), 'ETH');
+    assert.equal(F.normalizeFaucetAsset(''), 'ETH');
+    assert.throws(() => F.normalizeFaucetAsset('FLZ'), { message: F.FAUCET_UNKNOWN_ASSET });
+  });
+
+  it('sends exactly 100 tUSD from the tUSD contract to the stored wallet and starts a 24-hour wait', async () => {
+    const s = usdSender();
+    const before = Date.now();
+    const receipt = await F.claimFaucet(ALICE, { client: c(), sender: s, asset: 'TUSD' });
+    assert.equal(s.sends.length, 0, 'no ETH sent');
+    assert.equal(s.tokenSends.length, 1);
+    assert.equal(s.tokenSends[0].token, TUSD_ADDRESS);
+    assert.equal(s.tokenSends[0].to.toLowerCase(), WALLET);
+    assert.equal(s.tokenSends[0].units, TUSD_UNITS);
+    assert.equal(receipt.asset, 'TUSD');
+    assert.equal(receipt.unit, 'tUSD');
+    assert.equal(receipt.amount, '100');
+    const wait = new Date(receipt.nextClaimAt).getTime() - before;
+    assert.ok(wait > 23.9 * 3600e3 && wait <= 24 * 3600e3 + 5000, String(wait));
+    assert.equal(claims()[0].asset, 'TUSD');
+    assert.equal(claims()[0].amount_wei, String(TUSD_UNITS));
+  });
+
+  it('keeps the ETH and tUSD waits apart', async () => {
+    const s = usdSender();
+    await F.claimFaucet(ALICE, { client: c(), sender: s });
+    await F.claimFaucet(ALICE, { client: c(), sender: s, asset: 'TUSD' });
+    assert.equal(s.sends.length, 1);
+    assert.equal(s.tokenSends.length, 1);
+    await assert.rejects(() => F.claimFaucet(ALICE, { client: c(), sender: s, asset: 'TUSD' }), { message: F.FAUCET_COOLDOWN });
+    await assert.rejects(() => F.claimFaucet(ALICE, { client: c(), sender: s }), { message: F.FAUCET_COOLDOWN });
+    process.env.FAUCET_PRIVATE_KEY = '0x' + '11'.repeat(32);
+    try {
+      const usd = await F.faucetStatus(ALICE, c(), Date.now(), 'TUSD');
+      assert.equal(usd.unit, 'tUSD');
+      assert.equal(usd.cooldownHours, 24);
+      assert.ok(usd.nextClaimAt);
+      const eth = await F.faucetStatus(ALICE, c());
+      assert.equal(eth.unit, 'ETH');
+      assert.equal(eth.cooldownHours, 72);
+      assert.ok(eth.nextClaimAt);
+    } finally {
+      delete process.env.FAUCET_PRIVATE_KEY;
+    }
+  });
+
+  it('counts an old claim with no asset as ETH, never against tUSD', async () => {
+    claims().push({ id: 'legacy', account_id: ALICE, to_address: WALLET, amount_wei: '1', status: 'confirmed', tx_hash: HASH(9), created_at: new Date().toISOString() });
+    const s = usdSender();
+    await F.claimFaucet(ALICE, { client: c(), sender: s, asset: 'TUSD' });
+    assert.equal(s.tokenSends.length, 1);
+    await assert.rejects(() => F.claimFaucet(ALICE, { client: c(), sender: s }), { message: F.FAUCET_COOLDOWN });
+  });
+
+  it('frees it, and sends nothing, when the dispenser holds less than one claim', async () => {
+    const s = usdSender({ held: TUSD_UNITS - 1n });
+    await assert.rejects(() => F.claimFaucet(ALICE, { client: c(), sender: s, asset: 'TUSD' }), { message: F.FAUCET_EMPTY });
+    assert.equal(s.tokenSends.length, 0);
+    assert.equal(claims()[0].status, 'failed');
+  });
+
+  it('frees it, and sends nothing, when the dispenser has no ETH for the gas', async () => {
+    const s = usdSender({ eth: 0n });
+    await assert.rejects(() => F.claimFaucet(ALICE, { client: c(), sender: s, asset: 'TUSD' }), { message: F.FAUCET_EMPTY });
+    assert.equal(s.tokenSends.length, 0);
+  });
+
+  it('names tUSD when the send fails, and frees the claim', async () => {
+    const s = usdSender({ sendError: new Error('boom') });
+    await assert.rejects(() => F.claimFaucet(ALICE, { client: c(), sender: s, asset: 'TUSD' }), { message: F.FAUCET_SEND_FAILED_TUSD });
+    assert.equal(claims()[0].status, 'failed');
+  });
+
+  it('reads a database without the asset column as ETH only', async () => {
+    const client = {
+      ...c(),
+      from(table) {
+        const query = c().from(table);
+        if (table !== 'faucet_claims') return query;
+        const select = query.select.bind(query);
+        query.select = (cols) => (/\basset\b/.test(cols) ? { eq: () => ({ gte: () => ({ order: () => ({ limit: async () => ({ data: null, error: { message: 'column faucet_claims.asset does not exist' } }) }) }) }) } : select(cols));
+        return query;
+      },
+    };
+    process.env.FAUCET_PRIVATE_KEY = '0x' + '11'.repeat(32);
+    try {
+      const eth = await F.faucetStatus(ALICE, client);
+      assert.equal(eth.nextClaimAt, null);
+      const usd = await F.faucetStatus(ALICE, client, Date.now(), 'TUSD');
+      assert.equal(usd.nextClaimAt, null);
+    } finally {
+      delete process.env.FAUCET_PRIVATE_KEY;
+    }
+  });
+});
+
 describe('the dispenser key', () => {
   const saved = {};
   beforeEach(() => {
@@ -301,8 +419,19 @@ describe('faucet source', () => {
     const route = read('web/app/api/faucet/claim/route.ts');
     assert.match(route, /rejectIfCrossOrigin\(req\)/);
     assert.match(route, /getAccountIdFromCookie\(\)/);
-    assert.doesNotMatch(route, /req\.json\(/);
-    assert.match(route, /claimFaucet\(accountId\)/);
+    assert.doesNotMatch(route, /req\.json\(|req\.text\(|req\.formData\(/);
+    // The query names an asset and nothing else; normalizeFaucetAsset allows two.
+    assert.match(route, /const asset = normalizeFaucetAsset\(new URL\(req\.url\)\.searchParams\.get\('asset'\)\);/);
+    assert.match(route, /claimFaucet\(accountId, \{ asset \}\)/);
+  });
+
+  it('keeps the asset column and the per-asset reservation away from anon and authenticated', () => {
+    const sql = read('supabase/migrations/20261021120000_faucet_test_usd.sql');
+    assert.match(sql, /check \(asset in \('ETH', 'TUSD'\)\)/);
+    assert.match(sql, /revoke all on function public\.try_faucet_claim\(uuid, text, numeric, integer, text\) from anon, authenticated;/);
+    assert.match(sql, /revoke all on function public\.try_faucet_claim\(uuid, text, numeric, integer\) from anon, authenticated;/);
+    assert.match(sql, /and c\.asset = p_asset/);
+    assert.match(sql, /raise exception 'faucet_claims\.asset is missing'/);
   });
 
   it('keeps the claim functions and tables away from anon and authenticated', () => {

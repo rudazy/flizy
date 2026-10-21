@@ -858,12 +858,12 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                 <AboutRow label="Status">
                   {ammora
                     ? 'An Ammora launch. Flizy has not reviewed this token.'
-                    : listed
+                    : listed || (contract != null && listedByAddress(contract)?.sendable === true)
                       ? 'Verified. It can be sent on socials.'
                       : verifiedMark
-                        ? 'Verified. Only ETH and FLZ can be sent on socials.'
+                        ? 'Verified. Only ETH, FLZ and tUSD can be sent on socials.'
                         : seeded
-                          ? 'Listed on Flizy. Only ETH and FLZ can be sent on socials.'
+                          ? 'Listed on Flizy. Only ETH, FLZ and tUSD can be sent on socials.'
                           : 'Not listed. Flizy does not trade or send it.'}
                 </AboutRow>
               </dl>

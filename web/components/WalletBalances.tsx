@@ -8,6 +8,7 @@ import { useTapGesture } from './AppSection';
 import { isHeld } from '../lib/dashboardTypes';
 import { VerifiedMark } from './VerifiedMark';
 import { tokenLogo } from '../lib/tokenLogos';
+import { symbolLabel } from '../lib/listedTokens';
 import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
 import { WalletNfts } from './WalletNfts';
 import { WalletOffers } from './WalletOffers';
@@ -330,7 +331,7 @@ export function WalletBalances() {
                     </span>
                   )
                 }
-                symbol={t.symbol}
+                symbol={t.verified ? symbolLabel(t.symbol) : t.symbol}
                 tag={
                   t.verified ? (
                     <VerifiedMark />

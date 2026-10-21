@@ -438,7 +438,8 @@ A listed token:
   (`isUnverifiedSwap` in `lib/dex.js` and `web/lib/swapGate.ts` refuses every other
   token).
 
-`verified` on a listed token (IZY and MAKI, not DCAT) is display only: it draws the mark.
-Sending on socials is a separate fixed list, ETH and FLZ, in `listedSendSymbols` and
+`verified` on a listed token (IZY, MAKI and TUSD, not DCAT) is display only: it draws the mark.
+Sending on socials is a separate fixed list, ETH, FLZ and every listed token marked
+`sendable` (today only TUSD, Flizy Test USD), in `listedSendSymbols` and
 `web/lib/payAsset.ts`. Site liquidity works for every listed pool; limit orders remain FLZ
 only.

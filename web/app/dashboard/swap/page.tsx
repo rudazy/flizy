@@ -7,7 +7,7 @@ import { AppTopBar } from '../../../components/AppTopBar';
 import { AppPage } from '../../../components/AppSection';
 import { formatAmount } from '../../../lib/amountDisplay';
 import { pairFromQuery, SWAP_ASSETS, type SwapToken } from '../../../lib/swapPair';
-import { LISTED_TOKENS, listedBySymbol } from '../../../lib/listedTokens';
+import { LISTED_TOKENS, listedBySymbol, symbolLabel } from '../../../lib/listedTokens';
 import { tokenLogo } from '../../../lib/tokenLogos';
 import { announceTx } from '../../../lib/txSignal';
 import { AmmoraSwapPanel } from '../../../components/AmmoraSwapPanel';
@@ -1020,7 +1020,7 @@ function TokenPanel({
         <label className="relative flex w-[138px] shrink-0 cursor-pointer items-center gap-[11px] border-r border-[#2a2b30] pl-[11px] pr-[10px]">
           <TokenLogo token={token} />
           <span className="min-w-0 flex-1">
-            <span className="block font-sans text-[11.5px] font-semibold text-white">{token}</span>
+            <span className="block font-sans text-[11.5px] font-semibold text-white">{symbolLabel(token)}</span>
             <span className="block truncate font-sans text-[9.2px] text-[#a9a9a9]">{tokenName(token)}</span>
           </span>
           <ChevronDownIcon size={11} className="shrink-0 text-[#d9d9d9]" />
@@ -1032,7 +1032,7 @@ function TokenPanel({
           >
             {options.map((t) => (
               <option key={t} value={t}>
-                {t}
+                {symbolLabel(t)}
               </option>
             ))}
           </select>
@@ -1288,7 +1288,7 @@ function TokenSelect({
     <label className="relative flex h-[44px] w-[46%] min-w-[108px] max-w-[148px] shrink-0 cursor-pointer items-center gap-[8px] rounded-[8px] border border-[#3a3017] bg-[#14120c] pl-[8px] pr-[8px]">
       <TokenLogo token={token} size={26} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-sans text-[13px] font-semibold leading-[16px] text-white">{token}</span>
+        <span className="block truncate font-sans text-[13px] font-semibold leading-[16px] text-white">{symbolLabel(token)}</span>
         <span className="block truncate font-sans text-[9px] text-[#9d9d9d]">{tokenName(token)}</span>
       </span>
       <ChevronDownIcon size={12} className="shrink-0 text-[#d6c48a]" />
@@ -1300,7 +1300,7 @@ function TokenSelect({
       >
         {options.map((t) => (
           <option key={t} value={t}>
-            {t}, {tokenName(t)}
+            {symbolLabel(t)}, {tokenName(t)}
           </option>
         ))}
       </select>

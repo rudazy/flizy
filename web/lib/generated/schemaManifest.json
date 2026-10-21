@@ -322,8 +322,68 @@
     },
     {
       "kind": "check",
+      "name": "external_pay_attempts.external_pay_attempts_ip_key_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_pay_attempts"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_amount_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_asset_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_invoice_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_note_len",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_payee_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_payer_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_token_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_tx_hash_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
       "name": "faucet_claims.faucet_claims_amount_check",
       "providedBy": "20261010120000_faucet_claims.sql",
+      "requiredBy": "check on faucet_claims"
+    },
+    {
+      "kind": "check",
+      "name": "faucet_claims.faucet_claims_asset_check",
+      "providedBy": "20261021120000_faucet_test_usd.sql",
       "requiredBy": "check on faucet_claims"
     },
     {
@@ -814,6 +874,18 @@
     },
     {
       "kind": "check",
+      "name": "transfers.transfers_eth_in_check",
+      "providedBy": "20261021160000_pay_with_eth_limit.sql",
+      "requiredBy": "check on transfers"
+    },
+    {
+      "kind": "check",
+      "name": "transfers.transfers_receipt_token_format",
+      "providedBy": "20261021140000_transfer_receipts.sql",
+      "requiredBy": "check on transfers"
+    },
+    {
+      "kind": "check",
       "name": "transfers.transfers_venue_check",
       "providedBy": "20261016140000_ammora_venue.sql",
       "requiredBy": "check on transfers"
@@ -893,7 +965,7 @@
     {
       "kind": "function",
       "name": "daily_native_sent_eth",
-      "providedBy": "20261016130000_executor_reconcile.sql",
+      "providedBy": "20261021160000_pay_with_eth_limit.sql",
       "requiredBy": "web/lib/dailyLimits.ts"
     },
     {
@@ -1031,7 +1103,7 @@
     {
       "kind": "function",
       "name": "try_faucet_claim",
-      "providedBy": "20261010120000_faucet_claims.sql",
+      "providedBy": "20261021120000_faucet_test_usd.sql",
       "requiredBy": "web/lib/faucet.ts"
     },
     {
@@ -1074,7 +1146,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/auth/signup/verify/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pin/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/lib/accountReset.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/invite.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/pinGate.ts, web/lib/saleNotice.ts, web/lib/securityNotice.ts, web/lib/siteSearch.ts, web/lib/tasks.ts, web/lib/tiers.ts, web/lib/tokenSocial.ts"
+      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/outside-pay/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/auth/signup/verify/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/external/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pay/swap/route.ts, web/app/api/payments/received/route.ts, web/app/api/pin/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/app/pay/[code]/page.tsx, web/app/pay/c/[code]/page.tsx, web/lib/accountReset.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/invite.ts, web/lib/merchant.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/pinGate.ts, web/lib/receipts.ts, web/lib/saleNotice.ts, web/lib/securityNotice.ts, web/lib/siteSearch.ts, web/lib/tasks.ts, web/lib/tiers.ts, web/lib/tokenSocial.ts"
     },
     {
       "kind": "table",
@@ -1117,6 +1189,18 @@
       "name": "email_verifications",
       "providedBy": "20260805200000_email_verification.sql",
       "requiredBy": "web/lib/emailVerify.ts"
+    },
+    {
+      "kind": "table",
+      "name": "external_pay_attempts",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "web/lib/externalPay.ts"
+    },
+    {
+      "kind": "table",
+      "name": "external_payments",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "web/lib/externalPay.ts"
     },
     {
       "kind": "table",
@@ -1224,7 +1308,7 @@
       "kind": "table",
       "name": "pay_codes",
       "providedBy": "20260816000000_pay_codes.sql",
-      "requiredBy": "web/lib/payCode.ts"
+      "requiredBy": "web/lib/merchant.ts, web/lib/payCode.ts"
     },
     {
       "kind": "table",
@@ -1320,7 +1404,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/swapRateLimit.ts"
+      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/swap/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/externalPay.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/merchant.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/receipts.ts, web/lib/swapRateLimit.ts"
     },
     {
       "kind": "table",

@@ -166,6 +166,22 @@
         "seed": { "token": "600000", "eth": "1" },
         "seedTx": "0xcff5e94b4e995b3f962c3b013d8d928b9617614f3146e372f27c2b8e2224bf5f",
         "seedBlock": 38218044
+      },
+      "TUSD": {
+        "name": "Flizy Test USD",
+        "symbol": "tUSD",
+        "address": "0x4F28C18600c312Bfa8e8281D882e0EC306F82446",
+        "decimals": 6,
+        "supply": "1000000000",
+        "deployTx": "0x5486279fa7d00b5a58b095ae63788b35b9bdc7b41cb5c3087c32005ec241bad6",
+        "deployBlock": 39223474,
+        "constructorArgs": ["1000000000000000", "0x81Fb7Ed21B9843D2D5C232A7F3e959F91993401B"],
+        "pairWeth": "0xa20728AF77F48b1cabeA5A95DE770eC405334e50",
+        "seed": { "token": "800", "eth": "0.2" },
+        "seedTx": "0x3733492bd4dfa9449e3f339649cf614983db6c16132c439ecea99f82560e3ed9",
+        "seedBlock": 39223486,
+        "seededAt": "2026-10-21",
+        "script": "contracts/script/DeployTestUSD.s.sol"
       }
     },
     "verified": true,
@@ -174,7 +190,25 @@
       "DCAT is a third-party launchpad token (launchFactory 0xb3B575A35844CB4Ad77beB243f6daadC9Ad42e0e), not source verified. Its bytecode has no mint, owner or blacklist function; its launch transfer limits ended at block 37462734. It has no transfer tax: a fork buy returned exactly the router quote.",
       "DCAT was seeded at about 827700 DCAT per ETH, the price of its Uniswap V3 pool 0x3be84d789357ff44FFC8301A76585b6556660E24 at the time, so the two pools opened without an arbitrage gap.",
       "The deployer key also submits live handleOps, so a script run can lose a nonce to it. The script stopped after the DCAT pool for that reason; the IZY and MAKI approve and addLiquidityETH calls were then sent one at a time with the same amounts.",
-      "All three pairs and both tokens are source verified on the explorer (full match). The app lists these tokens from web/lib/listedTokens.ts and lib/listedTokens.js."
+      "All three pairs and both tokens are source verified on the explorer (full match). The app lists these tokens from web/lib/listedTokens.ts and lib/listedTokens.js.",
+      "TUSD is contracts/src/dex/FlizyTestUSD.sol (contract symbol tUSD): six decimals, fixed supply minted once to the deployer, no owner, no mint, no fee, no pause. It is test money and pegs to nothing. It is the one listed token that can be sent on socials.",
+      "TUSD's pool opened at 4000 tUSD per ETH, seeded by DeployTestUSD.s.sol with --slow so each transaction waited for the last. The ETH side is small because the deployer also pays gas for live handleOps.",
+      "People get tUSD from the Flizy faucet; the dispenser is funded by transfer from the deployer's unseeded supply. First funding: 1000000 tUSD on 2026-10-21, tx 0xc5e5a80ea2f5d89e135825524c1a9d29ff996a00f4a918c786882c9fd458f9fc (block 39233082).",
+      "TUSD and its pair are source verified on the explorer; the pair matched the already verified UniswapV2Pair bytecode."
+    ]
+  },
+  "paymentReceiver": {
+    "address": "0x12197866DdD74b0F37D2127AC5e2E69dFF6d6FF1",
+    "deployedAt": "2026-10-21",
+    "deployBlock": 39227190,
+    "deployTx": "0x6fd5ee68718ed44e0a7815c8f403ad58ae7b26d1a2b027143c6224d26b1a8391",
+    "script": "contracts/script/DeployPaymentReceiver.s.sol",
+    "constructorArgs": [],
+    "verified": true,
+    "explorer": "https://sepolia-explorer.giwa.io/address/0x12197866DdD74b0F37D2127AC5e2E69dFF6d6FF1",
+    "notes": [
+      "contracts/src/pay/FlizyPaymentReceiver.sol: payNative and payToken forward the whole amount to the payee in the same transaction and emit PaymentReceived(invoiceId, payer, payee, token, amount). No owner, no fee, no storage, no sweep; bare ETH is refused.",
+      "Lets a wallet outside Flizy pay a Flizy account from a pay link. The site records a payment only after reading this contract's event from the transaction receipt and matching payee, token and amount."
     ]
   }
 }

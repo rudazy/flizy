@@ -461,13 +461,21 @@ function createFakeSupabase(seed = {}, opts = {}) {
      * one opens. Failed claims and pending ones abandoned for five minutes do
      * not count. Synchronous, so two calls cannot interleave, as under the
      * advisory lock.
+     *
+     * 20261021120000_faucet_test_usd.sql: each asset has its own wait. The
+     * four-argument call is ETH; a row with no asset is ETH, as the column
+     * default makes every row written before it.
      */
-    try_faucet_claim({ p_account_id, p_to, p_amount_wei, p_cooldown_hours }) {
+    try_faucet_claim({ p_account_id, p_to, p_amount_wei, p_cooldown_hours, p_asset = 'ETH' }) {
+      if (!['ETH', 'TUSD'].includes(p_asset)) {
+        return { data: null, error: { message: 'try_faucet_claim: bad arguments' } };
+      }
       const now = Date.now();
       const windowMs = Number(p_cooldown_hours) * 3600e3;
       db.tables.faucet_claims = db.tables.faucet_claims || [];
       const counting = db.tables.faucet_claims.filter((c) => {
         const at = new Date(c.created_at).getTime();
+        if ((c.asset || 'ETH') !== p_asset) return false;
         if (String(c.account_id) !== String(p_account_id) || at <= now - windowMs) return false;
         if (c.status === 'failed') return false;
         return !(c.status === 'pending' && !c.tx_hash && at < now - 5 * 60e3);
@@ -481,6 +489,7 @@ function createFakeSupabase(seed = {}, opts = {}) {
         account_id: p_account_id,
         to_address: p_to,
         amount_wei: String(p_amount_wei),
+        asset: p_asset,
         status: 'pending',
         tx_hash: null,
         error: null,

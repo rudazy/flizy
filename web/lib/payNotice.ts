@@ -8,18 +8,23 @@
  */
 
 import { displaySafeLabel } from './sanitize.ts';
+import { symbolLabel } from './listedTokens.ts';
 
 export function formatPaymentReceived(p: {
   amount: string;
   asset: string;
+  /** What it was for, already cleaned by cleanPayNote; flattened again here. */
+  note?: string | null;
   fromLabel: string;
   walletUrl: string;
 }): string {
   // The payer's name is another user's text: flattened, and braces removed so
   // it can never read as a command marker.
   const from = displaySafeLabel(String(p.fromLabel || '').replace(/[{}]/g, '')) || 'someone';
+  const note = p.note ? displaySafeLabel(String(p.note).replace(/[{}]/g, ''), 80) : '';
   return [
-    `You received ${p.amount} ${p.asset} from ${from}.`,
+    `You received ${p.amount} ${symbolLabel(p.asset)} from ${from}.`,
+    ...(note ? [`For: ${note}`] : []),
     '',
     `It is in your Flizy wallet: ${p.walletUrl}`,
   ].join('\n');

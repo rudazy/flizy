@@ -5,8 +5,8 @@
 <h1 align="center">Flizy</h1>
 
 <p align="center">
-  <strong>Send crypto the way you send a message.</strong><br />
-  Payments, NFTs and trading from WhatsApp, Telegram and the web,<br />
+  <strong>Pay anyone with a phone number.</strong><br />
+  Payments, pay links, requests and receipts from WhatsApp, Telegram and the web,<br />
   where money can only move to destinations you approved.
 </p>
 
@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  Live at <a href="https://flizy.app">flizy.app</a> · GIWA Sepolia testnet · 14 contracts deployed and source verified
+  Live at <a href="https://flizy.app">flizy.app</a> · GIWA Sepolia testnet · 17 contracts deployed and source verified
 </p>
 
 ---
@@ -107,9 +107,15 @@ another adapter, not a second product.
 | **Chat payments** | Send ETH, FLZ and NFTs from WhatsApp or Telegram, with a plan and a confirm for every move | Live |
 | **Pay by identity** | Pay a Flizy `@username`, a 9-digit Flizy number, or a scanned QR. First payments are flagged | Live |
 | **Escrow claims** | Send to a phone, email, GitHub, Discord or Telegram identity. Funds wait in escrow until the owner proves that identity; the sender can cancel until then | Live (X identities: linking paused) |
-| **Pay me** | A personal QR, Flizy number and pay link, printable | Live |
+| **Pay me** | A personal QR, Flizy number and pay link, printable. "Ask for an amount" makes a link that opens with the amount, asset and note filled in | Live |
+| **Requests** | `request 50 tusd from @ada for design work`. The payer sees who asks, for what, and a warning when they have never paid that person. At most 20 requests an hour per account | Live |
+| **Receipts** | Every confirmed payment can be shared as a receipt page with a link preview. Chat sends reply with the link. Each person is named only if they chose to be named on Scan | Live |
+| **Pay from any wallet** | Off by default. When the owner turns it on, someone without Flizy can pay their pay link from their own browser wallet through FlizyPaymentReceiver; Flizy records it only after reading the payment from the chain | Live |
+| **Pay with ETH** | Pay a tUSD or FLZ amount with ETH in one swap that delivers to the payee. They receive at least the amount asked; the ETH counts toward the daily limit | Live |
+| **Get paid** | Payments received over 30, 90 or 365 days, totals per asset, a CSV export, and refunds back through the pay page | Live |
 | **Swap and liquidity** | Trade ETH against FLZ, IZY, MAKI or DCAT, and add liquidity to any of those pools, with fees and slippage shown before confirm | Live |
-| **Listed tokens** | FLZ, IZY and MAKI are verified; DCAT is listed. Each trades against an ETH pool Flizy seeded and shows in Explore, Home and the wallet. Only ETH and FLZ can be sent on socials | Live |
+| **Listed tokens** | FLZ, IZY, MAKI and tUSD are verified; DCAT is listed. Each trades against an ETH pool Flizy seeded and shows in Explore, Home and the wallet. Only ETH, FLZ and tUSD can be sent on socials | Live |
+| **Test dollars** | Flizy Test USD (tUSD), six decimals, fixed supply. Claim 100 a day from the faucet, then send, pay and request it like any other listed asset. It is test money and pegs to nothing | Live |
 | **Limit orders** | Place an FLZ buy or sell at a price; a watcher fills it when the pool reaches it | Live |
 | **NFT marketplace** | Browse collections, list, buy, make and accept offers, with creator royalties up to 10% | Live |
 | **Mints** | Launch a drop with public and allowlist phases, prices, limits and schedule; bring an existing collection | Live |
@@ -312,6 +318,7 @@ xychart-beta
 | **FlizyMarketplace** | ERC-721 listings, offers and royalties; 2% fixed fee | [`0x7e81...F64a`](https://sepolia-explorer.giwa.io/address/0x7e817b6c42C14C0eC90be76030f808eFB20dF64a) |
 | **FlizyDrop** | Runs every Flizy-managed mint: phases, allowlist, limits; 2% fixed fee on paid mints | [`0x8E5f...56cA`](https://sepolia-explorer.giwa.io/address/0x8E5f6205EF8bd47AB17EC03D529a3456EA8a56cA) |
 | **FlizyCollectionFactory** | Creates Flizy-native collections owned by the creator | [`0xFF60...0746`](https://sepolia-explorer.giwa.io/address/0xFF6035Bb2ef88Ff5F158C411a2337FF767270746) |
+| **FlizyPaymentReceiver** | Lets an outside wallet pay a Flizy account; forwards every payment to the payee in the same transaction, keeps nothing, no owner | [`0x1219...6FF1`](https://sepolia-explorer.giwa.io/address/0x12197866DdD74b0F37D2127AC5e2E69dFF6d6FF1) |
 | **FlizyFeeRouter** | Swap protocol fee, 30 bps default, 100 bps maximum | [`0x6427...d9cC`](https://sepolia-explorer.giwa.io/address/0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC) |
 | **UniswapV2Router02** | Swaps and liquidity | [`0x4055...Faa0`](https://sepolia-explorer.giwa.io/address/0x4055413A4757e069bbCAc481639EF2814224Faa0) |
 | **UniswapV2Factory** | Pair registry | [`0xBB1d...2BbF`](https://sepolia-explorer.giwa.io/address/0xBB1d2c582E455B448660A199097A54DF29162BbF) |
@@ -321,6 +328,8 @@ xychart-beta
 | **MAKI** | Verified listed token (`FlizyToken`), 1,000,000 fixed supply, no owner | [`0xd08d...693d`](https://sepolia-explorer.giwa.io/address/0xd08d83cdf19Db8CCd53Ed462034c8631De5F693d) |
 | **IZY / WETH pair** | The ETH and IZY pool | [`0x2fC4...29Da`](https://sepolia-explorer.giwa.io/address/0x2fC40Df0c997310E07370cE547c56A0014B029Da) |
 | **MAKI / WETH pair** | The ETH and MAKI pool | [`0xf9A9...33c5`](https://sepolia-explorer.giwa.io/address/0xf9A9FCF725bE455E9523a4846C649BC86d6533c5) |
+| **tUSD** | Flizy Test USD (`FlizyTestUSD`), 1,000,000,000 fixed supply, 6 decimals, no owner | [`0x4F28...2446`](https://sepolia-explorer.giwa.io/address/0x4F28C18600c312Bfa8e8281D882e0EC306F82446) |
+| **tUSD / WETH pair** | The ETH and tUSD pool | [`0xa207...4e50`](https://sepolia-explorer.giwa.io/address/0xa20728AF77F48b1cabeA5A95DE770eC405334e50) |
 | **DCAT / WETH pair** | The ETH and DCAT pool | [`0x3083...1797`](https://sepolia-explorer.giwa.io/address/0x3083C7Aa86Bc20256439c102156E7fCbe7b91797) |
 | **WETH9** | Wrapped ETH | [`0x3a13...6BDf`](https://sepolia-explorer.giwa.io/address/0x3a13399f2741122B63c7710B2A85346B97C6BFDf) |
 
@@ -361,7 +370,7 @@ WhatsApp uses the `flizy` prefix. Telegram uses `/command` and also accepts the 
 | `send TICKER to ...` | No amount: Flizy reads your wallet and asks which token or NFT |
 | `send N TICKER to ...` · `nft send TICKER ID to ...` | Send NFTs, one confirm each |
 | `claim` · `cancel claims` | Receive or cancel holds |
-| `request` · `pay` · `requests` | Payment requests |
+| `request AMOUNT [TOKEN] from name [for NOTE]` · `pay` · `requests` | Payment requests, in ETH, FLZ or tUSD |
 | `swap AMOUNT ETH for FLZ` · `buy 100 IZY` · `sell 10 MAKI` · `price FLZ` | Trading FLZ and the listed tokens against ETH |
 | `confirm` · `cancel` | Execute or drop the pending plan |
 | `lock` · `unlock` (PIN entered on a Flizy link, never in chat) | Device control, per channel |

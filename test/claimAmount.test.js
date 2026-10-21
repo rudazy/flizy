@@ -54,8 +54,23 @@ describe('claimAssetSymbol / formatClaimAmount', () => {
 });
 
 describe('listed send assets', () => {
-  it('lists ETH and FLZ only', () => {
-    assert.deepEqual(listedSendSymbols(), ['ETH', 'FLZ']);
+  it('lists ETH, FLZ and tUSD only', () => {
+    assert.deepEqual(listedSendSymbols(), ['ETH', 'FLZ', 'TUSD']);
+  });
+
+  it('resolves tUSD, typed as tusd or usd, to the listed contract', () => {
+    for (const typed of ['tUSD', 'tusd', 'USD']) {
+      const a = resolveListedSendAsset(typed);
+      assert.equal(a.native, false);
+      assert.equal(a.symbol, 'TUSD');
+      assert.equal(a.tokenAddress, '0x4F28C18600c312Bfa8e8281D882e0EC306F82446');
+    }
+  });
+
+  it('keeps listed tokens that are not sendable off socials', () => {
+    for (const typed of ['IZY', 'MAKI', 'DCAT']) {
+      assert.throws(() => resolveListedSendAsset(typed), /can be sent on socials/);
+    }
   });
 
   it('resolves ETH as native', () => {
@@ -73,7 +88,7 @@ describe('listed send assets', () => {
   });
 
   it('rejects unknown symbols and raw 0x paste', () => {
-    const refused = /Only ETH and FLZ can be sent on socials/;
+    const refused = /Only ETH, FLZ and tUSD can be sent on socials/;
     assert.throws(() => resolveListedSendAsset('USDC'), refused);
     const raw = '0x308be8f71DA695f18E70D2243A446e1fD1566BA6';
     assert.throws(() => resolveListedSendAsset(raw), (err) => {

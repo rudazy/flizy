@@ -13,6 +13,25 @@ Both talk to the same database, the same engine and the same wallets. A Chromium
 OOM must not take payments offline on both channels, which is the whole reason
 they are separate units rather than one process.
 
+## Git on the server
+
+`/opt/flizy` pulls over SSH from `git@github.com:rudazy/flizy.git`. HTTPS login does not
+work: GitHub rejects an account password, and a saved token on this host has already
+been refused.
+
+The key is the read-only deploy key named `contabo`. The private key stays at
+`/root/.ssh/flizy_deploy`. Leave write access off. The clone pins the key, and that
+setting is not committed:
+
+```bash
+git config core.sshCommand "ssh -i /root/.ssh/flizy_deploy -o IdentitiesOnly=yes"
+git remote set-url origin git@github.com:rudazy/flizy.git
+```
+
+A new clone needs both lines again, plus the public key from
+`/root/.ssh/flizy_deploy.pub` (the line that starts with `ssh-ed25519`) saved on the
+repo as a deploy key. Do not copy the private key off the server.
+
 ## Install (Contabo / Ubuntu)
 
 ```bash

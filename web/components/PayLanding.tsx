@@ -4,26 +4,44 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PinField, pinReady } from './PinField';
 import { withinQuickSend } from '../lib/quickSend';
+import { PAY_ASSETS, type PayAsset } from '../lib/payAsset';
+import { symbolLabel } from '../lib/listedTokens';
+import type { PayPreset } from '../lib/payLink';
+import { ShareReceiptButton } from './ShareReceiptButton';
+import { ExternalPay } from './ExternalPay';
+
+/** A sensible example amount per asset, shown as the input placeholder. */
+const PLACEHOLDER: Record<PayAsset, string> = { ETH: '0.01', FLZ: '10', TUSD: '20' };
 
 export function PayLanding({
   refSlug,
   username,
   displayName,
+  preset = null,
+  outsidePay = false,
 }: {
   refSlug: string;
   username: string | null;
   displayName: string | null;
+  /** From the link: a suggested amount, asset and note. The payer still reviews and confirms. */
+  preset?: PayPreset | null;
+  /** The owner lets wallets outside Flizy pay this link (accounts.accept_outside_pay). */
+  outsidePay?: boolean;
 }) {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [self, setSelf] = useState(false);
   const [payerHandle, setPayerHandle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [asset, setAsset] = useState<'ETH' | 'FLZ'>('ETH');
+  const [amount, setAmount] = useState(preset?.amount ?? '');
+  const [asset, setAsset] = useState<PayAsset>(preset?.asset ?? 'ETH');
+  /** Already flattened and capped by parsePayPreset; the server cleans it again. */
+  const note = preset?.note ?? null;
+  const unit = symbolLabel(asset);
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [ok, setOk] = useState(false);
   const [explorer, setExplorer] = useState('');
+  const [transferId, setTransferId] = useState('');
   const [firstPay, setFirstPay] = useState(false);
   const [alreadySaved, setAlreadySaved] = useState(true);
   /** From the preview: paid before, and the most a payment may be without the PIN. */
@@ -39,9 +57,38 @@ export function PayLanding({
   const [stage, setStage] = useState<'edit' | 'review'>('edit');
 
   const handle = username ? `@${username}` : 'this Flizy account';
-  const next = `/pay/${encodeURIComponent(refSlug)}`;
+  // Sign-in returns to the same ask, not to an empty form.
+  const presetQuery = new URLSearchParams({
+    ...(preset?.amount ? { amount: preset.amount } : {}),
+    ...(preset && preset.asset !== 'ETH' ? { asset: preset.asset.toLowerCase() } : {}),
+    ...(note ? { for: note } : {}),
+  }).toString();
+  const next = `/pay/${encodeURIComponent(refSlug)}${presetQuery ? `?${presetQuery}` : ''}`;
   const amountOk = Number(amount) > 0;
-  const needsPin = pinAsked || !(asset === 'ETH' && known && withinQuickSend(amount, quickSendEth));
+  /** Pay a token amount with ETH (POST /api/pay/swap). Off until the payer asks for it. */
+  const [withEth, setWithEth] = useState(false);
+  const [ethQuote, setEthQuote] = useState<{ maxEth: string } | null>(null);
+  // Paying with ETH is a swap, and a swap always takes the PIN.
+  const needsPin = withEth || pinAsked || !(asset === 'ETH' && known && withinQuickSend(amount, quickSendEth));
+
+  async function quoteWithEth() {
+    setMsg('');
+    setEthQuote(null);
+    try {
+      const res = await fetch(`/api/pay/swap?asset=${asset}&amount=${encodeURIComponent(amount)}`, { cache: 'no-store' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || typeof body.maxEth !== 'string') {
+        setMsg(typeof body.error === 'string' ? body.error : 'Could not price this in ETH.');
+        setWithEth(false);
+        return;
+      }
+      setEthQuote({ maxEth: body.maxEth });
+      setWithEth(true);
+    } catch {
+      setMsg('Could not price this in ETH.');
+      setWithEth(false);
+    }
+  }
 
   useEffect(() => {
     let live = true;
@@ -99,11 +146,17 @@ export function PayLanding({
     setMsg('');
     setOk(false);
     try {
-      const res = await fetch('/api/pay/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: refSlug, amount, pin: needsPin ? pin : '', asset }),
-      });
+      const res = withEth && ethQuote
+        ? await fetch('/api/pay/swap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ref: refSlug, amount, pin, asset, note, maxEth: ethQuote.maxEth }),
+          })
+        : await fetch('/api/pay/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ref: refSlug, amount, pin: needsPin ? pin : '', asset, note }),
+          });
       const body = await res.json().catch(() => ({}));
       // A wrong PIN is a 401 too; only a missing session (no code) means sign in.
       if (res.status === 401 && !body.code) {
@@ -117,6 +170,7 @@ export function PayLanding({
       }
       setOk(true);
       setExplorer(body.explorerUrl || '');
+      setTransferId(typeof body.transferId === 'string' ? body.transferId : '');
       setPin('');
       if (body.alreadySaved === true) setAlreadySaved(true);
       else setAlreadySaved(false);
@@ -160,6 +214,16 @@ export function PayLanding({
         </div>
       ) : null}
 
+      {loggedIn === false && outsidePay ? (
+        <ExternalPay
+          refSlug={refSlug}
+          presetAmount={preset?.amount ?? null}
+          presetAsset={preset?.asset ?? 'ETH'}
+          note={note}
+          handle={handle}
+        />
+      ) : null}
+
       {loggedIn && !self && !ok && stage === 'review' ? (
         <div className="card space-y-4 p-6">
           <p className="text-xs uppercase tracking-[0.18em] text-muted">Review payment</p>
@@ -180,18 +244,45 @@ export function PayLanding({
             <div className="flex items-center justify-between gap-3">
               <dt className="text-muted">Amount</dt>
               <dd className="m-0 font-mono text-paper">
-                {amount} {asset}
+                {amount} {unit}
               </dd>
             </div>
+            {note ? (
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted">For</dt>
+                <dd className="m-0 break-words text-right text-paper">{note}</dd>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-3">
               <dt className="text-muted">From</dt>
               <dd className="m-0 text-right text-paper">{payerHandle ? `${payerHandle}, Flizy wallet` : 'Your Flizy wallet'}</dd>
             </div>
+            {withEth && ethQuote ? (
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted">You pay</dt>
+                <dd className="m-0 text-right font-mono text-paper">up to {ethQuote.maxEth} ETH</dd>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-3">
               <dt className="text-muted">Network fee</dt>
               <dd className="m-0 text-right text-paper">Paid in ETH from your wallet</dd>
             </div>
           </dl>
+          {asset !== 'ETH' ? (
+            <label className="flex items-start gap-2 text-sm text-muted">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={withEth}
+                disabled={busy}
+                onChange={(e) => (e.target.checked ? void quoteWithEth() : (setWithEth(false), setEthQuote(null)))}
+              />
+              <span>
+                Pay with ETH instead. Your ETH is swapped and {handle} receives at least {amount} {unit}. Anything over that
+                from the price moving goes to them.
+              </span>
+            </label>
+          ) : null}
           {needsPin ? (
             <PinField id="pay-pin" value={pin} onChange={setPin} />
           ) : (
@@ -208,6 +299,8 @@ export function PayLanding({
               onClick={() => {
                 setPin('');
                 setMsg('');
+                setWithEth(false);
+                setEthQuote(null);
                 setStage('edit');
               }}
             >
@@ -219,7 +312,7 @@ export function PayLanding({
               disabled={busy || (needsPin && !pinReady(pin))}
               onClick={() => void onPay()}
             >
-              {busy ? 'Paying…' : `Confirm and pay ${amount} ${asset}`}
+              {busy ? 'Paying…' : `Confirm and pay ${amount} ${unit}`}
             </button>
           </div>
         </div>
@@ -238,32 +331,38 @@ export function PayLanding({
               before you send.
             </div>
           ) : null}
+          {note ? (
+            <p className="m-0 text-sm text-muted">
+              For: <span className="break-words text-paper">{note}</span>
+              <span className="block text-xs">Written by whoever made this link.</span>
+            </p>
+          ) : null}
           <div>
             <p className="label" id="pay-asset-label">
               Asset
             </p>
             <div className="mt-1 flex gap-2" role="group" aria-labelledby="pay-asset-label">
-              {(['ETH', 'FLZ'] as const).map((opt) => (
+              {PAY_ASSETS.map((opt) => (
                 <button
                   key={opt}
                   type="button"
                   className={asset === opt ? 'btn btn-primary flex-1 py-2' : 'btn btn-ghost flex-1 py-2'}
                   onClick={() => setAsset(opt)}
                 >
-                  {opt}
+                  {symbolLabel(opt)}
                 </button>
               ))}
             </div>
           </div>
           <div>
             <label className="label" htmlFor="pay-amount">
-              Amount ({asset})
+              Amount ({unit})
             </label>
             <input
               id="pay-amount"
               className="input"
               inputMode="decimal"
-              placeholder={asset === 'FLZ' ? '10' : '0.01'}
+              placeholder={PLACEHOLDER[asset]}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               required
@@ -286,9 +385,10 @@ export function PayLanding({
               target="_blank"
               rel="noreferrer"
             >
-              View receipt
+              View on explorer
             </a>
           ) : null}
+          {transferId ? <ShareReceiptButton transferId={transferId} className="text-sm text-sun disabled:opacity-60" /> : null}
           {!alreadySaved && !saveSkipped ? (
             <div className="space-y-3 border-t border-[var(--border)] pt-4">
               <p className="text-sm text-paper">

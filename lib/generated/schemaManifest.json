@@ -292,8 +292,20 @@
     },
     {
       "kind": "check",
+      "name": "payment_requests.payment_requests_asset_check",
+      "providedBy": "20261021130000_request_asset_and_note.sql",
+      "requiredBy": "check on payment_requests"
+    },
+    {
+      "kind": "check",
       "name": "payment_requests.payment_requests_from_channel_check",
       "providedBy": "20260907000000_request_platform_recipient.sql",
+      "requiredBy": "check on payment_requests"
+    },
+    {
+      "kind": "check",
+      "name": "payment_requests.payment_requests_note_len",
+      "providedBy": "20261021130000_request_asset_and_note.sql",
       "requiredBy": "check on payment_requests"
     },
     {
@@ -370,6 +382,18 @@
     },
     {
       "kind": "check",
+      "name": "transfers.transfers_eth_in_check",
+      "providedBy": "20261021160000_pay_with_eth_limit.sql",
+      "requiredBy": "check on transfers"
+    },
+    {
+      "kind": "check",
+      "name": "transfers.transfers_receipt_token_format",
+      "providedBy": "20261021140000_transfer_receipts.sql",
+      "requiredBy": "check on transfers"
+    },
+    {
+      "kind": "check",
       "name": "transfers.transfers_venue_check",
       "providedBy": "20261016140000_ammora_venue.sql",
       "requiredBy": "check on transfers"
@@ -437,7 +461,7 @@
     {
       "kind": "function",
       "name": "daily_native_sent_eth",
-      "providedBy": "20261016130000_executor_reconcile.sql",
+      "providedBy": "20261021160000_pay_with_eth_limit.sql",
       "requiredBy": "lib/dailyLimits.js"
     },
     {
@@ -678,7 +702,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/history.js, lib/payCode.js, lib/pots.js, lib/reconcile.js, lib/transferLog.js"
+      "requiredBy": "lib/history.js, lib/payCode.js, lib/pots.js, lib/receipts.js, lib/reconcile.js, lib/transferLog.js"
     },
     {
       "kind": "table",

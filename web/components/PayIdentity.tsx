@@ -3,6 +3,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { formatPayCode } from '../lib/dashboardTypes';
 import { PREF_CARD, PrefHero } from './AccountPrefs';
+import { buildPayLink, PAY_NOTE_MAX } from '../lib/payLink';
+import { PAY_ASSETS, type PayAsset } from '../lib/payAsset';
+import { symbolLabel } from '../lib/listedTokens';
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -158,6 +161,17 @@ export function PayIdentity({
           <Field label="Pay link" value={link} copyValue={url} copyLabel="Copy pay link" muted />
         </div>
 
+        <AskBuilder url={url} />
+
+        <OutsidePayToggle />
+
+        <a
+          href="/dashboard/received"
+          className="relative flex h-[46px] items-center justify-center rounded-[12px] border border-[#3a3a3e] font-sans text-[14px] text-[#f5f5f5] no-underline transition-colors hover:border-[#5a5a60] print:hidden"
+        >
+          Payments received, totals and CSV
+        </a>
+
         <div className="relative grid grid-cols-2 gap-3 print:hidden">
           <button
             type="button"
@@ -179,6 +193,141 @@ export function PayIdentity({
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Ask for a set amount: the same pay link with the amount, asset and note
+ * filled in, ready to paste into a chat. The payer still reviews it, and the
+ * server checks every field again when they pay.
+ */
+function AskBuilder({ url }: { url: string }) {
+  const [amount, setAmount] = useState('');
+  const [asset, setAsset] = useState<PayAsset>('TUSD');
+  const [note, setNote] = useState('');
+  const amountId = useId();
+  const noteId = useId();
+  const ask = Number(amount) > 0 ? buildPayLink(url, { amount, asset, note }) : null;
+
+  return (
+    <div className="relative grid gap-3 rounded-[14px] border border-[#2a2a2e] bg-[#0f0f10] px-4 py-4 print:hidden">
+      <p className="m-0 font-mono text-[10px] font-medium uppercase tracking-[0.24em] text-[#9a958c]">Ask for an amount</p>
+      <div className="flex gap-2" role="group" aria-label="Asset">
+        {PAY_ASSETS.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => setAsset(opt)}
+            className={`hit-y-44 h-9 flex-1 rounded-[8px] border font-sans text-[13px] transition-colors ${
+              asset === opt ? 'border-sun/70 text-sun' : 'border-[#3a3a3e] text-[#d9d4ca] hover:text-white'
+            }`}
+          >
+            {symbolLabel(opt)}
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
+        <label htmlFor={amountId} className="grid gap-1">
+          <span className="font-sans text-[12px] text-[#9a958c]">Amount</span>
+          <input
+            id={amountId}
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value.trim())}
+            placeholder={asset === 'TUSD' ? '50' : asset === 'FLZ' ? '10' : '0.01'}
+            className="input"
+          />
+        </label>
+        <label htmlFor={noteId} className="grid gap-1">
+          <span className="font-sans text-[12px] text-[#9a958c]">For (optional)</span>
+          <input
+            id={noteId}
+            value={note}
+            maxLength={PAY_NOTE_MAX}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Design work"
+            className="input"
+          />
+        </label>
+      </div>
+      {ask ? (
+        <Field label="Link for this ask" value={ask.replace(/^https?:\/\//, '')} copyValue={ask} copyLabel="Copy link for this ask" muted />
+      ) : (
+        <p className="m-0 font-sans text-[12.5px] text-[#9a958c]">Enter an amount to get a link that opens with it filled in.</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Let wallets outside Flizy pay this link. Off by default, because it hands the
+ * wallet address to anyone with the link, which ties the @username and Flizy
+ * number to that wallet's activity on the chain (/api/account/outside-pay).
+ */
+function OutsidePayToggle() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const id = useId();
+
+  useEffect(() => {
+    let live = true;
+    fetch('/api/account/outside-pay', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) => live && setEnabled(body?.enabled === true))
+      .catch(() => live && setEnabled(false));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function toggle(next: boolean) {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/account/outside-pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof body.error === 'string' ? body.error : 'Could not save that.');
+        return;
+      }
+      setEnabled(body.enabled === true);
+    } catch {
+      setError('Could not save that.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="relative grid gap-2 rounded-[14px] border border-[#2a2a2e] bg-[#0f0f10] px-4 py-4 print:hidden">
+      <label htmlFor={id} className="flex cursor-pointer items-start gap-3">
+        <input
+          id={id}
+          type="checkbox"
+          className="mt-1"
+          checked={enabled === true}
+          disabled={enabled === null || busy}
+          onChange={(e) => void toggle(e.target.checked)}
+        />
+        <span className="grid gap-1">
+          <span className="font-sans text-[14.5px] text-white">Accept payments from other wallets</span>
+          <span className="font-sans text-[12.5px] leading-relaxed text-[#9a958c]">
+            People without Flizy can pay your link from their own wallet. Anyone with the link can then see your
+            wallet address and its activity on the chain.
+          </span>
+        </span>
+      </label>
+      {error ? (
+        <p className="m-0 font-sans text-[12.5px] text-[#e0b070]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

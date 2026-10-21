@@ -1,6 +1,6 @@
 /**
  * The verification badge, in the accent colour: Flizy verified the token.
- * Which tokens can be sent on socials is a separate, fixed list (ETH and FLZ).
+ * Which tokens can be sent on socials is a separate, fixed list (ETH, FLZ and tUSD).
  */
 export function VerifiedMark() {
   return (

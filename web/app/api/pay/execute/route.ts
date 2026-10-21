@@ -9,7 +9,7 @@ import { isSavedMerchant, resolvePayRef } from '../../../../lib/payCode.ts';
 import { deriveAgentWallet, getWebChain, explorerTxUrl, resolveToken } from '../../../../lib/dexServer';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { apiErrorBody } from '../../../../lib/apiError';
-import { normalizePayAsset } from '../../../../lib/payAsset.ts';
+import { normalizePayAsset, UNKNOWN_PAY_ASSET, type PayAsset } from '../../../../lib/payAsset.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
 import {
   executeGatorCall,
@@ -24,6 +24,8 @@ import { outcomeUnknown } from '../../../../lib/gatorExecute.ts';
 import { notifyAllChannels } from '../../../../lib/notifyChannels';
 import { formatPaymentReceived, payerLabel } from '../../../../lib/payNotice.ts';
 import { siteOrigin } from '../../../../lib/siteOrigin';
+import { symbolLabel } from '../../../../lib/listedTokens';
+import { cleanPayNote } from '../../../../lib/payLink.ts';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -62,12 +64,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'You cannot pay your own account.' }, { status: 400 });
     }
 
-    let asset: 'ETH' | 'FLZ';
+    let asset: PayAsset;
     try {
       asset = normalizePayAsset(body.asset);
     } catch {
-      return NextResponse.json({ error: 'Unknown token. Listed: ETH, FLZ.' }, { status: 400 });
+      return NextResponse.json({ error: UNKNOWN_PAY_ASSET }, { status: 400 });
     }
+
+    // What the payment is for, from the link or the payer. Anyone's text: one
+    // line, capped, and shown to the payee only through the same cleaner.
+    const note = cleanPayNote(body.note);
 
     const { data: dest } = await supabase
       .from('accounts')
@@ -113,6 +119,8 @@ export async function POST(req: Request) {
     let amountHuman: string;
     let tokenAddress: string | null = null;
     let txHash: string;
+    /** The transfers row, so the payer can share a receipt for it. */
+    let transferId: string | null = null;
 
     if (asset === 'ETH') {
       let amountWei: bigint;
@@ -151,9 +159,11 @@ export async function POST(req: Request) {
           asset: 'ETH',
           counterparty_label: merchant.username ? `@${merchant.username}` : 'flizy pay',
           direction: 'out',
+          note,
         })
         .select('id')
         .maybeSingle();
+      transferId = logRow?.id ?? null;
 
       let receipt: ethers.TransactionReceipt | null;
       if (viaGator) {
@@ -201,16 +211,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Payment failed on-chain.' }, { status: 502 });
       }
     } else {
-      let flzAddr: string | null;
+      let assetAddr: string | null;
       try {
-        flzAddr = resolveToken('FLZ');
+        assetAddr = resolveToken(asset);
       } catch {
-        return NextResponse.json({ error: 'FLZ is not configured on this chain.' }, { status: 400 });
+        return NextResponse.json({ error: `${symbolLabel(asset)} is not configured on this chain.` }, { status: 400 });
       }
-      if (!flzAddr || !ethers.isAddress(flzAddr)) {
-        return NextResponse.json({ error: 'FLZ is not configured on this chain.' }, { status: 400 });
+      if (!assetAddr || !ethers.isAddress(assetAddr)) {
+        return NextResponse.json({ error: `${symbolLabel(asset)} is not configured on this chain.` }, { status: 400 });
       }
-      tokenAddress = ethers.getAddress(flzAddr);
+      tokenAddress = ethers.getAddress(assetAddr);
       const erc20 = new ethers.Contract(tokenAddress, ERC20_ABI, viaGator ? provider : signer);
       const decimals = Number(await erc20.decimals());
       let amountTok: bigint;
@@ -246,13 +256,15 @@ export async function POST(req: Request) {
           status: 'pending',
           chain_id: chain.chainId,
           kind: 'transfer',
-          asset: 'FLZ',
+          asset,
           token_address: tokenAddress,
           counterparty_label: merchant.username ? `@${merchant.username}` : 'flizy pay',
           direction: 'out',
+          note,
         })
         .select('id')
         .maybeSingle();
+      transferId = logRow?.id ?? null;
 
       let receipt: ethers.TransactionReceipt | null;
       if (viaGator) {
@@ -330,6 +342,7 @@ export async function POST(req: Request) {
         formatPaymentReceived({
           amount: amountHuman,
           asset,
+          note,
           fromLabel: payerLabel(payerRow),
           walletUrl: `${siteOrigin()}/dashboard/wallet`,
         })
@@ -349,6 +362,7 @@ export async function POST(req: Request) {
       ok: true,
       txHash,
       explorerUrl: explorerTxUrl(chain, txHash),
+      transferId,
       to: merchant.username ? `@${merchant.username}` : 'account',
       alreadySaved,
     });

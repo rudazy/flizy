@@ -100,6 +100,7 @@ describe('the tiers hold: account changes take the password, money takes the PIN
     'mints/collections',
     'mints/generated/pay',
     'pay/execute',
+    'pay/swap',
     'swap/limit',
   ];
 

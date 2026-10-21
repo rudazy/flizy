@@ -12,8 +12,8 @@ import { hasSessionCookie } from '../lib/cookies';
 
 const FEATURES = [
   {
-    t: 'Send and receive',
-    d: 'Pay a username, phone number or email. If they are not on Flizy yet, the money waits and you can cancel it.',
+    t: 'Pay and get paid',
+    d: 'Pay a username, phone number or email; if they are not on Flizy yet, the money waits. Share a pay link with the amount filled in. Turn it on, and people without Flizy can pay it from their own wallet.',
   },
   {
     t: 'Trade',
@@ -60,7 +60,7 @@ const FUND_STEPS = [
   {
     n: '03',
     t: 'Claim in one tap',
-    d: 'Open Wallet, then Fund, and tap Claim. 0.02 test ETH, once every 72 hours.',
+    d: 'Open Wallet, then Fund. Claim 100 test dollars (tUSD) a day, and 0.02 test ETH for fees every 72 hours.',
     href: '/dashboard/wallet?s=fund',
   },
 ];
@@ -75,14 +75,14 @@ export default function HomePage() {
         <div className="max-w-xl">
           <p className="text-xs uppercase tracking-[0.22em] text-gold">Simple · Social · On GIWA</p>
           <h1 className="mt-4 font-sans text-4xl font-semibold tracking-wide text-paper sm:text-5xl md:leading-[1.05] lg:text-5xl xl:text-6xl">
-            Your crypto wallet,
+            Pay anyone
             <span className="mt-1 block">
-              inside your <span className="text-[#f5c842]">chats</span>.
+              with a <span className="text-[#f5c842]">phone number</span>.
             </span>
           </h1>
           <p className="mt-6 font-sans text-base leading-relaxed text-paper md:text-lg">
-            Send, receive and trade through WhatsApp, Telegram or the Flizy app. Tell Flizy who
-            and how much. You confirm before anything moves.
+            Pay and get paid in test dollars or crypto from WhatsApp, Telegram or the Flizy app.
+            If they are not on Flizy yet, the money waits for them. You confirm before anything moves.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             {signedIn ? (
@@ -201,11 +201,11 @@ export default function HomePage() {
 
       <section className="card space-y-4 p-5 md:p-8">
         <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-gold">Get test ETH (GIWA)</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-gold">Get test money (GIWA)</p>
           <h2 className="mt-2 font-sans text-2xl tracking-wide text-paper">Fund your Flizy wallet</h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-            One tap puts 0.02 GIWA test ETH straight into your Flizy wallet. No address to copy and
-            no other site.
+            One tap puts 100 test dollars (tUSD) or 0.02 GIWA test ETH straight into your Flizy wallet.
+            No address to copy and no other site.
           </p>
         </div>
         <ol className="grid gap-3 sm:grid-cols-3">

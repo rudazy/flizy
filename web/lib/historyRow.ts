@@ -10,7 +10,7 @@
  * the server; the key itself can be a phone number.
  */
 
-import { listedByAddress } from './listedTokens.ts';
+import { listedByAddress, symbolLabel } from './listedTokens.ts';
 
 export type HistoryCategory = 'send' | 'receive' | 'swap' | 'claim' | 'nft';
 
@@ -24,11 +24,11 @@ export function assetSymbol(raw: unknown): string {
   if (!s) return 'ETH';
   if (/^0x[0-9a-f]{40}$/i.test(s)) {
     const listed = listedByAddress(s);
-    if (listed) return listed.symbol;
+    if (listed) return listed.label || listed.symbol;
     const lower = s.toLowerCase();
     return `${lower.slice(0, 6)}…${lower.slice(-4)}`;
   }
-  return s.toUpperCase();
+  return symbolLabel(s.toUpperCase());
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -43,6 +43,8 @@ export function channelLabel(key: unknown): string | null {
   const k = typeof key === 'string' ? key.trim().toLowerCase() : '';
   if (!k) return null;
   if (k === 'site') return 'Flizy app';
+  // Paid from a wallet outside Flizy, through FlizyPaymentReceiver.
+  if (k === 'external') return 'Outside wallet';
   const prefix = k.match(/^([a-z]+):/);
   if (prefix) return PLATFORM_LABELS[prefix[1]] ?? null;
   // WhatsApp keys are the bare id: digits, or a LID that is digits too.

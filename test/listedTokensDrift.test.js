@@ -100,8 +100,8 @@ describe('listed tokens resolve by symbol and print by symbol', () => {
   });
 
   it('still refuse an unknown symbol, naming what is accepted', () => {
-    assert.throws(() => dex.resolveToken('NOPE', 'giwa_sepolia'), /Use ETH, FLZ, DCAT, IZY, MAKI, or a 0x address/);
-    assert.throws(() => dexServer.resolveToken('NOPE'), /Use ETH, FLZ, DCAT, IZY, MAKI, or a 0x address/);
+    assert.throws(() => dex.resolveToken('NOPE', 'giwa_sepolia'), /Use ETH, FLZ, DCAT, IZY, MAKI, TUSD, or a 0x address/);
+    assert.throws(() => dexServer.resolveToken('NOPE'), /Use ETH, FLZ, DCAT, IZY, MAKI, TUSD, or a 0x address/);
   });
 
   it('know listed decimals without asking the contract', async () => {
@@ -113,15 +113,28 @@ describe('listed tokens resolve by symbol and print by symbol', () => {
 });
 
 describe('verified listed tokens', () => {
-  it('verify IZY and MAKI, Flizy tokens, and not DCAT, a third-party token', () => {
+  it('verify IZY, MAKI and TUSD, Flizy tokens, and not DCAT, a third-party token', () => {
     const verified = Object.fromEntries(chat.LISTED_TOKENS.map((t) => [t.symbol, t.verified]));
-    assert.deepEqual(verified, { DCAT: false, IZY: true, MAKI: true });
+    assert.deepEqual(verified, { DCAT: false, IZY: true, MAKI: true, TUSD: true });
   });
 
-  it('never put a listed token on the social send list', () => {
+  it('put only TUSD of the listed tokens on the social send list, in chat and on the pay page', () => {
     const dex = require('../lib/dex');
-    assert.deepEqual(dex.listedSendSymbols(), ['ETH', 'FLZ']);
-    assert.match(read('web/lib/payAsset.ts'), /export const PAY_ASSETS = \['ETH', 'FLZ'\] as const;/);
+    assert.deepEqual([...chat.SENDABLE_LISTED_SYMBOLS], ['TUSD']);
+    assert.deepEqual([...site.SENDABLE_LISTED_SYMBOLS], ['TUSD']);
+    assert.deepEqual(dex.listedSendSymbols(), ['ETH', 'FLZ', 'TUSD']);
+    assert.match(read('web/lib/payAsset.ts'), /export const PAY_ASSETS = \['ETH', 'FLZ', 'TUSD'\] as const;/);
+  });
+
+  it('print TUSD as tUSD by its exact symbol, and never relabel another token through the usd alias', () => {
+    for (const lib of [chat, site]) {
+      assert.equal(lib.symbolLabel('TUSD'), 'tUSD');
+      assert.equal(lib.symbolLabel('tusd'), 'tUSD');
+      assert.equal(lib.symbolLabel('USD'), 'USD');
+      assert.equal(lib.symbolLabel('IZY'), 'IZY');
+      assert.equal(lib.symbolLabel('ETH'), 'ETH');
+      assert.equal(lib.listedBySymbol('usd').symbol, 'TUSD');
+    }
   });
 });
 

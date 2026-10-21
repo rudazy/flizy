@@ -1,6 +1,6 @@
 # Flizy
 
-> Send money by phone number, email or username, from WhatsApp, Telegram or the web. GIWA-first, testnet.
+> Pay anyone by phone number, email or username, from WhatsApp, Telegram or the web, and get paid through pay links, requests and shareable receipts. Test dollars (tUSD) and ETH on GIWA Sepolia testnet.
 
 Money commands run in the chat app the user already has, and the same account can be linked
 on WhatsApp and Telegram at once. Raw wallet addresses only work once saved on the site with
@@ -15,7 +15,7 @@ testnet with source-verified contracts.
 - https://flizy.app/docs : Trusted destinations, invite counting rules
 - https://flizy.app/terms : Terms of service
 - https://flizy.app/privacy : Privacy policy, including TikTok user.info.basic
-- https://flizy.app/pay/:code : Pay a Flizy account by username or printed code, in ETH or FLZ. First payment is flagged; after success you can save them as a trusted contact.
+- https://flizy.app/pay/:code : Pay a Flizy account by username or printed code, in ETH, FLZ or tUSD (Flizy Test USD). First payment is flagged; after success you can save them as a trusted contact.
 - https://flizy.app/signup : Create account (email + verification code + username)
 - https://flizy.app/login : Sign in
 - https://flizy.app/dashboard : Wallet, personal invite link, PIN, trusted people, chat link code

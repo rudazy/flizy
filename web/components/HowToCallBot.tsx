@@ -167,13 +167,13 @@ export function HowToCallBot({ compact = false }: { compact?: boolean }) {
       </div>
 
       <div className="border-t border-border pt-6">
-        <p className="text-xs uppercase tracking-[0.18em] text-gold">Get test ETH</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-gold">Get test money</p>
         <h3 className="mt-2 font-sans text-base tracking-wide text-paper sm:text-lg">
           Fund your Flizy wallet
         </h3>
         <p className="mt-2 text-sm text-muted">
-          Claim 0.02 test ETH in one tap. It goes straight into your Flizy wallet, once every 72
-          hours. No address to copy and no other site.
+          Claim 100 test dollars (tUSD) once a day and 0.02 test ETH for fees once every 72 hours,
+          each in one tap, straight into your Flizy wallet. No address to copy and no other site.
         </p>
         <ol className="mt-4 space-y-2 text-xs leading-relaxed text-muted sm:text-sm">
           <li>

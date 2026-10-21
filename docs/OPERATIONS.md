@@ -146,6 +146,26 @@ fragile half: session loss, relink prompts, memory pressure. A Chromium failure 
 take Telegram payments offline as well, and a Telegram restart must not disturb a healthy
 WhatsApp session.
 
+### Git on the server
+
+The clone at `/opt/flizy` pulls over SSH. The remote is `git@github.com:rudazy/flizy.git`.
+An `https://github.com/rudazy/flizy.git` remote cannot pull: GitHub rejects an account
+password, and a saved token on this host has already been refused.
+
+Access is the read-only deploy key named `contabo` on the `rudazy/flizy` repository.
+The private key stays on the server at `/root/.ssh/flizy_deploy`. Write access stays off.
+This host only pulls. The clone pins that key:
+
+```bash
+git config core.sshCommand "ssh -i /root/.ssh/flizy_deploy -o IdentitiesOnly=yes"
+```
+
+That setting is local to the clone. It is not in git. A fresh clone needs the same
+`core.sshCommand`, the same remote, and the matching public key
+(`/root/.ssh/flizy_deploy.pub`, the single line that starts with `ssh-ed25519`)
+added again as a deploy key. Do not copy the private key off the server. The
+`SHA256:` fingerprint and the symbol picture are not the key.
+
 ### Install
 
 ```bash

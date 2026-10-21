@@ -4,20 +4,23 @@ import { getSupabase } from './supabase.ts';
 import { ClientError } from './apiError.ts';
 import { getWebChain } from './webChain.ts';
 import { closureOf, isMissingClosureColumn } from './accountClosure.ts';
+import { listedBySymbol } from './listedTokens.ts';
 
 /**
- * One-tap faucet: GIWA Sepolia test ETH from a Flizy-run dispenser wallet to
- * the signed-in account's own Flizy wallet.
+ * One-tap faucet: GIWA Sepolia test ETH, or Flizy Test USD (tUSD), from a
+ * Flizy-run dispenser wallet to the signed-in account's own Flizy wallet.
  *
- * The rules live here and in supabase/migrations/20261010120000_faucet_claims.sql,
- * never in the browser:
- *   - the amount and the cooldown are constants on this side, not inputs;
+ * The rules live here and in supabase/migrations/20261010120000_faucet_claims.sql
+ * and 20261021120000_faucet_test_usd.sql, never in the browser:
+ *   - the amount and the cooldown are constants on this side, one pair per
+ *     asset; the request only names which asset;
  *   - the destination is the account's stored wallet, never an address from
  *     the request;
  *   - try_faucet_claim reserves the claim under a per-account lock, so a
- *     double click or two tabs produce one claim;
+ *     double click or two tabs produce one claim; each asset has its own wait;
  *   - one send at a time leaves the dispenser wallet (faucet_signer_lock), so
- *     two people claiming at once cannot race on its nonce.
+ *     two people claiming at once cannot race on its nonce, whichever asset
+ *     each one asked for.
  *
  * The dispenser key is FAUCET_PRIVATE_KEY and nothing else. It never falls back
  * to the ops key, so a faucet bug cannot spend the gas the rest of Flizy runs
@@ -28,10 +31,57 @@ export type Db = ReturnType<typeof getSupabase>;
 
 export const FAUCET_AMOUNT_ETH = '0.02';
 export const FAUCET_COOLDOWN_HOURS = 72;
-/** GIWA Sepolia. The faucet hands out test ETH and runs nowhere else. */
+export const FAUCET_AMOUNT_TUSD = '100';
+export const FAUCET_COOLDOWN_HOURS_TUSD = 24;
+/** GIWA Sepolia. The faucet hands out test money and runs nowhere else. */
 export const FAUCET_CHAIN_ID = 91342;
 
-const AMOUNT_WEI = ethers.parseEther(FAUCET_AMOUNT_ETH);
+export type FaucetAsset = 'ETH' | 'TUSD';
+
+/** What one claim of an asset is: how much, in which smallest unit, and how long until the next. */
+type Drop = {
+  asset: FaucetAsset;
+  /** How the asset prints. */
+  unit: string;
+  amount: string;
+  units: bigint;
+  cooldownHours: number;
+  /** The token contract; null for native ETH. */
+  token: string | null;
+};
+
+const TUSD = listedBySymbol('TUSD');
+if (!TUSD) throw new Error('TUSD is missing from the listed tokens');
+
+const DROPS: Record<FaucetAsset, Drop> = {
+  ETH: {
+    asset: 'ETH',
+    unit: 'ETH',
+    amount: FAUCET_AMOUNT_ETH,
+    units: ethers.parseEther(FAUCET_AMOUNT_ETH),
+    cooldownHours: FAUCET_COOLDOWN_HOURS,
+    token: null,
+  },
+  TUSD: {
+    asset: 'TUSD',
+    unit: TUSD.label || TUSD.symbol,
+    amount: FAUCET_AMOUNT_TUSD,
+    units: ethers.parseUnits(FAUCET_AMOUNT_TUSD, TUSD.decimals),
+    cooldownHours: FAUCET_COOLDOWN_HOURS_TUSD,
+    token: ethers.getAddress(TUSD.address),
+  },
+};
+
+export const FAUCET_UNKNOWN_ASSET = 'The faucet hands out ETH and tUSD only.';
+
+/** The asset a request names. Nothing named is ETH, the faucet's first asset. */
+export function normalizeFaucetAsset(raw: unknown): FaucetAsset {
+  const s = String(raw ?? '').trim().toUpperCase();
+  if (!s || s === 'ETH') return 'ETH';
+  if (s === 'TUSD' || s === 'USD') return 'TUSD';
+  throw new ClientError(FAUCET_UNKNOWN_ASSET);
+}
+
 /** Kept back for the transfer's own gas, so the dispenser never sends what it cannot pay for. */
 const GAS_RESERVE_WEI = ethers.parseEther('0.0005');
 const LOCK_WAIT_MS = 10000;
@@ -43,16 +93,24 @@ export const FAUCET_NOT_SET_UP = 'The faucet is not set up yet.';
 export const FAUCET_EMPTY = 'The faucet is empty right now. Try again later.';
 export const FAUCET_BUSY = 'The faucet is busy. Try again in a moment.';
 export const FAUCET_SEND_FAILED = 'Could not send the test ETH. Try again.';
+export const FAUCET_SEND_FAILED_TUSD = 'Could not send the test tUSD. Try again.';
 export const FAUCET_COOLDOWN = 'You have already claimed. Come back when the timer ends.';
+
+/** A transaction the dispenser sent, and a way to learn how it ended. */
+export type FaucetSent = {
+  hash: string;
+  /** confirmed, reverted, or timeout when no receipt arrived in time. */
+  wait(timeoutMs: number): Promise<'confirmed' | 'reverted' | 'timeout'>;
+};
 
 /** What sending needs from the chain. Injectable, so the rules are testable without a network. */
 export type FaucetSender = {
+  /** The dispenser's ETH balance, in wei. */
   balance(): Promise<bigint>;
-  send(to: string, valueWei: bigint): Promise<{
-    hash: string;
-    /** confirmed, reverted, or timeout when no receipt arrived in time. */
-    wait(timeoutMs: number): Promise<'confirmed' | 'reverted' | 'timeout'>;
-  }>;
+  send(to: string, valueWei: bigint): Promise<FaucetSent>;
+  /** The dispenser's balance of one token, in its smallest unit. */
+  tokenBalance(token: string): Promise<bigint>;
+  sendToken(token: string, to: string, units: bigint): Promise<FaucetSent>;
 };
 
 function faucetKey(): string | null {
@@ -76,30 +134,49 @@ export function getFaucetSender(): FaucetSender {
   }
   const provider = new ethers.JsonRpcProvider(chain.rpcUrl, FAUCET_CHAIN_ID, { staticNetwork: true });
   const wallet = new ethers.Wallet(key, provider);
+  const erc20 = (token: string) =>
+    new ethers.Contract(
+      token,
+      ['function balanceOf(address) view returns (uint256)', 'function transfer(address to, uint256 amount) returns (bool)'],
+      wallet
+    );
+
+  // The RPC is asked which chain it serves before anything is signed; the
+  // static network above only stops ethers asking on every call.
+  const assertChain = async () => {
+    const network = await provider.send('eth_chainId', []);
+    if (Number(network) !== FAUCET_CHAIN_ID) {
+      throw new Error(`The RPC serves chain ${Number(network)}, not GIWA Sepolia.`);
+    }
+  };
+  const tracked = (hash: string): FaucetSent => ({
+    hash,
+    async wait(timeoutMs) {
+      try {
+        const receipt = await provider.waitForTransaction(hash, 1, timeoutMs);
+        if (!receipt) return 'timeout';
+        return receipt.status === 1 ? 'confirmed' : 'reverted';
+      } catch (err) {
+        if (ethers.isError(err, 'TIMEOUT')) return 'timeout';
+        throw err;
+      }
+    },
+  });
 
   return {
     balance: () => provider.getBalance(wallet.address),
     async send(to, valueWei) {
-      // The RPC is asked which chain it serves before anything is signed; the
-      // static network above only stops ethers asking on every call.
-      const network = await provider.send('eth_chainId', []);
-      if (Number(network) !== FAUCET_CHAIN_ID) {
-        throw new Error(`The RPC serves chain ${Number(network)}, not GIWA Sepolia.`);
-      }
+      await assertChain();
       const tx = await wallet.sendTransaction({ to, value: valueWei });
-      return {
-        hash: tx.hash,
-        async wait(timeoutMs) {
-          try {
-            const receipt = await provider.waitForTransaction(tx.hash, 1, timeoutMs);
-            if (!receipt) return 'timeout';
-            return receipt.status === 1 ? 'confirmed' : 'reverted';
-          } catch (err) {
-            if (ethers.isError(err, 'TIMEOUT')) return 'timeout';
-            throw err;
-          }
-        },
-      };
+      return tracked(tx.hash);
+    },
+    async tokenBalance(token) {
+      return BigInt(await erc20(token).balanceOf(wallet.address));
+    },
+    async sendToken(token, to, units) {
+      await assertChain();
+      const tx = await erc20(token).transfer(to, units);
+      return tracked(tx.hash);
     },
   };
 }
@@ -119,6 +196,8 @@ type ClaimRow = {
   tx_hash: string | null;
   created_at: string;
   sent_at: string | null;
+  /** Absent on a database without 20261021120000_faucet_test_usd.sql, where every claim is ETH. */
+  asset?: FaucetAsset | null;
 };
 
 /** Why this account cannot claim, and the screen that fixes it. Null when it can. */
@@ -154,17 +233,39 @@ async function loadAccount(accountId: string, supabase: Db): Promise<AccountRow 
   return (narrow.data as AccountRow | null) || null;
 }
 
-/** The claim that holds the cooldown: the newest one that did not fail and was not abandoned. */
-async function lastCountingClaim(accountId: string, supabase: Db, now: number): Promise<ClaimRow | null> {
-  const { data, error } = await supabase
-    .from('faucet_claims')
-    .select('id, status, tx_hash, created_at, sent_at')
-    .eq('account_id', accountId)
-    .gte('created_at', new Date(now - FAUCET_COOLDOWN_HOURS * 3600e3).toISOString())
-    .order('created_at', { ascending: false })
-    .limit(10);
+const CLAIM_COLUMNS = 'id, status, tx_hash, created_at, sent_at';
+
+function isMissingAssetColumn(error: { message?: string } | null): boolean {
+  const m = String(error?.message || '');
+  return /\basset\b/i.test(m) && /column|schema cache/i.test(m);
+}
+
+/**
+ * The claim that holds this asset's cooldown: the newest one of that asset
+ * that did not fail and was not abandoned.
+ *
+ * The asset is matched here rather than in the query so a row written before
+ * the asset column existed reads as ETH, which it is. A database without that
+ * column is read without it, and then holds ETH claims only.
+ */
+async function lastCountingClaim(accountId: string, supabase: Db, now: number, drop: Drop): Promise<ClaimRow | null> {
+  const since = new Date(now - drop.cooldownHours * 3600e3).toISOString();
+  const read = (columns: string) =>
+    supabase
+      .from('faucet_claims')
+      .select(columns)
+      .eq('account_id', accountId)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(50);
+  let { data, error } = await read(`${CLAIM_COLUMNS}, asset`);
+  if (error && isMissingAssetColumn(error)) {
+    if (drop.asset !== 'ETH') return null;
+    ({ data, error } = await read(CLAIM_COLUMNS));
+  }
   if (error) throw new Error(error.message);
-  for (const row of (data || []) as ClaimRow[]) {
+  for (const row of (data || []) as unknown as ClaimRow[]) {
+    if ((row.asset || 'ETH') !== drop.asset) continue;
     if (row.status === 'failed') continue;
     // The same rule try_faucet_claim applies: a pending claim with no
     // transaction after five minutes belongs to a request that died.
@@ -179,6 +280,12 @@ function txUrl(hash: string | null): string | null {
 }
 
 export type FaucetStatus = {
+  asset: FaucetAsset;
+  /** How the asset prints: ETH or tUSD. */
+  unit: string;
+  /** One claim, in `unit`. */
+  amount: string;
+  /** The same figure as `amount`. Named for the ETH-only faucet; kept for its callers. */
   amountEth: string;
   cooldownHours: number;
   ready: boolean;
@@ -191,26 +298,39 @@ export type FaucetStatus = {
   lastClaim: { status: ClaimRow['status']; txUrl: string | null; at: string } | null;
 };
 
-export async function faucetStatus(accountId: string, client?: Db, now = Date.now()): Promise<FaucetStatus> {
+export async function faucetStatus(
+  accountId: string,
+  client?: Db,
+  now = Date.now(),
+  asset: FaucetAsset = 'ETH'
+): Promise<FaucetStatus> {
+  const drop = DROPS[asset];
   const supabase = client ?? getSupabase();
   const account = await loadAccount(accountId, supabase);
   const blocked = ineligibility(account);
-  const last = account ? await lastCountingClaim(accountId, supabase, now) : null;
+  const last = account ? await lastCountingClaim(accountId, supabase, now, drop) : null;
   const ready = faucetConfigured();
   return {
-    amountEth: FAUCET_AMOUNT_ETH,
-    cooldownHours: FAUCET_COOLDOWN_HOURS,
+    asset,
+    unit: drop.unit,
+    amount: drop.amount,
+    amountEth: drop.amount,
+    cooldownHours: drop.cooldownHours,
     ready,
     eligible: ready && !blocked,
     reason: !ready ? FAUCET_NOT_SET_UP : blocked?.reason ?? null,
     fix: blocked?.fix ?? null,
     username: account?.username ?? null,
-    nextClaimAt: last ? new Date(new Date(last.created_at).getTime() + FAUCET_COOLDOWN_HOURS * 3600e3).toISOString() : null,
+    nextClaimAt: last ? new Date(new Date(last.created_at).getTime() + drop.cooldownHours * 3600e3).toISOString() : null,
     lastClaim: last ? { status: last.status, txUrl: txUrl(last.tx_hash), at: last.created_at } : null,
   };
 }
 
 export type FaucetReceipt = {
+  asset: FaucetAsset;
+  unit: string;
+  amount: string;
+  /** The same figure as `amount`. Named for the ETH-only faucet; kept for its callers. */
   amountEth: string;
   status: 'confirmed' | 'sent';
   txHash: string;
@@ -245,7 +365,8 @@ export function shortError(err: unknown): string {
 }
 
 /**
- * Claim once. Sends exactly FAUCET_AMOUNT_ETH to the account's stored wallet.
+ * Claim once. Sends exactly one drop of the asset (FAUCET_AMOUNT_ETH, or
+ * FAUCET_AMOUNT_TUSD) to the account's stored wallet.
  *
  * Anything that fails before a transaction exists marks the claim failed, which
  * frees it to be tried again. A transaction that was sent but not confirmed in
@@ -254,8 +375,10 @@ export function shortError(err: unknown): string {
  */
 export async function claimFaucet(
   accountId: string,
-  deps: { client?: Db; sender?: FaucetSender } = {}
+  deps: { client?: Db; sender?: FaucetSender; asset?: FaucetAsset } = {}
 ): Promise<FaucetReceipt> {
+  const drop = DROPS[deps.asset ?? 'ETH'];
+  const sendFailed = drop.asset === 'ETH' ? FAUCET_SEND_FAILED : FAUCET_SEND_FAILED_TUSD;
   const supabase = deps.client ?? getSupabase();
   if (!deps.sender && !faucetConfigured()) throw new ClientError(FAUCET_NOT_SET_UP);
 
@@ -264,11 +387,14 @@ export async function claimFaucet(
   if (blocked || !account) throw new ClientError(blocked?.reason || 'This account cannot claim.');
   const to = ethers.getAddress(String(account.agent_wallet_address));
 
+  // ETH reserves through the four-argument form, which every database has, so
+  // the ETH faucet does not wait on the asset migration. tUSD names its asset.
   const { data: reserved, error: reserveErr } = await supabase.rpc('try_faucet_claim', {
     p_account_id: accountId,
     p_to: to,
-    p_amount_wei: AMOUNT_WEI.toString(),
-    p_cooldown_hours: FAUCET_COOLDOWN_HOURS,
+    p_amount_wei: drop.units.toString(),
+    p_cooldown_hours: drop.cooldownHours,
+    ...(drop.asset === 'ETH' ? {} : { p_asset: drop.asset }),
   });
   if (reserveErr) throw new Error(reserveErr.message);
   const row = (Array.isArray(reserved) ? reserved[0] : reserved) as { claim_id: string | null; next_claim_at: string } | null;
@@ -293,20 +419,30 @@ export async function claimFaucet(
       throw new ClientError(FAUCET_BUSY);
     }
 
+    // ETH must cover the drop and the gas; a token drop still pays its gas in ETH.
     const balance = await sender.balance();
-    if (balance < AMOUNT_WEI + GAS_RESERVE_WEI) {
+    const ethNeeded = drop.token ? GAS_RESERVE_WEI : drop.units + GAS_RESERVE_WEI;
+    if (balance < ethNeeded) {
       console.warn(`[faucet] dispenser balance ${ethers.formatEther(balance)} ETH is below one claim; refill it`);
       await fail('dispenser empty');
       throw new ClientError(FAUCET_EMPTY);
     }
+    if (drop.token) {
+      const held = await sender.tokenBalance(drop.token);
+      if (held < drop.units) {
+        console.warn(`[faucet] dispenser holds less than one ${drop.unit} claim; refill it`);
+        await fail('dispenser empty');
+        throw new ClientError(FAUCET_EMPTY);
+      }
+    }
 
     let sent;
     try {
-      sent = await sender.send(to, AMOUNT_WEI);
+      sent = drop.token ? await sender.sendToken(drop.token, to, drop.units) : await sender.send(to, drop.units);
     } catch (err) {
       await fail(shortError(err));
       console.error(`[faucet] send failed for claim ${claimId}: ${shortError(err)}`);
-      throw new ClientError(FAUCET_SEND_FAILED);
+      throw new ClientError(sendFailed);
     }
     settled = true;
     await markClaim(supabase, claimId, { status: 'sent', tx_hash: sent.hash, sent_at: new Date().toISOString() });
@@ -321,12 +457,15 @@ export async function claimFaucet(
     }
     if (outcome === 'reverted') {
       await markClaim(supabase, claimId, { status: 'failed', error: 'reverted' });
-      throw new ClientError(FAUCET_SEND_FAILED);
+      throw new ClientError(sendFailed);
     }
     if (outcome === 'confirmed') await markClaim(supabase, claimId, { status: 'confirmed' });
 
     return {
-      amountEth: FAUCET_AMOUNT_ETH,
+      asset: drop.asset,
+      unit: drop.unit,
+      amount: drop.amount,
+      amountEth: drop.amount,
       status: outcome === 'confirmed' ? 'confirmed' : 'sent',
       txHash: sent.hash,
       txUrl: txUrl(sent.hash) as string,

@@ -25,9 +25,9 @@ function siteOrigin() {
 
 const origin = siteOrigin();
 
-const SITE_TITLE = 'Flizy | Send crypto from WhatsApp & Telegram';
+const SITE_TITLE = 'Flizy | Pay anyone with a phone number';
 const SITE_DESCRIPTION =
-  'Send money by phone number, email or username, from WhatsApp, Telegram or the web.';
+  'Pay and get paid by phone number, email or username, from WhatsApp, Telegram or the web. Pay links, requests and receipts.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(origin),

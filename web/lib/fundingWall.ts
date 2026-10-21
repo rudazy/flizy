@@ -6,12 +6,15 @@
  * test/fundingWall.test.js, which loads both and compares them on the same
  * vectors. Change one side, change the other, or that test fails.
  *
- * No imports on purpose, so node --test can load this file directly. That is
- * why the origin is resolved here rather than through lib/siteOrigin.ts.
+ * Its one import, listedTokens.ts, imports nothing itself, so node --test can
+ * still load this file directly. That is why the origin is resolved here
+ * rather than through lib/siteOrigin.ts.
  *
  * Why a wall says more than an address, and why the chat half lives elsewhere:
  * see the header of lib/engine/fundingWall.js.
  */
+
+import { symbolLabel } from './listedTokens.ts';
 
 /** Set as `reason` on any refusal built here. Unused on the site; kept in step. */
 export const FUND_REASON = 'insufficient_funds';
@@ -59,9 +62,10 @@ export function fundingWallText({
       lines.push(`Have ${have} ETH · Need ~${need} ETH + gas`);
     }
   } else {
-    lines.push(`Not enough ${asset} in your Flizy wallet.`);
+    const unit = symbolLabel(asset);
+    lines.push(`Not enough ${unit} in your Flizy wallet.`);
     if (have != null && need != null) {
-      lines.push(`Have ${have} ${asset} · Need ${need} ${asset}`);
+      lines.push(`Have ${have} ${unit} · Need ${need} ${unit}`);
     }
   }
 
