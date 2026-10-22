@@ -299,7 +299,7 @@ xychart-beta
 
 | Quality measure | Today |
 | --- | --- |
-| Automated tests | 3,117 Node tests and 194 Foundry contract tests, all passing |
+| Automated tests | 3,121 Node tests and 194 Foundry contract tests, all passing |
 | Test files | 222 Node, 10 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
 | Database | 90 idempotent migrations, each ending in a post-condition check that fails loudly |

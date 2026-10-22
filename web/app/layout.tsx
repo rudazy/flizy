@@ -10,6 +10,7 @@ import { JsonLd } from '../components/JsonLd';
 import { LocaleProvider } from '../components/LocaleProvider';
 import { CONSENT_COOKIE, readConsent } from '../lib/consent';
 import { hasSessionCookie } from '../lib/cookies';
+import { footerBotLinks } from '../lib/botPublic';
 import { INSTALL_CAPTURE_JS } from '../lib/installCapture';
 import { OG_IMAGE } from '../lib/seo';
 import './globals.css';
@@ -132,7 +133,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Analytics />
         </Suspense>
         <LocaleProvider>
-          <AppChrome signedIn={signedIn}>{children}</AppChrome>
+          <AppChrome signedIn={signedIn} {...footerBotLinks()}>
+            {children}
+          </AppChrome>
         </LocaleProvider>
         {askConsent ? <CookieConsent /> : null}
       </body>

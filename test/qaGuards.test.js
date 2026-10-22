@@ -50,9 +50,12 @@ describe('pay link', () => {
   });
 
   it('shows the first payment warning on the review step too', () => {
-    const reviewBlock = landing.slice(landing.indexOf("stage === 'review' ? ("), landing.indexOf("stage === 'edit' ? ("));
-    assert.match(reviewBlock, /firstPay \?/);
-    assert.match(reviewBlock, /First payment\./);
+    const reviewBlock = landing.slice(landing.indexOf("stage === 'review' ? ("), landing.lastIndexOf('{paid ? ('));
+    assert.match(reviewBlock, /\{firstPay \? <FirstPayNote handle=\{handle\} review \/> : null\}/);
+    // The note itself, shared with the amount step.
+    const note = landing.slice(landing.indexOf('function FirstPayNote'));
+    assert.match(note, /First payment\. You have not paid \{handle\} before\./);
+    assert.match(note, /Check this is the right person before you confirm\./);
   });
 
   it('says Paid once, not again as an error', () => {

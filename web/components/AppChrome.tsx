@@ -9,9 +9,14 @@ import { PwaRegister } from './PwaRegister';
 export function AppChrome({
   children,
   signedIn = false,
+  telegramUrl = null,
+  whatsappUrl = null,
 }: {
   children: ReactNode;
   signedIn?: boolean;
+  /** The bots' public links for the footer, read on the server (web/app/layout.tsx); null when not set. */
+  telegramUrl?: string | null;
+  whatsappUrl?: string | null;
 }) {
   const pathname = usePathname() || '';
   const isApp = pathname.startsWith('/dashboard');
@@ -32,7 +37,7 @@ export function AppChrome({
     <>
       <SiteHeader signedIn={signedIn} />
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 py-12 md:py-16">{children}</main>
-      <SiteFooter signedIn={signedIn} />
+      <SiteFooter telegramUrl={telegramUrl} whatsappUrl={whatsappUrl} />
       <PwaRegister />
     </>
   );

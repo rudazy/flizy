@@ -8,6 +8,7 @@ import {
   resolvePayRef,
 } from '../../../../lib/payCode.ts';
 import { apiErrorBody } from '../../../../lib/apiError';
+import { ethUsd } from '../../../../lib/ethUsd.ts';
 import { accountQuickSendWei, isKnownRecipient } from '../../../../lib/tiers.ts';
 
 const ROUTE = 'GET /api/pay/preview';
@@ -45,6 +46,8 @@ export async function GET(req: Request) {
       alreadySaved,
       known,
       quickSendEth,
+      // For the page's dollar estimates only; null hides them.
+      usdPerEth: await ethUsd().catch(() => null),
       username: merchant.username,
       displayName: merchant.displayName,
     });
