@@ -4,6 +4,9 @@ import { cache } from 'react';
 import { loadReceipt } from '../../../lib/receipts.ts';
 import { getWebChain, explorerTxUrl } from '../../../lib/dexServer';
 import { pageMetadata } from '../../../lib/seo';
+import { ethUsd } from '../../../lib/ethUsd.ts';
+import { partyNote, receiptAmount, receiptHash, receiptUsd, receiptWhen } from '../../../lib/receiptView';
+import { ReceiptCard } from '../../../components/ReceiptCard';
 
 /**
  * /r/{token}: a payment one of its two parties chose to share.
@@ -22,15 +25,11 @@ const readReceipt = cache(async (token: string) => {
   }
 });
 
-function when(iso: string): string {
-  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const r = await readReceipt(params.token);
   const base = pageMetadata({
     title: r ? `Paid ${r.amount} ${r.unit} on Flizy` : 'Receipt on Flizy',
-    description: r ? `A payment of ${r.amount} ${r.unit} on ${r.network}, ${when(r.at)}.` : 'A payment receipt on Flizy.',
+    description: r ? `A payment of ${r.amount} ${r.unit} on ${r.network}, ${receiptWhen(r.at)}.` : 'A payment receipt on Flizy.',
     path: `/r/${params.token}`,
     noindex: true,
   });
@@ -61,52 +60,27 @@ export default async function ReceiptPage({ params }: Props) {
   }
 
   const chain = getWebChain();
-  const rows: Array<[string, string]> = [
-    ['From', r.from],
-    ['To', r.to],
-    ...(r.note ? ([['For', r.note]] as Array<[string, string]>) : []),
-    ['When', when(r.at)],
-    ['Network', r.network],
-  ];
+  // The dollar line for ETH needs the mainnet rate; tUSD is one to one and needs nothing.
+  const usdPerEth = r.unit.toUpperCase() === 'ETH' ? await ethUsd().catch(() => null) : null;
 
   return (
-    <div className="fade-up mx-auto max-w-md space-y-6">
-      <section className="overflow-hidden rounded-[14px] border border-[#232323] bg-[#101010]">
-        <div className="grid justify-items-center gap-2 px-5 pb-6 pt-8 text-center">
-          <p className="m-0 font-sans text-[11px] uppercase tracking-[0.2em] text-sun">Payment confirmed</p>
-          <p className="m-0 font-sans text-[44px] font-semibold leading-none tracking-wide text-paper">
-            {r.amount} <span className="text-[22px] text-sun">{r.unit}</span>
-          </p>
-        </div>
-        <dl className="m-0 grid gap-3 border-t border-[#1f1f1f] p-5 text-sm">
-          {rows.map(([label, value]) => (
-            <div key={label} className="flex items-start justify-between gap-4">
-              <dt className="text-muted">{label}</dt>
-              <dd className="m-0 min-w-0 break-words text-right text-paper">{value}</dd>
-            </div>
-          ))}
-        </dl>
-        {r.txHash ? (
-          <div className="border-t border-[#1f1f1f] p-5">
-            <a
-              href={explorerTxUrl(chain, r.txHash)}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="text-sm text-sun no-underline hover:opacity-80"
-            >
-              View the transaction
-            </a>
-          </div>
-        ) : null}
-      </section>
-      <p className="text-center text-xs text-muted">
-        Shared by someone in this payment. {chain.name} is a test network; these funds have no cash value.
-      </p>
-      <div className="flex justify-center">
-        <Link href="/signup" className="btn btn-primary no-underline">
-          Get paid on Flizy
-        </Link>
-      </div>
-    </div>
+    <ReceiptCard
+      amount={receiptAmount(r.amount)}
+      unit={r.unit}
+      usd={receiptUsd(r.amount, r.unit, usdPerEth)}
+      from={r.from}
+      fromNote={partyNote(r.fromKind, 'from')}
+      to={r.to}
+      toNote={partyNote(r.toKind, 'to')}
+      toIsFlizy={r.toKind === 'flizy'}
+      note={r.note}
+      when={receiptWhen(r.at)}
+      network={r.network}
+      txHash={r.txHash}
+      hashLabel={r.txHash ? receiptHash(r.txHash) : null}
+      explorerUrl={r.txHash ? explorerTxUrl(chain, r.txHash) : null}
+      pagePath={`/r/${params.token}`}
+      imagePath={`/r/${params.token}/image`}
+    />
   );
 }

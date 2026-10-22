@@ -104,11 +104,16 @@ export type Receipt = {
   unit: string;
   from: string;
   to: string;
+  /** Whether each side is a Flizy account or a wallet outside Flizy. */
+  fromKind: PartyKind;
+  toKind: PartyKind;
   note: string | null;
   at: string;
   network: string;
   txHash: string | null;
 };
+
+export type PartyKind = 'flizy' | 'wallet';
 
 type Party = { username: string | null; scan_show_username: boolean | null };
 
@@ -140,6 +145,8 @@ export async function loadReceipt(token: string, network: string, client?: Db): 
     unit: assetSymbol(t.token_address || t.asset || 'ETH'),
     from: partyLabel(sender, null),
     to: partyLabel(payee, t.to_address),
+    fromKind: sender ? 'flizy' : 'wallet',
+    toKind: payee ? 'flizy' : 'wallet',
     note: t.note ? displaySafeLabel(t.note, 80) || null : null,
     at: t.created_at,
     network,

@@ -105,6 +105,19 @@ describe('what a receipt shows', () => {
     seed({ to_address: '0x' + '12'.repeat(20) });
     const r = await R.loadReceipt(await R.shareReceipt(SENDER, TX, c()), 'GIWA Sepolia', c());
     assert.equal(r.to, '0x1212…1212');
+    assert.equal(r.toKind, 'wallet');
+  });
+
+  it('says whether each side is a Flizy account', async () => {
+    seed();
+    const r = await R.loadReceipt(await R.shareReceipt(SENDER, TX, c()), 'GIWA Sepolia', c());
+    assert.deepEqual({ fromKind: r.fromKind, toKind: r.toKind }, { fromKind: 'flizy', toKind: 'flizy' });
+  });
+
+  it('does not call a sender with no account a Flizy wallet', async () => {
+    seed({ account_id: 'acc-gone', receipt_token: 'abcdefghijklmnopqrstuv' });
+    const r = await R.loadReceipt('abcdefghijklmnopqrstuv', 'GIWA Sepolia', c());
+    assert.deepEqual({ from: r.from, fromKind: r.fromKind }, { from: 'A wallet', fromKind: 'wallet' });
   });
 });
 
@@ -135,6 +148,13 @@ describe('the receipt route', () => {
     assert.match(route, /rejectIfCrossOrigin\(req\)/);
     assert.match(route, /getAccountIdFromCookie\(\)/);
     assert.match(read('web/app/r/[token]/page.tsx'), /noindex: true/);
+  });
+
+  it('opens the receipt image by token, unindexed', () => {
+    const route = read('web/app/r/[token]/image/route.tsx');
+    assert.match(route, /loadReceipt\(params\.token,/);
+    assert.match(route, /status: 404/);
+    assert.match(route, /X-Robots-Tag', 'noindex'/);
   });
 
   it('keeps names off the link preview card', () => {
