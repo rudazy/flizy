@@ -371,11 +371,18 @@ wallet; it never touches a Flizy-held key.
   once, from either path.
 - Swaps are built in the browser against the fee router from a server quote,
   with an approval for the swapped amount only.
-- Scan: once a swap, NFT trade or deposit into a Flizy wallet lands, the page
-  hands its hash to `POST /api/scan/record` (`web/lib/walletScanRecord.ts`).
-  The server reads the transaction, its receipt and the logs of Flizy's own
-  contracts, and writes one `transfers` row with no account and channel key
-  `wallet` ("Outside wallet"). Hashes Flizy already logged (its own sends,
+- Scan shows every trade on Flizy's contracts, account or not, as a guest's.
+  Once a swap, NFT trade or deposit into a Flizy wallet lands, the page hands
+  its hash to `POST /api/scan/record` (`web/lib/walletScanRecord.ts`), which
+  waits a few seconds for the server's RPC to see it. Independently, the Scan
+  page calls `POST /api/scan/sync` beside its own read (at most one sync every
+  30 seconds per server instance): it reads the latest calls to the fee router
+  and the marketplace from the explorer (`syncWalletScan`) and records the
+  ones not on file, whatever their age, up to a dozen at a time; the page
+  reads the feed again when rows were written. Either
+  way the server reads the transaction, its receipt and the logs of Flizy's
+  own contracts, and writes one `transfers` row with no account and channel
+  key `wallet` ("Guest", as are outside-wallet payments). Hashes Flizy already logged (its own sends,
   faucet drips, claim payouts and refunds) and anything sent by a Flizy wallet
   are skipped, and the unique index `transfers_wallet_tx_once` keeps each
   transaction to one row. With no account on the row, spending limits and the
@@ -383,8 +390,9 @@ wallet; it never touches a Flizy-held key.
   account's history, as any payment to its wallet does.
 - Without a session, reads, plans, notices and Scan records are capped per caller per hour
   (`web/lib/callerLimit.ts`, keyed on a hashed client address), and a notice
-  or a Scan record is accepted only for a transaction from the last hour, so
-  old trades cannot be replayed into chat or backfilled onto Scan.
+  or a handed-over Scan record is accepted only for a transaction from the
+  last hour, so old trades cannot be replayed into chat. Older trades reach
+  Scan only through the explorer sync, which reads Flizy's own contracts.
 - Limit orders, chat payments, requests, claims, mint creation and theses
   stay behind an account.
 

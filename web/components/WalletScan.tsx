@@ -81,6 +81,24 @@ export function WalletScan() {
   const datesRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
+  // Bumped when the guest sync wrote rows, so the feed is read again.
+  const [guestRows, setGuestRows] = useState(0);
+
+  // Guests' trades reach Scan through their own request (POST /api/scan/sync),
+  // so the feed never waits on the explorer.
+  useEffect(() => {
+    if (refreshing) return;
+    let cancel = false;
+    fetch('/api/scan/sync', { method: 'POST' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { written?: unknown } | null) => {
+        if (!cancel && typeof body?.written === 'number' && body.written > 0) setGuestRows((n) => n + 1);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancel = true;
+    };
+  }, [refreshing]);
 
   useEffect(() => {
     if (refreshing) return;
@@ -103,7 +121,7 @@ export function WalletScan() {
     return () => {
       cancel = true;
     };
-  }, [refreshing]);
+  }, [refreshing, guestRows]);
 
   useEffect(() => {
     const focus = parseScanFocus(query);

@@ -48,7 +48,7 @@ describe('what counts as received', () => {
   it('lists confirmed payments into this wallet in the window, newest first, and nothing else', async () => {
     const { payments } = await M.loadReceived(WALLET, 30, seed().client, now);
     assert.deepEqual(payments.map((p) => p.id), ['t1', 't2', 't3']);
-    assert.deepEqual(payments.map((p) => p.from), ['@ada', 'A Flizy account', 'Outside wallet 0xabab…abab']);
+    assert.deepEqual(payments.map((p) => p.from), ['@ada', 'A Flizy account', 'Guest 0xabab…abab']);
     assert.equal(payments[2].unit, 'tUSD');
   });
 

@@ -207,8 +207,10 @@ export default function PrivacyPage() {
             overused, we count requests per network address, kept as a hash; counts older than
             a day are cleared as new requests come in. After a swap, an NFT trade or a deposit
             into a Flizy wallet, we keep its transaction hash so the Flizy accounts it touched
-            are told once, and we add it to Scan. That Scan entry shows what the transaction
-            did and the wallet&apos;s address, both already public on the chain, and is not
+            are told once, and we add it to Scan. Scan also lists every swap and NFT trade made
+            through Flizy&apos;s own contracts, read from the public chain, whether or not the
+            wallet ever visited the site. Such an entry shows what the transaction did and the
+            wallet&apos;s address, both already public on the chain, as a guest, and is not
             filed under any Flizy account. A deposit also shows the Flizy wallet it reached,
             named only if that account shows its username on Scan. The wallet signs its own
             transactions, and

@@ -122,7 +122,7 @@ another adapter, not a second product.
 | **Mints** | Launch a drop with public and allowlist phases, prices, limits and schedule; bring an existing collection | Live |
 | **Collection creator** | Build a collection from artwork layers: traits, rarity weights, rules, unique combinations, standard metadata | Built: the creator runs today; launching switches on once the updated factory and storage are configured |
 | **Generate with AI** | Describe a collection; AI plans the traits and draws each layer, then the creator takes over | Built: switches on once AI and storage keys are configured |
-| **Scan** | A public ledger of Flizy activity, including swaps, NFT trades and deposits signed by a connected wallet. Recipients show as the payment rail, and each person chooses whether their username appears | Live |
+| **Scan** | A public ledger of Flizy activity. Every swap and NFT trade through Flizy's contracts shows, and a wallet with no Flizy account shows as a guest. Recipients show as the payment rail, and each person chooses whether their username appears | Live |
 | **Tasks and projects** | Publish tasks with a declared reward, category, level and steps; participants submit, the creator picks winners. Filter by category, save tasks, see saved, joined and published tasks under My tasks; Flizy features tasks at the top of Explore | Live (reward escrow comes later) |
 | **Copy trade** | Choose wallets to follow and set dollar rules | Settings only; nothing copies yet |
 | **Account and security** | Trusted wallets, unlock PIN, daily ETH limit, password change that signs out other devices, chat links, platform identities, privacy controls | Live |
@@ -299,7 +299,7 @@ xychart-beta
 
 | Quality measure | Today |
 | --- | --- |
-| Automated tests | 3,107 Node tests and 194 Foundry contract tests, all passing |
+| Automated tests | 3,117 Node tests and 194 Foundry contract tests, all passing |
 | Test files | 222 Node, 10 Foundry |
 | Production build | Type-checked, linted and schema-gated on every build |
 | Database | 90 idempotent migrations, each ending in a post-condition check that fails loudly |

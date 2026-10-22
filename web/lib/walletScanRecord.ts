@@ -4,13 +4,17 @@ import { MARKET_ABI } from './nftMarket.ts';
 import { displaySafeLabel } from './sanitize.ts';
 
 /**
- * Transactions a connected wallet signed on Flizy, recorded for Scan.
+ * Transactions a wallet outside Flizy signed on Flizy, recorded for Scan as
+ * a guest's.
  *
- * A trade from a Flizy wallet is logged by the route that sends it. A wallet
- * outside Flizy signs in the browser, so the page hands the hash over
- * afterwards (POST /api/scan/record) and the server reads what happened from
- * the chain: the transaction, its receipt and the logs of Flizy's own
- * contracts. Nothing the page says about amounts or tokens is used.
+ * A trade from a Flizy wallet is logged by the route that sends it. Any other
+ * wallet reaches Scan two ways: the page hands the hash over once it lands
+ * (POST /api/scan/record), and Scan itself reads the latest calls to the fee
+ * router and the marketplace from the explorer (syncWalletScan), which also
+ * catches trades by people with no Flizy account. Either way the server reads
+ * what happened from the chain: the transaction, its receipt and the logs of
+ * Flizy's own contracts. Nothing the page or the explorer says about amounts
+ * or tokens is used.
  *
  * Three kinds are recorded: a swap through Flizy's fee router, a marketplace
  * action, and a deposit into a Flizy account's wallet (ETH, FLZ or a listed
@@ -27,10 +31,10 @@ import { displaySafeLabel } from './sanitize.ts';
 
 type Db = ReturnType<typeof getSupabase>;
 
-/** How old a transaction may be and still be recorded. The page hands the hash over as soon as it lands. */
+/** How old a handed-over transaction may be and still be recorded. The page hands the hash over as soon as it lands. */
 export const RECORD_WINDOW_S = 60 * 60;
 
-/** The channel key on these rows. Scan shows it as "Outside wallet" (web/lib/historyRow.ts). */
+/** The channel key on these rows. Scan shows it as "Guest" (web/lib/historyRow.ts). */
 export const WALLET_CHANNEL = 'wallet';
 
 export type ScanToken = { address: string; symbol: string; decimals: number };
@@ -342,12 +346,22 @@ async function collectionName(provider: ethers.Provider, collection: string): Pr
   return typeof name === 'string' && name.trim() ? name.trim().slice(0, 40) : null;
 }
 
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** How long the hand-off route waits for the server's RPC to see a transaction the wallet's RPC already confirmed. */
+export const RECEIPT_WAIT_MS = 6000;
+const RECEIPT_POLL_MS = 1500;
+
 /**
  * Record a transaction a connected wallet signed. Returns false when it is not
- * recorded: not mined or failed, older than RECORD_WINDOW_S, not Flizy
- * activity, already logged by Flizy or sent by a Flizy wallet (whose own
- * route logs it), a deposit to a wallet that is not a Flizy account's, or
- * already on record.
+ * recorded: not mined or failed, older than `maxAgeS` (RECORD_WINDOW_S for a
+ * hash a page hands over; null for one read from the explorer, which is
+ * Flizy activity whatever its age), not Flizy activity, already logged by
+ * Flizy or sent by a Flizy wallet (whose own route logs it), a deposit to a
+ * wallet that is not a Flizy account's, or already on record.
+ *
+ * `waitMs` covers the moment right after a page hands a hash over: its wallet
+ * saw the receipt, but the RPC this server reads may not have it yet.
  */
 export async function recordWalletTx(args: {
   provider: ethers.Provider;
@@ -356,12 +370,24 @@ export async function recordWalletTx(args: {
   chainId: number;
   setup: ScanSetup;
   now?: number;
+  maxAgeS?: number | null;
+  waitMs?: number;
+  sleep?: (ms: number) => Promise<void>;
 }): Promise<boolean> {
   const { provider, supabase, setup } = args;
-  const [tx, receipt] = await Promise.all([provider.getTransaction(args.txHash), provider.getTransactionReceipt(args.txHash)]);
+  const maxAgeS = args.maxAgeS === undefined ? RECORD_WINDOW_S : args.maxAgeS;
+  const sleep = args.sleep ?? pause;
+  let waited = 0;
+  let [tx, receipt] = await Promise.all([provider.getTransaction(args.txHash), provider.getTransactionReceipt(args.txHash)]);
+  while ((!tx || !receipt) && waited < (args.waitMs ?? 0)) {
+    await sleep(RECEIPT_POLL_MS);
+    waited += RECEIPT_POLL_MS;
+    [tx, receipt] = await Promise.all([provider.getTransaction(args.txHash), provider.getTransactionReceipt(args.txHash)]);
+  }
   if (!tx || !receipt || receipt.status !== 1) return false;
   const block = await provider.getBlock(receipt.blockNumber);
-  if (!block || (args.now ?? Date.now()) / 1000 - block.timestamp > RECORD_WINDOW_S) return false;
+  if (!block) return false;
+  if (maxAgeS != null && (args.now ?? Date.now()) / 1000 - block.timestamp > maxAgeS) return false;
 
   const move = readWalletMove(
     { from: tx.from, to: tx.to, value: tx.value, data: tx.data, logs: receipt.logs.map((l) => ({ address: l.address, topics: l.topics, data: l.data })) },
@@ -386,4 +412,115 @@ export async function recordWalletTx(args: {
     throw new Error(error.message);
   }
   return true;
+}
+
+/** Contract methods whose transactions are Flizy activity, as the explorer names them. */
+const ROUTER_METHODS = new Set(['swapExactETHForTokens', 'swapExactTokensForETH', 'swapExactTokensForTokens']);
+const MARKET_METHODS = new Set(['list', 'cancelListing', 'buy', 'makeOffer', 'cancelOffer', 'acceptOffer', 'setRoyalty', 'withdraw']);
+
+/**
+ * New rows one sync may write, how long it may keep starting new ones, and
+ * how many it reads at once. The explorer takes a few seconds to answer and a
+ * row a few chain reads, measured against GIWA Sepolia.
+ */
+export const SYNC_MAX_NEW = 12;
+export const SYNC_BUDGET_MS = 25_000;
+const SYNC_PARALLEL = 4;
+const EXPLORER_TIMEOUT_MS = 12_000;
+
+type ExplorerTx = { hash?: unknown; status?: unknown; method?: unknown };
+
+/**
+ * Hashes this server instance already read and did not record, such as a swap
+ * of a token Flizy does not list. Kept so each sync spends its budget on new
+ * transactions; bounded, and empty again on a fresh instance.
+ */
+const declined = new Set<string>();
+const DECLINED_MAX = 1000;
+
+/** Hashes of the latest successful calls to `address` with one of `methods`, newest first. */
+async function explorerCalls(
+  explorerUrl: string,
+  address: string,
+  methods: Set<string>,
+  fetchImpl: typeof fetch
+): Promise<string[]> {
+  const res = await fetchImpl(`${explorerUrl}/api/v2/addresses/${address}/transactions?filter=to`, {
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(EXPLORER_TIMEOUT_MS),
+  });
+  if (!res.ok) return [];
+  const body = (await res.json().catch(() => null)) as { items?: ExplorerTx[] } | null;
+  const hashes: string[] = [];
+  for (const item of body?.items ?? []) {
+    const hash = typeof item.hash === 'string' ? item.hash.toLowerCase() : '';
+    // The explorer only points at candidates: each one is read again from the chain before it is recorded.
+    if (/^0x[0-9a-f]{64}$/.test(hash) && item.status === 'ok' && typeof item.method === 'string' && methods.has(item.method)) {
+      hashes.push(hash);
+    }
+  }
+  return hashes;
+}
+
+/**
+ * Put every recent swap through Flizy's fee router and every marketplace
+ * action on Scan, whoever signed it: the page's hand-off misses a trade when
+ * the tab closes first or the server's RPC lags, and someone with no Flizy
+ * account at all trades through the same contracts. The explorer lists the
+ * latest calls to each contract; hashes already in transfers are skipped, and
+ * the rest go through recordWalletTx with no age limit. Flizy wallets' own
+ * trades are logged by their routes and are skipped there too.
+ *
+ * Bounded by SYNC_MAX_NEW and SYNC_BUDGET_MS; whatever is left is picked up by
+ * the next sync. Returns how many rows it wrote.
+ */
+export async function syncWalletScan(args: {
+  provider: ethers.Provider;
+  supabase: Db;
+  chainId: number;
+  setup: ScanSetup;
+  explorerUrl: string;
+  fetchImpl?: typeof fetch;
+  now?: () => number;
+}): Promise<number> {
+  const { setup, supabase } = args;
+  const fetchImpl = args.fetchImpl ?? fetch;
+  const now = args.now ?? Date.now;
+  const started = now();
+  const lists = await Promise.all([
+    explorerCalls(args.explorerUrl, setup.feeRouter, ROUTER_METHODS, fetchImpl).catch(() => []),
+    setup.market ? explorerCalls(args.explorerUrl, setup.market, MARKET_METHODS, fetchImpl).catch(() => []) : Promise.resolve([]),
+  ]);
+  const candidates = [...new Set(lists.flat())];
+  if (!candidates.length) return 0;
+
+  const { data, error } = await supabase.from('transfers').select('tx_hash').in('tx_hash', candidates);
+  if (error) throw new Error(error.message);
+  const known = new Set((data || []).map((row: { tx_hash?: string | null }) => String(row.tx_hash || '').toLowerCase()));
+
+  const pending = candidates.filter((txHash) => !known.has(txHash) && !declined.has(txHash));
+  let written = 0;
+  // Newest first, a few at a time, so one sync never writes much past SYNC_MAX_NEW.
+  let next = 0;
+  while (next < pending.length && written < SYNC_MAX_NEW && now() - started <= SYNC_BUDGET_MS) {
+    const batch = pending.slice(next, next + Math.min(SYNC_PARALLEL, SYNC_MAX_NEW - written));
+    next += batch.length;
+    const results = await Promise.all(
+      batch.map((txHash) =>
+        recordWalletTx({ provider: args.provider, supabase, txHash, chainId: args.chainId, setup, maxAgeS: null }).then(
+          (recorded) => ({ txHash, recorded }),
+          // One unreadable transaction does not stop the rest; the next sync tries it again.
+          () => ({ txHash, recorded: null })
+        )
+      )
+    );
+    for (const { txHash, recorded } of results) {
+      if (recorded) written += 1;
+      else if (recorded === false) {
+        if (declined.size >= DECLINED_MAX) declined.clear();
+        declined.add(txHash);
+      }
+    }
+  }
+  return written;
 }

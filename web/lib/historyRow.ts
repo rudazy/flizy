@@ -44,9 +44,9 @@ export function channelLabel(key: unknown): string | null {
   if (!k) return null;
   if (k === 'site') return 'Flizy app';
   // Paid from a wallet outside Flizy, through FlizyPaymentReceiver.
-  if (k === 'external') return 'Outside wallet';
+  if (k === 'external') return 'Guest';
   // Signed by a connected wallet on the site, recorded for Scan (web/lib/walletScanRecord.ts).
-  if (k === 'wallet') return 'Outside wallet';
+  if (k === 'wallet') return 'Guest';
   const prefix = k.match(/^([a-z]+):/);
   if (prefix) return PLATFORM_LABELS[prefix[1]] ?? null;
   // WhatsApp keys are the bare id: digits, or a LID that is digits too.

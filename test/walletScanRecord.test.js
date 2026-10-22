@@ -218,8 +218,8 @@ describe('the row', () => {
     assert.equal(row.token_address, null);
   });
 
-  it('Scan and History show the channel as an outside wallet', () => {
-    assert.equal(historyRow.channelLabel('wallet'), 'Outside wallet');
+  it('Scan and History show the channel as a guest', () => {
+    assert.equal(historyRow.channelLabel('wallet'), 'Guest');
   });
 });
 
@@ -319,6 +319,146 @@ describe('recording', () => {
   });
 });
 
+describe('waiting for the receipt, and the explorer sync', () => {
+  const NOW = Date.parse('2026-10-21T10:30:00Z');
+  const BLOCK_TIME = Math.floor(Date.parse('2026-10-21T10:00:00Z') / 1000);
+  const hashN = (n) => `0x${n.toString(16).padStart(64, '0')}`;
+
+  /** A provider that knows `txs` by hash; `lagCalls` misses before a hash appears. */
+  function chain(txs, { lagCalls = 0, blockTime = BLOCK_TIME } = {}) {
+    let misses = 0;
+    const calls = { receipts: 0 };
+    return {
+      calls,
+      getTransaction: async (h) => (misses < lagCalls ? null : txs[h] ? { ...txs[h] } : null),
+      getTransactionReceipt: async (h) => {
+        calls.receipts += 1;
+        if (misses < lagCalls) {
+          misses += 1;
+          return null;
+        }
+        return txs[h] ? { status: 1, blockNumber: 5, logs: txs[h].logs } : null;
+      },
+      getBlock: async () => ({ timestamp: blockTime }),
+      call: async () => ethers.AbiCoder.defaultAbiCoder().encode(['string'], ['Giwaforge']),
+    };
+  }
+
+  function db(tables = {}) {
+    return createFakeSupabase({ accounts: [{ id: 'acct-1', agent_wallet_address: FLIZY_WALLET }], transfers: [], faucet_claims: [], claims: [], ...tables });
+  }
+
+  it('the hand-off waits for the server RPC to see a transaction the wallet already confirmed', async () => {
+    const fake = db();
+    const slept = [];
+    const ok = await rec.recordWalletTx({
+      provider: chain({ [HASH]: ethToFlz() }, { lagCalls: 2 }),
+      supabase: fake.client,
+      txHash: HASH,
+      chainId: 91342,
+      setup: SETUP,
+      now: NOW,
+      waitMs: rec.RECEIPT_WAIT_MS,
+      sleep: async (ms) => slept.push(ms),
+    });
+    assert.equal(ok, true);
+    assert.equal(slept.length, 2);
+  });
+
+  it('without a wait, a lagging RPC still answers "not recorded" at once', async () => {
+    const ok = await rec.recordWalletTx({ provider: chain({ [HASH]: ethToFlz() }, { lagCalls: 1 }), supabase: db().client, txHash: HASH, chainId: 91342, setup: SETUP, now: NOW });
+    assert.equal(ok, false);
+  });
+
+  it('with no age limit, an old trade is recorded at its own time', async () => {
+    const fake = db();
+    const old = BLOCK_TIME - 30 * 86400;
+    const ok = await rec.recordWalletTx({ provider: chain({ [HASH]: ethToFlz() }, { blockTime: old }), supabase: fake.client, txHash: HASH, chainId: 91342, setup: SETUP, now: NOW, maxAgeS: null });
+    assert.equal(ok, true);
+    assert.equal(fake.db.tables.transfers[0].created_at, new Date(old * 1000).toISOString());
+  });
+
+  function explorer(pages) {
+    const asked = [];
+    const fetchImpl = async (url) => {
+      asked.push(url);
+      const address = url.split('/addresses/')[1].split('/')[0].toLowerCase();
+      return { ok: true, json: async () => ({ items: pages[address] || [] }) };
+    };
+    return { fetchImpl, asked };
+  }
+
+  it('records the latest router and marketplace calls from guests, and skips what is already on file', async () => {
+    const swap = hashN(1);
+    const sale = hashN(2);
+    const flizyOwn = hashN(3);
+    const failed = hashN(4);
+    const liquidity = hashN(5);
+    const fake = db({ transfers: [{ id: 't1', tx_hash: flizyOwn }] });
+    const { fetchImpl, asked } = explorer({
+      [ROUTER.toLowerCase()]: [
+        { hash: swap, status: 'ok', method: 'swapExactETHForTokens' },
+        { hash: flizyOwn, status: 'ok', method: 'swapExactETHForTokens' },
+        { hash: failed, status: 'error', method: 'swapExactETHForTokens' },
+        { hash: liquidity, status: 'ok', method: 'addLiquidityETH' },
+      ],
+      [MARKET.toLowerCase()]: [{ hash: sale, status: 'ok', method: 'buy' }],
+    });
+    const written = await rec.syncWalletScan({
+      provider: chain({ [swap]: ethToFlz(), [sale]: buy(), [flizyOwn]: ethToFlz() }),
+      supabase: fake.client,
+      chainId: 91342,
+      setup: SETUP,
+      explorerUrl: 'https://explorer.test',
+      fetchImpl,
+    });
+    assert.equal(written, 2);
+    assert.deepEqual(
+      fake.db.tables.transfers.filter((r) => r.phone === 'wallet').map((r) => [r.tx_hash, r.kind]).sort(),
+      [[swap, 'swap'], [sale, 'nft_market']].sort()
+    );
+    assert.ok(asked.every((u) => u.startsWith('https://explorer.test/api/v2/addresses/') && u.endsWith('/transactions?filter=to')));
+  });
+
+  it('a transaction it reads and declines is not read again by the next sync', async () => {
+    const unlisted = hashN(6);
+    const tx = ethToFlz();
+    tx.data = routerIface.encodeFunctionData('swapExactETHForTokens', [1n, [WETH, STRANGER], OUTSIDE, 9999999999n]);
+    const provider = chain({ [unlisted]: tx });
+    const { fetchImpl } = explorer({ [ROUTER.toLowerCase()]: [{ hash: unlisted, status: 'ok', method: 'swapExactETHForTokens' }] });
+    const run = () => rec.syncWalletScan({ provider, supabase: db().client, chainId: 91342, setup: { ...SETUP, market: null }, explorerUrl: 'https://explorer.test', fetchImpl });
+    assert.equal(await run(), 0);
+    const after = provider.calls.receipts;
+    assert.equal(await run(), 0);
+    assert.equal(provider.calls.receipts, after);
+  });
+
+  it('writes at most SYNC_MAX_NEW rows per sync; the rest wait for the next one', async () => {
+    const txs = {};
+    const items = [];
+    for (let i = 100; i < 100 + rec.SYNC_MAX_NEW + 3; i += 1) {
+      txs[hashN(i)] = ethToFlz();
+      items.push({ hash: hashN(i), status: 'ok', method: 'swapExactETHForTokens' });
+    }
+    const fake = db();
+    const { fetchImpl } = explorer({ [ROUTER.toLowerCase()]: items });
+    const sync = () => rec.syncWalletScan({ provider: chain(txs), supabase: fake.client, chainId: 91342, setup: { ...SETUP, market: null }, explorerUrl: 'https://explorer.test', fetchImpl });
+    assert.equal(await sync(), rec.SYNC_MAX_NEW);
+    assert.equal(await sync(), 3);
+  });
+
+  it('an explorer that is down writes nothing and does not throw', async () => {
+    const fetchImpl = async () => {
+      throw new Error('offline');
+    };
+    assert.equal(await rec.syncWalletScan({ provider: chain({}), supabase: db().client, chainId: 91342, setup: SETUP, explorerUrl: 'https://explorer.test', fetchImpl }), 0);
+  });
+
+  it('payments from an outside wallet show as a guest too', () => {
+    assert.equal(historyRow.channelLabel('external'), 'Guest');
+  });
+});
+
 describe('wiring', () => {
   it('the route takes only a hash, refuses cross-origin calls, and is capped per caller', () => {
     const route = read('web/app/api/scan/record/route.ts');
@@ -326,6 +466,23 @@ describe('wiring', () => {
     assert.match(route, /takeCallerAttempt\(supabase, req\.headers, 'record'\)/);
     assert.match(route, /TX_HASH_RE\.test\(txHash\)/);
     assert.doesNotMatch(route, /getAccountIdFromCookie/);
+  });
+
+  it('the hand-off route waits for the receipt', () => {
+    assert.match(read('web/app/api/scan/record/route.ts'), /waitMs: RECEIPT_WAIT_MS,/);
+  });
+
+  it('the guest sync is its own signed-in request, once per window, and the feed reads again after it writes', () => {
+    const sync = read('web/app/api/scan/sync/route.ts');
+    assert.match(sync, /rejectIfCrossOrigin\(req\)/);
+    assert.match(sync, /if \(!\(await getAccountIdFromCookie\(\)\)\)/);
+    assert.match(sync, /const SYNC_EVERY_MS = 30_000;/);
+    assert.match(sync, /if \(!syncing && Date\.now\(\) - lastSync >= SYNC_EVERY_MS\)/);
+    // The feed itself never waits on the explorer.
+    assert.doesNotMatch(read('web/app/api/scan/route.ts'), /syncWalletScan/);
+    const page = read('web/components/WalletScan.tsx');
+    assert.match(page, /fetch\('\/api\/scan\/sync', \{ method: 'POST' \}\)/);
+    assert.match(page, /\}, \[refreshing, guestRows\]\);/);
   });
 
   it('the record bucket has its own hourly cap', async () => {

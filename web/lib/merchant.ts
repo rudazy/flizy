@@ -105,7 +105,7 @@ export async function loadReceived(
     const from = payer?.username
       ? `@${payer.username}`
       : r.phone === 'external' || r.phone === 'wallet'
-        ? `Outside wallet ${displaySafeLabel(r.counterparty_label || '', 20)}`.trim()
+        ? `Guest ${displaySafeLabel(r.counterparty_label || '', 20)}`.trim()
         : 'A Flizy account';
     return {
       id: String(r.id),
