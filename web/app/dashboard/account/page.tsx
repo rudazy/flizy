@@ -18,6 +18,7 @@ import { useLocale } from '../../../components/LocaleProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { PayIdentity } from '../../../components/PayIdentity';
 import { OwnWalletPanel } from '../../../components/OwnWalletPanel';
+import { SecureWalletPanel } from '../../../components/SecureWalletPanel';
 import { CountryPanel, LanguagePanel } from '../../../components/AccountPrefs';
 import { ChatAppsPanel, SecretInput, TrustedPanel } from '../../../components/AccountConnections';
 import { LimitsPanel, PinPanel, QuickSendPanel, SecurityPanel } from '../../../components/AccountSecurity';
@@ -1016,6 +1017,7 @@ export default function AccountPage() {
           changingPassword={busy === 'password'}
           onSignOut={() => void onSignOut()}
           signingOut={busy === 'logout'}
+          wallet={<SecureWalletPanel />}
         />
       ) : null}
     </AppPage>

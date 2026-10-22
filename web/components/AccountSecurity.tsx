@@ -472,6 +472,7 @@ export function SecurityPanel({
   changingPassword,
   onSignOut,
   signingOut,
+  wallet = null,
 }: {
   email: string | null;
   emailVerified: boolean;
@@ -481,6 +482,8 @@ export function SecurityPanel({
   changingPassword: boolean;
   onSignOut: () => void;
   signingOut: boolean;
+  /** Securing the wallet, shown after the settings when the account may use it. */
+  wallet?: ReactNode;
 }) {
   const [changing, setChanging] = useState(false);
   return (
@@ -543,6 +546,8 @@ export function SecurityPanel({
           <SettingRow icon={<ShieldGlyph />} title="Two-step verification" text="An extra check when you sign in." status="Not available yet" muted />
           <SettingRow icon={<ScreenGlyph />} title="Active sessions" text="See and sign out other devices." status="Not available yet" muted />
         </div>
+
+        {wallet}
 
         <div className="grid gap-2.5">
           <SectionLabel>Legal</SectionLabel>

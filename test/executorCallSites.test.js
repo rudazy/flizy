@@ -37,7 +37,7 @@ function callers() {
 }
 
 describe('every executor call site is known', () => {
-  it('matches the reviewed list (21 call sites)', () => {
+  it('matches the reviewed list (22 call sites)', () => {
     assert.deepEqual(callers(), {
       'lib/ammora/execute.js': 2,
       'lib/dex.js': 2,
@@ -47,6 +47,7 @@ describe('every executor call site is known', () => {
       'lib/listedNfts.js': 1,
       'web/app/api/pay/execute/route.ts': 2,
       'web/lib/ammora/execute.ts': 2,
+      'web/lib/custody/liveDeps.ts': 1,
       'web/lib/dexServer.ts': 6,
       'web/lib/marketExecute.ts': 1,
     });

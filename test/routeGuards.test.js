@@ -79,6 +79,7 @@ describe('the tiers hold: account changes take the password, money takes the PIN
     'account/closure',
     'account/password',
     'account/username',
+    'custody/passkey',
     'identity',
     'limits',
     'link/create',

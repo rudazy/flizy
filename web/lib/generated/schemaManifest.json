@@ -310,6 +310,78 @@
     },
     {
       "kind": "check",
+      "name": "custody_challenges.custody_challenges_challenge_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_challenges"
+    },
+    {
+      "kind": "check",
+      "name": "custody_challenges.custody_challenges_purpose_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_challenges"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_address_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_digest_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_salt_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_signed_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_status_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_symbol_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_passkeys.custody_passkeys_key_id_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_passkeys"
+    },
+    {
+      "kind": "check",
+      "name": "custody_passkeys.custody_passkeys_point_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_passkeys"
+    },
+    {
+      "kind": "check",
+      "name": "custody_passkeys.custody_passkeys_status_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_passkeys"
+    },
+    {
+      "kind": "check",
+      "name": "custody_passkeys.custody_passkeys_tx_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_passkeys"
+    },
+    {
+      "kind": "check",
       "name": "email_verifications.email_verifications_email_format",
       "providedBy": "20260805200000_email_verification.sql",
       "requiredBy": "check on email_verifications"
@@ -1152,7 +1224,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/outside-pay/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/auth/signup/verify/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/external/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pay/swap/route.ts, web/app/api/payments/received/route.ts, web/app/api/pin/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/app/pay/[code]/page.tsx, web/app/pay/c/[code]/page.tsx, web/lib/accountReset.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/invite.ts, web/lib/merchant.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/pinGate.ts, web/lib/receipts.ts, web/lib/saleNotice.ts, web/lib/securityNotice.ts, web/lib/siteSearch.ts, web/lib/tasks.ts, web/lib/tiers.ts, web/lib/tokenSocial.ts, web/lib/walletMarket.ts, web/lib/walletScanRecord.ts"
+      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/outside-pay/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/auth/signup/verify/route.ts, web/app/api/custody/passkey/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/external/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pay/swap/route.ts, web/app/api/payments/received/route.ts, web/app/api/pin/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/app/pay/[code]/page.tsx, web/app/pay/c/[code]/page.tsx, web/lib/accountReset.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/custody/liveDeps.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/invite.ts, web/lib/merchant.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/pinGate.ts, web/lib/receipts.ts, web/lib/saleNotice.ts, web/lib/securityNotice.ts, web/lib/siteSearch.ts, web/lib/tasks.ts, web/lib/tiers.ts, web/lib/tokenSocial.ts, web/lib/walletMarket.ts, web/lib/walletScanRecord.ts"
     },
     {
       "kind": "table",
@@ -1189,6 +1261,24 @@
       "name": "copy_wallets",
       "providedBy": "20260929120000_copy_setups.sql",
       "requiredBy": "web/lib/copySetup.ts"
+    },
+    {
+      "kind": "table",
+      "name": "custody_challenges",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "web/lib/custody/ceremony.ts"
+    },
+    {
+      "kind": "table",
+      "name": "custody_delegations",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "web/lib/custody/ceremony.ts"
+    },
+    {
+      "kind": "table",
+      "name": "custody_passkeys",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "web/lib/custody/ceremony.ts"
     },
     {
       "kind": "table",
