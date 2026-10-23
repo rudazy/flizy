@@ -677,3 +677,33 @@ did not move funds.
   That key exists here only because this is a chain test, not a user
   account.
 
+
+---
+
+## 13. Since this was measured (2026-10-23)
+
+The findings above stand as measured. What was built from them, and which of
+the open items in section 10 have since been exercised:
+
+- **In the product, as a pilot.** A secured account (Account > Security) holds
+  a passkey added with `addKey`, and that passkey signs one bounded permission
+  per asset: 0.1 ETH, 1000 FLZ and 50 tUSD a day, for 30 days
+  (`lib/custody/delegations.js`). Chat payments inside them are redeemed by a
+  dedicated relayer through `DelegationManager.redeemDelegations`
+  (`lib/custody/redeem.js`). A payment over the cap is sent only after the
+  passkey signs a one-off permission for exactly that payment
+  (`lib/custody/approvals.js`). Both kinds have redeemed on GIWA Sepolia from
+  a pilot account.
+- **The custody claim is unchanged.** Flizy's key is still `owner()` on every
+  account, so the caveats bound the relayer, not Flizy. The design moves
+  ownership to the user's own wallet with `transferOwnership` rather than the
+  `renounceOwnership` measured in section 12, so the account keeps an owner the
+  user controls. That step is not built; it ships before any mainnet launch.
+- **Exercised since section 10.** Browser and hardware WebAuthn signing a
+  delegation (a platform passkey on the pilot account, and Chrome's virtual
+  authenticator in `scripts/custody-e2e/`); ERC-20 amount limits; wrong-target
+  and expiry refusals; one-off permissions refused on a second redeem; and the
+  engine sending through a delegation. The local-fork checks are in
+  `scripts/custody-e2e/` and `scripts/custody-fork-check.js`.
+- **Still not built.** Ownership handover, freeze, recovery, and any cutover
+  beyond the pilot.

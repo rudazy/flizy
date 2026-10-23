@@ -6,8 +6,8 @@ where the bottom nav lives, and the rules that keep it working.
 Applies to every authenticated screen: Home, Wallet, Swap, History, Account.
 They all render inside the same shell, so a change here changes all five.
 
-Related: `tasks/LAYOUT.md` holds the slides model (chips, `?s=` deep links).
-This doc holds only the height and positioning contract.
+This doc holds only the height and positioning contract. The slides model
+(chips, `?s=` deep links) lives in `web/components/AppSection.tsx`.
 
 ---
 

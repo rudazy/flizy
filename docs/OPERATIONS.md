@@ -349,6 +349,9 @@ refuse without it.
      goes from the relayer to the DelegationManager.
 - **Recovery.** `scripts/custody-remove-key.js` takes a passkey off an account while Flizy is
   still its owner; every permission that passkey signed stops working.
+- **Ownership.** Flizy's key is still the owner of every account, so these limits bind the
+  relayer, not Flizy. Moving ownership to the user's own wallet ships before any mainnet
+  launch; until then nothing here may be described as non-custodial.
 
 ### `WALLET_DERIVATION_SECRET`
 

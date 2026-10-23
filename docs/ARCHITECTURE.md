@@ -340,14 +340,34 @@ Hold: agent → escrow. Cancel: escrow → sender agent. Claim: escrow → recip
 
 Live custody is a HybridDeleGator per account, owned by that account's derived
 EOA. That is a smart account, not a non-custodial one: the owner key is
-server-held, so Flizy can still move the funds. Moving the root to a user
-passkey and reducing Flizy to a bounded delegate is measured in
-[DELEGATION-GIWA.md](DELEGATION-GIWA.md) and not built in the product.
+server-held, so Flizy can still move the funds.
+
+Secured accounts (Account > Security, a pilot gated by `CUSTODY_PILOT_ACCOUNTS`)
+add the first two of three steps toward the user holding the account:
+
+1. **A passkey on the account.** Made on flizy.app, added by Flizy (still owner)
+   with `addKey` on the account itself (`web/lib/custody/ceremony.ts`).
+2. **Bounded permissions signed by that passkey.** One per asset: 0.1 ETH,
+   1000 FLZ and 50 tUSD a day, expiring after 30 days, as v1.3.0 caveat
+   enforcers (`lib/custody/delegations.js`). Chat payments inside them are sent
+   by a dedicated relayer redeeming the permission (`lib/custody/redeem.js`);
+   the contract enforces the cap, not Flizy's server. A payment over the cap is
+   never sent on the owner key: the passkey approves a one-off permission for
+   exactly that payment (`lib/custody/approvals.js`, `web/app/approve/[token]`).
+3. **Ownership to the user's own wallet.** Not built. Until it ships, Flizy's
+   key could act outside those limits, so no account is described as
+   non-custodial. It ships before any mainnet launch, together with an
+   owner-only withdrawal that works with Flizy's servers off.
+
+`scripts/custody-remove-key.js` takes a passkey off an account while Flizy is
+still owner. The on-chain measurements behind this are in
+[DELEGATION-GIWA.md](DELEGATION-GIWA.md) and
+[PASSKEY-P256-GIWA.md](PASSKEY-P256-GIWA.md); the fork checks that exercise the
+code against the deployed contracts are in `scripts/custody-e2e/`.
+
 `contracts/src/FlizyWallet.sol` is scaffold, not deployed, and not the upgrade
 path. Do not extend it. `lib/smartAccount.js` is a Kernel research smoke, not
 wired into the engine.
-P-256 / WebAuthn verification on GIWA Sepolia is measured in
-[PASSKEY-P256-GIWA.md](PASSKEY-P256-GIWA.md).
 
 ### Connected wallets (wallet mode)
 

@@ -126,6 +126,7 @@ another adapter, not a second product.
 | **Tasks and projects** | Publish tasks with a declared reward, category, level and steps; participants submit, the creator picks winners. Filter by category, save tasks, see saved, joined and published tasks under My tasks; Flizy features tasks at the top of Explore | Live (reward escrow comes later) |
 | **Copy trade** | Choose wallets to follow and set dollar rules | Settings only; nothing copies yet |
 | **Account and security** | Trusted wallets, unlock PIN, daily ETH limit, password change that signs out other devices, chat links, platform identities, privacy controls | Live |
+| **Passkey spending limits** | Add a passkey to your wallet and sign Flizy's daily limits with it: 0.1 ETH, 1,000 FLZ and 50 tUSD. Chat payments inside them go out through that signed permission, with the cap enforced by contract. A payment over it is never sent until you approve that one payment with your passkey on flizy.app | Pilot (one account). Flizy still holds the owner key; see below |
 
 ---
 
@@ -212,10 +213,17 @@ Stated plainly, because it matters more than sounding finished.
 - Each account's wallet is a **smart account** (a MetaMask HybridDeleGator) that both the
   chat engine and the site spend from. It is still owned by a key the server derives, so
   **the current model is custodial**.
-- The path out of custody has been **proven on chain but not shipped**: a passkey added to
-  the account, a bounded delegation signed with it, and the server key renounced. See
+- **Passkey spending limits are live in a pilot.** A passkey on the wallet signs Flizy's
+  daily limits; chat payments inside them are sent by a relayer through that signed
+  permission, and a payment over them needs a passkey approval for that one payment. The
+  limits are enforced by the contract, not by Flizy's server. See
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), with the on-chain measurements in
   [docs/DELEGATION-GIWA.md](docs/DELEGATION-GIWA.md) and
   [docs/PASSKEY-P256-GIWA.md](docs/PASSKEY-P256-GIWA.md).
+- **That does not make Flizy non-custodial yet.** While Flizy's key is still the owner, it
+  could act outside those limits. The last step moves ownership to the user's own wallet.
+  It ships **before any mainnet launch**, and no wallet is described as non-custodial
+  until it has and its owner can withdraw with Flizy's servers off.
 - The approved-destination rule is enforced **in the policy layer** today. Moving it onto
   the account itself is the next security milestone.
 
@@ -345,6 +353,15 @@ Also in the repository and not yet deployed: `FlizyLayeredCollection` and the fa
 `createWithMetadata`, which give every NFT of a generated collection its own metadata.
 `FlizyWallet.sol` is an early scaffold and not the custody path.
 
+Wallet accounts and passkey spending limits use unmodified MetaMask delegation-framework
+v1.3.0 contracts, deployed by Flizy on GIWA Sepolia. Every enforcer's code matches the
+release build byte for byte; the DelegationManager, the account implementation and its
+P-256 library differ only where deployment writes addresses into the code (constructor
+immutables and the library link), as each record explains. Addresses:
+[`giwa-sepolia-delegation.json`](deployments/giwa-sepolia-delegation.json),
+[`giwa-sepolia-period-enforcers.json`](deployments/giwa-sepolia-period-enforcers.json) and
+[`giwa-sepolia-transfer-amount-enforcer.json`](deployments/giwa-sepolia-transfer-amount-enforcer.json).
+
 ---
 
 ## Using Flizy
@@ -397,8 +414,9 @@ Swap fee mechanics: [docs/swap-fees.md](docs/swap-fees.md). Trusted wallets in d
 
 | Horizon | Focus |
 | --- | --- |
-| **Now** | Chat payments, identity claims, swap with FLZ, IZY, MAKI and DCAT, limit orders, NFT marketplace and mints, Scan with privacy controls, tasks, a full account and security center, all on GIWA Sepolia |
-| **Next** | Turn on generated collections (deploy the metadata factory, connect storage and AI). Ship the passkey custody transition so wallets stop being server-owned. Move the approved-destination rule onto the account |
+| **Now** | Chat payments, identity claims, swap with FLZ, IZY, MAKI and DCAT, limit orders, NFT marketplace and mints, Scan with privacy controls, tasks, a full account and security center, passkey spending limits in a pilot, all on GIWA Sepolia |
+| **Next** | Turn on generated collections (deploy the metadata factory, connect storage and AI). Move the approved-destination rule onto the account |
+| **Before mainnet** | Move wallet ownership from Flizy's key to each user's own wallet, with an owner-only withdrawal that works with Flizy's servers off. Mainnet does not launch on server-owned wallets |
 | **Then** | Copy trade execution and task reward escrow. Token-to-token pools and limit orders for listed tokens, then more EVM chains through the chain registry, on the same policy path |
 
 ---

@@ -327,3 +327,24 @@ Inference, not measured: EIP-7951 schedules 6900 gas for `P256VERIFY`; RIP-7212 
 - Inference: GIWA implements RIP-7212 / EIP-7951 `P256VERIFY` at `0x100`. Supported by valid vs invalid vectors matching the spec outputs. Not supported by "OP Stack", "reth", "code at 0x100", or docs.
 - Inference: a production HybridDeleGator on this chain would take the precompile path, not SCL, for a well-formed signature. Supported by `ret.length > 0` and `uint256(ret) == 1` on valid calls. Not proven by deploying HybridDeleGatorImpl.
 - Inference: 75473 gas is a fair per-signature number for the WebAuthn library path. Not a UserOp total and not a DelegationManager redeem.
+
+---
+
+## 11. Since this was measured (2026-10-23)
+
+The measurements above stand. Two of the open items in section 9 have since
+been exercised on this chain:
+
+- **The HybridDeleGator contract itself.** v1.3.0 HybridDeleGatorImpl and
+  DelegationManager are deployed on GIWA Sepolia (`docs/DELEGATION-GIWA.md`).
+  `addKey`, `authorizedKeys` lookup, the EOA-vs-P-256 length dispatch in
+  `_isValidSignature`, and DelegationManager's ERC-1271 check at redeem time
+  all ran in mined transactions.
+- **Hardware and browser WebAuthn.** A platform passkey on a pilot account
+  signed delegations that the account accepted on chain, and a relayer redeem
+  verified that signature through `0x100`. Signatures with a high `s` are
+  folded into the low half before submission, because P256SCLVerifierLib
+  refuses them (`web/lib/custody/webauthn.ts`).
+
+The verification cost inside an ERC-4337 UserOp and GIWA's exact precompile
+gas schedule remain unmeasured.

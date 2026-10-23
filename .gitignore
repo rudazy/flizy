@@ -150,3 +150,24 @@ contracts/lib/
 /scripts/custody-e2e/state.json
 /scripts/custody-e2e/delegate.txt
 /scripts/custody-e2e/*.png
+
+# Local-only tooling (kept on disk, not published). Research spikes, one-shot
+# diagnostics and migration runners that have done their job, admin tools that
+# act on a single account, and destructive maintenance. None is used by the
+# app, the tests or the docs. Migrations are applied by hand in the dashboard
+# and on dev with scripts/run-dev-migrations.js.
+/spikes/
+/scripts/check-giwa-dex.js
+/scripts/check-unlock-parse.js
+/scripts/inspect-claim-mismatch.js
+/scripts/migrate-gator-wallets.js
+/scripts/run-claims-migration.js
+/scripts/run-email-claim-migration.js
+/scripts/run-email-verification-migration.js
+/scripts/run-force-email-reverify.js
+/scripts/run-migration-file.js
+/scripts/set-account-password.js
+/scripts/smart-account-smoke.js
+/scripts/smoke-swap-quote.js
+/scripts/wipe-all-accounts.js
+/scripts/sql/wipe_all_user_data.sql
