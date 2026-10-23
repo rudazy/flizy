@@ -20,11 +20,7 @@ import {
   EyeIcon,
   GiwaMarkIcon,
   InfoIcon,
-  PersonIcon,
   RefreshIcon,
-  SwapArrowsIcon,
-  UserPlusIcon,
-  WalletIcon,
 } from './ExploreIcons';
 
 /** A sensible example amount per asset, shown as the input placeholder. */
@@ -461,33 +457,33 @@ export function PayLanding({
             <div className="rounded-[14px] border border-[#26262a] bg-[#0c0c0d] px-4 pb-1 pt-4">
               <p className="m-0 pb-3 font-mono text-[14px] font-semibold uppercase tracking-[0.08em] text-white">Review payment</p>
               <dl className="m-0">
-                <Row icon={<PersonIcon size={18} />} name="To" copyText={handle}>
+                <Row name="To" copyText={handle}>
                   {displayName ? `${displayName} ` : ''}
                   {handle}
                 </Row>
-                <Row icon={<DollarGlyph />} name="Amount" copyText={`${amount} ${unit}`}>
+                <Row name="Amount" copyText={`${amount} ${unit}`}>
                   {amount} {unit}
                 </Row>
                 {note ? (
-                  <Row icon={<DocGlyph />} name="For">
+                  <Row name="For">
                     <span className="break-words">{note}</span>
                   </Row>
                 ) : null}
-                <Row icon={<WalletIcon size={18} />} name="From">
+                <Row name="From">
                   {fromLabel}
                 </Row>
                 {withEth && ethQuote ? (
-                  <Row icon={<SwapArrowsIcon size={18} />} name="You pay">
+                  <Row name="You pay">
                     up to {ethQuote.maxEth} ETH
                   </Row>
                 ) : null}
-                <Row icon={<RingsGlyph />} name="Network">
-                  <span className="inline-flex items-center gap-2">
-                    <NetworkMark size={26} />
+                <Row name="Network">
+                  <span className="inline-flex items-center justify-end gap-2">
+                    <NetworkMark size={20} />
                     {NETWORK}
                   </span>
                 </Row>
-                <Row icon={<CoinsGlyph />} name="Network fee" info="Gas for this payment is paid in ETH from your Flizy wallet." last>
+                <Row name="Network fee" info="Gas for this payment is paid in ETH from your Flizy wallet." last>
                   Paid in ETH from your wallet
                 </Row>
               </dl>
@@ -495,9 +491,6 @@ export function PayLanding({
 
             {asset !== 'ETH' ? (
               <label className="flex cursor-pointer items-start gap-3.5 rounded-[14px] border border-[#5a4718] bg-[#14110a] px-4 py-4">
-                <span className="mt-0.5 text-sun">
-                  <SwapArrowsIcon size={20} />
-                </span>
                 <input
                   type="checkbox"
                   className="mt-1 h-[18px] w-[18px] shrink-0 accent-sun"
@@ -553,26 +546,26 @@ export function PayLanding({
           <div className="grid gap-4">
             <div className="rounded-[14px] border border-[#26262a] bg-[#0c0c0d] px-3.5 pb-1 pt-2">
               <dl className="m-0">
-                <Row boxed icon={<PersonIcon size={18} />} name="To" copyText={handle}>
+                <Row name="To" copyText={handle}>
                   {handle}
                 </Row>
-                <Row boxed icon={<DollarGlyph />} name="Amount" copyText={`${amount} ${unit}`}>
+                <Row name="Amount" copyText={`${amount} ${unit}`}>
                   <span className="block">
                     {amount} {unit}
                   </span>
                   {dollars != null ? <span className="block font-mono text-[12px] text-[#8d867c]">≈ {usd(dollars)}</span> : null}
                 </Row>
-                <Row boxed icon={<WalletIcon size={18} />} name="From" copyText={fromLabel}>
+                <Row name="From" copyText={fromLabel}>
                   {fromLabel}
                 </Row>
-                <Row boxed icon={<RingsGlyph />} name="Network" copyText={NETWORK}>
-                  <span className="inline-flex items-center gap-2">
-                    <NetworkMark size={26} />
+                <Row name="Network" copyText={NETWORK}>
+                  <span className="inline-flex items-center justify-end gap-2">
+                    <NetworkMark size={20} />
                     {NETWORK}
                   </span>
                 </Row>
                 {txHash ? (
-                  <Row boxed icon={<DocGlyph />} name="Transaction" href={explorer || undefined} last>
+                  <Row name="Transaction" href={explorer || undefined} last>
                     <span className="font-mono">{shortHash(txHash)}</span>
                   </Row>
                 ) : null}
@@ -595,7 +588,6 @@ export function PayLanding({
                 <ShareReceiptButton
                   transferId={transferId}
                   wide
-                  icon={<DocGlyph />}
                   className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-sun/70 py-3 font-sans text-[14.5px] font-semibold text-sun hover:bg-[#1c180c] disabled:opacity-60"
                 />
               ) : null}
@@ -605,14 +597,9 @@ export function PayLanding({
               <div className="alert alert-ok text-sm">Saved {handle} for later send.</div>
             ) : !alreadySaved && !saveSkipped ? (
               <div className="grid gap-4 rounded-[14px] border border-[#3a3017] bg-[#14110a] px-4 py-5">
-                <div className="flex items-center gap-3.5">
-                  <span className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full border border-[#5a4718] text-sun">
-                    <UserPlusIcon size={26} />
-                  </span>
-                  <div>
-                    <p className="m-0 font-sans text-[16px] font-semibold text-white">Save {handle} as a trusted contact</p>
-                    <p className="m-0 mt-0.5 font-sans text-[13.5px] text-[#9a958c]">So the next send is just their name.</p>
-                  </div>
+                <div>
+                  <p className="m-0 font-sans text-[16px] font-semibold text-white">Save {handle} as a trusted contact</p>
+                  <p className="m-0 mt-0.5 font-sans text-[13.5px] text-[#9a958c]">So the next send is just their name.</p>
                 </div>
                 <div className="grid gap-2">
                   <label className="font-mono text-[12px] font-semibold uppercase tracking-[0.1em] text-[#b7b1a8]" htmlFor="save-password">
@@ -687,26 +674,11 @@ export function PayLanding({
 function PaidHeader({ amount, unit, handle }: { amount: string; unit: string; handle: string }) {
   return (
     <div className="grid justify-items-center gap-2 pt-1 text-center">
-      <span className="relative flex h-[96px] w-[150px] items-center justify-center" aria-hidden>
-        <svg width="150" height="96" viewBox="0 0 150 96" className="absolute inset-0">
-          <g strokeLinecap="round" strokeWidth="2">
-            <path d="M28 30l8 4" stroke="#f7d047" />
-            <path d="M24 44h10" stroke="#3ddc84" />
-            <path d="M28 58l8-4" stroke="#f7d047" />
-            <path d="M122 30l-8 4" stroke="#f7d047" />
-            <path d="M126 44h-10" stroke="#f7d047" />
-            <path d="M122 58l-8-4" stroke="#3ddc84" />
-          </g>
-          <circle cx="20" cy="18" r="1.6" fill="#f7d047" />
-          <circle cx="40" cy="74" r="1.6" fill="#f7d047" />
-          <circle cx="128" cy="16" r="1.6" fill="#f7d047" />
-        </svg>
-        <span className="relative flex h-[86px] w-[86px] items-center justify-center rounded-full bg-[#0f2a1d] shadow-[0_0_40px_rgba(61,220,132,0.28)]">
-          <span className="flex h-[66px] w-[66px] items-center justify-center rounded-full border-[3px] border-[#3ddc84]">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#3ddc84" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12.5l4.5 4.5L19 7.5" />
-            </svg>
-          </span>
+      <span className="relative flex h-[86px] w-[86px] items-center justify-center rounded-full bg-[#0f2a1d] shadow-[0_0_40px_rgba(61,220,132,0.22)]" aria-hidden>
+        <span className="flex h-[66px] w-[66px] items-center justify-center rounded-full border-[3px] border-[#3ddc84]">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#3ddc84" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+          </svg>
         </span>
       </span>
       <h1 className="m-0 font-sans text-[28px] font-bold text-white">Payment successful!</h1>
@@ -717,39 +689,26 @@ function PaidHeader({ amount, unit, handle }: { amount: string; unit: string; ha
   );
 }
 
-/** One line of the review or receipt list: an icon, a name, the value, and a copy or open button. */
+/** One line of the review or the paid list: a name, the value, and a copy or open button. */
 function Row({
-  icon,
   name,
   children,
   copyText,
   href,
   info,
-  boxed = false,
   last = false,
 }: {
-  icon: ReactNode;
   name: string;
   children: ReactNode;
   copyText?: string;
   href?: string;
   info?: string;
-  boxed?: boolean;
   last?: boolean;
 }) {
   return (
     <div className={`flex items-center gap-3 py-3.5 ${last ? '' : 'border-b border-[#1f1f22]'}`}>
-      <span
-        className={
-          boxed
-            ? 'flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[10px] border border-[#3a3017] bg-[#14110a] text-sun'
-            : 'flex w-7 shrink-0 justify-center text-[#e6e6e6]'
-        }
-      >
-        {icon}
-      </span>
-      <dt className="w-[96px] shrink-0 font-sans text-[14.5px] text-[#9a958c]">{name}</dt>
-      <dd className={`m-0 min-w-0 flex-1 font-sans text-[15px] text-white ${boxed ? 'text-left' : 'text-right'}`}>{children}</dd>
+      <dt className="w-[108px] shrink-0 font-sans text-[14.5px] text-[#9a958c]">{name}</dt>
+      <dd className="m-0 min-w-0 flex-1 text-right font-sans text-[15px] text-white">{children}</dd>
       {copyText ? <CopyButton text={copyText} label={`Copy ${name.toLowerCase()}`} /> : null}
       {href ? (
         <a href={href} target="_blank" rel="noreferrer" aria-label="Open on explorer" className="inline-flex shrink-0 text-[#d9d4ca] hover:text-white">
@@ -822,11 +781,9 @@ function NetworkMark({ size }: { size: number }) {
 
 function CheckDot() {
   return (
-    <span className="flex h-[16px] w-[16px] items-center justify-center rounded-full bg-[#3ddc84] text-[#0f2a1d]" aria-hidden>
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 12.5l4.5 4.5L19 7.5" />
-      </svg>
-    </span>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
   );
 }
 
@@ -839,43 +796,6 @@ function QrGlyph() {
       <rect x="22" y="10" width="8" height="8" rx="1.2" />
       <rect x="10" y="22" width="8" height="8" rx="1.2" />
       <path d="M22 22h3v3M30 22v8h-4M22 28v2" />
-    </svg>
-  );
-}
-
-function DollarGlyph() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M14.8 9.2c-.5-1-1.5-1.5-2.8-1.5-1.6 0-2.8.8-2.8 2.1 0 2.9 5.8 1.5 5.8 4.3 0 1.3-1.2 2.2-3 2.2-1.4 0-2.5-.6-3-1.6M12 6.2v1.5M12 16.3v1.5" />
-    </svg>
-  );
-}
-
-function RingsGlyph() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <circle cx="8.5" cy="12" r="5.5" />
-      <circle cx="15.5" cy="12" r="5.5" />
-    </svg>
-  );
-}
-
-function CoinsGlyph() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
-      <ellipse cx="10" cy="6" rx="6" ry="2.5" />
-      <path d="M4 6v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V6M4 10v4c0 1.4 2.7 2.5 6 2.5M16 13.5c2.3.3 4 1.2 4 2.3 0 1.4-2.7 2.5-6 2.5s-6-1.1-6-2.5" />
-      <path d="M8 15.8v2.5c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-2.5" />
-    </svg>
-  );
-}
-
-function DocGlyph() {
-  return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden>
-      <path d="M6 3h8l4 4v14H6z" />
-      <path d="M14 3v4h4M9 12h6M9 16h6" strokeLinecap="round" />
     </svg>
   );
 }

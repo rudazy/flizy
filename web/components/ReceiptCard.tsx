@@ -3,13 +3,11 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
-  ClockIcon,
   CloseIcon,
   CopyIcon,
   ExternalLinkIcon,
   GiwaMarkIcon,
   InfoIcon,
-  PersonIcon,
   ShieldCheckIcon,
   XLogoIcon,
 } from './ExploreIcons';
@@ -166,7 +164,6 @@ export function ReceiptCard(p: ReceiptCardProps) {
               <span className="text-[44px] text-sun">{p.unit}</span>
             </p>
             <span className="mt-4 inline-flex max-w-full items-center gap-3 rounded-full border border-[#2c2a27] bg-[#0c0b0a] px-4 py-2 font-sans text-[15px]">
-              <PersonIcon size={18} className="shrink-0 text-[#e6e6e6]" />
               <span className="truncate text-white">{p.to}</span>
               {p.toIsFlizy ? (
                 <span className="inline-flex shrink-0 items-center gap-1.5 text-[#3ddc84]">
@@ -178,38 +175,38 @@ export function ReceiptCard(p: ReceiptCardProps) {
           </div>
 
           <dl className="relative m-0 mt-4 border-t border-[#24211d] px-1">
-            <Row icon={<PersonIcon size={22} />} name="From" copyText={p.from}>
+            <Row name="From" copyText={p.from}>
               <span className="block truncate">{p.from}</span>
               <span className="block text-[14px] text-[#9a958c]">{p.fromNote}</span>
             </Row>
-            <Row icon={<PersonIcon size={22} />} name="To" copyText={p.to}>
+            <Row name="To" copyText={p.to}>
               <span className="block truncate">{p.to}</span>
               <span className="block text-[14px] text-[#9a958c]">{p.toNote}</span>
             </Row>
-            <Row icon={<DollarGlyph />} name="Amount" copyText={`${p.amount} ${p.unit}`}>
+            <Row name="Amount" copyText={`${p.amount} ${p.unit}`}>
               <span className="block">
                 {p.amount} {p.unit}
               </span>
               {p.usd ? <span className="block text-[14px] text-[#9a958c]">{p.usd}</span> : null}
             </Row>
             {p.note ? (
-              <Row icon={<NoteGlyph />} name="For">
+              <Row name="For">
                 <span className="block break-words">{p.note}</span>
               </Row>
             ) : null}
-            <Row icon={<NodesGlyph />} name="Network" copyText={p.network}>
-              <span className="flex items-center gap-2.5">
-                <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-[#5a4718] bg-[#14110a] text-sun">
-                  <GiwaMarkIcon size={17} />
+            <Row name="Network" copyText={p.network}>
+              <span className="flex min-w-0 items-center justify-end gap-2.5">
+                <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border border-[#5a4718] bg-[#14110a] text-sun">
+                  <GiwaMarkIcon size={13} />
                 </span>
-                <span className="truncate">{p.network}</span>
+                <span className="min-w-0 truncate">{p.network}</span>
               </span>
             </Row>
-            <Row icon={<ClockIcon size={22} />} name="Date & time">
+            <Row name="Date & time">
               {p.when}
             </Row>
             {p.txHash && p.hashLabel ? (
-              <Row icon={<DocGlyph />} name="Transaction hash" copyText={p.txHash} href={p.explorerUrl} last>
+              <Row name="Transaction hash" copyText={p.txHash} href={p.explorerUrl} last>
                 <span className="block truncate">{p.hashLabel}</span>
               </Row>
             ) : null}
@@ -259,14 +256,12 @@ export function ReceiptCard(p: ReceiptCardProps) {
         <div className="mt-5 grid grid-cols-5 gap-1">
           <ShareTarget
             label="WhatsApp"
-            circle="bg-[#25d366] text-white border-transparent"
             onClick={() => window.open(`https://wa.me/?text=${encodedText}%20${encodedUrl()}`, '_blank', 'noopener,noreferrer')}
           >
             <WhatsAppGlyph />
           </ShareTarget>
           <ShareTarget
             label="Telegram"
-            circle="bg-sun text-sun-ink border-transparent"
             onClick={() =>
               window.open(`https://t.me/share/url?url=${encodedUrl()}&text=${encodedText}`, '_blank', 'noopener,noreferrer')
             }
@@ -297,16 +292,14 @@ export function ReceiptCard(p: ReceiptCardProps) {
   );
 }
 
-/** One line of the ticket: icon, name, value, then copy or open. */
+/** One line of the ticket: name, value, then copy or open. */
 function Row({
-  icon,
   name,
   children,
   copyText,
   href,
   last = false,
 }: {
-  icon: ReactNode;
   name: string;
   children: ReactNode;
   copyText?: string;
@@ -314,10 +307,9 @@ function Row({
   last?: boolean;
 }) {
   return (
-    <div className={`flex min-h-[70px] items-center gap-2.5 py-3 sm:gap-3 ${last ? '' : 'border-b border-[#24211d]'}`}>
-      <span className="flex w-7 shrink-0 justify-center text-[#e6e6e6]">{icon}</span>
-      <dt className="w-[84px] shrink-0 font-sans text-[14px] leading-snug text-[#a8a29a] sm:w-[34%] sm:text-[15px]">{name}</dt>
-      <dd className="m-0 min-w-0 flex-1 font-sans text-[14.5px] leading-snug text-white sm:text-[15.5px]">{children}</dd>
+    <div className={`flex min-h-[64px] items-center gap-3 py-3 ${last ? '' : 'border-b border-[#24211d]'}`}>
+      <dt className="w-[108px] shrink-0 font-sans text-[14px] leading-snug text-[#a8a29a] sm:text-[15px]">{name}</dt>
+      <dd className="m-0 min-w-0 flex-1 text-right font-sans text-[14.5px] leading-snug text-white sm:text-[15.5px]">{children}</dd>
       <span className="flex shrink-0 items-center gap-2.5">
         {href ? (
           <a
@@ -366,34 +358,22 @@ function ShareTarget({
   children: ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} className="grid justify-items-center gap-2 font-sans text-[13px] text-[#d9d4ca] hover:opacity-80">
-      <span className={`flex h-[54px] w-[54px] items-center justify-center rounded-full border ${circle}`}>{children}</span>
-      <span className="whitespace-nowrap">{label}</span>
+    <button type="button" onClick={onClick} className="grid min-w-0 justify-items-center gap-2 font-sans text-[12px] leading-tight text-[#d9d4ca] hover:opacity-80">
+      <span className={`flex h-11 w-11 items-center justify-center rounded-full border [&>svg]:h-[18px] [&>svg]:w-[18px] ${circle}`}>{children}</span>
+      <span className="max-w-full text-center">{label}</span>
     </button>
   );
 }
 
-/** The gold check in a lit ring, with a few sparks around it. */
+/** The gold check in a lit ring. */
 function CheckSeal() {
   return (
-    <span className="relative flex h-[130px] w-[220px] items-center justify-center" aria-hidden>
-      <svg width="220" height="130" viewBox="0 0 220 130" className="absolute inset-0">
-        <g fill="#f7d047">
-          <path d="M52 52l4 4-4 4-4-4z" />
-          <path d="M60 78l3 3-3 3-3-3z" opacity="0.8" />
-          <path d="M82 30l3 3-3 3-3-3z" opacity="0.7" />
-          <path d="M162 26l4 4-4 4-4-4z" />
-          <circle cx="174" cy="82" r="3.2" />
-          <circle cx="152" cy="98" r="1.6" opacity="0.6" />
-          <circle cx="182" cy="50" r="1.4" opacity="0.5" />
-        </g>
-      </svg>
-      <span className="relative flex h-[118px] w-[118px] items-center justify-center rounded-full bg-[radial-gradient(circle,#2a2008_0%,#17130a_60%,transparent_72%)]">
-        <span className="flex h-[86px] w-[86px] items-center justify-center rounded-full border-[3px] border-sun shadow-[0_0_34px_rgba(247,208,71,0.25)]">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#f7d047" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12.5l4.5 4.5L19 7.5" />
-          </svg>
-        </span>
+    <span className="relative flex h-[118px] w-[118px] items-center justify-center" aria-hidden>
+      <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle,#2a2008_0%,#17130a_58%,transparent_72%)]" />
+      <span className="relative flex h-[86px] w-[86px] items-center justify-center rounded-full border-[3px] border-sun shadow-[0_0_34px_rgba(247,208,71,0.25)]">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#f7d047" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12.5l4.5 4.5L19 7.5" />
+        </svg>
       </span>
     </span>
   );
@@ -435,51 +415,8 @@ function TicketEdge() {
 
 function CheckBadge() {
   return (
-    <span className="flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[#3ddc84] text-[#0f2a1d]" aria-hidden>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 12.5l4.5 4.5L19 7.5" />
-      </svg>
-    </span>
-  );
-}
-
-function DollarGlyph() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
-      <circle cx="12" cy="12" r="9.5" />
-      <path d="M14.8 9.2c-.5-1-1.5-1.5-2.8-1.5-1.6 0-2.8.8-2.8 2.1 0 2.9 5.8 1.5 5.8 4.3 0 1.3-1.2 2.2-3 2.2-1.4 0-2.5-.6-3-1.6M12 6.2v1.5M12 16.3v1.5" />
-    </svg>
-  );
-}
-
-function NodesGlyph() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
-      <circle cx="8" cy="5.5" r="2.6" />
-      <circle cx="16" cy="5.5" r="2.6" />
-      <circle cx="4.5" cy="12" r="2.6" />
-      <circle cx="19.5" cy="12" r="2.6" />
-      <circle cx="8" cy="18.5" r="2.6" />
-      <circle cx="16" cy="18.5" r="2.6" />
-      <path d="M10.6 5.5h2.8M6.7 7.7l-1 1.9M17.3 7.7l1 1.9M5.7 14.3l1 1.9M18.3 14.3l-1 1.9M10.6 18.5h2.8" />
-    </svg>
-  );
-}
-
-function DocGlyph() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden>
-      <path d="M6 3h8l4 4v14H6z" />
-      <path d="M14 3v4h4M9 12h6M9 16h6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function NoteGlyph() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M4 20l1-4L16 5l3 3L8 19z" />
-      <path d="M14 7l3 3" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
     </svg>
   );
 }

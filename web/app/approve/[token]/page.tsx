@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '../../../lib/seo';
+import { ethUsd } from '../../../lib/ethUsd.ts';
 import { ApprovePayment } from '../../../components/ApprovePayment';
 
 /**
@@ -19,6 +20,8 @@ export const metadata: Metadata = pageMetadata({
   noindex: true,
 });
 
-export default function ApprovePage({ params }: Props) {
-  return <ApprovePayment token={params.token} />;
+export default async function ApprovePage({ params }: Props) {
+  // Live mainnet ETH rate for the dollar line under the amount. Omitted when the rate is down.
+  const usdPerEth = await ethUsd().catch(() => null);
+  return <ApprovePayment token={params.token} usdPerEth={usdPerEth} />;
 }

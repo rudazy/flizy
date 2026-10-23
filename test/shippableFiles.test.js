@@ -37,6 +37,28 @@ const MUST_SHIP = [
 /** Extensions that are actually code or schema, rather than local noise. */
 const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|sql|css)$/;
 
+/**
+ * Kept on disk under scripts/ and listed in .gitignore so they never publish.
+ * One-shot diagnostics, migration runners already applied by hand, and tools
+ * that set a password or wipe accounts. Nothing in the app imports them.
+ */
+const LOCAL_ONLY = [
+  'scripts/check-giwa-dex.js',
+  'scripts/check-unlock-parse.js',
+  'scripts/inspect-claim-mismatch.js',
+  'scripts/migrate-gator-wallets.js',
+  'scripts/run-claims-migration.js',
+  'scripts/run-email-claim-migration.js',
+  'scripts/run-email-verification-migration.js',
+  'scripts/run-force-email-reverify.js',
+  'scripts/run-migration-file.js',
+  'scripts/set-account-password.js',
+  'scripts/smart-account-smoke.js',
+  'scripts/smoke-swap-quote.js',
+  'scripts/sql/wipe_all_user_data.sql',
+  'scripts/wipe-all-accounts.js',
+];
+
 /** Every code file under a directory, recursively. */
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -54,6 +76,23 @@ function walk(dir, out = []) {
   return out;
 }
 
+/** Paths git would refuse to add. check-ignore exits 1 when none match. */
+function checkIgnore(paths) {
+  if (!paths.length) return [];
+  let ignored = '';
+  try {
+    ignored = execFileSync('git', ['check-ignore', '--stdin'], {
+      cwd: ROOT,
+      input: paths.join('\n'),
+      encoding: 'utf8',
+    });
+  } catch (err) {
+    if (err.status !== 1) throw err;
+    ignored = String(err.stdout || '');
+  }
+  return ignored.split('\n').map((s) => s.trim()).filter(Boolean);
+}
+
 describe('every source file is shippable', () => {
   it('git ignores none of it', () => {
     const files = MUST_SHIP.flatMap((d) => walk(path.join(ROOT, d))).map((f) =>
@@ -61,22 +100,17 @@ describe('every source file is shippable', () => {
     );
     assert.ok(files.length > 50, `expected to find source files, found ${files.length}`);
 
+    const localOnly = new Set(LOCAL_ONLY);
+    const presentLocal = LOCAL_ONLY.filter((f) => files.includes(f));
+    const shippable = files.filter((f) => !localOnly.has(f));
+
     // check-ignore exits 1 when nothing matches, which is the good case, and
     // prints one line per ignored path otherwise.
-    let ignored = '';
-    try {
-      ignored = execFileSync('git', ['check-ignore', '--stdin'], {
-        cwd: ROOT,
-        input: files.join('\n'),
-        encoding: 'utf8',
-      });
-    } catch (err) {
-      if (err.status !== 1) throw err;
-      ignored = String(err.stdout || '');
-    }
+    const ignored = checkIgnore(shippable);
+    assert.deepEqual(ignored, [], 'these source files would never reach the remote');
 
-    const hits = ignored.split('\n').map((s) => s.trim()).filter(Boolean);
-    assert.deepEqual(hits, [], 'these source files would never reach the remote');
+    const kept = checkIgnore(presentLocal).sort();
+    assert.deepEqual(kept, [...presentLocal].sort(), 'local-only scripts must stay off the remote');
   });
 
   it('still ignores the private notes directory at the root', () => {
