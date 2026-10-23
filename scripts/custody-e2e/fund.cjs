@@ -1,7 +1,8 @@
 /**
- * Funds the throwaway wallet and the ops key on the local GIWA fork, and picks a
- * random relayer address for the run (delegate.txt, gitignored). Fork only:
- * it refuses anything that does not answer anvil's own RPC methods.
+ * Funds the throwaway wallet and the ops key on the local GIWA fork, and makes
+ * a random relayer for the run: its address in delegate.txt, its key in
+ * state.json (both gitignored), and gas for it on the fork. Fork only: it
+ * refuses anything that does not answer anvil's own RPC methods.
  *
  * Run: node scripts/custody-e2e/fund.cjs   (FORK_RPC defaults to http://127.0.0.1:8546)
  */
@@ -20,10 +21,13 @@ const RPC = process.env.FORK_RPC || 'http://127.0.0.1:8546';
   const ops = new ethers.Wallet(env.PRIVATE_KEY).address;
   const p = new ethers.JsonRpcProvider(RPC);
   await p.send('anvil_nodeInfo', []);
-  for (const addr of [state.gator, ops]) await p.send('anvil_setBalance', [addr, ethers.toQuantity(ethers.parseEther('5'))]);
-  const delegate = ethers.Wallet.createRandom().address;
-  fs.writeFileSync(path.join(__dirname, 'delegate.txt'), delegate);
-  console.log('fork funded; relayer for this run', delegate);
+  // A relayer for this run only. Its key stays in the gitignored state file,
+  // for the approval walk's worker; the address goes to the dev server.
+  const relayer = ethers.Wallet.createRandom();
+  for (const addr of [state.gator, ops, relayer.address]) await p.send('anvil_setBalance', [addr, ethers.toQuantity(ethers.parseEther('5'))]);
+  fs.writeFileSync(path.join(__dirname, 'delegate.txt'), relayer.address);
+  fs.writeFileSync(path.join(__dirname, 'state.json'), JSON.stringify({ ...state, relayerKey: relayer.privateKey }));
+  console.log('fork funded; relayer for this run', relayer.address);
 })().catch((err) => {
   console.error(err.message || err);
   process.exitCode = 1;

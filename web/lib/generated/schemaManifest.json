@@ -310,6 +310,54 @@
     },
     {
       "kind": "check",
+      "name": "custody_approvals.custody_approvals_address_check",
+      "providedBy": "20261025120000_custody_approvals.sql",
+      "requiredBy": "check on custody_approvals"
+    },
+    {
+      "kind": "check",
+      "name": "custody_approvals.custody_approvals_amount_check",
+      "providedBy": "20261025120000_custody_approvals.sql",
+      "requiredBy": "check on custody_approvals"
+    },
+    {
+      "kind": "check",
+      "name": "custody_approvals.custody_approvals_digest_check",
+      "providedBy": "20261025120000_custody_approvals.sql",
+      "requiredBy": "check on custody_approvals"
+    },
+    {
+      "kind": "check",
+      "name": "custody_approvals.custody_approvals_signed_check",
+      "providedBy": "20261025120000_custody_approvals.sql",
+      "requiredBy": "check on custody_approvals"
+    },
+    {
+      "kind": "check",
+      "name": "custody_approvals.custody_approvals_status_check",
+      "providedBy": "20261025120000_custody_approvals.sql",
+      "requiredBy": "check on custody_approvals"
+    },
+    {
+      "kind": "check",
+      "name": "custody_approvals.custody_approvals_symbol_check",
+      "providedBy": "20261025120000_custody_approvals.sql",
+      "requiredBy": "check on custody_approvals"
+    },
+    {
+      "kind": "check",
+      "name": "custody_approvals.custody_approvals_token_hash_check",
+      "providedBy": "20261025120000_custody_approvals.sql",
+      "requiredBy": "check on custody_approvals"
+    },
+    {
+      "kind": "check",
+      "name": "custody_approvals.custody_approvals_tx_check",
+      "providedBy": "20261025120000_custody_approvals.sql",
+      "requiredBy": "check on custody_approvals"
+    },
+    {
+      "kind": "check",
       "name": "custody_challenges.custody_challenges_challenge_check",
       "providedBy": "20261024120000_custody_passkeys.sql",
       "requiredBy": "check on custody_challenges"
@@ -1264,6 +1312,12 @@
     },
     {
       "kind": "table",
+      "name": "custody_approvals",
+      "providedBy": "20261025120000_custody_approvals.sql",
+      "requiredBy": "web/lib/custody/approvals.ts"
+    },
+    {
+      "kind": "table",
       "name": "custody_challenges",
       "providedBy": "20261024120000_custody_passkeys.sql",
       "requiredBy": "web/lib/custody/ceremony.ts"
@@ -1278,7 +1332,7 @@
       "kind": "table",
       "name": "custody_passkeys",
       "providedBy": "20261024120000_custody_passkeys.sql",
-      "requiredBy": "web/lib/custody/ceremony.ts"
+      "requiredBy": "web/lib/custody/approvals.ts, web/lib/custody/ceremony.ts"
     },
     {
       "kind": "table",
@@ -1506,7 +1560,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/swap/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/externalPay.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/merchant.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/receipts.ts, web/lib/swapRateLimit.ts, web/lib/walletScanRecord.ts"
+      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/swap/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/custody/approvals.ts, web/lib/externalPay.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/merchant.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/receipts.ts, web/lib/swapRateLimit.ts, web/lib/walletScanRecord.ts"
     },
     {
       "kind": "table",

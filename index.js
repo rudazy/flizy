@@ -38,6 +38,7 @@ const { registerChannelSender, startOutboxDrain } = require('./lib/notify');
 const { startApprovalWatcher } = require('./lib/chatApprovals');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const { startReconciler } = require('./lib/reconcile');
+const { startApprovalWorker } = require('./lib/custody/approvals');
 const { startAmmora } = require('./lib/ammora/boot');
 const router = require('./lib/router');
 
@@ -461,6 +462,10 @@ async function main() {
   // Sends whose outcome was unknown (broadcast, no receipt) are settled from
   // their receipt here, also from this process only (lib/reconcile.js).
   startReconciler({ supabase, provider });
+  // Payments over a secured account's daily cap that its passkey approved are
+  // sent from here, where the relayer key lives; late ones expire
+  // (lib/custody/approvals.js). Each approval is claimed before it is sent.
+  startApprovalWorker({ supabase, provider });
   // Ammora venue, only with AMMORA_ENABLED (lib/ammora/boot.js). The pool
   // inventory runs from this process only. Never awaited: a slow RPC must not
   // hold up WhatsApp.

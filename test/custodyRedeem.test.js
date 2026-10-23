@@ -238,11 +238,20 @@ describe('the decision as the engine calls it', () => {
     });
   };
 
-  it('returns null (owner path) with no key, a bad key, no permission, or over the cap', async () => {
+  it('returns null (owner path) with no key, a bad key, or no permission', async () => {
     assert.equal(await call([row('ETH')], provider(), ''), null);
     assert.equal(await call([row('ETH')], provider(), 'not-a-key'), null);
     assert.equal(await call([], provider(), relayer.privateKey), null);
-    assert.equal(await call([row('ETH')], provider({ available: 1n }), relayer.privateKey), null);
+  });
+
+  it('over the cap: sends nothing, never the owner path, and says so for an approval', async () => {
+    const p = provider({ available: 1n });
+    const out = await call([row('ETH')], p, relayer.privateKey);
+    assert.deepEqual(out, { route: 'over_cap', available: 1n, delegate: relayer.address });
+    assert.equal(p.calls.includes('broadcast'), false);
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /waiting for a passkey approval/);
+    assert.doesNotMatch(lines[0], /owner key/);
   });
 
   it('returns null when the relayer cannot send before broadcasting', async () => {
@@ -254,7 +263,6 @@ describe('the decision as the engine calls it', () => {
       [[row('ETH')], provider(), '', /relayer key unset/],
       [[row('ETH')], provider(), 'not-a-key', /relayer key is malformed/],
       [[], provider(), relayer.privateKey, /no permission/],
-      [[row('ETH')], provider({ available: 1n }), relayer.privateKey, /over today's allowance/],
       [[row('ETH')], provider({ balance: 0n }), relayer.privateKey, /relayer is out of gas/],
       [[row('ETH')], provider({ estimate: `refused at https://rpc.example/v2/SECRETKEY with ${'0x' + 'ab'.repeat(32)}` }), relayer.privateKey, /would refuse/],
     ];

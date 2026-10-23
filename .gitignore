@@ -144,8 +144,9 @@ scripts/p256-probe/out/
 contracts/lib/
 
 # Custody browser walk (scripts/custody-e2e/): run state for a throwaway dev
-# account (its id, session token and password), the relayer address picked for
-# the run, and screenshots. Written per run, removed with the account.
+# account (its id, session token and password, the run's relayer key and its
+# virtual passkey), the relayer address, and screenshots. Fork and dev only,
+# written per run, removed with the account.
 /scripts/custody-e2e/state.json
 /scripts/custody-e2e/delegate.txt
 /scripts/custody-e2e/*.png

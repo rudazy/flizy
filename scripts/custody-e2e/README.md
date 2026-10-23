@@ -1,19 +1,25 @@
 # Custody checks on a local GIWA fork
 
-Two checks for Secure your wallet, both on a local anvil fork of GIWA Sepolia.
+Checks for Secure your wallet, all on a local anvil fork of GIWA Sepolia.
 Nothing here sends to the live network: the dev ops key is the same key that
 submits live UserOps, so a live run could race them for nonces.
 
 - **Browser walk**: real Chrome with a virtual passkey clicks through Account >
   Security against the dev server and the dev database, then `verify.cjs` checks
   the database rows and the chain directly.
-- **Recovery check**: `remove-key-fork-check.cjs` runs
-  `scripts/custody-remove-key.js` against a throwaway account and proves the
-  passkey comes off and its permissions stop working.
+- **Approval walk**: `approve-walk.mjs`, after the browser walk. Approves an
+  over-cap payment on `/approve/{token}` with the same passkey, runs the
+  approval worker, cancels a second one, and opens the page with no session.
+- **Fork checks**, no browser or database: `redeem-fork-check.cjs` (chat sends
+  through the daily permissions), `approval-fork-check.cjs` (one-off
+  permissions for over-cap payments: once only, exact recipient and amount,
+  expiry), `remove-key-fork-check.cjs` (`scripts/custody-remove-key.js` takes
+  the passkey off and its permissions stop working).
 
 Run state (`state.json`, `delegate.txt`, screenshots) is written next to these
-files and is gitignored. It holds a throwaway dev account's session; `account.mjs
-remove` deletes the account and that state.
+files and is gitignored. It holds a throwaway dev account's session, this run's
+relayer key and the virtual passkey; `account.mjs remove` deletes the account
+and that state.
 
 ## Before you start
 
@@ -21,12 +27,13 @@ remove` deletes the account and that state.
   and the root and `web/` dependencies installed.
 - `.env.dev` (dev database target) and `web/.env.local` pointing at that same
   dev database. `account.mjs` refuses to run otherwise.
-- The custody migration applied on dev.
+- The custody migrations applied on dev (`20261024120000_custody_passkeys.sql`,
+  `20261025120000_custody_approvals.sql`).
 - `E2E_CHROME` set to a Chrome or Chromium executable (for the browser walk).
 
 Every command below runs from the repository root, in Windows CMD.
 
-## Recovery check
+## Fork checks
 
 Terminal 1:
 
@@ -37,6 +44,8 @@ anvil --fork-url https://sepolia-rpc.giwa.io --port 8546
 Terminal 2:
 
 ```
+node scripts\custody-e2e\redeem-fork-check.cjs
+node scripts\custody-e2e\approval-fork-check.cjs
 node scripts\custody-e2e\remove-key-fork-check.cjs
 ```
 
@@ -73,7 +82,15 @@ set E2E_CHROME=<path to chrome.exe>
 node scripts\custody-e2e\walk.mjs && node scripts\custody-e2e\verify.cjs
 ```
 
-The first dev compile of the dashboard can take a few minutes; the walk waits.
+Then the approval walk, with the same passkey and this run's relayer:
+
+```
+node scripts\custody-e2e\approve-walk.mjs
+```
+
+The first dev compile of a page can take a few minutes; the walks wait. If the
+dev server stops responding mid-compile, stop it, delete `web\.next` (a build
+cache) and start it again.
 
 Clean up, then stop terminals 1 and 3:
 

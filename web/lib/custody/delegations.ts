@@ -21,6 +21,10 @@ export const CONTRACTS = Object.freeze({
   erc20PeriodTransferEnforcer: '0x5f7e9B1133b40b7fE5898952409f5092291F85e1',
   exactCalldataEnforcer: '0x9c2E6f6986eeF48b8E8BD1239EDd231b3e96fe4F',
   valueLteEnforcer: '0xCDfF89B4f7D0F44Dc056C33B18f575D7B7fA0505',
+  // One-off permissions (oneOffCaveats below).
+  nativeTokenTransferAmountEnforcer: '0x163bD4BDcb68c4913deeFFa265ec54007d6C03CF',
+  allowedTargetsEnforcer: '0x6b50AD84c6Ba42d227bD8f88bCdC4B53d3fdA405',
+  erc20TransferAmountEnforcer: '0x90aBb16aED4C6aE5202EaD16D241b4F32297be68',
 });
 
 export const ROOT_AUTHORITY = '0x' + 'f'.repeat(64);
@@ -97,6 +101,63 @@ export function caveatsFor(symbol: AssetSymbol, signedAt: number): Caveat[] {
     { enforcer: CONTRACTS.valueLteEnforcer, terms: ethers.ZeroHash, args: '0x' },
     expiry,
   ];
+}
+
+const ERC20 = new ethers.Interface(['function transfer(address to, uint256 amount) returns (bool)']);
+
+/**
+ * A one-off permission's caveats: exactly this recipient, exactly this amount,
+ * spendable once, until expiresAt. Mirror of oneOffCaveats in
+ * lib/custody/delegations.js, which explains each caveat.
+ */
+export function oneOffCaveats(symbol: AssetSymbol, p: { to: string; amount: bigint; expiresAt: number }): Caveat[] {
+  const asset = ASSETS[symbol];
+  if (!asset) throw new Error(`no permission is defined for ${symbol}`);
+  if (typeof p.amount !== 'bigint' || p.amount <= 0n) throw new Error('amount must be a positive bigint');
+  wholeSeconds(p.expiresAt, 'expiresAt');
+  const recipient = ethers.getAddress(p.to);
+  const expiry = { enforcer: CONTRACTS.timestampEnforcer, terms: timestampTerms(p.expiresAt), args: '0x' };
+  if (asset.kind === 'native') {
+    return [
+      { enforcer: CONTRACTS.nativeTokenTransferAmountEnforcer, terms: u256(p.amount), args: '0x' },
+      { enforcer: CONTRACTS.allowedTargetsEnforcer, terms: recipient.toLowerCase(), args: '0x' },
+      { enforcer: CONTRACTS.exactCalldataEnforcer, terms: '0x', args: '0x' },
+      expiry,
+    ];
+  }
+  return [
+    { enforcer: CONTRACTS.erc20TransferAmountEnforcer, terms: ethers.concat([asset.token as string, u256(p.amount)]), args: '0x' },
+    { enforcer: CONTRACTS.exactCalldataEnforcer, terms: ERC20.encodeFunctionData('transfer', [recipient, p.amount]), args: '0x' },
+    { enforcer: CONTRACTS.valueLteEnforcer, terms: ethers.ZeroHash, args: '0x' },
+    expiry,
+  ];
+}
+
+/** An unsigned one-off permission for one payment. */
+export function buildOneOff(p: {
+  account: string;
+  delegate: string;
+  symbol: AssetSymbol;
+  to: string;
+  amount: bigint;
+  expiresAt: number;
+  salt: bigint;
+}): AssetDelegation {
+  const delegator = ethers.getAddress(p.account);
+  const relayer = ethers.getAddress(p.delegate);
+  if (delegator === relayer) throw new Error('an account cannot delegate to itself');
+  if (typeof p.salt !== 'bigint' || p.salt <= 0n) throw new Error('a positive salt is required');
+  return {
+    symbol: p.symbol,
+    delegation: {
+      delegate: relayer,
+      delegator,
+      authority: ROOT_AUTHORITY,
+      caveats: oneOffCaveats(p.symbol, { to: p.to, amount: p.amount, expiresAt: p.expiresAt }),
+      salt: p.salt,
+      signature: '0x',
+    },
+  };
 }
 
 export function buildDelegations(p: {

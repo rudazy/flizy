@@ -7,7 +7,8 @@
  *   chain, the relayer sends through the permission, the allowance drops by
  *   exactly that much, and a send bigger than what is left is routed over_cap.
  *   Then the same for tUSD, and the engine-level call returns the permission
- *   route for a send that fits.
+ *   route for a send that fits and, for one that does not, the over-cap signal
+ *   with nothing sent (the engine then opens a passkey approval).
  *
  * Random ops key, derivation secret and relayer key for this process only.
  * Refuses anything but a local anvil fork.
@@ -107,7 +108,10 @@ const record = (name, ok, extra = '') => {
   const viaEngine = await R.trySendWithPermission({ supabase, provider, accountId, wallet: gator, symbol: 'ETH', amount: ethers.parseEther('0.01'), to: engineSink, log: quiet });
   record('engine call: a fitting send goes through the permission', viaEngine?.route === 'permission' && (await provider.getBalance(engineSink)) === ethers.parseEther('0.01'));
   const tooBig = await R.trySendWithPermission({ supabase, provider, accountId, wallet: gator, symbol: 'ETH', amount: ethers.parseEther('0.5'), to: engineSink, log: quiet });
-  record('engine call: an over-cap send returns null, nothing sent', tooBig === null && (await provider.getBalance(engineSink)) === ethers.parseEther('0.01'));
+  record(
+    'engine call: an over-cap send returns the approval signal, nothing sent',
+    tooBig?.route === 'over_cap' && tooBig.delegate === relayer.address && (await provider.getBalance(engineSink)) === ethers.parseEther('0.01')
+  );
 
   console.log(failed ? `\n${failed} failed` : '\nall passed');
   process.exitCode = failed ? 1 : 0;

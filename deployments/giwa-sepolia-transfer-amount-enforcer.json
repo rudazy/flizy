@@ -1,0 +1,33 @@
+{
+  "chainId": 91342,
+  "chainName": "GIWA Sepolia",
+  "explorer": "https://sepolia-explorer.giwa.io",
+  "rpc": "https://sepolia-rpc.giwa.io",
+  "note": "Unmodified delegation-framework v1.3.0 ERC20TransferAmountEnforcer on GIWA Sepolia, for one-off token permissions. The token and amount are caveat terms per permission, not stored here. This record does not create a permission and does not change an owner.",
+  "pin": {
+    "repo": "https://github.com/MetaMask/delegation-framework",
+    "tag": "v1.3.0",
+    "commit": "bfbdf9795a976833ed2fa000baf42fbb83958b03",
+    "neverMain": true
+  },
+  "terms": "abi.encodePacked(address token, uint256 maxAmount): 52 bytes per permission",
+  "contracts": {
+    "erc20TransferAmountEnforcer": "0x90aBb16aED4C6aE5202EaD16D241b4F32297be68"
+  },
+  "deployTxs": {
+    "erc20TransferAmountEnforcer": "0xb77ef54486a33ce58ad4fd14f1d76fdec94f11d3a44c3de5a0f0c766b9c45f55"
+  },
+  "bytecode": {
+    "ERC20TransferAmountEnforcer": {
+      "address": "0x90aBb16aED4C6aE5202EaD16D241b4F32297be68",
+      "tx": "0xb77ef54486a33ce58ad4fd14f1d76fdec94f11d3a44c3de5a0f0c766b9c45f55",
+      "gasUsed": "502089",
+      "deployedBytes": 2078,
+      "deployedKeccak": "0xa9104d82ccfcdb251f90da0f1b49f36432d574925f72ed4cb97bec5b3a94cd54",
+      "artifactKeccak": "0xa9104d82ccfcdb251f90da0f1b49f36432d574925f72ed4cb97bec5b3a94cd54",
+      "creationKeccak": "0x2ad06509d5960eee36aba20971a8092f6184379f5c428047ee971481e4670121",
+      "exactRuntimeMatch": true
+    }
+  },
+  "rejected": {}
+}

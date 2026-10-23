@@ -66,7 +66,7 @@ if (action === 'create') {
   console.log(JSON.stringify({ keys: keys.data, dels: dels.data }));
 } else if (action === 'remove') {
   const { id } = JSON.parse(fs.readFileSync(STATE, 'utf8'));
-  for (const t of ['custody_delegations', 'custody_passkeys', 'custody_challenges', 'web_sessions']) {
+  for (const t of ['custody_approvals', 'custody_delegations', 'custody_passkeys', 'custody_challenges', 'web_sessions']) {
     const r = await db.from(t).delete().eq('account_id', id);
     if (r.error) throw new Error(`${t}: ${r.error.message}`);
   }

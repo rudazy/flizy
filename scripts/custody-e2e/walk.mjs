@@ -70,6 +70,9 @@ try {
 
   const creds = await cdp.send('WebAuthn.getCredentials', { authenticatorId });
   console.log('virtual authenticator: credentials', creds.credentials.length, 'sign count', creds.credentials[0]?.signCount);
+  // The virtual passkey ends with this browser. Keep it in the gitignored state
+  // file so approve-walk.mjs can load the same passkey into its own browser.
+  fs.writeFileSync(path.join(HERE, 'state.json'), JSON.stringify({ ...state, credential: creds.credentials[0] }));
   const [scrollWidth, innerWidth] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
   console.log(scrollWidth > innerWidth ? `FAIL horizontal scroll ${scrollWidth} > ${innerWidth}` : 'no horizontal scroll at 430px');
 } finally {

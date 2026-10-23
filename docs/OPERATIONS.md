@@ -320,9 +320,17 @@ swap; the SDK only quotes and builds the call.
 An account that secured its wallet on flizy.app (Account > Security) has a passkey on its
 smart account and three signed daily permissions: 0.1 ETH, 1000 FLZ and 50 tUSD. A chat
 payment of one of those assets that fits what is left today goes out as the relayer
-redeeming that permission (`lib/custody/redeem.js`), not as Flizy's owner key. Anything else,
-including a payment over the cap, still uses the owner key, and each such send logs one
-`[custody] ... send on the owner key: <reason>` line in the journal.
+redeeming that permission (`lib/custody/redeem.js`), not as Flizy's owner key. A send the
+relayer cannot make (no permission, no key, no gas) still uses the owner key, and each such
+send logs one `[custody] ... send on the owner key: <reason>` line in the journal.
+
+A payment over what is left today is never sent on the owner key. Chat replies with a one-time
+`flizy.app/approve/<token>` link, valid 10 minutes; the account's passkey signs a permission
+for exactly that payment, and the WhatsApp process (`startApprovalWorker` in `index.js`)
+sends it with the relayer. "cancel" in chat or Cancel on the page closes it; a late one
+expires. Requires `supabase/migrations/20261025120000_custody_approvals.sql` on the
+database before this code is deployed: the bots' startup check and the site build both
+refuse without it.
 
 - **Key.** A dedicated key, never `PRIVATE_KEY`: the ops key also submits UserOps and would
   race them for nonces. Its address is `CUSTODY_DELEGATE_ADDRESS` on Vercel; a permission
