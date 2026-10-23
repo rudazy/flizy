@@ -142,3 +142,10 @@ scripts/p256-probe/out/
 # forge-std is vendored via submodule/path; do not require committing broadcast
 # contracts/lib/ may be present locally; prefer lockfile + install
 contracts/lib/
+
+# Custody browser walk (scripts/custody-e2e/): run state for a throwaway dev
+# account (its id, session token and password), the relayer address picked for
+# the run, and screenshots. Written per run, removed with the account.
+/scripts/custody-e2e/state.json
+/scripts/custody-e2e/delegate.txt
+/scripts/custody-e2e/*.png
