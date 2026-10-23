@@ -172,6 +172,42 @@
     },
     {
       "kind": "check",
+      "name": "custody_delegations.custody_delegations_address_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_digest_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_salt_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_signed_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_status_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
+      "name": "custody_delegations.custody_delegations_symbol_check",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "check on custody_delegations"
+    },
+    {
+      "kind": "check",
       "name": "identity_events.identity_events_channel_check",
       "providedBy": "20260802160000_identity_events.sql",
       "requiredBy": "check on identity_events"
@@ -601,6 +637,12 @@
       "name": "contacts",
       "providedBy": "20260721020000_user_contacts.sql",
       "requiredBy": "lib/router.js"
+    },
+    {
+      "kind": "table",
+      "name": "custody_delegations",
+      "providedBy": "20261024120000_custody_passkeys.sql",
+      "requiredBy": "lib/custody/redeem.js"
     },
     {
       "kind": "table",

@@ -278,6 +278,9 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `AMMORA_ENABLED` | Ammora venue, bots and site server. Default off; off loads nothing and reads nothing. See [Ammora venue](#ammora-venue) |
 | `NEXT_PUBLIC_AMMORA_ENABLED` | Vercel only. Shows the Ammora launches view in Explore. Trade opens the token page, where Buy uses the Ammora venue. Default off |
 | `AMMORA_DATA_API_URL` | Ammora Data API for launch status. Defaults to `https://ammora-giwa-sepolia-data.fly.dev` |
+| `CUSTODY_RELAYER_KEY` | VPS only. The relayer that sends chat payments through a secured account's signed permissions. Unset: chat payments use the owner key as before. See [Custody relayer](#custody-relayer) |
+| `CUSTODY_PILOT_ACCOUNTS` | Vercel only. Account ids that may secure their wallet with a passkey. Empty: the section is hidden and the routes refuse |
+| `CUSTODY_DELEGATE_ADDRESS` | Vercel only. The relayer's address, written into every permission a passkey signs. Must be the address of `CUSTODY_RELAYER_KEY` |
 
 Treat `PRIVATE_KEY`, escrow keys and Supabase service keys as production secrets. Rotate
 immediately if one is exposed.
@@ -311,6 +314,33 @@ swap; the SDK only quotes and builds the call.
   `AMMORA_ENABLED=true`, wait for the first inventory pass in the WhatsApp journal
   (`[ammora] inventory`), then set `AMMORA_ENABLED` and `NEXT_PUBLIC_AMMORA_ENABLED` on
   Vercel and redeploy.
+
+### Custody relayer
+
+An account that secured its wallet on flizy.app (Account > Security) has a passkey on its
+smart account and three signed daily permissions: 0.1 ETH, 1000 FLZ and 50 tUSD. A chat
+payment of one of those assets that fits what is left today goes out as the relayer
+redeeming that permission (`lib/custody/redeem.js`), not as Flizy's owner key. Anything else,
+including a payment over the cap, still uses the owner key, and each such send logs one
+`[custody] ... send on the owner key: <reason>` line in the journal.
+
+- **Key.** A dedicated key, never `PRIVATE_KEY`: the ops key also submits UserOps and would
+  race them for nonces. Its address is `CUSTODY_DELEGATE_ADDRESS` on Vercel; a permission
+  names exactly one relayer, so changing the key means re-signing.
+- **Gas.** The relayer pays the gas for each permission send. With no gas it is skipped and
+  the payment goes on the owner key; the journal says `relayer is out of gas`.
+- **Unknown outcome.** The payment is reported as pending and is never sent again on the
+  owner key. The reconciler settles it from its receipt and messages the account.
+- **Going live** (code first, key second: with no key the bots behave as before):
+  1. Merge and push.
+  2. Send the relayer a little GIWA Sepolia ETH.
+  3. On the VPS: `cd /opt/flizy && git pull && npm install --omit=dev`
+  4. Add `CUSTODY_RELAYER_KEY=0x...` to `/opt/flizy/.env`.
+  5. `sudo systemctl restart flizy flizy-telegram`
+  6. Send a small payment in chat from a secured account and check that its transaction
+     goes from the relayer to the DelegationManager.
+- **Recovery.** `scripts/custody-remove-key.js` takes a passkey off an account while Flizy is
+  still its owner; every permission that passkey signed stops working.
 
 ### `WALLET_DERIVATION_SECRET`
 

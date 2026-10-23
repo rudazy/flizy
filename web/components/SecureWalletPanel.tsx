@@ -157,8 +157,8 @@ export function SecureWalletPanel() {
       <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-[#b7b1a8]">Secure your wallet</p>
       <div className="grid gap-3">
         <p className="m-0 font-sans text-[13.5px] leading-relaxed text-[#b7b1a8]">
-          Put your own passkey on your wallet, then let Flizy spend only a small daily amount for you. Flizy still holds the owner key
-          until the last step.
+          Put your own passkey on your wallet and sign the small daily amount Flizy may spend for you. Until the last step Flizy still
+          holds the owner key, so that limit does not bind Flizy yet.
         </p>
         {!status.walletReady ? (
           <p className="m-0 font-sans text-[13.5px] text-[#e0b070]">This account&apos;s wallet cannot take a passkey yet.</p>
@@ -196,8 +196,9 @@ export function SecureWalletPanel() {
 
         <Step n={2} title="Daily spending permissions" done={live.size === 3}>
           <p className="m-0 font-sans text-[13.5px] leading-relaxed text-[#b7b1a8]">
-            Flizy may send up to {Object.values(LABEL).join(', ')} a day from your wallet for chat payments. Anything more asks for your
-            passkey. {expires ? `Signed until ${new Date(expires).toLocaleDateString('en-GB', { dateStyle: 'medium' })}.` : ''}
+            Your passkey signs permissions for chat payments of up to {Object.values(LABEL).join(', ')} a day. Chat starts using them,
+            and asking for your passkey on larger sends, in the next update.{' '}
+            {expires ? `Signed until ${new Date(expires).toLocaleDateString('en-GB', { dateStyle: 'medium' })}.` : ''}
           </p>
           <button
             type="button"

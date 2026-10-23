@@ -137,7 +137,7 @@ describe('chat native send', () => {
     assert.equal(atBroadcast.tx_hash, HASH);
   });
 
-  it('unknown outcome: submitted, row stays submitted with its hash, credit not released, still-confirming copy', async () => {
+  it('unknown outcome: submitted, row stays submitted with its hash, credit not released, pending copy', async () => {
     script = unknown;
     const r = await send();
     assert.equal(r.ok, false);
@@ -145,7 +145,7 @@ describe('chat native send', () => {
     assert.equal(rows()[0].status, 'submitted');
     assert.equal(rows()[0].tx_hash, HASH);
     assert.equal(Number(credit().toFixed(10)), 0.6, 'reservation must NOT come back');
-    assert.match(r.error, /^Sent, and still confirming/);
+    assert.match(r.error, /^Your payment is pending/);
     assert.doesNotMatch(r.error, /not sent|nothing was sent/i);
   });
 
