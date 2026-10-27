@@ -5,8 +5,8 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppPage } from './AppSection';
-import { useComingSoon } from './ComingSoon';
 import { SearchButton } from './SiteSearch';
+import { NoticeBell } from './NoticeBell';
 import { formatEthDisplay, formatPct } from '../lib/tokenFormat';
 import { ProfileLink } from './ProfileLink';
 import { VerifiedMark } from './VerifiedMark';
@@ -24,7 +24,6 @@ import type { Thesis, ThesisComment, TokenProfile } from '../lib/tokenSocial';
 import {
   ArrowLeftIcon,
   BarChartIcon,
-  BellIcon,
   BookOpenIcon,
   CandlesIcon,
   CartIcon,
@@ -163,7 +162,6 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   /** Theses and the watchlist belong to a Flizy account, so wallet mode leaves them out. */
   const walletMode = useWalletMode();
   const social = listed && walletMode == null;
-  const [comingSoon, comingSoonNote] = useComingSoon();
 
   const [range, setRange] = useState<ChartRange>('1d');
   const [chartMode, setChartMode] = useState<'line' | 'candle'>('line');
@@ -563,9 +561,7 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           </div>
           <div className="grid shrink-0 grid-cols-2 gap-1.5 sm:gap-2">
             <SearchButton className={SQUARE_BUTTON} iconSize={18} />
-            <button type="button" className={`${SQUARE_BUTTON} relative`} aria-label="Notifications" onClick={() => comingSoon('Notifications')}>
-              <BellIcon size={18} />
-            </button>
+            <NoticeBell className={SQUARE_BUTTON} iconSize={18} />
             {social ? (
               <button
                 type="button"
@@ -948,7 +944,6 @@ export function TokenDetail({ symbol }: { symbol: string }) {
           }}
         />
       ) : null}
-      {comingSoonNote}
     </AppPage>
   );
 }

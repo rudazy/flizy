@@ -22,6 +22,7 @@ import { checkDailyNativeLimit } from '../../../../lib/dailyLimits.ts';
 import { gatorFailure, markTransferSubmitted } from '../../../../lib/gatorOutcome.ts';
 import { outcomeUnknown } from '../../../../lib/gatorExecute.ts';
 import { notifyAllChannels } from '../../../../lib/notifyChannels';
+import { saveIncomingPayment } from '../../../../lib/incomingNotice.ts';
 import { formatPaymentReceived, payerLabel } from '../../../../lib/payNotice.ts';
 import { siteOrigin } from '../../../../lib/siteOrigin';
 import { symbolLabel } from '../../../../lib/listedTokens';
@@ -337,16 +338,27 @@ export async function POST(req: Request) {
         .select('username, display_name')
         .eq('id', payerId)
         .maybeSingle();
+      const fromLabel = payerLabel(payerRow);
       await notifyAllChannels(
         merchant.accountId,
         formatPaymentReceived({
           amount: amountHuman,
           asset,
           note,
-          fromLabel: payerLabel(payerRow),
+          fromLabel,
           walletUrl: `${siteOrigin()}/dashboard/wallet`,
         })
       );
+      if (merchant.accountId !== payerId) {
+        await saveIncomingPayment(supabase, {
+          accountId: merchant.accountId,
+          txHash,
+          amount: amountHuman,
+          asset,
+          fromLabel,
+          note,
+        });
+      }
     } catch {
       console.warn(`[${ROUTE}] payee notice was not queued`);
     }

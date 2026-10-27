@@ -15,6 +15,7 @@
 import { ethers } from 'ethers';
 import { getSupabase } from './supabase.ts';
 import { notifyAllChannels } from './notifyChannels.ts';
+import { saveIncomingPayment } from './incomingNotice.ts';
 import { deriveAgentPrivateKey } from './agentWallet.ts';
 import { predictGatorAddress } from './gatorAccount.ts';
 import { getWebChain, type WebChain } from './dexServer.ts';
@@ -473,6 +474,15 @@ export async function executeWebClaimPayout(p: {
           explorerUrl,
         })
       );
+    }
+    if (!updated.nft_token_id && updated.from_account_id !== accountId) {
+      await saveIncomingPayment(supabase, {
+        accountId,
+        txHash: tx.hash,
+        amount: String(updated.amount_eth ?? ''),
+        asset: String(updated.asset || 'ETH'),
+        fromLabel: 'a held claim',
+      });
     }
 
     return {

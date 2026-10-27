@@ -80,7 +80,7 @@ describe('the note on the way to the payee', () => {
   it('is cleaned by the server before it is stored or sent', () => {
     const route = read('web/app/api/pay/execute/route.ts');
     assert.match(route, /const note = cleanPayNote\(body\.note\);/);
-    assert.equal((route.match(/^\s+note,$/gm) || []).length, 3, 'stored on both transfer rows and sent in the notice');
+    assert.equal((route.match(/^\s+note,$/gm) || []).length, 4, 'stored on both transfer rows, the chat notice, and the payment email');
   });
 
   it('is never put in the link preview, where it would read as Flizy speaking', () => {

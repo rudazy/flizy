@@ -20,7 +20,7 @@ export default async function LoginPage({
   searchParams?: { next?: string; door?: string };
 }) {
   if (await getAccountIdFromCookie()) redirect(safeNext(searchParams?.next));
-  // Email and password sign in on this page.
+  // Email and password sign in on this page. "Continue with email" uses that form.
   // door=password is the same form, so an older link still lands here.
   // Google and a passkey say Coming soon. "Continue with a wallet" connects the
   // visitor's own wallet for wallet mode (components/ExternalWalletProvider.tsx);

@@ -39,6 +39,7 @@ describe('every state-changing route checks the request Origin', () => {
   const ORIGIN_EXEMPT = {
     withdraw: 'disabled: every method answers a fixed 403 and reads nothing',
     'internal/security-mail': 'server to server: no cookie, a bearer secret instead (checked below)',
+    'internal/payment-notice': 'server to server: no cookie, a bearer secret instead (checked below)',
   };
   const ORIGIN_CHECK = /rejectIfCrossOrigin\(|generationCaller\(/;
 

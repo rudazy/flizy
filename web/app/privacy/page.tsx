@@ -83,6 +83,12 @@ export default function PrivacyPage() {
               related transaction hashes.
             </li>
             <li>
+              <span className="text-paper">Payment notices.</span> When a payment reaches your
+              Flizy wallet, we store a short notice on your account and email it to your
+              registration address. The notice names the amount, the asset, and who sent it.
+              It does not include your password, your PIN, or a wallet key.
+            </li>
+            <li>
               <span className="text-paper">Session cookies.</span> A logged-in session cookie
               on the site. If you open an invite or a claim that carries an invite, a short
               invite cookie so signup can attribute you once. One cookie recording your
@@ -152,6 +158,7 @@ export default function PrivacyPage() {
             <li>Keep trusted destinations and an unlock PIN under your control.</li>
             <li>Attribute an invite once, and count it only after onboarding, a verified phone, and a confirmed Flizy transaction.</li>
             <li>Operate the product, debug failures, and stop abuse.</li>
+            <li>Email you, and show a notice in the app, when a payment reaches your Flizy wallet.</li>
             <li>Show a public profile, follower counts, and who follows whom, when those switches are on.</li>
           </ul>
         </section>
@@ -198,7 +205,7 @@ export default function PrivacyPage() {
           <LegalH id="share">Who it is shared with</LegalH>
           <p>
             We pass account data only to the services that run Flizy: Supabase (database) and
-            our email sender for verification codes. If you accepted analytics, the measurement
+            our email sender for verification codes and payment notices. If you accepted analytics, the measurement
             services named above also receive the site usage described there, and nothing else.
             We do not sell it. We do not use advertising pixels.
           </p>

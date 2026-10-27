@@ -52,6 +52,24 @@
     },
     {
       "kind": "check",
+      "name": "account_notices.account_notices_body_len",
+      "providedBy": "20261027160000_account_notices.sql",
+      "requiredBy": "check on account_notices"
+    },
+    {
+      "kind": "check",
+      "name": "account_notices.account_notices_dedupe_len",
+      "providedBy": "20261027160000_account_notices.sql",
+      "requiredBy": "check on account_notices"
+    },
+    {
+      "kind": "check",
+      "name": "account_notices.account_notices_kind_check",
+      "providedBy": "20261027160000_account_notices.sql",
+      "requiredBy": "check on account_notices"
+    },
+    {
+      "kind": "check",
       "name": "account_tokens.account_tokens_address_check",
       "providedBy": "20260929140000_account_tokens.sql",
       "requiredBy": "check on account_tokens"
@@ -1279,6 +1297,12 @@
       "name": "account_follows",
       "providedBy": "20261027120000_account_follows.sql",
       "requiredBy": "web/lib/followStore.ts"
+    },
+    {
+      "kind": "table",
+      "name": "account_notices",
+      "providedBy": "20261027160000_account_notices.sql",
+      "requiredBy": "web/lib/incomingNotice.ts"
     },
     {
       "kind": "table",

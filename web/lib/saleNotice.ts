@@ -7,6 +7,7 @@
 import { ethers } from 'ethers';
 import { getSupabase } from './supabase';
 import { notifyAllChannels } from './notifyChannels';
+import { saveIncomingPayment } from './incomingNotice.ts';
 import { formatSaleNotices, soldEvents } from './saleNoticeFormat.ts';
 
 const NAME_ABI = ['function name() view returns (string)'];
@@ -52,6 +53,18 @@ export async function noticeSales(args: {
       });
       if (sellerAcc && sellerAcc.id !== args.actorAccountId) await notifyAllChannels(sellerAcc.id, text.seller);
       if (buyerAcc && buyerAcc.id !== args.actorAccountId) await notifyAllChannels(buyerAcc.id, text.buyer);
+      const received = BigInt(sale.price) - BigInt(sale.fee) - BigInt(sale.royalty);
+      if (sellerAcc && received > 0n && sellerAcc.id !== buyerAcc?.id) {
+        await saveIncomingPayment(supabase, {
+          accountId: sellerAcc.id,
+          txHash: args.txHash,
+          amount: ethers.formatEther(received),
+          asset: 'ETH',
+          fromLabel: label(buyerAcc, sale.buyer),
+          note: `${typeof name === 'string' && name.trim() ? name.trim().slice(0, 40) : 'NFT'} #${sale.tokenId}`,
+          tag: 'sale',
+        });
+      }
     }
   } catch {
     console.warn('[market] sale notice was not queued');

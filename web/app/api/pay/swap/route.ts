@@ -15,6 +15,7 @@ import { checkDailyNativeLimit } from '../../../../lib/dailyLimits.ts';
 import { gatorFailure, markTransferSubmitted } from '../../../../lib/gatorOutcome.ts';
 import { outcomeUnknown } from '../../../../lib/gatorExecute.ts';
 import { notifyAllChannels } from '../../../../lib/notifyChannels';
+import { saveIncomingPayment } from '../../../../lib/incomingNotice.ts';
 import { formatPaymentReceived, payerLabel } from '../../../../lib/payNotice.ts';
 import { siteOrigin } from '../../../../lib/siteOrigin';
 import { symbolLabel } from '../../../../lib/listedTokens';
@@ -217,10 +218,21 @@ export async function POST(req: Request) {
 
       try {
         const { data: payerRow } = await supabase.from('accounts').select('username, display_name').eq('id', payerId).maybeSingle();
+        const fromLabel = payerLabel(payerRow);
         await notifyAllChannels(
           merchant.accountId,
-          formatPaymentReceived({ amount, asset, note, fromLabel: payerLabel(payerRow), walletUrl: `${siteOrigin()}/dashboard/wallet` })
+          formatPaymentReceived({ amount, asset, note, fromLabel, walletUrl: `${siteOrigin()}/dashboard/wallet` })
         );
+        if (merchant.accountId !== payerId) {
+          await saveIncomingPayment(supabase, {
+            accountId: merchant.accountId,
+            txHash,
+            amount,
+            asset,
+            fromLabel,
+            note,
+          });
+        }
       } catch {
         console.warn(`[POST ${ROUTE}] payee notice was not queued`);
       }

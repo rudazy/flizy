@@ -17,6 +17,7 @@ import { INVOICE_NONCE_RE, PAYMENT_RECEIVER } from '../../../../lib/paymentRecei
 import { invoiceIdFor } from '../../../../lib/invoiceId.ts';
 import { cleanPayNote } from '../../../../lib/payLink.ts';
 import { notifyAllChannels } from '../../../../lib/notifyChannels';
+import { saveIncomingPayment } from '../../../../lib/incomingNotice.ts';
 import { formatPaymentReceived } from '../../../../lib/payNotice.ts';
 import { siteOrigin } from '../../../../lib/siteOrigin';
 
@@ -112,19 +113,29 @@ export async function POST(req: Request) {
     // The payee hears about each payment once: a second confirm records nothing.
     // Dust is recorded but not announced, so nobody can spam a payee's chats
     // with a stream of near-free payments.
-    for (const pay of recorded) {
+    for (const [index, pay] of recorded.entries()) {
       if (Number(pay.amount) < (pay.asset === 'ETH' ? 0.0001 : 0.01)) continue;
       try {
+        const fromLabel = `an outside wallet (${pay.payer.slice(0, 6)}…${pay.payer.slice(-4)})`;
         await notifyAllChannels(
           merchant.accountId,
           formatPaymentReceived({
             amount: pay.amount,
             asset: pay.asset,
             note: noteHolds ? note : null,
-            fromLabel: `an outside wallet (${pay.payer.slice(0, 6)}…${pay.payer.slice(-4)})`,
+            fromLabel,
             walletUrl: `${siteOrigin()}/dashboard/wallet`,
           })
         );
+        await saveIncomingPayment(supabase, {
+          accountId: merchant.accountId,
+          txHash,
+          amount: String(pay.amount),
+          asset: pay.asset,
+          fromLabel,
+          note: noteHolds ? note : null,
+          part: String(index),
+        });
       } catch {
         console.warn(`[${ROUTE}] payee notice was not queued`);
       }

@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { AppDesktopTabs } from './AppBottomNav';
 import { useDashboard } from './DashboardProvider';
-import { useComingSoon } from './ComingSoon';
-import { BellIcon, RefreshIcon } from './ExploreIcons';
+import { RefreshIcon } from './ExploreIcons';
+import { NoticeBell } from './NoticeBell';
 import { ProfileLink } from './ProfileLink';
 import { SearchButton } from './SiteSearch';
 
@@ -31,7 +31,6 @@ export function AppTopBar({
   // is personal, and this line is on every page and in every screenshot.
   const username = data?.account.username;
   const subtitle = username ? `@${username}` : data?.account.display_name || '';
-  const [comingSoon, comingSoonNote] = useComingSoon();
 
   return (
     <>
@@ -84,23 +83,13 @@ export function AppTopBar({
               </button>
             ) : null}
             <SearchButton className={ICON_BUTTON} />
-            <button
-              type="button"
-              onClick={() => comingSoon('Notifications')}
-              className={ICON_BUTTON}
-              aria-label="Notifications, coming soon"
-            >
-              {/* No unread dot: there is nothing to read until notifications exist. */}
-              <BellIcon size={17} />
-            </button>
+            <NoticeBell className={ICON_BUTTON} />
           </div>
         </div>
         <div className="mt-3 hidden md:block">
           <AppDesktopTabs />
         </div>
       </header>
-      {/* Outside the header: its backdrop filter would pin a fixed child to it. */}
-      {comingSoonNote}
     </>
   );
 }
