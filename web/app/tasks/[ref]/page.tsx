@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { getTaskByRef, type TaskDetail } from '../../../lib/tasks';
 import { getSiteConfig } from '../../../lib/supabase';
+import { ProfileLink } from '../../../components/ProfileLink';
 import { TaskSubmitForm } from '../../../components/TaskSubmitForm';
 import { LocalWhen } from '../../../components/LocalWhen';
 import { VerifiedBadge } from '../../../components/VerifiedBadge';
@@ -292,7 +293,11 @@ export default async function TaskPage({ params }: { params: { ref: string } }) 
                       {ordinal(w.place)} place
                       {w.rewardNote ? <span className="text-sun">, {w.rewardNote}</span> : null}
                     </p>
-                    <p className="m-0 font-sans text-sm text-[#a3a3a3]">@{w.username}</p>
+                    <p className="m-0 font-sans text-sm text-[#a3a3a3]">
+                      <ProfileLink username={w.username} className="text-[#a3a3a3] no-underline">
+                        @{w.username}
+                      </ProfileLink>
+                    </p>
                     <p className="m-0 font-mono text-xs text-[#8a8a8a]">Submission #{w.submissionRef}</p>
                   </div>
                   {w.url ? (

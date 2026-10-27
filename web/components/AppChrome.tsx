@@ -20,6 +20,7 @@ export function AppChrome({
 }) {
   const pathname = usePathname() || '';
   const isApp = pathname.startsWith('/dashboard');
+  const isProfile = pathname.startsWith('/u/') || pathname === '/people';
 
   if (isApp) {
     // App routes: own top bar + bottom nav; no marketing chrome.
@@ -36,7 +37,15 @@ export function AppChrome({
   return (
     <>
       <SiteHeader signedIn={signedIn} />
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 py-12 md:py-16">{children}</main>
+      <main
+        className={
+          isProfile
+            ? 'mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6 md:px-8 md:py-10'
+            : 'mx-auto w-full max-w-[1200px] flex-1 px-6 py-12 md:py-16'
+        }
+      >
+        {children}
+      </main>
       <SiteFooter telegramUrl={telegramUrl} whatsappUrl={whatsappUrl} />
       <PwaRegister />
     </>

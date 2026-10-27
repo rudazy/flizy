@@ -140,9 +140,20 @@ describe('live search', () => {
 
   it('finds a person only by the whole username', async () => {
     const exact = await run('@ludarep');
-    assert.deepEqual(exact.people, [{ kind: 'person', title: '@ludarep', subtitle: 'Pay @ludarep', href: '/pay/ludarep' }]);
+    assert.deepEqual(exact.people, [{ kind: 'person', title: '@ludarep', subtitle: 'Profile', href: '/u/ludarep' }]);
     assert.deepEqual((await run('@lud')).people, []);
     assert.deepEqual((await run('luda')).people, []);
+  });
+
+  it('does not list a paused or removed account', async () => {
+    fake = createFakeSupabase({
+      accounts: [
+        { id: 'acc-3', username: 'paused', deactivated_at: '2026-10-01T00:00:00.000Z' },
+        { id: 'acc-4', username: 'gone', deleted_at: '2026-10-01T00:00:00.000Z' },
+      ],
+    });
+    assert.deepEqual((await run('@paused')).people, []);
+    assert.deepEqual((await run('@gone')).people, []);
   });
 
   it('carries no account or owner ids', async () => {

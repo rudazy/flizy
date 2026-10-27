@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '21 October 2026';
+const UPDATED = '27 October 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -113,6 +113,15 @@ export default function PrivacyPage() {
               is stored privately, shown only on your own signed-in pages, and removed when you
               replace it. Pausing the account keeps it. Signing in brings it back.
             </li>
+            <li>
+              <span className="text-paper">Follows.</span> When you follow someone, we store
+              that pair, the time, whether you asked for activity alerts, and whether copy
+              trade is on for that follow. No alert is sent yet, and nothing is copied yet.
+              Follower and following counts and lists are public unless you turn off Show
+              followers and following. Volume and swaps on a profile follow Show trading
+              stats. Activity on a profile stays hidden unless you turn on Show activity.
+              Following does not send a payment and does not open a chat.
+            </li>
           </ul>
         </section>
 
@@ -143,6 +152,7 @@ export default function PrivacyPage() {
             <li>Keep trusted destinations and an unlock PIN under your control.</li>
             <li>Attribute an invite once, and count it only after onboarding, a verified phone, and a confirmed Flizy transaction.</li>
             <li>Operate the product, debug failures, and stop abuse.</li>
+            <li>Show a public profile, follower counts, and who follows whom, when those switches are on.</li>
           </ul>
         </section>
 
@@ -241,6 +251,7 @@ export default function PrivacyPage() {
               A phone that has already produced an invite credit is remembered so the same
               number cannot mint a second credit after unlink. That record is not a live bind.
             </li>
+            <li>A follow stays until you unfollow, or until either account is removed.</li>
             <li>On-chain records last as long as the chain does. We cannot erase them.</li>
           </ul>
         </section>

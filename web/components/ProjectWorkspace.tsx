@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useDashboard } from './DashboardProvider';
 import type { ProjectLink, ProjectMember, ProjectWorkspace as Workspace } from '../lib/tasks';
 import { shrinkProjectBanner, shrinkProjectImage } from '../lib/projectImage';
+import { ProfileLink } from './ProfileLink';
 import { ProjectAvatar } from './ProjectAvatar';
 import { ProjectPage } from './ProjectPage';
 import { LINK_KINDS, LINK_LABEL } from './AccountProjects';
@@ -248,10 +249,12 @@ function Members({
       <ul className="m-0 list-none p-0">
         {members.map((m) => (
           <li key={m.username} className="flex items-center gap-3 border-b border-[#1c1c1c] px-4 py-3 last:border-b-0">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sun/40 bg-sun-wash font-sans text-sm font-semibold text-sun">
-              {m.username.slice(0, 1).toUpperCase()}
-            </span>
-            <span className="min-w-0 flex-1 truncate font-sans text-sm text-[#f5f5f5]">@{m.username}</span>
+            <ProfileLink username={m.username} className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 no-underline">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sun/40 bg-sun-wash font-sans text-sm font-semibold text-sun">
+                {m.username.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-sans text-sm text-[#f5f5f5]">@{m.username}</span>
+            </ProfileLink>
             <span className="font-sans text-[10px] font-semibold uppercase tracking-wide text-[#8f8f8f]">
               {m.role === 'owner' ? 'Owner' : 'Member'}
             </span>

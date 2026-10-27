@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { AccountBackground } from './AccountBackground';
 import { useEffect, useId, useState } from 'react';
 import {
@@ -23,8 +24,8 @@ import {
  * The Account profile, drawn to the phone layout.
  *
  * This is the signed-in account, so it does not offer Follow. Deactivate
- * opens the pause sheet. Figures that Flizy does not store stay blank. Invite
- * and credit counts are the account's own.
+ * opens the pause sheet. Follower and following counts are this account's
+ * own. Invite and credit counts are the account's own.
  */
 
 type Props = {
@@ -169,6 +170,43 @@ function SoonToggle({
   );
 }
 
+/** A saved profile switch. Disabled until the account's own follow row has loaded. */
+function FlagSwitch({
+  on,
+  label,
+  icon,
+  disabled,
+  onClick,
+}: {
+  on: boolean | null;
+  label: string;
+  icon: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const pressed = on === true;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || on == null}
+      aria-pressed={on == null ? undefined : pressed}
+      className="hit-y-44 flex min-h-[44px] w-full items-center gap-3 border-t border-[#26262a] px-3.5 py-2 text-left disabled:opacity-60"
+    >
+      <span className="text-[#c8c2b8]">{icon}</span>
+      <span className="min-w-0 flex-1 truncate font-sans text-[13px] text-[#f3f1ec]">{label}</span>
+      <span
+        className={`relative h-[22px] w-[40px] shrink-0 rounded-full ${pressed ? 'bg-[#f7d047]' : 'bg-[#3a3a3e]'}`}
+        aria-hidden
+      >
+        <span
+          className={`absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white ${pressed ? 'left-[20px]' : 'left-[2px]'}`}
+        />
+      </span>
+    </button>
+  );
+}
+
 /**
  * "Show username on Scan": a real setting, off by default, saved as soon as it
  * is flipped. Off, Scan never shows the @username: payments to this account
@@ -262,6 +300,79 @@ function CopyGlyph() {
   );
 }
 
+type OwnSocial = {
+  followers: number;
+  following: number;
+  showSocial: boolean;
+  showStats: boolean;
+  showActivity: boolean;
+};
+
+function useOwnSocial() {
+  const [social, setSocial] = useState<OwnSocial | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    const abort = new AbortController();
+    const timer = window.setTimeout(() => abort.abort(), 10000);
+    fetch('/api/follow', { signal: abort.signal })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!live) return;
+        if (res.ok && typeof data.followers === 'number' && typeof data.following === 'number') {
+          setSocial({
+            followers: data.followers,
+            following: data.following,
+            showSocial: data.showSocial !== false,
+            showStats: data.showStats !== false,
+            showActivity: data.showActivity === true,
+          });
+        } else setError(typeof data.error === 'string' ? data.error : 'Could not load follows.');
+      })
+      .catch(() => {
+        if (live) setError('Could not load follows.');
+      })
+      .finally(() => window.clearTimeout(timer));
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+      abort.abort();
+    };
+  }, []);
+
+  async function setFlag(patch: { showSocial?: boolean; showStats?: boolean; showActivity?: boolean }) {
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/follow', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || typeof data.followers !== 'number' || typeof data.following !== 'number') {
+        setError(typeof data.error === 'string' ? data.error : 'Could not save that.');
+        return;
+      }
+      setSocial({
+        followers: data.followers,
+        following: data.following,
+        showSocial: data.showSocial !== false,
+        showStats: data.showStats !== false,
+        showActivity: data.showActivity === true,
+      });
+    } catch {
+      setError('Could not save that.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { social, error, busy, setFlag };
+}
+
 export function AccountProfile({
   username,
   displayName,
@@ -284,6 +395,8 @@ export function AccountProfile({
   onSignOut,
 }: Props) {
   const stats = useAccountStats();
+  const socialState = useOwnSocial();
+  const social = socialState.social;
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
   const silkId = useId().replace(/:/g, '');
@@ -351,7 +464,13 @@ export function AccountProfile({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 pt-0.5">
                   <p className="flex items-center gap-1.5 font-sans text-[18px] font-bold leading-none text-white">
-                    <span className="truncate">{handle}</span>
+                    {username ? (
+                      <Link href={`/u/${username}`} className="truncate text-white no-underline">
+                        {handle}
+                      </Link>
+                    ) : (
+                      <span className="truncate">{handle}</span>
+                    )}
                     {username ? (
                       <svg width="16" height="16" viewBox="0 0 24 24" className="shrink-0 text-[#f7d047]" aria-hidden>
                         <circle cx="12" cy="12" r="9" fill="currentColor" />
@@ -455,21 +574,17 @@ export function AccountProfile({
       <section className="grid grid-cols-4 divide-x divide-[#2a2b30] rounded-[14px] border border-[#2a2b30] bg-[#101012] px-1 py-2.5">
         <Stat icon={<ChartLineIcon size={14} />} value={stats ? volumeText(stats.volumeEth) : '-'} label="Total volume" />
         <Stat icon={<SwapGlyph />} value={stats ? String(stats.swaps) : '-'} label="Swaps" />
-        <Stat icon={<PeopleIcon size={14} />} value="0" label="Followers" />
         <Stat
-          icon={<StarGlyph />}
-          value="-"
-          label="Followers' volume"
-          note={
-            <button
-              type="button"
-              onClick={() => onSoon("Followers' volume")}
-              aria-label="About followers' volume"
-              className="hit-y-44 inline-flex text-[#6f6a62]"
-            >
-              <InfoGlyph />
-            </button>
-          }
+          icon={<PeopleIcon size={14} />}
+          value={social ? String(social.followers) : '-'}
+          label="Followers"
+          href={username ? `/u/${username}?list=followers` : undefined}
+        />
+        <Stat
+          icon={<PersonIcon size={14} />}
+          value={social ? String(social.following) : '-'}
+          label="Following"
+          href={username ? `/u/${username}?list=following` : undefined}
         />
       </section>
 
@@ -541,16 +656,53 @@ export function AccountProfile({
         <div className="grid grid-cols-4 gap-1.5 border-t border-[#26262a] px-3 py-3">
           <Mini icon={<UserPlusIcon size={14} />} value={String(invites)} label="Invites" />
           <Mini icon={<CoinsGlyph />} value={String(credits)} label="Credits" />
-          <Mini icon={<PeopleIcon size={14} />} value="0" label="Followers" />
-          <Mini icon={<PersonIcon size={14} />} value="0" label="Following" />
+          <Mini
+            icon={<PeopleIcon size={14} />}
+            value={social ? String(social.followers) : '-'}
+            label="Followers"
+            href={username ? `/u/${username}?list=followers` : undefined}
+          />
+          <Mini
+            icon={<PersonIcon size={14} />}
+            value={social ? String(social.following) : '-'}
+            label="Following"
+            href={username ? `/u/${username}?list=following` : undefined}
+          />
         </div>
+        <Link href="/people" className="flex min-h-[44px] items-center gap-3 border-t border-[#26262a] px-3.5 py-2 no-underline">
+          <span className="text-[#c8c2b8]">
+            <PeopleIcon size={16} />
+          </span>
+          <span className="min-w-0 flex-1 font-sans text-[13px] text-[#f3f1ec]">Find people</span>
+          <ChevronRightIcon size={16} className="shrink-0 text-[#6f6a62]" />
+        </Link>
       </Card>
 
       <Card dropdown icon={<EyeIcon size={16} />} title="Privacy & Visibility" hint="Control what others can see of your profile.">
         <Row icon={<GlobeIcon size={16} />} label="Profile visibility" value="Public" onClick={() => onSoon('Profile visibility')} />
         <ScanUsernameToggle />
-        <SoonToggle on icon={<ChartLineIcon size={16} />} label="Show trading stats" onSoon={() => onSoon('Show trading stats')} />
-        <SoonToggle on icon={<PeopleIcon size={16} />} label="Show followers & following" onSoon={() => onSoon('Show followers and following')} />
+        <FlagSwitch
+          on={social ? social.showStats : null}
+          disabled={socialState.busy || !social}
+          icon={<ChartLineIcon size={16} />}
+          label="Show trading stats"
+          onClick={() => void socialState.setFlag({ showStats: !(social && social.showStats) })}
+        />
+        <FlagSwitch
+          on={social ? social.showSocial : null}
+          disabled={socialState.busy || !social}
+          icon={<PeopleIcon size={16} />}
+          label="Show followers & following"
+          onClick={() => void socialState.setFlag({ showSocial: !(social && social.showSocial) })}
+        />
+        <FlagSwitch
+          on={social ? social.showActivity : null}
+          disabled={socialState.busy || !social}
+          icon={<BarsGlyph />}
+          label="Show activity"
+          onClick={() => void socialState.setFlag({ showActivity: !(social && social.showActivity) })}
+        />
+        {socialState.error ? <p className="m-0 px-3.5 py-2 font-sans text-[11.5px] text-[#e0b070]">{socialState.error}</p> : null}
         <SoonToggle on={false} icon={<WalletIcon size={16} />} label="Show wallet address" onSoon={() => onSoon('Show wallet address')} />
         <SoonToggle on={false} icon={<PieGlyph />} label="Show portfolio value" onSoon={() => onSoon('Show portfolio value')} />
       </Card>
@@ -608,14 +760,16 @@ function Stat({
   value,
   label,
   note,
+  href,
 }: {
   icon: ReactNode;
   value: string;
   label: string;
   note?: ReactNode;
+  href?: string;
 }) {
-  return (
-    <div className="min-w-0 px-1 text-center">
+  const body = (
+    <>
       <p className="flex items-center justify-center gap-1 font-sans text-[15px] font-bold leading-none text-white">
         <span className="text-[#f7d047]">{icon}</span>
         {value}
@@ -624,13 +778,19 @@ function Stat({
         <span>{label}</span>
         {note}
       </p>
-    </div>
+    </>
+  );
+  if (!href) return <div className="min-w-0 px-1 text-center">{body}</div>;
+  return (
+    <Link href={href} className="flex min-h-[44px] min-w-0 flex-col items-center justify-center px-1 text-center text-white no-underline">
+      {body}
+    </Link>
   );
 }
 
-function Mini({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
-  return (
-    <div className="min-w-0 rounded-[12px] border border-[#2a2b30] bg-[#0c0c0e] px-1.5 py-2">
+function Mini({ icon, value, label, href }: { icon: ReactNode; value: string; label: string; href?: string }) {
+  const body = (
+    <>
       <p className="flex items-center gap-1 font-sans text-[13px] font-bold text-[#f7d047]">
         {icon}
         <span className="text-white">{value}</span>
@@ -639,7 +799,14 @@ function Mini({ icon, value, label }: { icon: ReactNode; value: string; label: s
         <span className="truncate">{label}</span>
         <ChevronRightIcon size={12} />
       </p>
-    </div>
+    </>
+  );
+  const box = 'min-w-0 rounded-[12px] border border-[#2a2b30] bg-[#0c0c0e] px-1.5 py-2 text-white';
+  if (!href) return <div className={box}>{body}</div>;
+  return (
+    <Link href={href} className={`flex min-h-[44px] flex-col justify-center no-underline ${box}`}>
+      {body}
+    </Link>
   );
 }
 
@@ -686,14 +853,6 @@ function SwapGlyph() {
   );
 }
 
-function StarGlyph() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M12 3.2l2.4 5.6 6 .6-4.5 4 1.3 5.9L12 16.6 6.8 19.3 8.1 13.4 3.6 9.4l6-.6z" />
-    </svg>
-  );
-}
-
 function CoinsGlyph() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
@@ -723,13 +882,5 @@ function PieGlyph() {
   );
 }
 
-function InfoGlyph() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
-      <circle cx="12" cy="12" r="8.5" strokeWidth="1.7" />
-      <path d="M12 11v5" strokeWidth="1.8" />
-      <circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
+
 

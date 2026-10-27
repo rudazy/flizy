@@ -18,9 +18,9 @@ const TEXT_LINK = 'text-muted no-underline hover:text-lime';
  */
 export function SiteFooter({ telegramUrl = null, whatsappUrl = null }: { telegramUrl?: string | null; whatsappUrl?: string | null }) {
   return (
-    <footer className="mt-auto border-t border-border">
-      <div className="mx-auto max-w-[1200px] px-6 py-10">
-        <div className="flex items-start justify-between gap-6">
+    <footer className="mt-auto overflow-x-clip border-t border-border">
+      <div className="mx-auto max-w-[1200px] px-4 py-10 sm:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-4 sm:gap-6">
           <div className="min-w-0">
             <Link href="/" className="flex items-center gap-3 no-underline">
               <span className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-surface font-sans text-lg font-semibold text-lime shadow-glow">
@@ -29,7 +29,7 @@ export function SiteFooter({ telegramUrl = null, whatsappUrl = null }: { telegra
               <span className="font-sans text-sm font-semibold tracking-[0.18em] text-paper">FLIZY</span>
             </Link>
           </div>
-          <nav aria-label="Flizy on chat and social" className="flex shrink-0 gap-2.5">
+          <nav aria-label="Flizy on chat and social" className="flex w-full gap-2.5 sm:w-auto sm:shrink-0">
             <FooterIcon href={telegramUrl ?? '/how-it-works'} label="Flizy on Telegram" external={Boolean(telegramUrl)}>
               <TelegramGlyph />
             </FooterIcon>

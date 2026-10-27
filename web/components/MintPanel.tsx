@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useDashboard } from './DashboardProvider';
 import { MintActionSheet, SheetRow, EthAmount } from './MintActionSheet';
+import { ProfileLink } from './ProfileLink';
 import { NftArt } from './NftCollection';
 import { artworkFor } from '../lib/nftArtwork';
 import { CheckIcon, ClockIcon, EthDiamondIcon, ShieldCheckIcon } from './ExploreIcons';
@@ -156,7 +157,18 @@ export function MintPanel({
             <div className="min-w-0">
               <h1 className="m-0 truncate font-sans text-[20px] font-bold text-white">{d.name}</h1>
               <p className="m-0 mt-[3px] font-sans text-[12.5px] text-[#cfcfcf]">
-                {d.creatorUsername ? `By @${d.creatorUsername}` : d.verified ? 'By Flizy' : 'Creator unknown'}
+                {d.creatorUsername ? (
+                  <>
+                    By{' '}
+                    <ProfileLink username={d.creatorUsername} className="text-[#f7d047] no-underline">
+                      @{d.creatorUsername}
+                    </ProfileLink>
+                  </>
+                ) : d.verified ? (
+                  'By Flizy'
+                ) : (
+                  'Creator unknown'
+                )}
               </p>
               <span
                 className={`mt-[6px] inline-flex h-[22px] items-center gap-[5px] rounded-full border px-[9px] font-sans text-[11px] ${
@@ -287,7 +299,20 @@ export function MintPanel({
       <section className="grid gap-[8px] rounded-[12px] border border-[#23242a] bg-[#0d0d0e] p-[14px]" aria-label="About the collection">
         <h3 className="m-0 font-sans text-[13px] font-semibold text-white">About the collection</h3>
         {d.description ? <p className="m-0 font-sans text-[12.5px] leading-[18px] text-[#d6d6d6]">{d.description}</p> : null}
-        <SheetRow label="Creator" value={d.creatorUsername ? `@${d.creatorUsername}` : d.contractManaged && d.verified ? 'Flizy' : 'Unknown'} />
+        <SheetRow
+          label="Creator"
+          value={
+            d.creatorUsername ? (
+              <ProfileLink username={d.creatorUsername} className="text-[#f7d047] no-underline">
+                @{d.creatorUsername}
+              </ProfileLink>
+            ) : d.contractManaged && d.verified ? (
+              'Flizy'
+            ) : (
+              'Unknown'
+            )
+          }
+        />
         <SheetRow
           label="Contract"
           value={

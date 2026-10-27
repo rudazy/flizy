@@ -1,3 +1,4 @@
+import { profilePath } from './follows.ts';
 import { getSupabase } from './supabase.ts';
 import { validateUsername } from './username.ts';
 import type { SearchResult } from './searchIndex.ts';
@@ -129,15 +130,24 @@ async function nfts(q: string, lookup: CollectionLookup): Promise<SearchResult[]
   }));
 }
 
-/** Exactly one account, by its whole username, or nobody. */
+/**
+ * Exactly one open account, by its whole username, or nobody.
+ * The result opens the profile. Paying stays on that profile.
+ */
 async function people(q: string, supabase: Db): Promise<SearchResult[]> {
   const checked = validateUsername(q.replace(/^@/, ''));
   if (!checked.ok) return [];
-  const { data, error } = await supabase.from('accounts').select('username').eq('username', checked.username).maybeSingle();
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('username')
+    .eq('username', checked.username)
+    .is('deactivated_at', null)
+    .is('deleted_at', null)
+    .maybeSingle();
   if (error) throw new Error(error.message);
   const username = (data as { username?: string | null } | null)?.username;
   if (!username) return [];
-  return [{ kind: 'person', title: `@${username}`, subtitle: `Pay @${username}`, href: `/pay/${encodeURIComponent(username)}` }];
+  return [{ kind: 'person', title: `@${username}`, subtitle: 'Profile', href: profilePath(username) }];
 }
 
 export async function siteSearch(

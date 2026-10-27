@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AppTopBar } from '../../../../../components/AppTopBar';
 import { AppPage, AppSection } from '../../../../../components/AppSection';
 import { LocalWhen } from '../../../../../components/LocalWhen';
+import { ProfileLink } from '../../../../../components/ProfileLink';
 
 /**
  * Review entries and choose winners.
@@ -260,7 +261,11 @@ export default function ReviewPage() {
                             <span className="badge badge-lime ml-2">Post verified</span>
                           ) : null}
                         </p>
-                        <p className="m-0 text-sm text-muted">@{s.username}</p>
+                        <p className="m-0 text-sm text-muted">
+                          <ProfileLink username={s.username} className="text-muted no-underline">
+                            @{s.username}
+                          </ProfileLink>
+                        </p>
                         {s.url ? (
                           <a
                             className="m-0 text-xs text-lime no-underline hover:underline"

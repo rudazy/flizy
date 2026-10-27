@@ -9,6 +9,7 @@ import { PAY_ASSETS, type PayAsset } from '../lib/payAsset';
 import { listedBySymbol, symbolLabel } from '../lib/listedTokens';
 import { FLZ_TOKEN } from '../lib/walletChain';
 import type { PayPreset } from '../lib/payLink';
+import { ProfileLink } from './ProfileLink';
 import { ShareReceiptButton } from './ShareReceiptButton';
 import { ExternalPay } from './ExternalPay';
 import {
@@ -298,7 +299,13 @@ export function PayLanding({
                 </span>
                 <div className="min-w-0">
                   <h1 className="m-0 break-words font-sans text-[26px] font-bold leading-tight text-white">{displayName || handle}</h1>
-                  {displayName && username ? <p className="m-0 font-mono text-[13px] text-[#9a958c]">@{username}</p> : null}
+                  {displayName && username ? (
+                    <p className="m-0 font-mono text-[13px] text-[#9a958c]">
+                      <ProfileLink username={username} className="text-[#9a958c] no-underline">
+                        @{username}
+                      </ProfileLink>
+                    </p>
+                  ) : null}
                   <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#1f6b45] bg-[#0f2a1d] px-2.5 py-1 font-sans text-[12px] text-[#3ddc84]">
                     <CheckDot />
                     Flizy user

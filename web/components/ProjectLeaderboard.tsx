@@ -1,4 +1,5 @@
 import type { ProjectLeaderboard } from '../lib/tasks';
+import { ProfileLink } from './ProfileLink';
 
 /**
  * Who has earned XP from a project, highest first. Shared by the workspace and
@@ -34,7 +35,9 @@ export function Leaderboard({ board }: { board: ProjectLeaderboard }) {
               {entry.rank}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-sans text-sm text-[#f5f5f5]">@{entry.username}</span>
+              <ProfileLink username={entry.username} className="block truncate font-sans text-sm text-[#f5f5f5] no-underline">
+                @{entry.username}
+              </ProfileLink>
               <span className="block text-xs text-muted">
                 {entry.wins} {entry.wins === 1 ? 'win' : 'wins'}
               </span>

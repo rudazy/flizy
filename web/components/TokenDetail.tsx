@@ -8,6 +8,7 @@ import { AppPage } from './AppSection';
 import { useComingSoon } from './ComingSoon';
 import { SearchButton } from './SiteSearch';
 import { formatEthDisplay, formatPct } from '../lib/tokenFormat';
+import { ProfileLink } from './ProfileLink';
 import { VerifiedMark } from './VerifiedMark';
 import { tokenLogo } from '../lib/tokenLogos';
 import { listedByAddress } from '../lib/listedTokens';
@@ -546,7 +547,11 @@ export function TokenDetail({ symbol }: { symbol: string }) {
               </p>
               <p className="m-0 mt-0.5 flex flex-wrap gap-x-2.5 font-sans text-[13px] text-[#a9a9a9] sm:gap-x-3 sm:text-base">
                 <span>{ticker}</span>
-                {profile?.creatorUsername ? <span>@{profile.creatorUsername}</span> : null}
+                {profile?.creatorUsername ? (
+                  <ProfileLink username={profile.creatorUsername} className="text-sun no-underline">
+                    @{profile.creatorUsername}
+                  </ProfileLink>
+                ) : null}
               </p>
               <p className="m-0 mt-1 flex items-center gap-2 sm:mt-1.5">
                 <span className="rounded-[6px] bg-[#1c1c1c] px-1.5 py-0.5 font-mono text-[11px] font-semibold text-[#e6e6e6] sm:px-2 sm:text-xs">GIWA</span>
@@ -858,7 +863,13 @@ export function TokenDetail({ symbol }: { symbol: string }) {
                     <AboutRow label="Chain">{market.chainName}</AboutRow>
                   </>
                 ) : null}
-                {profile?.creatorUsername ? <AboutRow label="Creator">@{profile.creatorUsername}</AboutRow> : null}
+                {profile?.creatorUsername ? (
+                  <AboutRow label="Creator">
+                    <ProfileLink username={profile.creatorUsername} className="text-sun no-underline">
+                      @{profile.creatorUsername}
+                    </ProfileLink>
+                  </AboutRow>
+                ) : null}
                 <AboutRow label="Status">
                   {ammora
                     ? 'An Ammora launch. Flizy has not reviewed this token.'

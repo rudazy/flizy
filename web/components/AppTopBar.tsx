@@ -5,6 +5,7 @@ import { AppDesktopTabs } from './AppBottomNav';
 import { useDashboard } from './DashboardProvider';
 import { useComingSoon } from './ComingSoon';
 import { BellIcon, RefreshIcon } from './ExploreIcons';
+import { ProfileLink } from './ProfileLink';
 import { SearchButton } from './SiteSearch';
 
 type AppTopBarProps = {
@@ -48,10 +49,15 @@ export function AppTopBar({
               <h1 className="truncate font-sans text-[15.5px] font-semibold leading-tight tracking-wide text-[#f5f5f5]">
                 {title}
               </h1>
-              {subtitle ? (
-                <p className="truncate font-sans text-[12px] leading-snug text-[#9d9d9d]">
-                  {subtitle}
-                </p>
+              {username ? (
+                <ProfileLink
+                  username={username}
+                  className="block truncate font-sans text-[12px] leading-snug text-[#9d9d9d] no-underline"
+                >
+                  @{username}
+                </ProfileLink>
+              ) : subtitle ? (
+                <p className="truncate font-sans text-[12px] leading-snug text-[#9d9d9d]">{subtitle}</p>
               ) : null}
             </div>
           </div>

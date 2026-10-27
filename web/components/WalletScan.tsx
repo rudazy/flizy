@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useDashboard } from './DashboardProvider';
+import { ProfileLink } from './ProfileLink';
 import {
   ArrowDownIcon,
   CalendarIcon,
@@ -324,7 +325,14 @@ export function WalletScan() {
         </div>
       </section>
 
-      {focusCaption ? (
+      {focusActive && focus && focus.kind === 'username' ? (
+        <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-sun">
+          Showing{' '}
+          <ProfileLink username={focus.username} className="text-sun no-underline">
+            @{focus.username}
+          </ProfileLink>
+        </p>
+      ) : focusCaption ? (
         <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-sun">Showing {focusCaption}</p>
       ) : missingName ? (
         <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-[#9a9388]">No account named @{missingName}</p>

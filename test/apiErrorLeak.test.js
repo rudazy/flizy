@@ -164,6 +164,19 @@ describe('no route sends a raw error message', () => {
         lineMustMatch: /error:\s*err\.message/,
         reason: 'BindError product copy (IDENTITY_TAKEN, LOCKED, ...)',
       },
+      ...[
+        'follow/route.ts',
+        'people/route.ts',
+        'u/[username]/follow/route.ts',
+        'u/[username]/followers/route.ts',
+        'u/[username]/following/route.ts',
+        'u/[username]/route.ts',
+      ].map((file) => ({
+        file,
+        // ClientError: "Follows are not available yet." from web/lib/followStore.ts.
+        lineMustMatch: /error:\s*err\.message/,
+        reason: 'ClientError product copy (Follows are not available yet.)',
+      })),
     ];
 
     const offenders = [];

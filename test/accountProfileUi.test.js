@@ -23,6 +23,7 @@ describe('account profile layout', () => {
       'Deactivate account',
       'Show trading stats',
       'Show followers & following',
+      'Show activity',
       'Two-factor authentication',
       'GIWA · Ethereum',
     ]) {
@@ -41,10 +42,14 @@ describe('account profile layout', () => {
     assert.match(PAGE, /invites=\{data\.invite\?\.attributed \?\? 0\}/);
     assert.match(PAGE, /credits=\{data\.invite\?\.credits \?\? 0\}/);
     assert.doesNotMatch(PROFILE, /24\.8K|386|1,284|42\.6K|ludaluda/);
-    // Volume and swaps are the account's own confirmed rows; blank until read.
+    // Volume, swaps, followers and following stay blank until their own read succeeds.
     assert.match(PROFILE, /value=\{stats \? volumeText\(stats\.volumeEth\) : '-'\} label="Total volume"/);
     assert.match(PROFILE, /value=\{stats \? String\(stats\.swaps\) : '-'\} label="Swaps"/);
-    assert.match(PROFILE, /value="0" label="Followers"/);
+    assert.match(PROFILE, /value=\{social \? String\(social\.followers\) : '-'\}/);
+    assert.match(PROFILE, /value=\{social \? String\(social\.following\) : '-'\}/);
+    assert.match(PROFILE, /label="Followers"/);
+    assert.match(PROFILE, /label="Following"/);
+    assert.doesNotMatch(PROFILE, /Followers' volume/);
   });
 
   it('keeps the other account tools and the public mailboxes', () => {
