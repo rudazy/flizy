@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { PersonRow } from './PersonRow';
 import type { PublicPerson } from '../lib/follows.ts';
 
@@ -9,9 +8,10 @@ import type { PublicPerson } from '../lib/follows.ts';
  * Search usernames and a short set of suggested profiles.
  * Opening a row goes to that profile. Nothing here follows or pays.
  */
-export function PeopleFinder({ signedIn }: { signedIn: boolean }) {
-  const [draft, setDraft] = useState('');
-  const [query, setQuery] = useState('');
+export function PeopleFinder({ initialQuery = '' }: { initialQuery?: string }) {
+  const seed = initialQuery.trim().slice(0, 24);
+  const [draft, setDraft] = useState(seed);
+  const [query, setQuery] = useState(seed);
   const [suggestions, setSuggestions] = useState<PublicPerson[]>([]);
   const [results, setResults] = useState<PublicPerson[] | null>(null);
   const [error, setError] = useState('');
@@ -53,46 +53,49 @@ export function PeopleFinder({ signedIn }: { signedIn: boolean }) {
 
   return (
     <div className="mx-auto w-full max-w-lg md:max-w-5xl">
-      <section className="relative overflow-hidden rounded-[20px] border border-[#3a3424] bg-[#100e0b] px-4 py-5 sm:px-7 sm:py-7">
-        <div
+      <label className="relative block">
+        <span className="sr-only">Search usernames</span>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
           aria-hidden
-          className="pointer-events-none absolute -right-16 -top-24 h-56 w-56 rounded-full bg-[#f7d047]/12 blur-3xl"
+          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#8d867c]"
+        >
+          <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.7" />
+          <path d="M16 16.5L20 20.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="Search users..."
+          autoComplete="off"
+          maxLength={24}
+          className="h-11 w-full rounded-full border border-[#2a2b30] bg-[#14120e] pl-11 pr-4 font-sans text-[15px] text-white outline-none placeholder:text-[#6f6a62] focus:border-[#f7d047]"
         />
-        <div className="relative mb-5 flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <p className="m-0 font-sans text-[11px] uppercase tracking-[0.18em] text-[#f7d047]">Directory</p>
-            <h1 className="m-0 mt-1 font-sans text-[28px] font-semibold tracking-wide text-white sm:text-[36px]">People</h1>
-            <p className="m-0 mt-2 max-w-xl font-sans text-[13px] leading-relaxed text-[#c8c2b8]">
-              Find a username and open that profile.
-            </p>
-          </div>
-          <Link
-            href={signedIn ? '/dashboard' : '/login'}
-            className="inline-flex min-h-[44px] shrink-0 items-center font-sans text-[13px] text-[#c8c2b8] no-underline hover:text-white"
-          >
-            {signedIn ? 'Home' : 'Sign in'}
-          </Link>
-        </div>
-        <label className="relative block">
-          <span className="sr-only">Search usernames</span>
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Search a username"
-            autoComplete="off"
-            className="h-12 w-full rounded-[14px] border border-[#3a3424] bg-[#0c0b09] px-4 font-sans text-[15px] text-white outline-none placeholder:text-[#6f6a62] focus:border-[#f7d047]"
-          />
-        </label>
-      </section>
+      </label>
+      <p className="m-0 mt-3 font-sans text-[13px] leading-relaxed text-[#8d867c]">Find a username and open that profile.</p>
       <p className="m-0 mt-5 font-sans text-[11px] uppercase tracking-[0.16em] text-[#8d867c]">
         {searching ? 'Matches' : 'Suggested'}
       </p>
       {error ? <p className="m-0 mt-3 font-sans text-[13px] text-[#e0b070]">{error}</p> : null}
       {rows === null && !error ? <p className="m-0 mt-3 font-sans text-[13px] text-[#8d867c]">Loading</p> : null}
       {rows && rows.length === 0 && !error ? (
-        <p className="m-0 mt-3 rounded-[16px] border border-[#2a2b30] bg-[#101012] px-4 py-8 text-center font-sans text-[13px] text-[#c8c2b8]">
-          {searching ? 'No matches.' : 'Search a username to open a profile.'}
-        </p>
+        <div className="mt-3 rounded-[18px] border border-[#2a2b30] bg-[linear-gradient(180deg,rgba(247,208,71,0.05),transparent_36%),#101012] px-4 py-10 text-center">
+          <span
+            aria-hidden
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-[#f7d047]/50 bg-[#14120e] text-[#f7d047] shadow-[0_0_24px_rgba(247,208,71,0.16)]"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.7" />
+              <path d="M16 16.5L20 20.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
+          </span>
+          <p className="m-0 font-sans text-[13px] text-[#c8c2b8]">
+            {searching ? 'No matches.' : 'Search a username to open a profile.'}
+          </p>
+        </div>
       ) : null}
       {rows && rows.length ? (
         <ul className="m-0 mt-3 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2 lg:grid-cols-3">

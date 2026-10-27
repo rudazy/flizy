@@ -76,128 +76,131 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
   const loginHref = `/login?next=${encodeURIComponent(profilePath(profile.username))}`;
   const activityOpen = profile.isSelf || profile.showActivity;
   const showCopy = !profile.isSelf && following;
+  const openFollowers = socialOpen && followers !== null ? () => setList('followers') : undefined;
+  const openFollowing = socialOpen && followingCount !== null ? () => setList('following') : undefined;
 
   return (
-    <div className="mx-auto w-full max-w-lg md:max-w-5xl">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <Link href="/people" className="inline-flex min-h-[44px] items-center font-sans text-[13px] text-[#f7d047] no-underline hover:text-[#ffe38a]">
-          People
-        </Link>
-        <Link
-          href={profile.signedIn ? '/dashboard' : '/login'}
-          className="inline-flex min-h-[44px] items-center font-sans text-[13px] text-[#c8c2b8] no-underline hover:text-white"
-        >
-          {profile.signedIn ? 'Home' : 'Sign in'}
-        </Link>
-      </div>
-
-      <section className="relative rounded-[20px] border border-[#3a3424] bg-[#100e0b] px-4 py-5 sm:px-7 sm:py-7">
-        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-[20px]">
-          <div className="absolute -left-16 -top-24 h-56 w-56 rounded-full bg-[#f7d047]/15 blur-3xl" />
-          <div className="absolute -bottom-28 -right-16 hidden h-56 w-56 rounded-full bg-[#f7d047]/10 blur-3xl lg:block" />
+    <div className="mx-auto w-full max-w-lg md:max-w-none">
+      <div className="md:grid md:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] md:items-start md:gap-4">
+      <div className="min-w-0">
+      <section className="relative rounded-[22px] border border-[#3a3424] bg-[#100e0b] px-4 py-5 shadow-[0_24px_70px_rgba(0,0,0,0.42)]">
+        <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-[42%] overflow-hidden rounded-r-[22px]">
+          <div className="absolute -left-[70%] top-[-12%] h-[130%] w-[170%] rounded-full border border-[#f7d047]/45 shadow-[inset_0_0_40px_rgba(247,208,71,0.08)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_42%,rgba(247,208,71,0.2),transparent_64%)]" />
         </div>
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-4">
-            <span className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border-2 border-[#f7d047] bg-[#14120e] font-sans text-[30px] font-semibold text-[#f7d047] shadow-[0_0_0_8px_rgba(247,208,71,0.08)] sm:h-24 sm:w-24 sm:text-[40px]">
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-[3px] border-[#f7d047] bg-[#14120e] font-sans text-[34px] font-semibold text-[#f7d047] shadow-[0_0_0_7px_rgba(247,208,71,0.1),0_0_32px_rgba(247,208,71,0.28)]">
               {profile.username.slice(0, 1).toUpperCase()}
             </span>
             <div className="min-w-0">
-              <h1 className="truncate font-sans text-[24px] font-semibold tracking-wide text-white sm:text-[32px]">
-                @{profile.username}
-              </h1>
+              <h1 className="truncate font-sans text-[26px] font-semibold tracking-wide text-white">@{profile.username}</h1>
               {profile.displayName ? (
-                <p className="mt-1 truncate font-sans text-[13px] text-[#c8c2b8]">{profile.displayName}</p>
+                <p className="mt-0.5 truncate font-sans text-[13px] text-[#c8c2b8]">{profile.displayName}</p>
               ) : null}
             </div>
           </div>
-          <div className="relative flex w-full flex-col gap-2 sm:flex-row lg:w-auto lg:shrink-0">
-              {profile.isSelf ? (
-                <Link
-                  href="/dashboard/account"
-                  className="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-[#f7d047] px-5 font-sans text-[14px] font-semibold text-[#1a1405] no-underline shadow-[0_8px_24px_rgba(247,208,71,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047] focus-visible:ring-offset-2 focus-visible:ring-offset-[#100e0b] sm:w-auto sm:min-w-[160px]"
-                >
-                  Edit profile
-                </Link>
-              ) : following ? (
-                <button
-                  type="button"
-                  aria-expanded={menu}
-                  aria-controls={menuId}
-                  disabled={busy}
-                  onClick={() => setMenu((open) => !open)}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-[12px] border border-[#f7d047] bg-transparent px-5 font-sans text-[14px] font-semibold text-[#f7d047] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047] disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
-                >
-                  Following
-                </button>
-              ) : profile.signedIn ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void send('POST')}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-[#f7d047] px-5 font-sans text-[14px] font-semibold text-[#1a1405] shadow-[0_8px_24px_rgba(247,208,71,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047] focus-visible:ring-offset-2 focus-visible:ring-offset-[#100e0b] disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
-                >
-                  Follow
-                </button>
-              ) : (
-                <Link
-                  href={loginHref}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-[#f7d047] px-5 font-sans text-[14px] font-semibold text-[#1a1405] no-underline shadow-[0_8px_24px_rgba(247,208,71,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047] focus-visible:ring-offset-2 focus-visible:ring-offset-[#100e0b] sm:w-auto sm:min-w-[180px]"
-                >
-                  Sign in to follow
-                </Link>
-              )}
-              {profile.isSelf ? null : (
-                <Link
-                  href={`/pay/${encodeURIComponent(profile.username)}`}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-[12px] border border-[#5a5138] px-5 font-sans text-[14px] font-semibold text-[#f3ead2] no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047] sm:w-auto sm:min-w-[120px]"
-                >
-                  Pay
-                </Link>
-              )}
-              {menu ? (
-                <div
-                  id={menuId}
-                  className="absolute left-0 right-0 top-full z-20 mt-2 rounded-[14px] border border-[#3a3424] bg-[#16130e] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.45)] sm:right-auto sm:w-72"
-                >
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void send('DELETE')}
-                    className="flex min-h-[44px] w-full items-center rounded-[8px] px-3 text-left font-sans text-[13px] text-[#f3f1ec] disabled:opacity-60"
-                  >
-                    Unfollow
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void send('PATCH', { alerts: !alerts })}
-                    className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-[8px] px-3 text-left font-sans text-[13px] text-[#f3f1ec] disabled:opacity-60"
-                  >
-                    <span>Activity alerts</span>
-                    <span className="text-[#f7d047]">{alerts ? 'On' : 'Off'}</span>
-                  </button>
-                  <p className="m-0 px-3 pb-2 font-sans text-[11px] leading-snug text-[#8d867c]">
-                    Saved on this follow. No alert is sent yet.
-                  </p>
-                </div>
-              ) : null}
-            </div>
+          {profile.isSelf ? (
+            <Link
+              href="/dashboard/account"
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-[12px] border border-[#5a5138] bg-[#14120e]/80 px-3.5 font-sans text-[13px] font-semibold text-[#f3ead2] no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047]"
+            >
+              Edit profile
+            </Link>
+          ) : null}
         </div>
+        <div className="relative mt-4 flex items-center gap-4">
+          <CountButton value={followers === null ? '-' : String(followers)} label="Followers" onClick={openFollowers} />
+          <span className="h-8 w-px bg-[#3a3424]" aria-hidden />
+          <CountButton value={followingCount === null ? '-' : String(followingCount)} label="Following" onClick={openFollowing} />
+        </div>
+        {profile.isSelf ? null : (
+          <div className="relative mt-4 flex flex-col gap-2 sm:flex-row">
+            {following ? (
+              <button
+                type="button"
+                aria-expanded={menu}
+                aria-controls={menuId}
+                disabled={busy}
+                onClick={() => setMenu((open) => !open)}
+                className="inline-flex h-11 w-full items-center justify-center rounded-[12px] border border-[#f7d047] bg-transparent px-5 font-sans text-[14px] font-semibold text-[#f7d047] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047] disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
+              >
+                Following
+              </button>
+            ) : profile.signedIn ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void send('POST')}
+                className="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-[#f7d047] px-5 font-sans text-[14px] font-semibold text-[#1a1405] shadow-[0_8px_24px_rgba(247,208,71,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047] disabled:opacity-60 sm:w-auto sm:min-w-[160px]"
+              >
+                Follow
+              </button>
+            ) : (
+              <Link
+                href={loginHref}
+                className="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-[#f7d047] px-5 font-sans text-[14px] font-semibold text-[#1a1405] no-underline shadow-[0_8px_24px_rgba(247,208,71,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047] sm:w-auto sm:min-w-[180px]"
+              >
+                Sign in to follow
+              </Link>
+            )}
+            <Link
+              href={`/pay/${encodeURIComponent(profile.username)}`}
+              className="inline-flex h-11 w-full items-center justify-center rounded-[12px] border border-[#5a5138] px-5 font-sans text-[14px] font-semibold text-[#f3ead2] no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047] sm:w-auto sm:min-w-[120px]"
+            >
+              Pay
+            </Link>
+            {menu ? (
+              <div
+                id={menuId}
+                className="absolute left-0 right-0 top-full z-20 mt-2 rounded-[14px] border border-[#3a3424] bg-[#16130e] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.45)] sm:right-auto sm:w-72"
+              >
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void send('DELETE')}
+                  className="flex min-h-[44px] w-full items-center rounded-[8px] px-3 text-left font-sans text-[13px] text-[#f3f1ec] disabled:opacity-60"
+                >
+                  Unfollow
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void send('PATCH', { alerts: !alerts })}
+                  className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-[8px] px-3 text-left font-sans text-[13px] text-[#f3f1ec] disabled:opacity-60"
+                >
+                  <span>Activity alerts</span>
+                  <span className="text-[#f7d047]">{alerts ? 'On' : 'Off'}</span>
+                </button>
+                <p className="m-0 px-3 pb-2 font-sans text-[11px] leading-snug text-[#8d867c]">
+                  Saved on this follow. No alert is sent yet.
+                </p>
+              </div>
+            ) : null}
+          </div>
+        )}
         {error ? <p className="relative m-0 mt-3 font-sans text-[12px] text-[#e0b070]">{error}</p> : null}
       </section>
 
-      <section className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <Stat value={profile.volumeEth === null ? '-' : formatVolumeEth(profile.volumeEth)} label="Total volume" />
-        <Stat value={profile.swaps === null ? '-' : String(profile.swaps)} label="Swaps" />
+      <section className="mt-3 grid grid-cols-2 gap-2">
+        <Stat
+          value={profile.volumeEth === null ? '-' : formatVolumeEth(profile.volumeEth)}
+          label="Total volume"
+          unit={profile.volumeEth === null ? undefined : 'ETH'}
+          icon={<Bars tone="gold" />}
+        />
+        <Stat value={profile.swaps === null ? '-' : String(profile.swaps)} label="Swaps" icon={<Bars tone="green" />} />
         <Stat
           value={followers === null ? '-' : String(followers)}
           label="Followers"
-          onClick={socialOpen && followers !== null ? () => setList('followers') : undefined}
+          onClick={openFollowers}
+          icon={<PeopleMark />}
         />
         <Stat
           value={followingCount === null ? '-' : String(followingCount)}
           label="Following"
-          onClick={socialOpen && followingCount !== null ? () => setList('following') : undefined}
+          onClick={openFollowing}
+          icon={<PersonMark />}
         />
       </section>
 
@@ -207,14 +210,11 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
       {profile.isSelf && !profile.showStats ? (
         <p className="m-0 mt-2 font-sans text-[12px] text-[#8d867c]">Volume and swaps are hidden from others.</p>
       ) : null}
+      </div>
 
-      <div
-        className={`mt-4 grid grid-cols-1 gap-4 ${
-          profile.followedBy.length ? 'lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start' : ''
-        }`}
-      >
+      <div className="mt-4 grid grid-cols-1 gap-4 md:mt-0">
         {profile.followedBy.length ? (
-          <section className="order-2 rounded-[16px] border border-[#2a2b30] bg-[#101012] px-4 py-4 lg:order-1">
+          <section className="order-2 rounded-[16px] border border-[#2a2b30] bg-[#101012] px-4 py-4">
             <h2 className="m-0 font-sans text-[11px] font-medium uppercase tracking-[0.16em] text-[#8d867c]">Followed by</h2>
             <p className="m-0 mt-2 font-sans text-[13px] leading-relaxed text-[#c8c2b8]">
               {profile.followedBy.map((person, index) => (
@@ -234,9 +234,9 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
           </section>
         ) : null}
 
-        <section className="order-1 rounded-[16px] border border-[#2a2b30] bg-[#101012] px-1 pb-4 lg:order-2">
-          <div className="flex items-center justify-between gap-3 px-3.5 pt-4">
-            <h2 className="m-0 font-sans text-[15px] font-semibold text-white">Activity</h2>
+        <section className="order-1 rounded-[16px] border border-[#2a2b30] bg-[#101012] px-1 pb-4">
+          <div className="flex items-center gap-3 px-3.5 pt-4">
+            <h2 className="m-0 border-b-2 border-[#f7d047] pb-1 font-sans text-[15px] font-semibold text-[#f7d047]">Activity</h2>
           </div>
           {activityOpen && profile.activity.length === 0 ? (
             <p className="m-0 px-3.5 pt-4 font-sans text-[13px] text-[#8d867c]">No swaps yet.</p>
@@ -249,8 +249,8 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
                   className="flex min-h-[64px] items-center justify-between gap-3 border-t border-[#26262a] px-3.5 py-2.5"
                 >
                   <span className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#3a3424] bg-[#14120e] font-sans text-[11px] font-semibold text-[#f7d047]">
-                      {item.title.slice(0, 1)}
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#f7d047]/50 bg-[#14120e] text-[#f7d047]">
+                      <SwapMark />
                     </span>
                     <span className="min-w-0">
                       <span className="block font-sans text-[14px] font-semibold text-white">{item.title}</span>
@@ -295,37 +295,109 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
           ) : null}
         </section>
       </div>
+      </div>
 
-      <Link
-        href="/people"
-        className="mt-4 flex min-h-[44px] items-center font-sans text-[13px] text-[#f7d047] no-underline hover:text-[#ffe38a]"
-      >
-        Find people
-      </Link>
     </div>
   );
 }
 
-function Stat({ value, label, onClick }: { value: string; label: string; onClick?: () => void }) {
+function CountButton({ value, label, onClick }: { value: string; label: string; onClick?: () => void }) {
   const body = (
     <>
-      <p className="font-sans text-[22px] font-semibold leading-none tracking-tight text-white sm:text-[26px]">{value}</p>
-      <p className="mt-2 max-w-full px-1 font-sans text-[11px] font-medium uppercase leading-tight tracking-[0.08em] text-[#c8c2b8] sm:text-[12px] sm:tracking-[0.12em]">
-        {label}
-      </p>
+      <span className="block font-sans text-[18px] font-semibold leading-none text-white">{value}</span>
+      <span className="mt-1 block font-sans text-[12px] text-[#8d867c]">{label}</span>
     </>
   );
+  if (!onClick) return <div className="min-w-[88px]">{body}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="min-h-[44px] min-w-[88px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047]"
+    >
+      {body}
+    </button>
+  );
+}
+
+function Stat({
+  value,
+  label,
+  unit,
+  onClick,
+  icon,
+}: {
+  value: string;
+  label: string;
+  unit?: string;
+  onClick?: () => void;
+  icon: JSX.Element;
+}) {
+  const body = (
+    <span className="flex w-full items-center justify-between gap-2">
+      <span className="min-w-0 text-left">
+        <span className="block font-sans text-[12px] text-[#8d867c]">{label}</span>
+        <span className="mt-1.5 block font-sans text-[26px] font-semibold leading-none tracking-tight text-white">{value}</span>
+        {unit ? <span className="mt-1 block font-sans text-[11px] text-[#6f6a62]">{unit}</span> : null}
+      </span>
+      <span aria-hidden className="shrink-0">
+        {icon}
+      </span>
+    </span>
+  );
   const box =
-    'flex min-h-[76px] min-w-0 flex-col items-center justify-center rounded-[14px] border border-[#2a2b30] bg-[#101012] px-2 py-3 text-center';
+    'flex min-h-[96px] min-w-0 items-center rounded-[16px] border border-[#2a2b30] bg-[linear-gradient(180deg,rgba(247,208,71,0.06),transparent_42%),#101012] px-3.5 py-3';
   if (!onClick) return <div className={box}>{body}</div>;
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`${box} transition-colors hover:border-[#5a5138] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047]`}
+      className={`${box} text-left transition-colors hover:border-[#5a5138] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f7d047]`}
     >
       {body}
     </button>
+  );
+}
+
+/** Ornament only. The heights are not this account's volume or swaps. */
+function Bars({ tone }: { tone: 'gold' | 'green' }) {
+  const color = tone === 'gold' ? '#f7d047' : '#3ecf8e';
+  const heights = [8, 12, 10, 16, 13, 18];
+  return (
+    <svg width="54" height="22" viewBox="0 0 54 22" fill="none" aria-hidden>
+      {heights.map((h, i) => (
+        <rect key={h + i} x={i * 9} y={22 - h} width="5" height={h} rx="1.5" fill={color} opacity={0.35 + i * 0.1} />
+      ))}
+    </svg>
+  );
+}
+
+function PeopleMark() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden className="text-[#8d867c]">
+      <circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="16" cy="10" r="2.2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3.5 18.5c.8-2.4 2.8-3.5 5.5-3.5s4.7 1.1 5.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M14 15.2c1.6-.3 3.2.2 4.3 1.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PersonMark() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden className="text-[#8d867c]">
+      <circle cx="12" cy="9" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M5.5 18.5c.9-2.8 3.1-4 6.5-4s5.6 1.2 6.5 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SwapMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M7 7h11l-2.5-2.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17 17H6l2.5 2.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 

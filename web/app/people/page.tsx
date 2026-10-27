@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { PeopleFinder } from '../../components/PeopleFinder';
-import { getAccountIdFromCookie } from '../../lib/cookies';
 import { pageMetadata } from '../../lib/seo';
 
 /**
@@ -17,7 +16,8 @@ export const metadata: Metadata = pageMetadata({
   noindex: true,
 });
 
-export default async function PeoplePage() {
-  const signedIn = Boolean(await getAccountIdFromCookie().catch(() => null));
-  return <PeopleFinder signedIn={signedIn} />;
+export default async function PeoplePage({ searchParams }: { searchParams?: { q?: string } }) {
+  // A username is at most 24 characters. Anything longer is not a search.
+  const raw = typeof searchParams?.q === 'string' ? searchParams.q.trim() : '';
+  return <PeopleFinder initialQuery={raw.slice(0, 24)} />;
 }
