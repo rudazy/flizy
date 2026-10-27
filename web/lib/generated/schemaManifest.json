@@ -1620,7 +1620,7 @@
       "kind": "table",
       "name": "web_sessions",
       "providedBy": "20260727120000_web_sessions.sql",
-      "requiredBy": "web/lib/cookies.ts"
+      "requiredBy": "web/app/api/account/sessions/route.ts, web/lib/cookies.ts"
     },
     {
       "kind": "trigger",

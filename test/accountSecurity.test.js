@@ -51,9 +51,15 @@ describe('Limits', () => {
 });
 
 describe('Security', () => {
-  it('offers no control for features that do not exist', () => {
-    // Two-step verification and session management do not exist yet: status only.
-    assert.equal((SEC.match(/status="Not available yet"/g) || []).length, 2);
+  it('offers no control for two-step verification, and lists sessions', () => {
+    // Two-step verification does not exist yet. Active sessions does.
+    assert.equal((SEC.match(/status="Not available yet"/g) || []).length, 1);
+    assert.match(SEC, /Two-step verification/);
+    assert.match(SEC, /Disconnect all other sessions/);
+    assert.match(SEC, /fetch\('\/api\/account\/sessions', \{ cache: 'no-store' \}\)/);
+    assert.match(SEC, /fetch\('\/api\/account\/sessions', \{ method: 'POST' \}\)/);
+    assert.match(SEC, /This is the only signed-in device\./);
+    assert.match(SEC, /Other devices were signed out\./);
   });
 
   it('Change on the password row opens the change sheet', () => {
@@ -67,6 +73,19 @@ describe('Security', () => {
   it('keeps the legal links and sign out', () => {
     for (const href of ['/docs', '/terms', '/privacy']) assert.ok(SEC.includes(`href="${href}"`), href);
     assert.match(PAGE, /onSignOut=\{\(\) => void onSignOut\(\)\}/);
+  });
+});
+
+describe('POST /api/account/sessions', () => {
+  const SRC = read('app/api/account/sessions/route.ts');
+
+  it('signs the other devices out and does not return the session secret', () => {
+    assert.match(SRC, /rejectIfCrossOrigin\(req\)/);
+    assert.doesNotMatch(SRC, /requirePassword/);
+    assert.match(SRC, /\.neq\('token_hash', hash\)/);
+    assert.match(SRC, /\.gt\('expires_at', now\)/);
+    assert.match(SRC, /sessions: presentSessions\(rows, getSessionKey\(\) \|\| ''\)/);
+    assert.doesNotMatch(SRC, /NextResponse\.json\(\{[^}]*token_hash/);
   });
 });
 

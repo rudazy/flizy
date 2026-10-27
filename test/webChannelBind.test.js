@@ -167,13 +167,42 @@ describe('the bind mirror does not drift', () => {
     assert.equal(out.results[1].code, 'ALREADY_LINKED_DIFFERENT');
   });
 
-  it('agrees that chat channels may hold two identities', async () => {
-    const out = await assertNoDrift('whatsapp second LID', [
-      { accountId: ACC_A, channel: 'whatsapp', externalId: WA_LID, rebindPolicy: MOVE },
+  it('agrees that a second WhatsApp is refused and names the number', async () => {
+    const out = await assertNoDrift('whatsapp second number', [
+      {
+        accountId: ACC_A,
+        channel: 'whatsapp',
+        externalId: WA_LID,
+        extraColumns: { phone_e164: '2348012349434' },
+        rebindPolicy: MOVE,
+      },
       { accountId: ACC_A, channel: 'whatsapp', externalId: WA_LID_NEW, rebindPolicy: MOVE },
     ]);
-    assert.equal(out.results[1].outcome, 'LINKED');
-    assert.equal(out.state.identities.length, 2);
+    assert.equal(out.results[1].code, 'ALREADY_LINKED_DIFFERENT');
+    assert.equal(out.results[1].message, 'First disconnect the number ending with 9434');
+    assert.equal(out.state.identities.length, 1);
+  });
+
+  it('agrees that a second Telegram is refused and names the handle', async () => {
+    const out = await assertNoDrift('telegram second bot', [
+      {
+        accountId: ACC_A,
+        channel: 'telegram',
+        externalId: '100200300',
+        displayHandle: 'ludarep',
+        rebindPolicy: MOVE,
+      },
+      {
+        accountId: ACC_A,
+        channel: 'telegram',
+        externalId: '400500600',
+        displayHandle: 'someoneelse',
+        rebindPolicy: MOVE,
+      },
+    ]);
+    assert.equal(out.results[1].code, 'ALREADY_LINKED_DIFFERENT');
+    assert.equal(out.results[1].message, 'First disconnect @ludarep');
+    assert.equal(out.state.identities.length, 1);
   });
 
   it('agrees on the lockout ladder', async () => {
@@ -227,6 +256,8 @@ describe('the mirrored constants match', () => {
   it('pins the same index names on both sides', () => {
     assert.equal(web.IDENTITY_UNIQUE_INDEX, bot.IDENTITY_UNIQUE_INDEX);
     assert.equal(web.ACCOUNT_PLATFORM_UNIQUE_INDEX, bot.ACCOUNT_PLATFORM_UNIQUE_INDEX);
+    assert.equal(web.ACCOUNT_CHAT_UNIQUE_INDEX, bot.ACCOUNT_CHAT_UNIQUE_INDEX);
+    assert.equal(bot.ACCOUNT_CHAT_UNIQUE_INDEX, 'channel_identities_account_chat_idx');
   });
 
   it('agrees on outcomes, events and policies', () => {

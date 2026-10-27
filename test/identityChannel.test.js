@@ -245,4 +245,43 @@ describe('link codes bind any channel', () => {
     const rows = await listIdentitiesForAccount('acc-a');
     assert.equal(rows.length, 2);
   });
+
+  it('refuses a second Telegram and names the one already linked', async () => {
+    seedCode('TG000001', 'acc-a');
+    seedCode('TG000002', 'acc-a');
+
+    const first = await consumeLinkCode(CHANNELS.TELEGRAM, TG_ID, 'TG000001', null, {
+      displayHandle: 'ludarep',
+    });
+    assert.equal(first.ok, true);
+
+    const second = await consumeLinkCode(CHANNELS.TELEGRAM, '900111222', 'TG000002', null, {
+      displayHandle: 'someoneelse',
+    });
+    assert.equal(second.ok, false);
+    assert.equal(second.reason, 'already_linked');
+    assert.equal(second.message, 'First disconnect @ludarep');
+    assert.equal(fake.db.tables.link_codes[1].used_at, null);
+    assert.equal((await listIdentitiesForAccount('acc-a')).length, 1);
+  });
+
+  it('refuses a second WhatsApp and names the number already linked', async () => {
+    seedCode('WA000001', 'acc-a');
+    seedCode('WA000002', 'acc-a');
+
+    const first = await consumeLinkCode(CHANNELS.WHATSAPP, WA_LID, 'WA000001', '2348012349434');
+    assert.equal(first.ok, true);
+
+    const second = await consumeLinkCode(CHANNELS.WHATSAPP, '216999888777666', 'WA000002', '15550001111');
+    assert.equal(second.ok, false);
+    assert.equal(second.reason, 'already_linked');
+    assert.equal(second.message, 'First disconnect the number ending with 9434');
+    assert.equal(fake.db.tables.link_codes[1].used_at, null);
+  });
+
+  it('the bot replies with that sentence instead of a generic failure', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../lib/router.js'), 'utf8');
+    assert.match(src, /result\.reason === 'already_linked'/);
+    assert.match(src, /result\.message \|\| 'First disconnect the chat already on this account\.'/);
+  });
 });

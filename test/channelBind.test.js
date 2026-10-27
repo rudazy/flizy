@@ -26,6 +26,7 @@ const {
   BindError,
   IDENTITY_UNIQUE_INDEX,
   ACCOUNT_PLATFORM_UNIQUE_INDEX,
+  ACCOUNT_CHAT_UNIQUE_INDEX,
   normalizeDisplayHandle,
   bindChannelIdentity,
   unlinkChannelIdentity,
@@ -268,16 +269,87 @@ describe('one identity per channel', () => {
           externalId: GH_OTHER,
           rebindPolicy: REBIND_POLICY.REJECT,
         }),
-      (err) => err instanceof BindError && err.code === 'ALREADY_LINKED_DIFFERENT'
+      (err) =>
+        err instanceof BindError &&
+        err.code === 'ALREADY_LINKED_DIFFERENT' &&
+        err.message === 'This account already has a different one linked. Unlink it first.'
     );
 
     assert.equal(identities().length, 1);
     assert.ok(eventTypes().includes(IDENTITY_EVENT.LINK_REJECTED_ALREADY_LINKED));
   });
 
-  it('does NOT apply to chat channels, so a changed WhatsApp LID still re-links', async () => {
-    // The reason the DB index is partial. Swapping device gives a new LID, and
-    // redeeming a link code has to be able to insert it alongside the old one.
+  it('refuses a second WhatsApp and does not present the LID as a phone', async () => {
+    await bindChannelIdentity(fake.client, {
+      accountId: ACC_A,
+      channel: 'whatsapp',
+      externalId: WA_LID,
+      rebindPolicy: REBIND_POLICY.MOVE,
+    });
+    await assert.rejects(
+      () =>
+        bindChannelIdentity(fake.client, {
+          accountId: ACC_A,
+          channel: 'whatsapp',
+          externalId: WA_LID_NEW,
+          rebindPolicy: REBIND_POLICY.MOVE,
+        }),
+      (err) => {
+        assert.ok(err instanceof BindError);
+        assert.equal(err.code, 'ALREADY_LINKED_DIFFERENT');
+        assert.equal(err.message, 'First disconnect your WhatsApp.');
+        assert.equal(err.message.includes(WA_LID), false);
+        return true;
+      }
+    );
+    assert.equal(identities().length, 1);
+  });
+
+  it('names the last four digits of the WhatsApp already linked', async () => {
+    await bindChannelIdentity(fake.client, {
+      accountId: ACC_A,
+      channel: 'whatsapp',
+      externalId: WA_LID,
+      extraColumns: { phone_e164: '2348012349434' },
+      rebindPolicy: REBIND_POLICY.MOVE,
+    });
+    await assert.rejects(
+      () =>
+        bindChannelIdentity(fake.client, {
+          accountId: ACC_A,
+          channel: 'whatsapp',
+          externalId: WA_LID_NEW,
+          extraColumns: { phone_e164: '15550001111' },
+          rebindPolicy: REBIND_POLICY.MOVE,
+        }),
+      (err) => err instanceof BindError && err.message === 'First disconnect the number ending with 9434'
+    );
+    assert.equal(identities().length, 1);
+  });
+
+  it('names the Telegram already linked', async () => {
+    await bindChannelIdentity(fake.client, {
+      accountId: ACC_A,
+      channel: 'telegram',
+      externalId: '100200300',
+      displayHandle: 'ludarep',
+      rebindPolicy: REBIND_POLICY.MOVE,
+    });
+    await assert.rejects(
+      () =>
+        bindChannelIdentity(fake.client, {
+          accountId: ACC_A,
+          channel: 'telegram',
+          externalId: '400500600',
+          displayHandle: 'someoneelse',
+          rebindPolicy: REBIND_POLICY.MOVE,
+        }),
+      (err) => err instanceof BindError && err.message === 'First disconnect @ludarep'
+    );
+    assert.equal(identities().length, 1);
+  });
+
+  it('still accepts the same WhatsApp identity again', async () => {
     await bindChannelIdentity(fake.client, {
       accountId: ACC_A,
       channel: 'whatsapp',
@@ -287,12 +359,11 @@ describe('one identity per channel', () => {
     const res = await bindChannelIdentity(fake.client, {
       accountId: ACC_A,
       channel: 'whatsapp',
-      externalId: WA_LID_NEW,
+      externalId: WA_LID,
       rebindPolicy: REBIND_POLICY.MOVE,
     });
-
-    assert.equal(res.outcome, BIND_OUTCOME.LINKED);
-    assert.equal(identities().length, 2, 'both LIDs live on the account');
+    assert.equal(res.outcome, BIND_OUTCOME.ALREADY_LINKED);
+    assert.equal(identities().length, 1);
   });
 });
 
@@ -354,9 +425,27 @@ describe('races, told apart by which unique fired', () => {
     );
   });
 
+  it('maps the one-chat unique to ALREADY_LINKED_DIFFERENT', async () => {
+    const client = raceOn(fake.client, {
+      winnerAccountId: null,
+      index: ACCOUNT_CHAT_UNIQUE_INDEX,
+    });
+    await assert.rejects(
+      () =>
+        bindChannelIdentity(client, {
+          accountId: ACC_A,
+          channel: 'whatsapp',
+          externalId: WA_LID,
+          rebindPolicy: REBIND_POLICY.MOVE,
+        }),
+      (err) => err.code === 'ALREADY_LINKED_DIFFERENT'
+    );
+  });
+
   it('pins the index names the migrations create', () => {
     assert.equal(IDENTITY_UNIQUE_INDEX, 'channel_identities_channel_external_idx');
     assert.equal(ACCOUNT_PLATFORM_UNIQUE_INDEX, 'channel_identities_account_platform_idx');
+    assert.equal(ACCOUNT_CHAT_UNIQUE_INDEX, 'channel_identities_account_chat_idx');
   });
 });
 

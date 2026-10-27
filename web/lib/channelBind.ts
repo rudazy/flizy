@@ -41,10 +41,10 @@ export const CHANNELS = {
 const KNOWN_CHANNELS = new Set<string>(Object.values(CHANNELS));
 
 /**
- * Channels where an account may hold at most one identity. Chat channels are
- * excluded so a changed WhatsApp LID can still be re-linked alongside the old
- * one. The database says the same thing: channel_identities_account_platform_idx
- * is partial over exactly this set.
+ * Platform channels, where an account may hold at most one identity.
+ * WhatsApp and Telegram are also one per account. That check is onePerAccount
+ * below, backed by channel_identities_account_chat_idx. A second chat on the
+ * same app is refused until the existing one is unlinked.
  */
 const PLATFORM_CHANNELS = new Set<string>([CHANNELS.X, CHANNELS.GITHUB, CHANNELS.DISCORD]);
 
@@ -120,6 +120,7 @@ const ATTEMPTS_TABLE = 'identity_bind_attempts';
 
 export const IDENTITY_UNIQUE_INDEX = 'channel_identities_channel_external_idx';
 export const ACCOUNT_PLATFORM_UNIQUE_INDEX = 'channel_identities_account_platform_idx';
+export const ACCOUNT_CHAT_UNIQUE_INDEX = 'channel_identities_account_chat_idx';
 
 export const BIND_OUTCOME = {
   LINKED: 'LINKED',
@@ -175,8 +176,27 @@ function isUniqueViolation(error: any): boolean {
 function violatedIndex(error: any): string {
   const text = `${error?.message || ''} ${error?.details || ''}`;
   if (text.includes(ACCOUNT_PLATFORM_UNIQUE_INDEX)) return ACCOUNT_PLATFORM_UNIQUE_INDEX;
+  if (text.includes(ACCOUNT_CHAT_UNIQUE_INDEX)) return ACCOUNT_CHAT_UNIQUE_INDEX;
   if (text.includes(IDENTITY_UNIQUE_INDEX)) return IDENTITY_UNIQUE_INDEX;
   return '';
+}
+
+function onePerAccount(channel: string): boolean {
+  return isPlatformChannel(channel) || channel === 'whatsapp' || channel === 'telegram';
+}
+
+function firstDisconnectMessage(channel: string, held: { display_handle?: string | null; phone_e164?: string | null } | null): string {
+  if (channel === 'telegram') {
+    const handle = normalizeDisplayHandle(held && held.display_handle);
+    if (handle && /^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(handle)) return `First disconnect @${handle}`;
+    return 'First disconnect your Telegram.';
+  }
+  if (channel === 'whatsapp') {
+    const digits = String((held && held.phone_e164) || '').replace(/\D/g, '');
+    if (digits.length >= 4) return `First disconnect the number ending with ${digits.slice(-4)}`;
+    return 'First disconnect your WhatsApp.';
+  }
+  return 'This account already has a different one linked. Unlink it first.';
 }
 
 function isMissingRelation(error: any): boolean {
@@ -329,19 +349,18 @@ export async function bindChannelIdentity(supabase: AnyClient, p: BindParams) {
     return resolveCrossAccount(supabase, existing, ctx);
   }
 
-  if (isPlatformChannel(channel)) {
-    const { data: held, error } = await supabase
+  if (onePerAccount(channel)) {
+    const { data: heldRows, error } = await supabase
       .from(IDENTITY_TABLE)
-      .select('external_id')
+      .select('external_id, display_handle, phone_e164')
       .eq('account_id', accountId)
       .eq('channel', channel)
-      .maybeSingle();
+      .limit(5);
     if (error && !isMissingRelation(error)) {
       throw new Error(`identity lookup failed: ${error.message}`);
     }
-    if (held && normalizeExternalId(held.external_id) !== externalId) {
-      return rejectAlreadyLinked(supabase, ctx);
-    }
+    const other = (heldRows || []).find((row: { external_id?: string }) => normalizeExternalId(row.external_id) !== externalId);
+    if (other) return rejectAlreadyLinked(supabase, ctx);
   }
 
   const row: Record<string, unknown> = {
@@ -368,7 +387,8 @@ export async function bindChannelIdentity(supabase: AnyClient, p: BindParams) {
     throw new Error(`identity bind failed: ${insertErr.message}`);
   }
 
-  if (violatedIndex(insertErr) === ACCOUNT_PLATFORM_UNIQUE_INDEX) {
+  const hit = violatedIndex(insertErr);
+  if (hit === ACCOUNT_PLATFORM_UNIQUE_INDEX || hit === ACCOUNT_CHAT_UNIQUE_INDEX) {
     return rejectAlreadyLinked(supabase, ctx);
   }
 
@@ -438,10 +458,18 @@ async function resolveCrossAccount(supabase: AnyClient, existing: any, ctx: Ctx)
 async function rejectAlreadyLinked(supabase: AnyClient, ctx: Ctx): Promise<never> {
   await recordRejectedBind(supabase, ctx.accountId);
   await logIdentityEvent(supabase, { ...ctx, eventType: IDENTITY_EVENT.LINK_REJECTED_ALREADY_LINKED });
-  throw new BindError(
-    'ALREADY_LINKED_DIFFERENT',
-    'This account already has a different one linked. Unlink it first.'
-  );
+  const { data, error } = await supabase
+    .from(IDENTITY_TABLE)
+    .select('display_handle, phone_e164')
+    .eq('account_id', ctx.accountId)
+    .eq('channel', ctx.channel)
+    .limit(5);
+  if (error && !isMissingRelation(error)) {
+    throw new Error(`identity lookup failed: ${error.message}`);
+  }
+  const rows = data || [];
+  const held = rows.find((row: { display_handle?: string | null; phone_e164?: string | null }) => row.display_handle || row.phone_e164) || rows[0] || null;
+  throw new BindError('ALREADY_LINKED_DIFFERENT', firstDisconnectMessage(ctx.channel, held));
 }
 
 /**

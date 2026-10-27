@@ -11,9 +11,10 @@
  * and the user logs in again.
  */
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { createHash, randomBytes } from 'crypto';
 import { getSupabase } from './supabase';
+import { isMissingSessionColumn, sessionClientFrom } from './sessionClient';
 import {
   LOGIN_DEVICE_COOKIE,
   LOGIN_DEVICE_TTL_MS,
@@ -74,11 +75,26 @@ export async function createSession(accountId: string, sink?: SessionCookieSink)
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
   const supabase = getSupabase();
-  const { error } = await supabase.from('web_sessions').insert({
+  const row: Record<string, string> = {
     account_id: accountId,
     token_hash: hashToken(token),
     expires_at: expiresAt.toISOString(),
-  });
+  };
+  try {
+    const seen = sessionClientFrom(headers());
+    if (seen.label) row.client_label = seen.label;
+    if (seen.place) row.client_place = seen.place;
+  } catch {
+    // No request headers, for example a script. The session still opens.
+  }
+  let { error } = await supabase.from('web_sessions').insert(row);
+  if (error && isMissingSessionColumn(error)) {
+    ({ error } = await supabase.from('web_sessions').insert({
+      account_id: accountId,
+      token_hash: row.token_hash,
+      expires_at: row.expires_at,
+    }));
+  }
   if (error) throw new Error(`Could not start session: ${error.message}`);
 
   const jar = sink ? sink.cookies : cookies();

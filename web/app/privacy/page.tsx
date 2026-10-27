@@ -92,7 +92,9 @@ export default function PrivacyPage() {
             </li>
             <li>
               <span className="text-paper">Session cookies.</span> A logged-in session cookie
-              on the site. Continue with Google also sets a cookie for ten minutes. It
+              on the site. While that sign-in lasts we keep a short name for the device,
+              and the city when the host provides one. We do not keep the network address.
+              Continue with Google also sets a cookie for ten minutes. It
               carries the sign-in check and the page to open afterwards. It does not hold
               your email or a Google token. If you open an invite or a claim that carries
               an invite, a short invite cookie so signup can attribute you once. One cookie

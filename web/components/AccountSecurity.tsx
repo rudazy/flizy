@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { validatePassword } from '../lib/passwordPolicy';
 import { HeroArt, PREF_CARD, PrefHero } from './AccountPrefs';
 import { txPin } from '../lib/txPin';
+import { ChevronDownIcon } from './ExploreIcons';
 import {
   ChevronGlyph,
   FieldLabel,
@@ -544,7 +545,7 @@ export function SecurityPanel({
             }
           />
           <SettingRow icon={<ShieldGlyph />} title="Two-step verification" text="An extra check when you sign in." status="Not available yet" muted />
-          <SettingRow icon={<ScreenGlyph />} title="Active sessions" text="See and sign out other devices." status="Not available yet" muted />
+          <ActiveSessions />
         </div>
 
         {wallet}
@@ -673,6 +674,137 @@ function SectionLabel({ children }: { children: ReactNode }) {
 }
 
 /** A setting: its state, and its control when one exists. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+type SessionRow = {
+  id: string;
+  label: string | null;
+  place: string | null;
+  createdAt: string;
+  current: boolean;
+};
+
+function signedInOn(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * Every live sign-in for this account. Disconnecting others leaves this browser
+ * signed in. The list is the device name and, when the host sent one, the city.
+ */
+function ActiveSessions() {
+  const [sessions, setSessions] = useState<SessionRow[] | null>(null);
+  const [problem, setProblem] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let gone = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/account/sessions', { cache: 'no-store' });
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body || !Array.isArray(body.sessions)) {
+          if (!gone) setProblem('Sessions could not be loaded.');
+          return;
+        }
+        if (!gone) setSessions(body.sessions);
+      } catch {
+        if (!gone) setProblem('Sessions could not be loaded.');
+      }
+    })();
+    return () => {
+      gone = true;
+    };
+  }, []);
+
+  const others = sessions ? sessions.filter((row) => !row.current).length : 0;
+  const onlyHere = sessions !== null && others === 0;
+
+  async function disconnect() {
+    if (busy || onlyHere) return;
+    setBusy(true);
+    setProblem('');
+    setNote('');
+    try {
+      const res = await fetch('/api/account/sessions', { method: 'POST' });
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body || body.ok !== true) {
+        setProblem('Could not sign out the other devices.');
+        return;
+      }
+      setSessions((rows) => (rows || []).filter((row) => row.current));
+      if (Number(body.removed) > 0) setNote('Other devices were signed out.');
+    } catch {
+      setProblem('Could not sign out the other devices.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const count =
+    !sessions || sessions.length === 0
+      ? ''
+      : sessions.length === 1
+        ? '1 device'
+        : `${sessions.length} devices`;
+
+  return (
+    <details className="group rounded-[16px] border border-[#26262a] bg-[#0f0f10]">
+      <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-4 p-4 text-left [&::-webkit-details-marker]:hidden">
+        <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[12px] bg-[#2a2210] text-sun" aria-hidden>
+          <ScreenGlyph />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-sans text-[15.5px] font-semibold text-white">Active sessions</span>
+          <span className="mt-0.5 block font-sans text-[13px] leading-[1.5] text-[#9a958c]">See and sign out other devices.</span>
+        </span>
+        {count ? <span className="shrink-0 font-sans text-[12px] text-[#9a958c]">{count}</span> : null}
+        <ChevronDownIcon size={16} className="shrink-0 text-[#9a958c] transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="grid gap-3 border-t border-[#26262a] px-4 pb-4 pt-3">
+        {problem ? <p className="m-0 font-sans text-[13px] text-[#f87171]">{problem}</p> : null}
+        {sessions === null && !problem ? <p className="m-0 font-sans text-[13px] text-[#9a958c]">Loading sessions.</p> : null}
+        {sessions && sessions.length > 0 ? (
+          <ul className="m-0 grid list-none gap-2 p-0">
+            {sessions.map((row) => {
+              const when = signedInOn(row.createdAt);
+              return (
+                <li key={row.id} className="rounded-[12px] border border-[#26262a] bg-[#141416] px-3 py-2.5">
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 font-sans text-[14px] font-medium text-white">
+                      {row.label || (row.current ? 'This browser' : 'Another device')}
+                    </span>
+                    {row.current ? (
+                      <span className="shrink-0 rounded-full border border-[#5a4a1f] px-2 py-0.5 font-sans text-[11px] text-sun">
+                        This device
+                      </span>
+                    ) : null}
+                  </span>
+                  {row.place ? <span className="mt-0.5 block font-sans text-[13px] text-[#d9d4ca]">{row.place}</span> : null}
+                  {when ? <span className="mt-0.5 block font-sans text-[12px] text-[#9a958c]">Signed in {when}</span> : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+        {onlyHere ? <p className="m-0 font-sans text-[13px] text-[#9a958c]">This is the only signed-in device.</p> : null}
+        {note ? <p className="m-0 font-sans text-[13px] text-[#d9d4ca]">{note}</p> : null}
+        <button
+          type="button"
+          onClick={() => void disconnect()}
+          disabled={busy || sessions === null || onlyHere}
+          className="inline-flex h-[44px] w-full items-center justify-center rounded-[10px] border border-[#5a4a1f] px-4 font-sans text-[14px] font-medium text-sun hover:border-sun/70 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? 'Signing out...' : 'Disconnect all other sessions'}
+        </button>
+      </div>
+    </details>
+  );
+}
+
 function SettingRow({
   icon,
   title,
