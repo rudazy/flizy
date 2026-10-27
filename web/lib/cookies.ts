@@ -47,11 +47,29 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
+type SessionCookieSink = {
+  cookies: {
+    set: (
+      name: string,
+      value: string,
+      options: {
+        httpOnly?: boolean;
+        secure?: boolean;
+        sameSite?: 'lax' | 'strict' | 'none';
+        path?: string;
+        maxAge?: number;
+      }
+    ) => void;
+  };
+};
+
 /**
  * Start a session for an account and set the cookie.
+ * Pass a redirect response when the caller returns NextResponse.redirect.
+ * cookies().set on its own does not reliably ride along with that redirect.
  * Returns nothing useful on purpose: the token is for the browser only.
  */
-export async function createSession(accountId: string): Promise<void> {
+export async function createSession(accountId: string, sink?: SessionCookieSink): Promise<void> {
   const token = randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
@@ -63,7 +81,7 @@ export async function createSession(accountId: string): Promise<void> {
   });
   if (error) throw new Error(`Could not start session: ${error.message}`);
 
-  const jar = cookies();
+  const jar = sink ? sink.cookies : cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
     // Off in local dev, where Next serves plain http and a secure cookie would

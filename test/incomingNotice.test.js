@@ -125,15 +125,13 @@ describe('incoming payment wiring', () => {
     }
   });
 
-  it('email sign-in next to the wallet uses the existing form', () => {
+  it('email sign-in stays the form at the top', () => {
     const login = read('web/app/login/LoginForm.tsx');
-    const email = login.indexOf('title="Continue with email"');
-    const wallet = login.indexOf("title={walletDoor.busy ? 'Connecting...' : 'Continue with a wallet'}");
-    assert.ok(email > 0 && wallet > email);
-    assert.match(login, /Sign in to your Flizy account/);
-    assert.match(login, /getElementById\('desk-email'\)/);
-    assert.match(login, /form\.requestSubmit\(\)/);
-    assert.doesNotMatch(login.slice(email, wallet), /showSoon\(/);
+    assert.match(login, /id="desk-email"/);
+    assert.match(login, /id="desk-password"/);
+    assert.match(login, /type="submit"/);
+    assert.doesNotMatch(login, /Continue with email/);
+    assert.doesNotMatch(login, /continueWithEmail/);
   });
 
   it('the bot route checks the bearer secret before it reads the body', () => {

@@ -10,6 +10,7 @@ import { PasswordField } from '../../components/PasswordField';
 import { track } from '../../lib/analytics';
 import { clearAppearanceCache } from '../../lib/appearanceCache';
 import type { LocaleCode } from '../../lib/locale';
+import { googleLoginError } from '../../lib/googleLoginCopy.ts';
 import { safeNext } from '../../lib/safeNext.ts';
 import { useWalletDoor } from '../../components/WalletModeBits';
 
@@ -37,6 +38,8 @@ export function LoginForm() {
     if (account === 'deleted' || account === 'deactivated') {
       setAccountNote('This account is paused. Enter the same email and the account password to bring it back.');
     }
+    const google = googleLoginError(params.get('google'));
+    if (google) setError(google);
   }, []);
 
   const paneRef = useRef<HTMLDivElement | null>(null);
@@ -119,21 +122,12 @@ export function LoginForm() {
     }
   }
 
-  function continueWithEmail() {
-    const emailInput = document.getElementById('desk-email');
-    const passwordInput = document.getElementById('desk-password');
-    const form = emailInput?.closest('form');
-    const emailValue = emailInput instanceof HTMLInputElement ? emailInput.value.trim() : '';
-    const passwordValue = passwordInput instanceof HTMLInputElement ? passwordInput.value : '';
-    if (emailValue && passwordValue && form instanceof HTMLFormElement) {
-      form.requestSubmit();
-      return;
-    }
-    const target = emailValue ? passwordInput : emailInput;
-    if (target instanceof HTMLElement) {
-      target.focus();
-      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
+  function continueWithGoogle() {
+    const params = new URLSearchParams(window.location.search);
+    const next = safeNext(params.get('next'));
+    const q = new URLSearchParams({ back: 'login' });
+    if (next !== '/dashboard') q.set('next', next);
+    window.location.assign(`/api/auth/google/start?${q.toString()}`);
   }
 
   async function resendCode() {
@@ -325,13 +319,7 @@ export function LoginForm() {
             <SoonRow
               icon={<GoogleMark />}
               title="Continue with Google"
-              onClick={() => showSoon('Continue with Google')}
-            />
-            <SoonRow
-              icon={<MailMark />}
-              title="Continue with email"
-              note="Sign in to your Flizy account"
-              onClick={continueWithEmail}
+              onClick={continueWithGoogle}
             />
             <SoonRow
               icon={<WalletMark />}
@@ -475,15 +463,6 @@ function ArrowMark() {
   return (
     <Mark>
       <path d="M5 12h12M13 7l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </Mark>
-  );
-}
-
-function MailMark() {
-  return (
-    <Mark>
-      <rect x="3.5" y="5.5" width="17" height="13" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m4 7 8 6 8-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </Mark>
   );
 }

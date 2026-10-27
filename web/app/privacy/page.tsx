@@ -61,7 +61,9 @@ export default function PrivacyPage() {
             <li>
               <span className="text-paper">Email and verification codes.</span> Registration
               email, optional extra emails, and short-lived codes that prove you control that
-              inbox.
+              inbox. If you choose Continue with Google, Google tells us the verified email
+              on that Google account. We use it to find your Flizy account. We do not store
+              a Google access token.
             </li>
             <li>
               <span className="text-paper">Phone number.</span> Only when you prove it in
@@ -90,9 +92,11 @@ export default function PrivacyPage() {
             </li>
             <li>
               <span className="text-paper">Session cookies.</span> A logged-in session cookie
-              on the site. If you open an invite or a claim that carries an invite, a short
-              invite cookie so signup can attribute you once. One cookie recording your
-              analytics answer, set whichever way you answer.
+              on the site. Continue with Google also sets a cookie for ten minutes. It
+              carries the sign-in check and the page to open afterwards. It does not hold
+              your email or a Google token. If you open an invite or a claim that carries
+              an invite, a short invite cookie so signup can attribute you once. One cookie
+              recording your analytics answer, set whichever way you answer.
             </li>
             <li>
               <span className="text-paper">Chat link.</span> One-time link codes and the
@@ -205,7 +209,8 @@ export default function PrivacyPage() {
           <LegalH id="share">Who it is shared with</LegalH>
           <p>
             We pass account data only to the services that run Flizy: Supabase (database) and
-            our email sender for verification codes and payment notices. If you accepted analytics, the measurement
+            our email sender for verification codes and payment notices. Continue with Google
+            sends you to Google, which receives that sign-in request. If you accepted analytics, the measurement
             services named above also receive the site usage described there, and nothing else.
             We do not sell it. We do not use advertising pixels.
           </p>
@@ -273,7 +278,9 @@ export default function PrivacyPage() {
             Deactivate is the only way to close the sign-in. It pauses the account.
             Sign in later with the same email and the account password and that same
             account opens again, including the wallet and the history. A new browser
-            still asks for the emailed code before the pause is lifted. Chat does not
+            still asks for the emailed code before the pause is lifted. Continue with
+            Google opens that same account when Google has verified the same email,
+            without the password and without that code. Chat does not
             run while the account is paused. Payments sent to the username or Flizy
             number can still arrive. The button does not move funds. Confirmed chain
             transactions stay on the chain.

@@ -20,11 +20,13 @@ export default async function LoginPage({
   searchParams?: { next?: string; door?: string };
 }) {
   if (await getAccountIdFromCookie()) redirect(safeNext(searchParams?.next));
-  // Email and password sign in on this page. "Continue with email" uses that form.
+  // Email and password sign in on this page, in the form above the other options.
   // door=password is the same form, so an older link still lands here.
-  // Google and a passkey say Coming soon. "Continue with a wallet" connects the
-  // visitor's own wallet for wallet mode (components/ExternalWalletProvider.tsx);
-  // it signs nobody in. The Privy login door is not mounted.
+  // "Continue with Google" starts Google sign-in for an account that already
+  // verified that email. A passkey says Coming soon. "Continue with a wallet"
+  // connects the visitor's own wallet for wallet mode
+  // (components/ExternalWalletProvider.tsx); it signs nobody in. The Privy
+  // login door is not mounted.
   return (
     <ExternalWalletProvider>
       <LoginForm />

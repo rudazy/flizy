@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthStage } from '../../components/AuthStage';
-import { useComingSoon } from '../../components/ComingSoon';
 import { useWalletDoor } from '../../components/WalletModeBits';
 import { PasswordField } from '../../components/PasswordField';
 import { LanguageSelect, useLocale } from '../../components/LocaleProvider';
@@ -12,6 +11,7 @@ import { track } from '../../lib/analytics';
 import { clearAppearanceCache } from '../../lib/appearanceCache';
 import { passwordChecklist, validatePassword } from '../../lib/passwordPolicy';
 import type { LocaleCode } from '../../lib/locale';
+import { googleLoginError } from '../../lib/googleLoginCopy.ts';
 import { safeNext } from '../../lib/safeNext.ts';
 import { HONEYPOT_FIELD } from '../../lib/honeypot.ts';
 import { SITE_PHONE_COUNTRIES } from '../../lib/phoneFormat';
@@ -40,11 +40,11 @@ export function SignupForm() {
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState('');
   const [notice, setNotice] = useState('');
-  const [showSoon, soonNote] = useComingSoon();
-
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     setNext(safeNext(q.get('next'), '/dashboard?welcome=1'));
+    const google = googleLoginError(q.get('google'));
+    if (google) setError(google);
     const fromQuery = (q.get('invite') || q.get('i') || '').replace(/^@/, '');
     if (fromQuery) {
       setInviteCode(fromQuery);
@@ -176,7 +176,6 @@ export function SignupForm() {
 
   return (
     <>
-    {soonNote}
     <div ref={paneRef} className="fixed inset-x-0 bottom-0 top-[109px] z-30 overflow-y-auto bg-[#07060a] font-sans text-paper lg:top-[71px]">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div className="absolute left-[4%] top-[4%] h-[520px] w-[520px] rounded-full border border-sun/10" />
@@ -430,7 +429,12 @@ export function SignupForm() {
             </div>
             <button
               type="button"
-              onClick={() => showSoon('Continue with Google')}
+              onClick={() => {
+                const q = new URLSearchParams({ back: 'signup' });
+                const dest = safeNext(new URLSearchParams(window.location.search).get('next'), '/dashboard?welcome=1');
+                if (dest !== '/dashboard') q.set('next', dest);
+                window.location.assign(`/api/auth/google/start?${q.toString()}`);
+              }}
               className="flex min-h-[52px] w-full items-center justify-center gap-3 rounded-[6px] border border-[#3a3228] bg-[#100e0b] px-4 text-[14px] text-paper shadow-[inset_0_1px_0_rgba(247,208,71,0.06)] hover:border-sun/50"
             >
               <GoogleG />
