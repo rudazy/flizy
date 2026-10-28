@@ -271,10 +271,12 @@ describe('Scan username visibility', () => {
     assert.doesNotMatch(route, /names\.set\(String\(owner\.id\), owner\.username/);
   });
 
-  it('the setting is a real switch saved by its own route', () => {
+  it('the account switch saves through the follow route, and the scan route still writes the column', () => {
     const ui = fs.readFileSync(path.join(__dirname, '..', 'web', 'components', 'AccountProfile.tsx'), 'utf8');
     assert.match(ui, /role="switch"/);
-    assert.match(ui, /fetch\('\/api\/account\/scan-visibility', \{\s*method: 'POST'/);
+    assert.match(ui, /showUsername/);
+    assert.match(ui, /fetch\('\/api\/follow'/);
+    assert.doesNotMatch(ui, /\/api\/account\/scan-visibility/);
     const api = fs.readFileSync(path.join(__dirname, '..', 'web', 'app', 'api', 'account', 'scan-visibility', 'route.ts'), 'utf8');
     assert.match(api, /typeof body\?\.showUsername !== 'boolean'/);
     assert.match(api, /rejectIfCrossOrigin\(req\)/);

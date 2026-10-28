@@ -138,38 +138,6 @@ function Row({
   );
 }
 
-function SoonToggle({
-  on,
-  label,
-  icon,
-  onSoon,
-}: {
-  on: boolean;
-  label: string;
-  icon: ReactNode;
-  onSoon: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSoon}
-      aria-label={`${label}. Not available yet.`}
-      className="hit-y-44 flex min-h-[44px] w-full items-center gap-3 border-t border-[#26262a] px-3.5 py-2 text-left"
-    >
-      <span className="text-[#c8c2b8]">{icon}</span>
-      <span className="min-w-0 flex-1 truncate font-sans text-[13px] text-[#f3f1ec]">{label}</span>
-      <span
-        className={`relative h-[22px] w-[40px] shrink-0 rounded-full ${on ? 'bg-[#f7d047]' : 'bg-[#3a3a3e]'}`}
-        aria-hidden
-      >
-        <span
-          className={`absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white ${on ? 'left-[20px]' : 'left-[2px]'}`}
-        />
-      </span>
-    </button>
-  );
-}
-
 /** A saved profile switch. Disabled until the account's own follow row has loaded. */
 function FlagSwitch({
   on,
@@ -208,86 +176,45 @@ function FlagSwitch({
 }
 
 /**
- * "Show username on Scan": a real setting, off by default, saved as soon as it
- * is flipped. Off, Scan never shows the @username: payments to this account
- * show its short wallet address, and its own payments show only how they
- * travelled.
+ * "Show username on Scan". Off, Scan never shows the @username: payments to
+ * this account show its short wallet address, and its own payments show only
+ * how they travelled.
  */
-function ScanUsernameToggle() {
-  const [on, setOn] = useState<boolean | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let live = true;
-    // A request that never answers would leave this on Loading for good.
-    const abort = new AbortController();
-    const timer = window.setTimeout(() => abort.abort(), 10000);
-    fetch('/api/account/scan-visibility', { signal: abort.signal })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
-        if (live && res.ok && typeof data.showUsername === 'boolean') setOn(data.showUsername);
-        else if (live) setError('Could not load this setting.');
-      })
-      .catch(() => live && setError('Could not load this setting. Reload to try again.'))
-      .finally(() => window.clearTimeout(timer));
-    return () => {
-      live = false;
-      window.clearTimeout(timer);
-      abort.abort();
-    };
-  }, []);
-
-  async function flip() {
-    if (on == null || busy) return;
-    const next = !on;
-    setBusy(true);
-    setError('');
-    try {
-      const res = await fetch('/api/account/scan-visibility', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ showUsername: next }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || typeof data.showUsername !== 'boolean') throw new Error();
-      setOn(data.showUsername);
-    } catch {
-      setError('That did not save. Try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
+function ScanUsernameToggle({
+  on,
+  disabled,
+  onClick,
+}: {
+  on: boolean | null;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div className="border-t border-[#26262a]">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on === true}
-        disabled={on == null || busy}
-        onClick={() => void flip()}
-        className="hit-y-44 flex min-h-[44px] w-full items-center gap-3 px-3.5 py-2 text-left disabled:opacity-60"
-      >
-        <span className="text-[#c8c2b8]">
-          <ScanIcon size={16} />
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on === true}
+      disabled={disabled || on == null}
+      onClick={onClick}
+      className="hit-y-44 flex min-h-[44px] w-full items-center gap-3 border-t border-[#26262a] px-3.5 py-2 text-left disabled:opacity-60"
+    >
+      <span className="text-[#c8c2b8]">
+        <ScanIcon size={16} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-sans text-[13px] text-[#f3f1ec]">Show username on Scan</span>
+        <span className="block font-sans text-[11.5px] leading-[16px] text-[#8f8a82]">
+          {on === null
+            ? 'Loading...'
+            : on
+              ? 'On: your @username shows on payments you send and receive.'
+              : 'Off: Scan shows your short wallet address, never your username.'}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-sans text-[13px] text-[#f3f1ec]">Show username on Scan</span>
-          <span className="block font-sans text-[11.5px] leading-[16px] text-[#8f8a82]">
-            {on === null
-              ? error || 'Loading...'
-              : on
-                ? 'On: your @username shows on payments you send and receive.'
-                : 'Off: Scan shows your short wallet address, never your username.'}
-          </span>
-        </span>
-        <span className={`relative h-[22px] w-[40px] shrink-0 rounded-full ${on ? 'bg-[#f7d047]' : 'bg-[#3a3a3e]'}`} aria-hidden>
-          <span className={`absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white ${on ? 'left-[20px]' : 'left-[2px]'}`} />
-        </span>
-      </button>
-      {error && on !== null ? <p className="m-0 px-3.5 pb-2 font-sans text-[11.5px] text-[#e0b070]">{error}</p> : null}
-    </div>
+      </span>
+      <span className={`relative h-[22px] w-[40px] shrink-0 rounded-full ${on ? 'bg-[#f7d047]' : 'bg-[#3a3a3e]'}`} aria-hidden>
+        <span className={`absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white ${on ? 'left-[20px]' : 'left-[2px]'}`} />
+      </span>
+    </button>
   );
 }
 
@@ -303,9 +230,23 @@ function CopyGlyph() {
 type OwnSocial = {
   followers: number;
   following: number;
+  profilePublic: boolean;
   showSocial: boolean;
   showStats: boolean;
   showActivity: boolean;
+  showWallet: boolean;
+  showPortfolio: boolean;
+  showUsername: boolean;
+};
+
+type SocialPatch = {
+  profilePublic?: boolean;
+  showSocial?: boolean;
+  showStats?: boolean;
+  showActivity?: boolean;
+  showWallet?: boolean;
+  showPortfolio?: boolean;
+  showUsername?: boolean;
 };
 
 function useOwnSocial() {
@@ -316,19 +257,13 @@ function useOwnSocial() {
   useEffect(() => {
     let live = true;
     const abort = new AbortController();
-    const timer = window.setTimeout(() => abort.abort(), 10000);
+    const timer = window.setTimeout(() => abort.abort(), 30000);
     fetch('/api/follow', { signal: abort.signal })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!live) return;
         if (res.ok && typeof data.followers === 'number' && typeof data.following === 'number') {
-          setSocial({
-            followers: data.followers,
-            following: data.following,
-            showSocial: data.showSocial !== false,
-            showStats: data.showStats !== false,
-            showActivity: data.showActivity === true,
-          });
+          setSocial(readSocial(data));
         } else setError(typeof data.error === 'string' ? data.error : 'Could not load follows.');
       })
       .catch(() => {
@@ -342,7 +277,7 @@ function useOwnSocial() {
     };
   }, []);
 
-  async function setFlag(patch: { showSocial?: boolean; showStats?: boolean; showActivity?: boolean }) {
+  async function setFlag(patch: SocialPatch) {
     setBusy(true);
     setError('');
     try {
@@ -356,13 +291,7 @@ function useOwnSocial() {
         setError(typeof data.error === 'string' ? data.error : 'Could not save that.');
         return;
       }
-      setSocial({
-        followers: data.followers,
-        following: data.following,
-        showSocial: data.showSocial !== false,
-        showStats: data.showStats !== false,
-        showActivity: data.showActivity === true,
-      });
+      setSocial(readSocial(data));
     } catch {
       setError('Could not save that.');
     } finally {
@@ -371,6 +300,88 @@ function useOwnSocial() {
   }
 
   return { social, error, busy, setFlag };
+}
+
+function readSocial(data: {
+  followers: number;
+  following: number;
+  profilePublic?: boolean;
+  showSocial?: boolean;
+  showStats?: boolean;
+  showActivity?: boolean;
+  showWallet?: boolean;
+  showPortfolio?: boolean;
+  showUsername?: boolean;
+}): OwnSocial {
+  return {
+    followers: data.followers,
+    following: data.following,
+    profilePublic: data.profilePublic !== false,
+    showSocial: data.showSocial !== false,
+    showStats: data.showStats !== false,
+    showActivity: data.showActivity === true,
+    showWallet: data.showWallet === true,
+    showPortfolio: data.showPortfolio === true,
+    showUsername: data.showUsername === true,
+  };
+}
+
+function VisibilityChoice({
+  value,
+  disabled,
+  onPick,
+}: {
+  value: '' | 'Public' | 'Private';
+  disabled: boolean;
+  onPick: (mode: 'public' | 'private') => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        disabled={disabled || !value}
+        onClick={() => setOpen((next) => !next)}
+        className="hit-y-44 flex min-h-[44px] w-full items-center gap-3 border-t border-[#26262a] px-3.5 py-2 text-left disabled:opacity-60"
+      >
+        <span className="text-[#c8c2b8]">
+          <GlobeIcon size={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-sans text-[13px] text-[#f3f1ec]">Profile visibility</span>
+          <span className="block font-sans text-[11.5px] leading-[16px] text-[#8f8a82]">
+            Private turns these off. Public turns them on.
+          </span>
+        </span>
+        <span className="max-w-[40%] truncate text-right font-sans text-[12px] text-[#b7b1a8]">{value || 'Loading...'}</span>
+        <ChevronDownIcon size={16} className={`shrink-0 text-[#6f6a62] transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && value ? (
+        <div className="grid gap-1 px-3.5 pb-3">
+          {(['public', 'private'] as const).map((mode) => {
+            const label = mode === 'public' ? 'Public' : 'Private';
+            const selected = value === label;
+            return (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => {
+                  setOpen(false);
+                  if (!selected) onPick(mode);
+                }}
+                className="flex min-h-[44px] items-center justify-between rounded-[10px] border border-[#26262a] bg-[#141416] px-3 text-left font-sans text-[13px] text-[#f3f1ec]"
+              >
+                <span>{label}</span>
+                {selected ? <span className="font-sans text-[12px] text-sun">Current</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function AccountProfile({
@@ -679,8 +690,16 @@ export function AccountProfile({
       </Card>
 
       <Card dropdown icon={<EyeIcon size={16} />} title="Privacy & Visibility" hint="Control what others can see of your profile.">
-        <Row icon={<GlobeIcon size={16} />} label="Profile visibility" value="Public" onClick={() => onSoon('Profile visibility')} />
-        <ScanUsernameToggle />
+        <VisibilityChoice
+          value={social ? (social.profilePublic ? 'Public' : 'Private') : ''}
+          disabled={socialState.busy || !social}
+          onPick={(mode) => void socialState.setFlag({ profilePublic: mode === 'public' })}
+        />
+        <ScanUsernameToggle
+          on={social ? social.showUsername : null}
+          disabled={socialState.busy || !social}
+          onClick={() => void socialState.setFlag({ showUsername: !(social && social.showUsername) })}
+        />
         <FlagSwitch
           on={social ? social.showStats : null}
           disabled={socialState.busy || !social}
@@ -702,9 +721,21 @@ export function AccountProfile({
           label="Show activity"
           onClick={() => void socialState.setFlag({ showActivity: !(social && social.showActivity) })}
         />
+        <FlagSwitch
+          on={social ? social.showWallet : null}
+          disabled={socialState.busy || !social}
+          icon={<WalletIcon size={16} />}
+          label="Show wallet address"
+          onClick={() => void socialState.setFlag({ showWallet: !(social && social.showWallet) })}
+        />
+        <FlagSwitch
+          on={social ? social.showPortfolio : null}
+          disabled={socialState.busy || !social}
+          icon={<PieGlyph />}
+          label="Show portfolio value"
+          onClick={() => void socialState.setFlag({ showPortfolio: !(social && social.showPortfolio) })}
+        />
         {socialState.error ? <p className="m-0 px-3.5 py-2 font-sans text-[11.5px] text-[#e0b070]">{socialState.error}</p> : null}
-        <SoonToggle on={false} icon={<WalletIcon size={16} />} label="Show wallet address" onSoon={() => onSoon('Show wallet address')} />
-        <SoonToggle on={false} icon={<PieGlyph />} label="Show portfolio value" onSoon={() => onSoon('Show portfolio value')} />
       </Card>
 
       <Card dropdown icon={<ShieldCheckIcon size={16} />} title="Security" hint="Keep your account safe.">

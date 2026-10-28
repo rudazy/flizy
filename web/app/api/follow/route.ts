@@ -35,15 +35,17 @@ export async function PATCH(req: Request) {
     if (denied) return denied;
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
-    const body = (await req.json().catch(() => null)) as {
-      showSocial?: unknown;
-      showStats?: unknown;
-      showActivity?: unknown;
-    } | null;
-    const showSocial = body?.showSocial;
-    const showStats = body?.showStats;
-    const showActivity = body?.showActivity;
-    const chosen = [showSocial, showStats, showActivity];
+    const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+    const keys = [
+      'profilePublic',
+      'showSocial',
+      'showStats',
+      'showActivity',
+      'showWallet',
+      'showPortfolio',
+      'showUsername',
+    ] as const;
+    const chosen = keys.map((key) => body?.[key]);
     if (!chosen.some((value) => typeof value === 'boolean')) {
       return NextResponse.json({ error: 'Choose on or off.' }, { status: 400 });
     }
@@ -51,9 +53,13 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Choose on or off.' }, { status: 400 });
     }
     const saved = await setProfileVisibility(accountId, {
-      showSocial: typeof showSocial === 'boolean' ? showSocial : undefined,
-      showStats: typeof showStats === 'boolean' ? showStats : undefined,
-      showActivity: typeof showActivity === 'boolean' ? showActivity : undefined,
+      profilePublic: typeof body?.profilePublic === 'boolean' ? body.profilePublic : undefined,
+      showSocial: typeof body?.showSocial === 'boolean' ? body.showSocial : undefined,
+      showStats: typeof body?.showStats === 'boolean' ? body.showStats : undefined,
+      showActivity: typeof body?.showActivity === 'boolean' ? body.showActivity : undefined,
+      showWallet: typeof body?.showWallet === 'boolean' ? body.showWallet : undefined,
+      showPortfolio: typeof body?.showPortfolio === 'boolean' ? body.showPortfolio : undefined,
+      showUsername: typeof body?.showUsername === 'boolean' ? body.showUsername : undefined,
     });
     return NextResponse.json(saved);
   } catch (err) {

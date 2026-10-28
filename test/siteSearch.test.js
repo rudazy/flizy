@@ -145,15 +145,17 @@ describe('live search', () => {
     assert.deepEqual((await run('luda')).people, []);
   });
 
-  it('does not list a paused or removed account', async () => {
+  it('does not list a paused, removed, or private account', async () => {
     fake = createFakeSupabase({
       accounts: [
         { id: 'acc-3', username: 'paused', deactivated_at: '2026-10-01T00:00:00.000Z' },
         { id: 'acc-4', username: 'gone', deleted_at: '2026-10-01T00:00:00.000Z' },
+        { id: 'acc-5', username: 'quiet', profile_public: false },
       ],
     });
     assert.deepEqual((await run('@paused')).people, []);
     assert.deepEqual((await run('@gone')).people, []);
+    assert.deepEqual((await run('@quiet')).people, []);
   });
 
   it('carries no account or owner ids', async () => {

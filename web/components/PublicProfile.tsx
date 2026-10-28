@@ -98,6 +98,9 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
               {profile.displayName ? (
                 <p className="mt-0.5 truncate font-sans text-[13px] text-[#c8c2b8]">{profile.displayName}</p>
               ) : null}
+              {!profile.isSelf && !profile.profilePublic ? (
+                <p className="m-0 mt-1 font-sans text-[13px] text-[#c8c2b8]">This profile is private.</p>
+              ) : null}
             </div>
           </div>
           {profile.isSelf ? (
@@ -109,6 +112,12 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
             </Link>
           ) : null}
         </div>
+        {profile.wallet ? (
+          <p className="relative m-0 mt-3 break-all font-mono text-[12px] leading-snug text-[#c8c2b8]">{profile.wallet}</p>
+        ) : null}
+        {profile.isSelf && !profile.showWallet ? (
+          <p className="relative m-0 mt-2 font-sans text-[12px] text-[#8d867c]">Wallet address is hidden from others.</p>
+        ) : null}
         <div className="relative mt-4 flex items-center gap-4">
           <CountButton value={followers === null ? '-' : String(followers)} label="Followers" onClick={openFollowers} />
           <span className="h-8 w-px bg-[#3a3424]" aria-hidden />
@@ -202,6 +211,14 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
           onClick={openFollowing}
           icon={<PersonMark />}
         />
+        {profile.isSelf || profile.showPortfolio ? (
+          <Stat
+            value={profile.portfolioEth === null ? '-' : formatVolumeEth(profile.portfolioEth)}
+            label="Portfolio"
+            unit={profile.portfolioEth === null ? undefined : 'ETH'}
+            icon={<Bars tone="gold" />}
+          />
+        ) : null}
       </section>
 
       {profile.isSelf && !profile.showSocial ? (
@@ -209,6 +226,9 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
       ) : null}
       {profile.isSelf && !profile.showStats ? (
         <p className="m-0 mt-2 font-sans text-[12px] text-[#8d867c]">Volume and swaps are hidden from others.</p>
+      ) : null}
+      {profile.isSelf && !profile.showPortfolio ? (
+        <p className="m-0 mt-2 font-sans text-[12px] text-[#8d867c]">Portfolio value is hidden from others.</p>
       ) : null}
       </div>
 

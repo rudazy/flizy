@@ -37,6 +37,16 @@ export type ProfilePayload = {
   showStats: boolean;
   /** Owner's switch. Other people see activity only when this is true. */
   showActivity: boolean;
+  /** Owner's switch. Other people see the wallet address only when this is true. */
+  showWallet: boolean;
+  /** Owner's switch. Other people see the ETH balance only when this is true. */
+  showPortfolio: boolean;
+  /** False hides the profile from search. The direct link still opens. */
+  profilePublic: boolean;
+  /** Checksummed address, or null when this viewer must not see it. */
+  wallet: string | null;
+  /** Wallet ETH balance, or null when this viewer must not see it or the read failed. */
+  portfolioEth: number | null;
   followers: number | null;
   followingCount: number | null;
   swaps: number | null;
@@ -154,14 +164,36 @@ export function relativeTime(iso: string, now = Date.now()): string {
   return new Date(t).toISOString().slice(0, 10);
 }
 
+/** Columns written when the account picks Public or Private. */
+export function visibilityPatch(mode: 'public' | 'private'): {
+  profile_public: boolean;
+  profile_show_social: boolean;
+  profile_show_stats: boolean;
+  profile_show_activity: boolean;
+  profile_show_wallet: boolean;
+  profile_show_portfolio: boolean;
+  scan_show_username: boolean;
+} {
+  const on = mode === 'public';
+  return {
+    profile_public: on,
+    profile_show_social: on,
+    profile_show_stats: on,
+    profile_show_activity: on,
+    profile_show_wallet: on,
+    profile_show_portfolio: on,
+    scan_show_username: on,
+  };
+}
+
 /**
  * The profile a browser receives.
  *
- * The owner always sees their own counts, trading figures, and activity.
- * Everyone else sees counts and volume only while those switches are on.
- * Activity stays hidden from everyone else until Show activity is on.
- * Follower counts do not follow the activity switch. Account ids never
- * enter this object. copyTrade is this viewer's saved choice, not a trade.
+ * The owner always sees their own counts, trading figures, activity, wallet
+ * address, and ETH balance. Everyone else sees each of those only while that
+ * switch is on. Follower counts do not follow the activity switch. Account
+ * ids never enter this object. copyTrade is this viewer's saved choice, not
+ * a trade.
  */
 export function publicProfile(input: {
   username: string;
@@ -174,6 +206,11 @@ export function publicProfile(input: {
   showSocial: boolean;
   showStats: boolean;
   showActivity: boolean;
+  showWallet?: boolean;
+  showPortfolio?: boolean;
+  profilePublic?: boolean;
+  wallet?: string | null;
+  portfolioEth?: number | null;
   followers: number;
   followingCount: number;
   swaps: number;
@@ -185,6 +222,8 @@ export function publicProfile(input: {
   const social = input.isSelf || input.showSocial;
   const stats = input.isSelf || input.showStats;
   const activityOpen = input.isSelf || input.showActivity === true;
+  const showWallet = input.showWallet === true;
+  const showPortfolio = input.showPortfolio === true;
   const followedBy = social ? input.followedBy.slice(0, 3) : [];
   return {
     username: input.username,
@@ -197,6 +236,11 @@ export function publicProfile(input: {
     showSocial: input.showSocial,
     showStats: input.showStats,
     showActivity: input.showActivity === true,
+    showWallet,
+    showPortfolio,
+    profilePublic: input.profilePublic !== false,
+    wallet: input.isSelf || showWallet ? publicWallet(input.wallet) : null,
+    portfolioEth: input.isSelf || showPortfolio ? publicEth(input.portfolioEth) : null,
     followers: social ? input.followers : null,
     followingCount: social ? input.followingCount : null,
     swaps: stats ? input.swaps : null,
@@ -206,6 +250,16 @@ export function publicProfile(input: {
     followedByMore: social ? Math.max(0, input.followedBy.length - followedBy.length) : 0,
     followedByCapped: social ? input.followedByCapped : false,
   };
+}
+
+function publicWallet(raw: string | null | undefined): string | null {
+  const text = String(raw || '');
+  return /^0x[a-fA-F0-9]{40}$/.test(text) ? text : null;
+}
+
+function publicEth(raw: number | null | undefined): number | null {
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return null;
+  return raw;
 }
 
 function tradeSymbol(raw: unknown): string {

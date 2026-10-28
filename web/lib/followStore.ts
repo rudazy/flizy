@@ -13,15 +13,24 @@ import {
   publicPerson,
   publicProfile,
   publicSwap,
+  visibilityPatch,
   type ProfilePayload,
   type PublicPerson,
 } from './follows.ts';
+import { profileShare } from './profileShare.ts';
 import { getSupabase } from './supabase.ts';
 import { validateUsername } from './username.ts';
 
-const ACCOUNT_PUBLIC =
-  'id, username, display_name, profile_show_social, profile_show_stats, profile_show_activity';
-const ACCOUNT_COLS = `${ACCOUNT_PUBLIC}, deactivated_at, deleted_at`;
+const CORE = 'id, username, display_name';
+const FLAG_OLD = 'profile_show_social, profile_show_stats, profile_show_activity';
+const FLAG_NEW = 'profile_public, profile_show_wallet, profile_show_portfolio';
+const CLOSURE = 'deactivated_at, deleted_at';
+const ACCOUNT_ATTEMPTS = [
+  `${CORE}, ${FLAG_OLD}, ${FLAG_NEW}, ${CLOSURE}`,
+  `${CORE}, ${FLAG_OLD}, ${FLAG_NEW}`,
+  `${CORE}, ${FLAG_OLD}, ${CLOSURE}`,
+  `${CORE}, ${FLAG_OLD}`,
+];
 
 type Db = ReturnType<typeof getSupabase>;
 
@@ -34,6 +43,9 @@ type AccountHit = {
   profile_show_social: boolean | null;
   profile_show_stats: boolean | null;
   profile_show_activity: boolean | null;
+  profile_public?: boolean | null;
+  profile_show_wallet?: boolean | null;
+  profile_show_portfolio?: boolean | null;
 };
 
 export type FollowWriteResult =
@@ -50,13 +62,36 @@ export type FollowWriteResult =
 export type OwnSocial = {
   followers: number;
   following: number;
+  profilePublic: boolean;
   showSocial: boolean;
   showStats: boolean;
   showActivity: boolean;
+  showWallet: boolean;
+  showPortfolio: boolean;
+  showUsername: boolean;
 };
 
-function mapDb(error: { message?: string } | null): Error {
+export type VisibilityPatch = {
+  profilePublic?: boolean;
+  showSocial?: boolean;
+  showStats?: boolean;
+  showActivity?: boolean;
+  showWallet?: boolean;
+  showPortfolio?: boolean;
+  showUsername?: boolean;
+};
+
+function isMissingProfileColumn(error: { message?: string; code?: string } | null | undefined): boolean {
+  const code = String(error && error.code ? error.code : '');
+  const message = String(error && error.message ? error.message : '');
+  return code === '42703' || code === 'PGRST204' || /profile_public|profile_show_wallet|profile_show_portfolio/.test(message);
+}
+
+function mapDb(error: { message?: string; code?: string } | null): Error {
   const msg = String(error?.message || '');
+  if (/profile_public|profile_show_wallet|profile_show_portfolio/.test(msg)) {
+    return new ClientError('Profile visibility is not available yet.');
+  }
   if (/account_follows|profile_show_social|profile_show_stats|profile_show_activity|copy_trade/i.test(msg)) {
     return new ClientError('Follows are not available yet.');
   }
@@ -68,14 +103,21 @@ function isOpen(row: AccountHit | null | undefined): row is AccountHit {
 }
 
 async function lookup(supabase: Db, username: string): Promise<AccountHit | null> {
-  let result = await supabase.from('accounts').select(ACCOUNT_COLS).eq('username', username).maybeSingle();
-  // Pause columns are optional. When they are absent the account stays open,
-  // which is the same rule the session uses.
-  if (result.error && isMissingClosureColumn(result.error)) {
-    result = (await supabase.from('accounts').select(ACCOUNT_PUBLIC).eq('username', username).maybeSingle()) as typeof result;
+  return oneAccount((cols) => supabase.from('accounts').select(cols).eq('username', username).maybeSingle());
+}
+
+type AccountRead = { data: unknown; error: { message?: string; code?: string } | null };
+
+/** One account row. Newer columns are skipped when this database does not have them yet. */
+async function oneAccount(run: (cols: string) => PromiseLike<AccountRead>): Promise<AccountHit | null> {
+  let last: { message?: string; code?: string } | null = null;
+  for (const cols of ACCOUNT_ATTEMPTS) {
+    const result = await run(cols);
+    if (!result.error) return (result.data as AccountHit | null) ?? null;
+    last = result.error;
+    if (!isMissingClosureColumn(result.error) && !isMissingProfileColumn(result.error)) throw mapDb(result.error);
   }
-  if (result.error) throw mapDb(result.error);
-  return (result.data as AccountHit | null) ?? null;
+  throw mapDb(last);
 }
 
 async function countsFor(supabase: Db, accountId: string): Promise<{ followers: number; followingCount: number }> {
@@ -108,22 +150,35 @@ async function relation(
 async function accountsByIds(supabase: Db, ids: string[]): Promise<Map<string, AccountHit>> {
   const map = new Map<string, AccountHit>();
   if (!ids.length) return map;
-  let result = await supabase.from('accounts').select(ACCOUNT_COLS).in('id', ids);
-  if (result.error && isMissingClosureColumn(result.error)) {
-    result = (await supabase.from('accounts').select(ACCOUNT_PUBLIC).in('id', ids)) as typeof result;
+  let last: { message?: string; code?: string } | null = null;
+  let rows: AccountHit[] = [];
+  for (const cols of ACCOUNT_ATTEMPTS) {
+    const result = await supabase.from('accounts').select(cols).in('id', ids);
+    if (!result.error) {
+      rows = (result.data || []) as unknown as AccountHit[];
+      last = null;
+      break;
+    }
+    last = result.error;
+    if (!isMissingClosureColumn(result.error) && !isMissingProfileColumn(result.error)) throw mapDb(result.error);
   }
-  if (result.error) throw mapDb(result.error);
-  const { data } = result;
-  for (const row of (data || []) as AccountHit[]) map.set(row.id, row);
+  if (last) throw mapDb(last);
+  for (const row of rows) map.set(row.id, row);
   return map;
 }
 
 function peopleFrom(
-  rows: Array<{ username?: string | null; display_name?: string | null; deactivated_at?: string | null; deleted_at?: string | null }>
+  rows: Array<{
+    username?: string | null;
+    display_name?: string | null;
+    deactivated_at?: string | null;
+    deleted_at?: string | null;
+    profile_public?: boolean | null;
+  }>
 ): PublicPerson[] {
   const out: PublicPerson[] = [];
   for (const row of rows) {
-    if (!row || row.deactivated_at || row.deleted_at) continue;
+    if (!row || row.deactivated_at || row.deleted_at || row.profile_public === false) continue;
     const person = publicPerson(row);
     if (person) out.push(person);
   }
@@ -190,7 +245,10 @@ export async function loadProfile(rawUsername: string, viewerId: string | null):
   const showSocial = target.profile_show_social !== false;
   const showStats = target.profile_show_stats !== false;
   const showActivity = target.profile_show_activity === true;
-  const [counts, rel, trade, socialProof] = await Promise.all([
+  const showWallet = target.profile_show_wallet === true;
+  const showPortfolio = target.profile_show_portfolio === true;
+  const profilePublic = target.profile_public !== false;
+  const [counts, rel, trade, socialProof, shared] = await Promise.all([
     countsFor(supabase, target.id),
     viewerId && !isSelf
       ? relation(supabase, viewerId, target.id)
@@ -199,6 +257,9 @@ export async function loadProfile(rawUsername: string, viewerId: string | null):
       ? trading(supabase, target.id)
       : Promise.resolve({ swaps: 0, volumeEth: 0, activity: [] }),
     viewerId && (isSelf || showSocial) ? followedBy(supabase, viewerId, target.id) : Promise.resolve({ people: [], capped: false }),
+    isSelf || showWallet || showPortfolio
+      ? profileShare(target.id, { wallet: isSelf || showWallet, portfolio: isSelf || showPortfolio })
+      : Promise.resolve({ wallet: null, portfolioEth: null }),
   ]);
 
   return publicProfile({
@@ -212,6 +273,11 @@ export async function loadProfile(rawUsername: string, viewerId: string | null):
     showSocial,
     showStats,
     showActivity,
+    showWallet,
+    showPortfolio,
+    profilePublic,
+    wallet: shared.wallet,
+    portfolioEth: shared.portfolioEth,
     followers: counts.followers,
     followingCount: counts.followingCount,
     swaps: trade.swaps,
@@ -321,22 +387,10 @@ export async function listFollows(
   const ownerColumn = side === 'followers' ? 'following_id' : 'follower_id';
 
   if (prefix) {
-    let named = await supabase
-      .from('accounts')
-      .select(ACCOUNT_COLS)
-      .ilike('username', `${prefix}%`)
-      .is('deactivated_at', null)
-      .is('deleted_at', null)
-      .limit(40);
-    if (named.error && isMissingClosureColumn(named.error)) {
-      named = (await supabase
-        .from('accounts')
-        .select(ACCOUNT_PUBLIC)
-        .ilike('username', `${prefix}%`)
-        .limit(40)) as typeof named;
-    }
-    if (named.error) throw mapDb(named.error);
-    const rows = ((named.data || []) as AccountHit[]).filter((row) => isOpen(row));
+    const named = await accountRows((cols) =>
+      supabase.from('accounts').select(cols).ilike('username', `${prefix}%`).limit(40)
+    );
+    const rows = named.filter((row) => isOpen(row));
     const ids = rows.map((row) => row.id);
     if (!ids.length) return { people: [] };
     const edges = await supabase
@@ -367,24 +421,21 @@ export async function listFollows(
 /** Username prefix search. Two characters, already checked by the route. */
 export async function searchPeople(prefix: string): Promise<PublicPerson[]> {
   const supabase = getSupabase();
-  let result = await supabase
-    .from('accounts')
-    .select('username, display_name, deactivated_at, deleted_at')
-    .ilike('username', `${prefix}%`)
-    .is('deactivated_at', null)
-    .is('deleted_at', null)
-    .order('username', { ascending: true })
-    .limit(20);
-  if (result.error && isMissingClosureColumn(result.error)) {
-    result = (await supabase
-      .from('accounts')
-      .select('username, display_name')
-      .ilike('username', `${prefix}%`)
-      .order('username', { ascending: true })
-      .limit(20)) as typeof result;
+  const rows = await accountRows((cols) =>
+    supabase.from('accounts').select(cols).ilike('username', `${prefix}%`).order('username', { ascending: true }).limit(20)
+  );
+  return peopleFrom(rows);
+}
+
+async function accountRows(run: (cols: string) => PromiseLike<AccountRead>): Promise<AccountHit[]> {
+  let last: { message?: string; code?: string } | null = null;
+  for (const cols of ACCOUNT_ATTEMPTS) {
+    const result = await run(cols);
+    if (!result.error) return (result.data || []) as AccountHit[];
+    last = result.error;
+    if (!isMissingClosureColumn(result.error) && !isMissingProfileColumn(result.error)) throw mapDb(result.error);
   }
-  if (result.error) throw mapDb(result.error);
-  return peopleFrom((result.data || []) as AccountHit[]);
+  throw mapDb(last);
 }
 
 /**
@@ -417,38 +468,53 @@ export async function suggestPeople(viewerId: string | null): Promise<PublicPers
   return peopleFrom(ids.map((id) => accounts.get(id)).filter((row): row is AccountHit => Boolean(row)));
 }
 
+const OWN_FULL =
+  'profile_show_social, profile_show_stats, profile_show_activity, profile_public, profile_show_wallet, profile_show_portfolio, scan_show_username';
+const OWN_BASE = 'profile_show_social, profile_show_stats, profile_show_activity, scan_show_username';
+
 /** Counts and visibility for the signed-in account's own screen. */
 export async function ownSocial(accountId: string): Promise<OwnSocial> {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('accounts')
-    .select('profile_show_social, profile_show_stats, profile_show_activity')
-    .eq('id', accountId)
-    .maybeSingle();
-  if (error) throw mapDb(error);
+  let result = await supabase.from('accounts').select(OWN_FULL).eq('id', accountId).maybeSingle();
+  if (result.error && isMissingProfileColumn(result.error)) {
+    result = await supabase.from('accounts').select(OWN_BASE).eq('id', accountId).maybeSingle();
+  }
+  if (result.error) throw mapDb(result.error);
   const counts = await countsFor(supabase, accountId);
-  const row = data as {
+  const row = result.data as {
     profile_show_social?: boolean | null;
     profile_show_stats?: boolean | null;
     profile_show_activity?: boolean | null;
+    profile_public?: boolean | null;
+    profile_show_wallet?: boolean | null;
+    profile_show_portfolio?: boolean | null;
+    scan_show_username?: boolean | null;
   } | null;
   return {
     followers: counts.followers,
     following: counts.followingCount,
+    profilePublic: row?.profile_public !== false,
     showSocial: row?.profile_show_social !== false,
     showStats: row?.profile_show_stats !== false,
     showActivity: row?.profile_show_activity === true,
+    showWallet: row?.profile_show_wallet === true,
+    showPortfolio: row?.profile_show_portfolio === true,
+    showUsername: row?.scan_show_username === true,
   };
 }
 
-export async function setProfileVisibility(
-  accountId: string,
-  patch: { showSocial?: boolean; showStats?: boolean; showActivity?: boolean }
-): Promise<OwnSocial> {
-  const update: { profile_show_social?: boolean; profile_show_stats?: boolean; profile_show_activity?: boolean } = {};
-  if (typeof patch.showSocial === 'boolean') update.profile_show_social = patch.showSocial;
-  if (typeof patch.showStats === 'boolean') update.profile_show_stats = patch.showStats;
-  if (typeof patch.showActivity === 'boolean') update.profile_show_activity = patch.showActivity;
+export async function setProfileVisibility(accountId: string, patch: VisibilityPatch): Promise<OwnSocial> {
+  const update: Record<string, boolean> = {};
+  if (typeof patch.profilePublic === 'boolean') {
+    Object.assign(update, visibilityPatch(patch.profilePublic ? 'public' : 'private'));
+  } else {
+    if (typeof patch.showSocial === 'boolean') update.profile_show_social = patch.showSocial;
+    if (typeof patch.showStats === 'boolean') update.profile_show_stats = patch.showStats;
+    if (typeof patch.showActivity === 'boolean') update.profile_show_activity = patch.showActivity;
+    if (typeof patch.showWallet === 'boolean') update.profile_show_wallet = patch.showWallet;
+    if (typeof patch.showPortfolio === 'boolean') update.profile_show_portfolio = patch.showPortfolio;
+    if (typeof patch.showUsername === 'boolean') update.scan_show_username = patch.showUsername;
+  }
   const supabase = getSupabase();
   if (Object.keys(update).length) {
     const { error } = await supabase.from('accounts').update(update).eq('id', accountId);

@@ -137,17 +137,32 @@ async function nfts(q: string, lookup: CollectionLookup): Promise<SearchResult[]
 async function people(q: string, supabase: Db): Promise<SearchResult[]> {
   const checked = validateUsername(q.replace(/^@/, ''));
   if (!checked.ok) return [];
-  const { data, error } = await supabase
+  const wide = await supabase
     .from('accounts')
-    .select('username')
+    .select('username, profile_public')
     .eq('username', checked.username)
     .is('deactivated_at', null)
     .is('deleted_at', null)
     .maybeSingle();
-  if (error) throw new Error(error.message);
-  const username = (data as { username?: string | null } | null)?.username;
-  if (!username) return [];
-  return [{ kind: 'person', title: `@${username}`, subtitle: 'Profile', href: profilePath(username) }];
+  let data: { username?: string | null; profile_public?: boolean | null } | null = wide.data;
+  if (wide.error) {
+    const code = String(wide.error.code || '');
+    const message = String(wide.error.message || '');
+    const missing = code === '42703' || code === 'PGRST204' || /profile_public/.test(message);
+    if (!missing) throw new Error(message);
+    const narrow = await supabase
+      .from('accounts')
+      .select('username')
+      .eq('username', checked.username)
+      .is('deactivated_at', null)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (narrow.error) throw new Error(narrow.error.message);
+    data = narrow.data;
+  }
+  const row = data as { username?: string | null; profile_public?: boolean | null } | null;
+  if (!row?.username || row.profile_public === false) return [];
+  return [{ kind: 'person', title: `@${row.username}`, subtitle: 'Profile', href: profilePath(row.username) }];
 }
 
 export async function siteSearch(

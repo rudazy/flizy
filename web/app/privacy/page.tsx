@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '27 October 2026';
+const UPDATED = '28 October 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -132,6 +132,10 @@ export default function PrivacyPage() {
               Follower and following counts and lists are public unless you turn off Show
               followers and following. Volume and swaps on a profile follow Show trading
               stats. Activity on a profile stays hidden unless you turn on Show activity.
+              Choosing Private turns those switches off and removes the profile from search.
+              Choosing Public turns them on. Show wallet address shows the wallet on the
+              profile. Show portfolio value shows that wallet's ETH balance. The profile
+              link still opens when the profile is private.
               Following does not send a payment and does not open a chat.
             </li>
           </ul>
@@ -165,7 +169,7 @@ export default function PrivacyPage() {
             <li>Attribute an invite once, and count it only after onboarding, a verified phone, and a confirmed Flizy transaction.</li>
             <li>Operate the product, debug failures, and stop abuse.</li>
             <li>Email you, and show a notice in the app, when a payment reaches your Flizy wallet.</li>
-            <li>Show a public profile, follower counts, and who follows whom, when those switches are on.</li>
+            <li>Show a public profile, follower counts, and who follows whom, when those switches are on. A wallet address or that wallet's ETH balance is shown only when that switch is on.</li>
           </ul>
         </section>
 

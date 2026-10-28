@@ -139,8 +139,100 @@ describe('public profile', () => {
     assert.equal(shown.followedBy.length, 3);
     assert.equal(shown.followedByMore, 1);
     assert.equal(JSON.stringify(shown).includes('id'), false);
+    assert.equal(shown.wallet, null);
+    assert.equal(shown.portfolioEth, null);
+    assert.equal(shown.profilePublic, true);
+    assert.equal(shown.showWallet, false);
+    assert.equal(shown.showPortfolio, false);
     assert.equal(publicPerson({ username: 'ada', display_name: 'Ada' }).username, 'ada');
     assert.equal(publicPerson({ username: 'no', display_name: 'No' }), null);
+  });
+
+  it('shows the wallet and the ETH balance only to the owner, or when that switch is on', async () => {
+    ({ publicProfile } = await import('../web/lib/follows.ts'));
+    const address = '0x' + 'ab'.repeat(20);
+    const closed = publicProfile({
+      ...base,
+      showWallet: false,
+      showPortfolio: false,
+      wallet: address,
+      portfolioEth: 1.5,
+      profilePublic: false,
+    });
+    assert.equal(closed.wallet, null);
+    assert.equal(closed.portfolioEth, null);
+    assert.equal(closed.profilePublic, false);
+
+    const opened = publicProfile({
+      ...base,
+      showWallet: true,
+      showPortfolio: true,
+      wallet: address,
+      portfolioEth: 1.5,
+    });
+    assert.equal(opened.wallet, address);
+    assert.equal(opened.portfolioEth, 1.5);
+    assert.equal(opened.profilePublic, true);
+    assert.equal(JSON.stringify(opened).includes('"id"'), false);
+
+    const owner = publicProfile({
+      ...base,
+      isSelf: true,
+      showWallet: false,
+      showPortfolio: false,
+      wallet: address,
+      portfolioEth: 2,
+      profilePublic: false,
+    });
+    assert.equal(owner.wallet, address);
+    assert.equal(owner.portfolioEth, 2);
+    assert.equal(owner.profilePublic, false);
+
+    const junk = publicProfile({
+      ...base,
+      showWallet: true,
+      showPortfolio: true,
+      wallet: 'not-an-address',
+      portfolioEth: Number.NaN,
+    });
+    assert.equal(junk.wallet, null);
+    assert.equal(junk.portfolioEth, null);
+  });
+});
+
+describe('profile visibility', () => {
+  it('turns every switch on for public and off for private', async () => {
+    const { visibilityPatch } = await import('../web/lib/follows.ts');
+    const on = visibilityPatch('public');
+    const off = visibilityPatch('private');
+    for (const value of Object.values(on)) assert.equal(value, true);
+    for (const value of Object.values(off)) assert.equal(value, false);
+    assert.equal(on.profile_public, true);
+    assert.equal(on.scan_show_username, true);
+    assert.equal(on.profile_show_wallet, true);
+    assert.equal(on.profile_show_portfolio, true);
+    assert.equal(off.profile_public, false);
+    assert.equal(off.profile_show_activity, false);
+    assert.equal(off.scan_show_username, false);
+  });
+
+  it('adds the three columns and fails if any of them is missing', () => {
+    const sql = read('supabase/migrations/20261028120000_profile_visibility.sql');
+    assert.match(sql, /profile_public boolean not null default true/);
+    assert.match(sql, /profile_show_wallet boolean not null default false/);
+    assert.match(sql, /profile_show_portfolio boolean not null default false/);
+    assert.match(sql, /add column if not exists/);
+    assert.match(sql, /profile visibility columns are missing/);
+    assert.doesNotMatch(sql, /grant .+ to anon/i);
+  });
+
+  it('closes the balance provider when the read ends or times out', () => {
+    const src = read('web/lib/profileShare.ts');
+    assert.match(src, /staticNetwork: true/);
+    assert.match(src, /clearTimeout\(timer\)/);
+    assert.match(src, /provider\.destroy\(\)/);
+    assert.match(src, /4000/);
+    assert.doesNotMatch(src, /console\./);
   });
 });
 
@@ -271,6 +363,13 @@ describe('follow routes', () => {
     assert.match(store, /ignoreDuplicates: true/);
     assert.match(store, /onConflict: 'follower_id,following_id'/);
     assert.match(store, /You can follow up to 1000 people/);
+    assert.match(store, /visibilityPatch/);
+    assert.match(store, /Profile visibility is not available yet/);
+    assert.match(own, /profilePublic/);
+    assert.match(own, /showWallet/);
+    assert.match(own, /showPortfolio/);
+    assert.match(own, /showUsername/);
+    assert.match(own, /Choose on or off/);
     assert.doesNotMatch(store, /email|phone|password|wallet_address|privy/i);
   });
 });
@@ -300,14 +399,28 @@ describe('follow screens', () => {
     assert.match(account, /Find people/);
     assert.match(account, /Show trading stats/);
     assert.match(account, /Show followers & following/);
+    assert.match(account, /Show wallet address/);
+    assert.match(account, /Show portfolio value/);
+    assert.match(account, /Profile visibility/);
+    assert.match(account, /Private turns these off\. Public turns them on\./);
+    assert.doesNotMatch(account, /onSoon\('Profile visibility'\)/);
+    assert.doesNotMatch(account, /onSoon\('Show wallet address'\)/);
+    assert.doesNotMatch(account, /onSoon\('Show portfolio value'\)/);
+    assert.match(pub, /This profile is private\./);
+    assert.match(pub, /Wallet address is hidden from others\./);
+    assert.match(pub, /Portfolio value is hidden from others\./);
+    assert.match(pub, /label="Portfolio"/);
     assert.doesNotMatch(nav, /href: '\/people'/);
     assert.match(read('web/app/u/[username]/page.tsx'), /noindex: true/);
+    assert.match(read('web/app/u/[username]/page.tsx'), /force-dynamic/);
     assert.match(read('web/app/people/page.tsx'), /noindex: true/);
     assert.doesNotMatch(read('web/app/sitemap.ts'), /\/people|\/u\//);
     assert.doesNotMatch(read('web/app/robots.ts'), /disallow: \[[^\]]*\/people|disallow: \[[^\]]*\/u\//);
     assert.match(read('web/public/llms.txt'), /\/u\/:username/);
     assert.match(read('web/public/llms.txt'), /flizy\.app\/people/);
-    assert.match(read('web/app/privacy/page.tsx'), /27 October 2026/);
+    assert.match(read('web/app/privacy/page.tsx'), /28 October 2026/);
+    assert.match(read('web/app/privacy/page.tsx'), /Show wallet address/);
+    assert.match(read('web/app/privacy/page.tsx'), /Show portfolio value/);
     assert.match(read('web/app/privacy/page.tsx'), /Following does not send a payment/);
     assert.match(read('web/app/privacy/page.tsx'), /nothing is copied yet/);
     assert.match(read('web/app/privacy/page.tsx'), /Show activity/);
