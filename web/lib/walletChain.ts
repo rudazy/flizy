@@ -1,5 +1,5 @@
 import type { EIP1193Provider } from 'viem';
-import { PAYMENT_RECEIVER_CHAIN as GIWA } from './paymentReceiver';
+import { PAYMENT_RECEIVER_CHAIN as GIWA } from './paymentReceiver.ts';
 
 /**
  * A connected wallet, ready to sign on GIWA Sepolia.

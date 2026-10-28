@@ -9,6 +9,8 @@ import { isHeld } from '../lib/dashboardTypes';
 import { VerifiedMark } from './VerifiedMark';
 import { tokenLogo } from '../lib/tokenLogos';
 import { symbolLabel } from '../lib/listedTokens';
+import { subtractHolding } from '../lib/reservesMath';
+import { SavingsCard, type SavingsRow } from './SavingsCard';
 import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
 import { WalletNfts } from './WalletNfts';
 import { WalletOffers } from './WalletOffers';
@@ -70,6 +72,9 @@ export function WalletBalances() {
   const [tokenError, setTokenError] = useState('');
   const [tokenBusy, setTokenBusy] = useState(false);
   const [addingToken, setAddingToken] = useState(false);
+  const [reserveStatus, setReserveStatus] = useState<'loading' | 'missing' | 'error' | 'ready'>('loading');
+  const [reserveRows, setReserveRows] = useState<SavingsRow[]>([]);
+  const [reserveTick, setReserveTick] = useState(0);
 
   // The FLZ pool price, for the ETH value beside an FLZ balance. A failure
   // only means that line is left out; the balance itself does not depend on it.
@@ -104,6 +109,37 @@ export function WalletBalances() {
     []
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/reserves');
+        const body = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (!res.ok || !body) {
+          setReserveStatus('error');
+          setReserveRows([]);
+          return;
+        }
+        if (body.missing) {
+          setReserveStatus('missing');
+          setReserveRows([]);
+          return;
+        }
+        setReserveRows(Array.isArray(body.rows) ? body.rows : []);
+        setReserveStatus('ready');
+      } catch {
+        if (!cancelled) {
+          setReserveStatus('error');
+          setReserveRows([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [reserveTick, holdings]);
+
   // One tap copies the address; a second tap inside the window opens it on the
   // explorer. The copy runs inside the tap, see useTapGesture.
   const onAddressTap = useTapGesture(
@@ -114,14 +150,34 @@ export function WalletBalances() {
   if (!data) return null;
 
   const address = data.account.agent_wallet_address || '';
-  const native = holdings?.holdings?.native || null;
   const chainName = holdings?.holdings?.chain?.name || 'GIWA Sepolia';
   const credit = Number(data.account.balance_eth || 0);
+  // Available is the chain balance minus Savings. Until that read returns, the
+  // chain figure is not shown as Available. A missing table means there is no
+  // Savings book, so the chain figure is the balance.
+  const reserveReady = reserveStatus === 'ready' || reserveStatus === 'missing';
+  const reservedByAsset = new Map(reserveRows.map((row) => [row.asset, row]));
+  let native = holdings?.holdings?.native ? { ...holdings.holdings.native } : null;
+  let tokenRows = (holdings?.holdings?.tokens || []).map((t) => ({ ...t }));
+  if (!reserveReady) {
+    if (native) native = { ...native, balance: '...' };
+    tokenRows = [];
+  } else if (reserveStatus === 'ready') {
+    const ethSaved = reservedByAsset.get('ETH');
+    if (native && ethSaved && native.balance != null && native.balance !== '') {
+      native = { ...native, balance: subtractHolding(String(native.balance), 18, ethSaved.amountBase) };
+    }
+    tokenRows = tokenRows.map((t) => {
+      const saved = reservedByAsset.get(String(t.symbol || '').toUpperCase());
+      if (!saved || t.balance == null || t.balance === '') return t;
+      return { ...t, balance: subtractHolding(String(t.balance), saved.decimals, saved.amountBase) };
+    });
+  }
   // Only what the wallet actually holds. The API returns every tracked token at
   // zero so other callers can read the balance; this list shows a row only when
   // there is something in it. See isHeld: an unreadable
   // row stays visible rather than being reported as none.
-  const tokens = (holdings?.holdings?.tokens || []).filter((t) => isHeld(t.balance));
+  const tokens = tokenRows.filter((t) => isHeld(t.balance));
 
   async function copyAddress() {
     if (!address) return;
@@ -166,7 +222,7 @@ export function WalletBalances() {
 
   return (
     <div className="grid gap-[12.5px]">
-      {/* Total balance */}
+      {/* Available */}
       <section
         className="relative h-[118.7px] overflow-hidden rounded-[6px] border border-[#4a3d1c]"
         style={{ background: 'linear-gradient(100deg, #0e0d0b 0%, #14120c 55%, #1c1709 100%)' }}
@@ -174,7 +230,7 @@ export function WalletBalances() {
         <HeroGlow />
         <div className="relative px-[16.5px] pt-[16.5px]">
           <div className="flex items-center gap-[10px]">
-            <span className="font-mono text-[9.4px] uppercase tracking-[0.12em] text-[#cfcfcf]">Total balance</span>
+            <span className="font-mono text-[9.4px] uppercase tracking-[0.12em] text-[#cfcfcf]">Available</span>
             <button
               type="button"
               onClick={() => setHidden((h) => !h)}
@@ -225,6 +281,16 @@ export function WalletBalances() {
           </span>
         </div>
       </section>
+
+      <SavingsCard
+        hidden={hidden}
+        status={reserveStatus}
+        rows={reserveRows}
+        onMoved={() => {
+          setReserveTick((n) => n + 1);
+          void refreshAll();
+        }}
+      />
 
       {/* Address */}
       <Card className="px-[13.5px] pb-[9.5px] pt-[14px]">

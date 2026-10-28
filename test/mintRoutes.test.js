@@ -85,7 +85,7 @@ describe('on-chain actions take every gate, in order', () => {
       'requireStepUp(supabase, accountId, args.pin, tx.reason)',
       'tryAccountTxLock(supabase, accountId, MARKET_KIND)',
       'checkDailyNativeLimit(supabase, accountId, tx.value)',
-      'assertCanPay(ctx.provider, viewer, tx.value, tx.calls.length)',
+      'assertCanPay(ctx.provider, viewer, tx.value, tx.calls.length, { supabase, accountId })',
       ".from('transfers')",
       'runMarketCalls(',
       "status: 'confirmed'",

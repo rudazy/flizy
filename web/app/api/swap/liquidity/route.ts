@@ -18,7 +18,8 @@ import { gatorFailure } from '../../../../lib/gatorOutcome.ts';
 import { getSupabase } from '../../../../lib/supabase';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
-import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
+import { gatorGasReserveWei, pointerIsGator } from '../../../../lib/gatorExecute.ts';
+import { assertSpendable, resolveReserveAsset } from '../../../../lib/reserveStore';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 
 const ROUTE_GET = 'GET /api/swap/liquidity';
@@ -26,6 +27,14 @@ const ROUTE_POST = 'POST /api/swap/liquidity';
 
 /** Refused before anything is read: liquidity is only for pools Flizy seeded. */
 const NOT_A_POOL = 'Liquidity is for FLZ and the listed tokens only.';
+
+function gasBufferWei(): bigint {
+  try {
+    return ethers.parseEther(String(process.env.GAS_BUFFER_ETH || '0.0001'));
+  } catch {
+    return ethers.parseEther('0.0001');
+  }
+}
 
 /** Site-only: current LP position in one pool (?token=FLZ by default) for the logged-in agent wallet. */
 export async function GET(req: Request) {
@@ -198,6 +207,31 @@ export async function POST(req: Request) {
 
     const amountTokenMin = tokenWei - tokenWei / 50n;
     const amountEthMin = ethWei - ethWei / 50n;
+
+    const gasBuf = viaGator ? await gatorGasReserveWei(provider, walletAddr) : gasBufferWei();
+    const ethBal = await provider.getBalance(walletAddr);
+    const ethInfo = resolveReserveAsset('ETH');
+    const ethFence = await assertSpendable(supabase, accountId, {
+      asset: 'ETH',
+      holding: ethBal,
+      amount: ethWei,
+      gas: gasBuf,
+      decimals: 18,
+      label: ethInfo ? ethInfo.label : 'ETH',
+    });
+    if (!ethFence.ok) return NextResponse.json({ error: ethFence.message }, { status: 400 });
+    const tokenInfo = resolveReserveAsset(pool.symbol);
+    const tokenContract = new ethers.Contract(pool.token, ['function balanceOf(address) view returns (uint256)'], provider);
+    const tokenBal: bigint = await tokenContract.balanceOf(walletAddr);
+    const tokenFence = await assertSpendable(supabase, accountId, {
+      asset: tokenInfo ? tokenInfo.asset : pool.symbol,
+      holding: tokenBal,
+      amount: tokenWei,
+      gas: 0n,
+      decimals: pool.decimals,
+      label: tokenInfo ? tokenInfo.label : pool.symbol,
+    });
+    if (!tokenFence.ok) return NextResponse.json({ error: tokenFence.message }, { status: 400 });
 
     const result = viaGator
       ? await addLiquidityEthViaGator({

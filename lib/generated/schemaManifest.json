@@ -10,6 +10,18 @@
     },
     {
       "kind": "check",
+      "name": "account_reserves.account_reserves_amount_check",
+      "providedBy": "20261028140000_account_reserves.sql",
+      "requiredBy": "check on account_reserves"
+    },
+    {
+      "kind": "check",
+      "name": "account_reserves.account_reserves_asset_check",
+      "providedBy": "20261028140000_account_reserves.sql",
+      "requiredBy": "check on account_reserves"
+    },
+    {
+      "kind": "check",
       "name": "accounts.accounts_default_calling_code_check",
       "providedBy": "20261005120000_account_default_calling_code.sql",
       "requiredBy": "check on accounts"
@@ -586,6 +598,12 @@
     },
     {
       "kind": "function",
+      "name": "move_account_reserve",
+      "providedBy": "20261028140000_account_reserves.sql",
+      "requiredBy": "lib/reservesChat.js"
+    },
+    {
+      "kind": "function",
       "name": "record_known_recipient",
       "providedBy": "20261018100000_known_recipients.sql",
       "requiredBy": "executed by trigger transfers_record_known_recipient"
@@ -637,6 +655,12 @@
       "name": "account_emails",
       "providedBy": "20260805120000_claim_email_recipient.sql",
       "requiredBy": "lib/accountEmails.js"
+    },
+    {
+      "kind": "table",
+      "name": "account_reserves",
+      "providedBy": "20261028140000_account_reserves.sql",
+      "requiredBy": "lib/reserves.js"
     },
     {
       "kind": "table",

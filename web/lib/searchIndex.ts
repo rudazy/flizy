@@ -21,14 +21,14 @@ export type SearchResult = {
 type Place = { title: string; subtitle: string; href: string; keywords: string[] };
 
 export const PLACES: Place[] = [
-  { title: 'Home', subtitle: 'Your balance and what needs you', href: '/dashboard', keywords: ['home', 'overview', 'dashboard', 'start'] },
+  { title: 'Home', subtitle: 'Your available balance and what needs you', href: '/dashboard', keywords: ['home', 'overview', 'dashboard', 'start', 'available'] },
   { title: 'Claims', subtitle: 'Money waiting for you or for others', href: '/dashboard?s=claims', keywords: ['claim', 'claims', 'waiting', 'escrow', 'pending', 'receive'] },
   { title: 'Go', subtitle: 'Shortcuts to what you do most', href: '/dashboard?s=go', keywords: ['go', 'shortcuts', 'quick', 'actions'] },
   { title: 'Invite', subtitle: 'Your invite link and invites earned', href: '/dashboard#invite', keywords: ['invite', 'invites', 'referral', 'refer', 'friends', 'invite link'] },
   { title: 'Send money', subtitle: 'How to send from WhatsApp or Telegram', href: `/how-it-works#${faqAnchor(FLIZY_FAQ.findIndex((item) => /send crypto/i.test(item.question)))}`, keywords: ['send', 'send money', 'transfer', 'pay someone', 'send crypto'] },
   { title: 'Recent', subtitle: 'Your latest activity on Home', href: '/dashboard?s=recent', keywords: ['recent', 'latest', 'activity'] },
 
-  { title: 'Wallet', subtitle: 'Balances of every token you hold', href: '/dashboard/wallet', keywords: ['wallet', 'balance', 'balances', 'tokens', 'holdings', 'eth', 'money'] },
+  { title: 'Wallet', subtitle: 'Available balance and Savings', href: '/dashboard/wallet', keywords: ['wallet', 'balance', 'balances', 'tokens', 'holdings', 'eth', 'money', 'available', 'savings'] },
   { title: 'History', subtitle: 'Every send, receive, swap and claim', href: '/dashboard/wallet?s=history', keywords: ['history', 'transactions', 'activity', 'sent', 'received', 'receipts'] },
   { title: 'Fund', subtitle: 'Claim free test ETH in one tap', href: '/dashboard/wallet?s=fund', keywords: ['fund', 'faucet', 'test eth', 'free eth', 'deposit', 'top up', 'add money', 'get eth'] },
   { title: 'Scan', subtitle: 'Every Flizy payment, public ledger', href: '/dashboard/wallet?s=scan', keywords: ['scan', 'ledger', 'explorer', 'payments', 'public'] },

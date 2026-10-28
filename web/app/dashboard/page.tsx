@@ -17,6 +17,7 @@ import { announceTx } from '../../lib/txSignal';
 import { FirstSteps } from '../../components/FirstSteps';
 import { TrendingTokens } from '../../components/TrendingTokens';
 import { formatAmount } from '../../../lib/amountDisplay';
+import { subtractHolding } from '../../lib/reservesMath';
 import {
   AlertCircleIcon,
   ArrowDownIcon,
@@ -66,6 +67,7 @@ export default function DashboardHomePage() {
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [walletFlash, setWalletFlash] = useState('');
   const [taskCounts, setTaskCounts] = useState<TaskCounts | null>(null);
+  const [ethReserve, setEthReserve] = useState<'loading' | 'missing' | 'error' | 'none' | string>('loading');
   // Your tasks and Quick actions start closed; a tap on either header opens it.
   const [tasksOpen, setTasksOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -77,6 +79,32 @@ export default function DashboardHomePage() {
       if (copyTimer.current) clearTimeout(copyTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/reserves');
+        const body = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (!res.ok || !body) {
+          setEthReserve('error');
+          return;
+        }
+        if (body.missing) {
+          setEthReserve('missing');
+          return;
+        }
+        const row = (body.rows || []).find((item: { asset?: string }) => item.asset === 'ETH');
+        setEthReserve(row && row.amountBase ? String(row.amountBase) : 'none');
+      } catch {
+        if (!cancelled) setEthReserve('error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [holdings]);
 
   // Tasks this account has entered, by state. A failure leaves the card on
   // dashes rather than on zeros that would read as a real answer.
@@ -268,7 +296,7 @@ export default function DashboardHomePage() {
           <HeroEmblem />
           <div className="relative px-[16.8px] pt-[17px]">
             <div className="flex items-center gap-[12px]">
-              <span className="font-mono text-[9.2px] uppercase tracking-[0.12em] text-[#cfcfcf]">Total balance</span>
+              <span className="font-mono text-[9.2px] uppercase tracking-[0.12em] text-[#cfcfcf]">Available</span>
               <button
                 type="button"
                 onClick={() => setBalanceOpen((open) => !open)}
@@ -282,7 +310,13 @@ export default function DashboardHomePage() {
             <div className="mt-[9px] flex h-[26px] items-center gap-[13px]">
               {balanceOpen ? (
                 <span className="font-sans text-[24px] font-semibold leading-none text-white">
-                  {nativeBal ? formatAmount(nativeBal.balance) : '...'}
+                  {nativeBal && ethReserve !== 'loading' && ethReserve !== 'error'
+                    ? formatAmount(
+                        ethReserve === 'missing' || ethReserve === 'none'
+                          ? nativeBal.balance
+                          : subtractHolding(String(nativeBal.balance), 18, ethReserve)
+                      )
+                    : '...'}
                 </span>
               ) : (
                 <span className="flex gap-[5.6px]" aria-label="Balance hidden">

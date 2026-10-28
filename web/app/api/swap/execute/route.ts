@@ -20,7 +20,8 @@ import {
 import { apiErrorBody } from '../../../../lib/apiError';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { tryAccountTxLock, releaseAccountTxLock } from '../../../../lib/accountTxLock.ts';
-import { pointerIsGator } from '../../../../lib/gatorExecute.ts';
+import { gatorGasReserveWei, pointerIsGator } from '../../../../lib/gatorExecute.ts';
+import { assertSpendable, resolveReserveAsset } from '../../../../lib/reserveStore';
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 import { gatorFailure, markTransferSubmitted } from '../../../../lib/gatorOutcome.ts';
 import { outcomeUnknown } from '../../../../lib/gatorExecute.ts';
@@ -30,6 +31,14 @@ import { ammoraSiteExecute } from '../../../../lib/ammora/siteSwap.ts';
 import { ClientError, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
 
 const ROUTE = 'POST /api/swap/execute';
+
+function gasBufferWei(): bigint {
+  try {
+    return ethers.parseEther(String(process.env.GAS_BUFFER_ETH || '0.0001'));
+  } catch {
+    return ethers.parseEther('0.0001');
+  }
+}
 
 /** An Ammora swap re-quotes, then sends approvals and the swap as UserOps. */
 export const maxDuration = 60;
@@ -197,6 +206,55 @@ export async function POST(req: Request) {
       const viaGator = pointerIsGator(accountId, account.agent_wallet_address);
       const signer = deriveAgentWallet(accountId).connect(provider);
       const walletAddr = viaGator ? predictGatorAddress(accountId) : signer.address;
+      const gasBuf = viaGator ? await gatorGasReserveWei(provider, walletAddr) : gasBufferWei();
+      const ethBal = await provider.getBalance(walletAddr);
+      const markNotSent = async () => {
+        if (logRow?.id) {
+          await supabase.from('transfers').update({ status: 'failed', error: 'not sent' }).eq('id', logRow.id);
+        }
+      };
+      if (tokenIn == null) {
+        const fence = await assertSpendable(supabase, accountId, {
+          asset: 'ETH',
+          holding: ethBal,
+          amount: amountIn,
+          gas: gasBuf,
+          decimals: 18,
+          label: 'ETH',
+        });
+        if (!fence.ok) {
+          await markNotSent();
+          return NextResponse.json({ error: fence.message }, { status: 400 });
+        }
+      } else {
+        const gasFence = await assertSpendable(supabase, accountId, {
+          asset: 'ETH',
+          holding: ethBal,
+          amount: 0n,
+          gas: gasBuf,
+          decimals: 18,
+          label: 'ETH',
+        });
+        if (!gasFence.ok) {
+          await markNotSent();
+          return NextResponse.json({ error: gasFence.message }, { status: 400 });
+        }
+        const erc20 = new ethers.Contract(tokenIn, ['function balanceOf(address) view returns (uint256)'], provider);
+        const tokBal: bigint = await erc20.balanceOf(walletAddr);
+        const info = resolveReserveAsset(inLabel);
+        const tokenFence = await assertSpendable(supabase, accountId, {
+          asset: info ? info.asset : inLabel,
+          holding: tokBal,
+          amount: amountIn,
+          gas: 0n,
+          decimals: info ? info.decimals : inDecimals,
+          label: info ? info.label : inLabel,
+        });
+        if (!tokenFence.ok) {
+          await markNotSent();
+          return NextResponse.json({ error: tokenFence.message }, { status: 400 });
+        }
+      }
       const result = viaGator
         ? await executeSwapViaGator({
             accountId,

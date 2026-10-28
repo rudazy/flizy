@@ -18,7 +18,8 @@ import { getRouteClient, loadInventory, prepareAmmora, quoteAmmora, AmmoraQuoteE
 import { flizySymbols, toView } from './catalog.ts';
 import { executeAmmoraSwap } from './execute.ts';
 import { markTransferSubmitted } from '../gatorOutcome.ts';
-import { outcomeUnknown } from '../gatorExecute.ts';
+import { gatorGasReserveWei, outcomeUnknown } from '../gatorExecute.ts';
+import { assertSpendable } from '../reserveStore.ts';
 
 export const AMMORA_ROUTE_REFUSALS: Record<string, string> = {
   off: 'Ammora is not available right now.',
@@ -169,6 +170,44 @@ export async function ammoraSiteExecute(
     pools,
   });
   if (!policy.ok) throw refuse('policy');
+
+  // Available pays the swap. A refused route returns above, before this read.
+  const gas = await gatorGasReserveWei(provider, args.gator);
+  const ethBal = await provider.getBalance(args.gator);
+  if (nativeIn) {
+    const fence = await assertSpendable(supabase, args.accountId, {
+      asset: 'ETH',
+      holding: ethBal,
+      amount: amountIn,
+      gas,
+      decimals: 18,
+      label: 'ETH',
+    });
+    if (!fence.ok) throw new ClientError(fence.message);
+  } else {
+    const gasFence = await assertSpendable(supabase, args.accountId, {
+      asset: 'ETH',
+      holding: ethBal,
+      amount: 0n,
+      gas,
+      decimals: 18,
+      label: 'ETH',
+    });
+    if (!gasFence.ok) throw new ClientError(gasFence.message);
+    const erc20 = new ethers.Contract(token.baseToken, ['function balanceOf(address) view returns (uint256)'], provider);
+    const tokBal: bigint = await erc20.balanceOf(args.gator);
+    const asset = String(token.symbol || '').toUpperCase();
+    const decimals = token.decimals ?? 18;
+    const tokenFence = await assertSpendable(supabase, args.accountId, {
+      asset,
+      holding: tokBal,
+      amount: amountIn,
+      gas: 0n,
+      decimals,
+      label: asset || 'TOKEN',
+    });
+    if (!tokenFence.ok) throw new ClientError(tokenFence.message);
+  }
 
   const view = toView(token, 'ACTIVE');
   const { data: logRow } = await supabase

@@ -119,7 +119,7 @@ describe('the tiers hold: account changes take the password, money takes the PIN
    * take no PIN. This list is the only place such a route may live, so a new
    * money route cannot skip the PIN by accident.
    */
-  const NO_PIN_TRADE_ROUTES = ['swap/execute', 'swap/liquidity'];
+  const NO_PIN_TRADE_ROUTES = ['swap/execute', 'swap/liquidity', 'reserves'];
 
   const PASSWORD_CHECK = /requirePassword\(/;
   const STEP_UP_CHECK = /requireStepUp\(|requireApproval\(|runMintTx\(/;

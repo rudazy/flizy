@@ -21,6 +21,7 @@ import { siteOrigin } from '../../../../lib/siteOrigin';
 import { symbolLabel } from '../../../../lib/listedTokens';
 import { cleanPayNote } from '../../../../lib/payLink.ts';
 import { quoteRefusal, quoteSwapPay, receivedInReceipt, type SwapPayAsset } from '../../../../lib/swapPay.ts';
+import { assertSpendable } from '../../../../lib/reserveStore';
 
 const ROUTE = '/api/pay/swap';
 
@@ -133,6 +134,15 @@ export async function POST(req: Request) {
       const walletAddr = viaGator ? predictGatorAddress(payerId) : signer.address;
       const ethBal = await provider.getBalance(walletAddr);
       const gasBuf = viaGator ? await gatorGasReserveWei(provider, walletAddr) : gasBufferWei();
+      const fence = await assertSpendable(supabase, payerId, {
+        asset: 'ETH',
+        holding: ethBal,
+        amount: quote.ethIn,
+        gas: gasBuf,
+        decimals: 18,
+        label: 'ETH',
+      });
+      if (!fence.ok) return NextResponse.json({ error: fence.message }, { status: 400 });
       if (ethBal < quote.ethIn + gasBuf) {
         return NextResponse.json({ error: fundingWallText({ kind: 'native', address: walletAddr }) }, { status: 400 });
       }

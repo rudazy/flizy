@@ -420,7 +420,7 @@ export async function POST(req: Request, { params }: { params: { action: string 
         const daily = await checkDailyNativeLimit(supabase, accountId, plan.value);
         if (!daily.ok) return NextResponse.json({ error: daily.message }, { status: 403 });
       }
-      await assertCanPay(ctx.provider, viewer, plan.value, plan.calls.length);
+      await assertCanPay(ctx.provider, viewer, plan.value, plan.calls.length, { supabase, accountId });
 
       const { data: logRow, error: logError } = await supabase
         .from('transfers')

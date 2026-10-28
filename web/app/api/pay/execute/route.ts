@@ -27,6 +27,7 @@ import { formatPaymentReceived, payerLabel } from '../../../../lib/payNotice.ts'
 import { siteOrigin } from '../../../../lib/siteOrigin';
 import { symbolLabel } from '../../../../lib/listedTokens';
 import { cleanPayNote } from '../../../../lib/payLink.ts';
+import { assertSpendable, resolveReserveAsset } from '../../../../lib/reserveStore';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -133,6 +134,15 @@ export async function POST(req: Request) {
       if (amountWei <= 0n) {
         return NextResponse.json({ error: 'Amount must be greater than zero.' }, { status: 400 });
       }
+      const ethFence = await assertSpendable(supabase, payerId, {
+        asset: 'ETH',
+        holding: ethBal,
+        amount: amountWei,
+        gas: gasBuf,
+        decimals: 18,
+        label: 'ETH',
+      });
+      if (!ethFence.ok) return NextResponse.json({ error: ethFence.message }, { status: 400 });
       if (ethBal < amountWei + gasBuf) {
         return NextResponse.json(
           { error: fundingWallText({ kind: 'native', address: walletAddr }) },
@@ -233,6 +243,17 @@ export async function POST(req: Request) {
       if (amountTok <= 0n) {
         return NextResponse.json({ error: 'Amount must be greater than zero.' }, { status: 400 });
       }
+      const info = resolveReserveAsset(asset);
+      if (!info) return NextResponse.json({ error: 'Could not read Savings. Nothing was sent.' }, { status: 400 });
+      const gasFence = await assertSpendable(supabase, payerId, {
+        asset: 'ETH',
+        holding: ethBal,
+        amount: 0n,
+        gas: gasBuf,
+        decimals: 18,
+        label: 'ETH',
+      });
+      if (!gasFence.ok) return NextResponse.json({ error: gasFence.message }, { status: 400 });
       if (ethBal < gasBuf) {
         return NextResponse.json(
           { error: fundingWallText({ kind: 'gas', address: walletAddr }) },
@@ -240,6 +261,15 @@ export async function POST(req: Request) {
         );
       }
       const tokBal = await erc20.balanceOf(walletAddr);
+      const tokenFence = await assertSpendable(supabase, payerId, {
+        asset: info.asset,
+        holding: tokBal,
+        amount: amountTok,
+        gas: 0n,
+        decimals: info.decimals,
+        label: info.label,
+      });
+      if (!tokenFence.ok) return NextResponse.json({ error: tokenFence.message }, { status: 400 });
       if (tokBal < amountTok) {
         return NextResponse.json(
           { error: fundingWallText({ kind: 'token', asset, address: walletAddr }) },

@@ -72,7 +72,7 @@ export async function runMintTx(args: {
       const daily = await checkDailyNativeLimit(supabase, accountId, tx.value);
       if (!daily.ok) throw new MintError(daily.message, 403);
     }
-    await assertCanPay(ctx.provider, viewer, tx.value, tx.calls.length);
+    await assertCanPay(ctx.provider, viewer, tx.value, tx.calls.length, { supabase, accountId });
 
     const { data: logRow, error: logError } = await supabase
       .from('transfers')

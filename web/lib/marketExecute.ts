@@ -12,6 +12,7 @@ import { ethers } from 'ethers';
 import { deriveAgentWallet } from './dexServer';
 import { executeApprovalCall, executeGatorCall, gatorGasReserveWei } from './gatorExecute.ts';
 import { ClientError } from './apiError';
+import { assertSpendable } from './reserveStore.ts';
 
 export type MarketCall = { target: string; value: bigint; data: string };
 
@@ -26,7 +27,8 @@ export async function assertCanPay(
   provider: ethers.JsonRpcProvider,
   wallet: { address: string; viaGator: boolean },
   value: bigint,
-  calls: number
+  calls: number,
+  fence?: { supabase: { from: (table: string) => unknown }; accountId: string } | null
 ): Promise<void> {
   const balance = await provider.getBalance(wallet.address);
   let gas: bigint;
@@ -36,6 +38,17 @@ export async function assertCanPay(
     const fee = await provider.getFeeData();
     const price = fee.maxFeePerGas || fee.gasPrice || ethers.parseUnits('1', 'gwei');
     gas = price * EOA_GAS_LIMIT * BigInt(calls);
+  }
+  if (fence?.accountId) {
+    const available = await assertSpendable(fence.supabase, fence.accountId, {
+      asset: 'ETH',
+      holding: balance,
+      amount: value,
+      gas,
+      decimals: 18,
+      label: 'ETH',
+    });
+    if (!available.ok) throw new ClientError(available.message);
   }
   if (balance < value + gas) {
     const need = ethers.formatEther(value + gas);
