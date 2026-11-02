@@ -483,11 +483,42 @@ describe('the site mirror agrees with the engine', () => {
     );
   });
 
+  it('takes ETH only into Savings, in chat and on the site, and still lets a token out', () => {
+    assert.equal(bot.SAVINGS_ASSET, 'ETH');
+    assert.equal(webMath.SAVINGS_ASSET, bot.SAVINGS_ASSET);
+    assert.equal(webMath.SAVINGS_ETH_ONLY, bot.SAVINGS_ETH_ONLY);
+    const route = read('web/app/api/reserves/route.ts');
+    assert.match(route, /if \(direction === 'to_savings' && info\?\.asset !== SAVINGS_ASSET\) \{\s*return NextResponse\.json\(\{ error: SAVINGS_ETH_ONLY \}, \{ status: 400 \}\);/);
+    const chat = read('lib/reservesChat.js');
+    assert.match(chat, /if \(move\.direction === 'to_savings' && info\.asset !== SAVINGS_ASSET\) \{\s*await reply\(ctx, SAVINGS_ETH_ONLY\);/);
+    assert.match(chat, /if \(pending\.direction === 'to_savings' && info\.asset !== SAVINGS_ASSET\) \{/);
+    // The card sends ETH in, and only a transfer back names another asset.
+    assert.match(read('web/components/SavingsCard.tsx'), /asset: saving \? SAVINGS_ASSET : asset/);
+  });
+
+  it('points a send to @savings at an ETH move, and a token send at the ETH-only rule', () => {
+    const cmd = (body) => `{{cmd:${body}}}`;
+    assert.equal(
+      bot.reserveTargetRefusal('0.02', 'ETH', cmd),
+      'Savings is not a person.\nTo move money: {{cmd:transfer 0.02 ETH from spending to savings}}'
+    );
+    assert.equal(bot.reserveTargetRefusal('5', 'TUSD', cmd), `Savings is not a person.\n${bot.SAVINGS_ETH_ONLY}`);
+  });
+
+  it('opens the move from a + on the card, with a review step before anything moves', () => {
+    const card = read('web/components/SavingsCard.tsx');
+    assert.match(card, /<PlusIcon size=\{14\} \/>/);
+    assert.match(card, /aria-label="Move funds to or from Savings"/);
+    assert.match(card, /setStage\('review'\)/);
+    assert.match(card, /\{busy \? 'Moving\.\.\.' : 'Confirm'\}/);
+    assert.match(read('web/components/WalletBalances.tsx'), /available=\{reserveReady && native\?\.balance != null/);
+  });
+
   it('shows the same helper on the card', () => {
     const card = read('web/components/SavingsCard.tsx');
     assert.match(card, /SAVINGS_HELPER/);
-    assert.match(card, /To Savings/);
-    assert.match(card, /To Spending/);
+    assert.match(card, /Move to Savings/);
+    assert.match(card, /tab\('to_spending', 'Transfer'\)/);
     assert.match(read('web/lib/reservesMath.ts'), /This is not a bank account and it does not earn yield\./);
     assert.match(read('web/components/WalletBalances.tsx'), />Available</);
     assert.match(read('web/app/dashboard/page.tsx'), />Available</);

@@ -182,6 +182,28 @@ describe('the worker sends what the passkey signed', () => {
     assert.match(notices[0][1], /could not be sent\. Nothing moved\./);
   });
 
+  it('an approved payment that would use Savings is not sent, and says so', async () => {
+    await open();
+    sign(approvals()[0]);
+    // 1 ETH on chain, 0.9 in Savings: 0.1 is available, the payment is 0.2.
+    fake.db.tables.account_reserves = [{ account_id: ACCOUNT, asset: 'ETH', amount: String(9n * 10n ** 17n) }];
+    const p = chain();
+    assert.equal(await A.sendSignedApprovals({ supabase: db(), provider: p, notify, explorerUrl, relayer: wallet(p), now: NOW, log: quiet }), 0);
+    assert.equal(approvals()[0].status, 'failed');
+    assert.equal(fake.db.tables.transfers[0].status, 'failed');
+    assert.equal(p.calls.includes('broadcast'), false);
+    assert.match(notices[0][1], /was not sent\. Nothing moved\.\nInsufficient available balance\.\nAvailable: 0\.1 ETH/);
+  });
+
+  it('an approved payment within Available is sent, Savings or not', async () => {
+    await open();
+    sign(approvals()[0]);
+    fake.db.tables.account_reserves = [{ account_id: ACCOUNT, asset: 'ETH', amount: String(8n * 10n ** 17n) }];
+    const p = chain();
+    assert.equal(await A.sendSignedApprovals({ supabase: db(), provider: p, notify, explorerUrl, relayer: wallet(p), now: NOW, log: quiet }), 1);
+    assert.equal(approvals()[0].status, 'sent');
+  });
+
   it('an unknown outcome stays submitted with its hash, for the reconciler', async () => {
     await open();
     sign(approvals()[0]);

@@ -286,6 +286,7 @@ export function WalletBalances() {
         hidden={hidden}
         status={reserveStatus}
         rows={reserveRows}
+        available={reserveReady && native?.balance != null && native.balance !== '' ? String(native.balance) : null}
         onMoved={() => {
           setReserveTick((n) => n + 1);
           void refreshAll();

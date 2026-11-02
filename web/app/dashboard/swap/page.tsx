@@ -17,6 +17,7 @@ import { txPin } from '../../../lib/txPin';
 import { TradeWalletSwitch, useTradeWallet } from '../../../components/WalletModeBits';
 import { walletBalances, walletSwap, type WalletSwapQuote } from '../../../lib/walletTrade';
 import { FLZ_TOKEN, WETH_TOKEN, walletErrorText } from '../../../lib/walletChain';
+import { fetchSavings, spendable } from '../../../lib/spendable';
 import {
   ArrowRightIcon,
   ChartLineIcon,
@@ -217,18 +218,19 @@ function SwapPage() {
       return;
     }
     try {
-      const res = await fetch('/api/holdings');
+      const [res, savings] = await Promise.all([fetch('/api/holdings'), fetchSavings()]);
       const data = await res.json();
-      if (!res.ok) return;
+      // Without Savings the chain figure would offer money that cannot be spent.
+      if (!res.ok || !savings) return;
       const rows: Array<{ symbol?: string; address?: string | null; balance?: string | null }> = data?.holdings?.tokens || [];
-      const next: Balances = { ETH: String(data?.holdings?.native?.balance || '0') };
+      const next: Balances = { ETH: spendable(String(data?.holdings?.native?.balance || '0'), 'ETH', savings) };
       const flzTok = rows.find((t) => String(t.symbol || '').toUpperCase() === 'FLZ');
-      next.FLZ = flzTok?.balance != null ? String(flzTok.balance) : '0';
+      next.FLZ = spendable(flzTok?.balance != null ? String(flzTok.balance) : '0', 'FLZ', savings);
       // Listed tokens are matched by contract, so a look-alike symbol someone
       // added by hand cannot stand in for one.
       for (const listed of LISTED_TOKENS) {
         const row = rows.find((t) => String(t.address || '').toLowerCase() === listed.address.toLowerCase());
-        next[listed.symbol] = row?.balance != null ? String(row.balance) : '0';
+        next[listed.symbol] = spendable(row?.balance != null ? String(row.balance) : '0', listed.symbol, savings);
       }
       setBalances(next);
       setBalancesReady(true);

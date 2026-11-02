@@ -9,6 +9,7 @@ import { walletBalances, walletSwap, type WalletSwapQuote } from '../lib/walletT
 import { FLZ_TOKEN, WETH_TOKEN, walletErrorText } from '../lib/walletChain';
 import { formatEthDisplay, maxSpend } from '../lib/tokenFormat';
 import { announceTx } from '../lib/txSignal';
+import { fetchSavings, spendable, type SavingsRow } from '../lib/spendable';
 import {
   ArrowRightIcon,
   CartIcon,
@@ -128,6 +129,17 @@ export function TokenTradeSheet({
       live = false;
     };
   }, [tradeWallet?.address, walletToken, walletDecimals, walletReads]);
+  // The Flizy wallet's Savings, taken off Balance and Max. Null until read, or
+  // when it cannot be: then no balance is offered rather than one counting Savings.
+  const [savings, setSavings] = useState<SavingsRow[] | null>(null);
+  useEffect(() => {
+    if (tradeWallet) return;
+    let live = true;
+    void fetchSavings().then((rows) => live && setSavings(rows));
+    return () => {
+      live = false;
+    };
+  }, [tradeWallet, holdings]);
   const [amount, setAmount] = useState('');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoting, setQuoting] = useState(false);
@@ -140,13 +152,20 @@ export function TokenTradeSheet({
   const buying = side === 'buy';
   const payAsset = buying ? 'ETH' : symbol;
   const getAsset = buying ? symbol : 'ETH';
-  const ethBalance = tradeWallet ? walletHeld?.eth ?? null : holdings?.holdings?.native?.balance ?? null;
+  const flizyEth = holdings?.holdings?.native?.balance;
+  const ethBalance = tradeWallet
+    ? walletHeld?.eth ?? null
+    : flizyEth != null && savings
+      ? spendable(String(flizyEth), 'ETH', savings)
+      : null;
   const tokenRow = (holdings?.holdings?.tokens || []).find((t) =>
     tokenAddress
       ? String(t.address || '').toLowerCase() === tokenAddress.toLowerCase()
       : String(t.symbol || '').toUpperCase() === symbol.toUpperCase()
   );
-  const balance = buying ? ethBalance : tradeWallet ? walletHeld?.token ?? null : tokenRow?.balance ?? null;
+  const flizyToken =
+    tokenRow?.balance != null && savings ? spendable(String(tokenRow.balance), String(tokenRow.symbol || symbol), savings) : null;
+  const balance = buying ? ethBalance : tradeWallet ? walletHeld?.token ?? null : flizyToken;
   const spendMax = maxSpend(balance, buying);
   const maxNum = num(spendMax) ?? 0;
   const amountNum = num(amount) ?? 0;

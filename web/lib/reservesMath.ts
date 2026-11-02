@@ -7,6 +7,14 @@
 export const SAVINGS_HELPER =
   'Funds here are not available for normal spending. This is not a bank account and it does not earn yield.';
 
+/**
+ * Savings takes ETH only. A token already in Savings from before this rule can
+ * still be moved back to Spending, so nothing is stuck there. Mirror of
+ * lib/reserves.js.
+ */
+export const SAVINGS_ASSET = 'ETH';
+export const SAVINGS_ETH_ONLY = 'Savings holds ETH only. Tokens stay in Spending.';
+
 function asBase(value: bigint | string | number): bigint {
   if (typeof value === 'bigint') {
     if (value < 0n) throw new Error('negative base');

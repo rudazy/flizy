@@ -8,7 +8,7 @@ import { tryAccountTxLock, releaseAccountTxLock } from '../../../lib/accountTxLo
 import { gatorGasReserveWei, pointerIsGator } from '../../../lib/gatorExecute';
 import { getWebChain } from '../../../lib/dexServer';
 import { formatAmount } from '../../../lib/amountDisplay';
-import { parseUnits, formatUnits, reserveMoveGas } from '../../../lib/reservesMath';
+import { parseUnits, formatUnits, reserveMoveGas, SAVINGS_ASSET, SAVINGS_ETH_ONLY } from '../../../lib/reservesMath';
 import {
   SAVINGS_HELPER,
   loadReserveRows,
@@ -82,6 +82,9 @@ export async function POST(req: Request) {
     const info = resolveReserveAsset(String(body.asset || ''));
     if (!info && direction === 'to_savings') {
       return NextResponse.json({ error: 'That asset cannot be moved.' }, { status: 400 });
+    }
+    if (direction === 'to_savings' && info?.asset !== SAVINGS_ASSET) {
+      return NextResponse.json({ error: SAVINGS_ETH_ONLY }, { status: 400 });
     }
     const asset = info ? info.asset : String(body.asset || '').trim().toUpperCase();
     if (!/^[A-Z][A-Z0-9]{0,15}$/.test(asset)) {

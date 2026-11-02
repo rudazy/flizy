@@ -8,6 +8,7 @@ import { withinQuickSend } from '../lib/quickSend';
 import { PAY_ASSETS, type PayAsset } from '../lib/payAsset';
 import { listedBySymbol, symbolLabel } from '../lib/listedTokens';
 import { FLZ_TOKEN } from '../lib/walletChain';
+import { fetchSavings, spendable } from '../lib/spendable';
 import type { PayPreset } from '../lib/payLink';
 import { ProfileLink } from './ProfileLink';
 import { ShareReceiptButton } from './ShareReceiptButton';
@@ -187,19 +188,22 @@ export function PayLanding({
     };
   }, [refSlug]);
 
-  /** The payer's Flizy wallet balances, from the same read the wallet page uses. */
+  /**
+   * The payer's Flizy wallet balances, from the same read the wallet page uses,
+   * with Savings taken off: a payment cannot use Savings.
+   */
   const loadBalances = useCallback(async () => {
     try {
-      const res = await fetch('/api/holdings', { cache: 'no-store' });
-      if (!res.ok) throw new Error('unavailable');
+      const [res, savings] = await Promise.all([fetch('/api/holdings', { cache: 'no-store' }), fetchSavings()]);
+      if (!res.ok || !savings) throw new Error('unavailable');
       const body = await res.json();
       const tokens = Array.isArray(body?.holdings?.tokens) ? (body.holdings.tokens as Array<{ address?: string; balance?: string | null }>) : [];
       const of = (address: string | undefined) =>
         (address && tokens.find((t) => String(t.address || '').toLowerCase() === address.toLowerCase())?.balance) || '0';
       setBalances({
-        ETH: String(body?.holdings?.native?.balance ?? '0'),
-        FLZ: of(FLZ_TOKEN),
-        TUSD: of(listedBySymbol('TUSD')?.address),
+        ETH: spendable(String(body?.holdings?.native?.balance ?? '0'), 'ETH', savings),
+        FLZ: spendable(of(FLZ_TOKEN), 'FLZ', savings),
+        TUSD: spendable(of(listedBySymbol('TUSD')?.address), 'TUSD', savings),
       });
     } catch {
       // No balance shown is better than a wrong one; the payment still works.
