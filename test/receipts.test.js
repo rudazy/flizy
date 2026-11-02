@@ -92,13 +92,25 @@ describe('what a receipt shows', () => {
     assert.equal(await R.loadReceipt("'; drop table--", 'GIWA Sepolia', c()), null);
   });
 
-  it('names each person only when they chose to be named on Scan', async () => {
+  it('names each person in full only when they chose to be named on Scan', async () => {
     seed();
     const r = await R.loadReceipt(await R.shareReceipt(SENDER, TX, c()), 'GIWA Sepolia', c());
     assert.deepEqual(
       { amount: r.amount, unit: r.unit, from: r.from, to: r.to, note: r.note, network: r.network },
-      { amount: '50', unit: 'tUSD', from: '@ada', to: 'A Flizy account', note: 'design work', network: 'GIWA Sepolia' }
+      { amount: '50', unit: 'tUSD', from: '@ada', to: 'k***i', note: 'design work', network: 'GIWA Sepolia' }
     );
+  });
+
+  it('masks a hidden username to five characters whatever its length', () => {
+    assert.equal(R.maskUsername('ludarep'), 'l***p');
+    assert.equal(R.maskUsername('sunnysmith'), 's***h');
+    assert.equal(R.maskUsername('ama'), 'a***a');
+  });
+
+  it('falls back to "A Flizy account" when there is no username', async () => {
+    seed({}, { payee: { username: null } });
+    const r = await R.loadReceipt(await R.shareReceipt(SENDER, TX, c()), 'GIWA Sepolia', c());
+    assert.equal(r.to, 'A Flizy account');
   });
 
   it('shortens a wallet outside Flizy rather than printing it whole', async () => {

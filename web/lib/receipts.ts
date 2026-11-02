@@ -15,8 +15,9 @@ import { displaySafeLabel } from './sanitize.ts';
  * What a receipt shows is the minimum that proves a payment: amount, asset,
  * when, the network, the transaction, and what it was for. Each person is
  * named by @username only when they chose to be named on Scan
- * (accounts.scan_show_username); otherwise "A Flizy account", or a shortened
- * address for a wallet outside Flizy. The note is shown because the sharer
+ * (accounts.scan_show_username); otherwise by a masked username (l***p),
+ * "A Flizy account" when there is no username, or a shortened address for a
+ * wallet outside Flizy. The note is shown because the sharer
  * chose to share it; it is flattened like every other text from a person.
  */
 
@@ -117,8 +118,19 @@ export type PartyKind = 'flizy' | 'wallet';
 
 type Party = { username: string | null; scan_show_username: boolean | null };
 
+/**
+ * First and last letter around three stars, whatever the length, so the mask
+ * never tells how long the username is: ludarep -> l***p, ama -> a***a.
+ */
+export function maskUsername(username: string): string {
+  return `${username[0]}***${username[username.length - 1]}`;
+}
+
 function partyLabel(party: Party | null, address: string | null): string {
-  if (party) return party.username && party.scan_show_username === true ? `@${party.username}` : 'A Flizy account';
+  if (party) {
+    if (!party.username) return 'A Flizy account';
+    return party.scan_show_username === true ? `@${party.username}` : maskUsername(party.username);
+  }
   if (address && /^0x[0-9a-fA-F]{40}$/.test(address)) return `${address.slice(0, 6)}…${address.slice(-4)}`;
   return 'A wallet';
 }

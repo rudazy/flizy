@@ -53,8 +53,14 @@ describe('Limits', () => {
 describe('Security', () => {
   it('offers no control for two-step verification, and lists sessions', () => {
     // Two-step verification does not exist yet. Active sessions does.
-    assert.equal((SEC.match(/status="Not available yet"/g) || []).length, 1);
+    assert.equal((SEC.match(/Not available yet/g) || []).length, 1);
     assert.match(SEC, /Two-step verification/);
+    assert.equal((SEC.match(/<Fold[\s>]/g) || []).length, 5);
+    const wallet = read('components/SecureWalletPanel.tsx');
+    assert.match(wallet, /<details className="group\/wallet/);
+    assert.match(wallet, /<details className="group\/step/);
+    assert.match(wallet, /Secure your wallet/);
+    assert.match(wallet, /Passkey on your wallet/);
     assert.match(SEC, /Disconnect all other sessions/);
     assert.match(SEC, /fetch\('\/api\/account\/sessions', \{ cache: 'no-store' \}\)/);
     assert.match(SEC, /fetch\('\/api\/account\/sessions', \{ method: 'POST' \}\)/);

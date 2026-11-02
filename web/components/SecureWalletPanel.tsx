@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { SecretInput } from './AccountConnections';
+import { ChevronDownIcon } from './ExploreIcons';
 
 /**
  * Secure this wallet, steps 1 and 2: a passkey on the wallet, then Flizy's
  * daily spending permissions signed by it (web/lib/custody/ceremony.ts).
- * A section of the Security card, under its settings.
+ * A closed section of the Security card, under its settings.
  *
  * Shown only to pilot accounts; everyone else gets nothing from the status
  * call and this renders nothing, heading included. Ownership still sits with
@@ -153,9 +154,18 @@ export function SecureWalletPanel() {
   }
 
   return (
-    <div className="grid gap-2.5">
-      <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-[#b7b1a8]">Secure your wallet</p>
-      <div className="grid gap-3">
+    <details className="group/wallet rounded-[16px] border border-[#26262a] bg-[#0f0f10]">
+      <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-4 p-4 text-left [&::-webkit-details-marker]:hidden">
+        <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[12px] bg-[#2a2210] text-sun" aria-hidden>
+          <KeyGlyph />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-sans text-[15.5px] font-semibold text-white">Secure your wallet</span>
+          <span className="mt-0.5 block font-sans text-[13px] leading-[1.5] text-[#9a958c]">A passkey, then the daily amount Flizy may spend.</span>
+        </span>
+        <ChevronDownIcon size={16} className="shrink-0 text-[#9a958c] transition-transform group-open/wallet:rotate-180" />
+      </summary>
+      <div className="grid gap-3 border-t border-[#26262a] px-4 pb-4 pt-3">
         <p className="m-0 font-sans text-[13.5px] leading-relaxed text-[#b7b1a8]">
           Put your own passkey on your wallet and sign the small daily amount Flizy may spend for you. Until the last step Flizy still
           holds the owner key, so that limit does not bind Flizy yet.
@@ -220,14 +230,14 @@ export function SecureWalletPanel() {
           </p>
         ) : null}
       </div>
-    </div>
+    </details>
   );
 }
 
 function Step({ n, title, done, children }: { n: number; title: string; done: boolean; children: React.ReactNode }) {
   return (
-    <div className="grid gap-3 rounded-[14px] border border-[#2e2e33] bg-[#0f0f10] p-4">
-      <div className="flex items-center gap-3">
+    <details className="group/step rounded-[14px] border border-[#2e2e33] bg-[#0f0f10]">
+      <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-3 p-4 text-left [&::-webkit-details-marker]:hidden">
         <span
           className={`flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full font-sans text-[13px] font-semibold ${
             done ? 'bg-sun text-sun-ink' : 'border border-[#3a3833] text-[#d9d4ca]'
@@ -241,9 +251,19 @@ function Step({ n, title, done, children }: { n: number; title: string; done: bo
             n
           )}
         </span>
-        <p className="m-0 font-sans text-[15px] font-semibold text-white">{title}</p>
-      </div>
-      {children}
-    </div>
+        <span className="min-w-0 flex-1 font-sans text-[15px] font-semibold text-white">{title}</span>
+        <ChevronDownIcon size={16} className="shrink-0 text-[#9a958c] transition-transform group-open/step:rotate-180" />
+      </summary>
+      <div className="grid gap-3 border-t border-[#2e2e33] px-4 pb-4 pt-3">{children}</div>
+    </details>
+  );
+}
+
+function KeyGlyph() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="8" cy="14" r="4" />
+      <path d="M11.5 11.5L20 3M16 7l2 2M18 5l2 2" />
+    </svg>
   );
 }

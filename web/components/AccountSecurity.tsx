@@ -497,93 +497,77 @@ export function SecurityPanel({
         art={<HeroArt src="/account/security-hero.webp" />}
       />
 
-      <div className="grid gap-5 px-4 pb-5 pt-2">
-        <div className="flex items-center gap-4 rounded-[16px] border border-[#2e2e33] bg-[#0f0f10] p-4">
-          <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-[#2a2210] text-sun" aria-hidden>
-            <PersonGlyph />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="m-0 font-sans text-[13px] text-[#9a958c]">Signed in as</p>
-            <p className="m-0 mt-0.5 break-all font-sans text-[16px] font-semibold text-white">
-              {email || 'No email on this account'}
-            </p>
-            {email ? (
-              <span
-                className={`mt-1.5 inline-flex h-[24px] items-center gap-1.5 rounded-full border px-2.5 font-sans text-[12px] ${
-                  emailVerified ? 'border-[#1f4a2c] bg-[#0f2a18] text-[#4ade80]' : 'border-[#5a4a1f] bg-[#16130b] text-sun'
-                }`}
-              >
-                <span className={`h-[7px] w-[7px] rounded-full ${emailVerified ? 'bg-[#4ade80]' : 'bg-sun'}`} aria-hidden />
-                {emailVerified ? 'Verified' : 'Not verified'}
-              </span>
-            ) : null}
-          </div>
+      <div className="grid gap-2.5 px-4 pb-5 pt-2">
+        <Fold icon={<PersonGlyph />} title="Signed in as" text={email || 'No email on this account'}>
+          {email ? (
+            <span
+              className={`inline-flex h-[24px] w-fit items-center gap-1.5 rounded-full border px-2.5 font-sans text-[12px] ${
+                emailVerified ? 'border-[#1f4a2c] bg-[#0f2a18] text-[#4ade80]' : 'border-[#5a4a1f] bg-[#16130b] text-sun'
+              }`}
+            >
+              <span className={`h-[7px] w-[7px] rounded-full ${emailVerified ? 'bg-[#4ade80]' : 'bg-sun'}`} aria-hidden />
+              {emailVerified ? 'Verified' : 'Not verified'}
+            </span>
+          ) : (
+            <p className="m-0 font-sans text-[13px] text-[#9a958c]">No email on this account.</p>
+          )}
           <button
             type="button"
             onClick={onChangeEmail}
-            className="inline-flex h-[42px] shrink-0 items-center gap-1 rounded-[10px] border border-[#5a4a1f] px-3.5 font-sans text-[14px] font-medium text-sun hover:border-sun/70"
+            className="inline-flex h-[44px] w-fit items-center rounded-[10px] border border-[#5a4a1f] px-3.5 font-sans text-[14px] font-medium text-sun hover:border-sun/70"
           >
             {email ? 'Change email' : 'Add email'}
           </button>
-        </div>
+        </Fold>
 
-        <div className="grid gap-2.5">
-          <SectionLabel>Security settings</SectionLabel>
-          <SettingRow
-            icon={<LockGlyph />}
-            title="Account password"
-            text="Approves trusted wallets, limits, your PIN and other sensitive changes."
-            action={
-              <button
-                type="button"
-                onClick={() => setChanging(true)}
-                aria-haspopup="dialog"
-                className="inline-flex h-[42px] shrink-0 items-center rounded-[10px] border border-[#5a4a1f] px-4 font-sans text-[14px] font-medium text-sun hover:border-sun/70"
-              >
-                Change
-              </button>
-            }
-          />
-          <SettingRow icon={<ShieldGlyph />} title="Two-step verification" text="An extra check when you sign in." status="Not available yet" muted />
-          <ActiveSessions />
-        </div>
+        <Fold icon={<LockGlyph />} title="Account password" text="Approves trusted wallets, limits, your PIN and other sensitive changes.">
+          <button
+            type="button"
+            onClick={() => setChanging(true)}
+            aria-haspopup="dialog"
+            className="inline-flex h-[44px] w-fit items-center rounded-[10px] border border-[#5a4a1f] px-4 font-sans text-[14px] font-medium text-sun hover:border-sun/70"
+          >
+            Change
+          </button>
+        </Fold>
+
+        <Fold
+          icon={<ShieldGlyph />}
+          title="Two-step verification"
+          text="An extra check when you sign in."
+          muted
+          extra={<span className="shrink-0 rounded-full bg-[#1d1d20] px-3 py-1 font-sans text-[12px] text-[#9a958c]">Not available yet</span>}
+        >
+          <p className="m-0 font-sans text-[13px] text-[#9a958c]">This check is not offered yet.</p>
+        </Fold>
+
+        <ActiveSessions />
 
         {wallet}
 
-        <div className="grid gap-2.5">
-          <SectionLabel>Legal</SectionLabel>
-          {/*
-            The signed-in app has no footer (AppChrome returns early for
-            /dashboard), so without these the only copy of the agreement a user
-            accepted is unreachable from inside the product.
-          */}
-          <div className="grid gap-2.5 sm:grid-cols-3">
+        {/*
+          The signed-in app has no footer (AppChrome returns early for
+          /dashboard), so without these the only copy of the agreement a user
+          accepted is unreachable from inside the product.
+        */}
+        <Fold icon={<DocGlyph />} title="Legal" text="Security docs, the terms, and the privacy policy.">
+          <div className="grid gap-2.5">
             <LegalCard href="/docs" icon={<DocGlyph />} title="Security docs" text="Learn how we keep your assets safe." />
             <LegalCard href="/terms" icon={<ListGlyph />} title="Terms of service" text="Rules for using Flizy." />
             <LegalCard href="/privacy" icon={<ShieldGlyph />} title="Privacy policy" text="How we protect your data." />
           </div>
-        </div>
+        </Fold>
 
-        <div className="grid gap-2.5">
-          <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-[#f87171]">Danger zone</p>
+        <Fold icon={<SignOutGlyph />} title={signingOut ? 'Signing out...' : 'Sign out'} text="Sign out from this device." danger>
           <button
             type="button"
             onClick={onSignOut}
             disabled={signingOut}
-            className="flex min-h-[68px] w-full items-center gap-4 rounded-[16px] border border-[#6b2430] bg-[linear-gradient(90deg,rgba(220,38,38,0.12),rgba(220,38,38,0.02))] px-4 py-3 text-left hover:border-[#8a2f3c] disabled:opacity-60"
+            className="inline-flex h-[44px] w-full items-center justify-center rounded-[10px] border border-[#6b2430] font-sans text-[14px] font-medium text-[#f87171] hover:border-[#8a2f3c] disabled:opacity-60"
           >
-            <span className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[12px] bg-[#2a1216] text-[#f87171]" aria-hidden>
-              <SignOutGlyph />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-sans text-[16px] font-semibold text-white">{signingOut ? 'Signing out...' : 'Sign out'}</span>
-              <span className="mt-0.5 block font-sans text-[13px] text-[#b7b1a8]">Sign out from this device.</span>
-            </span>
-            <span className="text-[#f87171]" aria-hidden>
-              <ChevronGlyph />
-            </span>
+            {signingOut ? 'Signing out...' : 'Sign out'}
           </button>
-        </div>
+        </Fold>
       </div>
 
       {changing ? (
@@ -669,11 +653,46 @@ function ChangePasswordSheet({
   );
 }
 
-function SectionLabel({ children }: { children: ReactNode }) {
-  return <p className="m-0 font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-[#b7b1a8]">{children}</p>;
+/** A closed security block. The header stays visible. The control is inside. */
+function Fold({
+  icon,
+  title,
+  text,
+  extra,
+  muted = false,
+  danger = false,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  extra?: ReactNode;
+  muted?: boolean;
+  danger?: boolean;
+  children: ReactNode;
+}) {
+  const box = danger
+    ? 'border-[#6b2430] bg-[linear-gradient(90deg,rgba(220,38,38,0.12),rgba(220,38,38,0.02))]'
+    : 'border-[#26262a] bg-[#0f0f10]';
+  const mark = danger ? 'bg-[#2a1216] text-[#f87171]' : muted ? 'bg-[#18181a] text-[#9a958c]' : 'bg-[#2a2210] text-sun';
+  return (
+    <details className={`group rounded-[16px] border ${box}`}>
+      <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-4 p-4 text-left [&::-webkit-details-marker]:hidden">
+        <span className={`flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[12px] ${mark}`} aria-hidden>
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-sans text-[15.5px] font-semibold text-white">{title}</span>
+          <span className="mt-0.5 block truncate font-sans text-[13px] leading-[1.5] text-[#9a958c]">{text}</span>
+        </span>
+        {extra}
+        <ChevronDownIcon size={16} className="shrink-0 text-[#9a958c] transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="grid gap-3 border-t border-[#26262a] px-4 pb-4 pt-3">{children}</div>
+    </details>
+  );
 }
 
-/** A setting: its state, and its control when one exists. */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 type SessionRow = {
@@ -802,45 +821,6 @@ function ActiveSessions() {
         </button>
       </div>
     </details>
-  );
-}
-
-function SettingRow({
-  icon,
-  title,
-  text,
-  status,
-  action,
-  muted = false,
-}: {
-  icon: ReactNode;
-  title: string;
-  text: string;
-  status?: string;
-  /** A real control for this setting, when one exists. */
-  action?: ReactNode;
-  muted?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-4 rounded-[16px] border border-[#26262a] bg-[#0f0f10] p-4">
-      <span className={`flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[12px] ${muted ? 'bg-[#18181a] text-[#9a958c]' : 'bg-[#2a2210] text-sun'}`} aria-hidden>
-        {icon}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="m-0 font-sans text-[15.5px] font-semibold text-white">{title}</p>
-        <p className="m-0 mt-0.5 font-sans text-[13px] leading-[1.5] text-[#9a958c]">{text}</p>
-      </div>
-      {status ? (
-        <span
-          className={`shrink-0 rounded-full px-3 py-1 font-sans text-[12px] ${
-            muted ? 'bg-[#1d1d20] text-[#9a958c]' : 'border border-[#1f4a2c] bg-[#0f2a18] text-[#4ade80]'
-          }`}
-        >
-          {status}
-        </span>
-      ) : null}
-      {action}
-    </div>
   );
 }
 
