@@ -239,7 +239,8 @@ describe('first steps on Home', () => {
     assert.match(steps, /lastClaim\?\.status === 'sent' \|\| faucet\?\.lastClaim\?\.status === 'confirmed'/);
     assert.match(read('web/app/api/history/route.ts'), /\.in\('status', \['sent', 'confirmed'\]\)/);
     assert.match(steps, /swapped: stats\.swaps > 0/);
-    assert.match(steps, /sent: stats\.sends > 0/);
+    assert.match(steps, /chatLinked: starter\.chatLinked/);
+    assert.match(steps, /paidHost: starter\.paidHost/);
     assert.match(read('web/app/api/account/stats/route.ts'), /\.eq\('from_account_id', accountId\)\s*\.neq\('status', 'cancelled'\)/);
   });
 

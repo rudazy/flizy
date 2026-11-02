@@ -5,20 +5,24 @@ import Link from 'next/link';
 import { useDashboard } from './DashboardProvider';
 import { CheckIcon, ChevronRightIcon } from './ExploreIcons';
 import { TX_EVENT } from '../lib/txSignal';
+import { STARTER_AMOUNT_ETH, STARTER_HOST } from '../lib/starterHost';
 
 /**
- * First steps on Home: free test ETH, a first swap, a first payment.
+ * The starter pack on Home: link a chat, free test ETH, a first payment to
+ * STARTER_HOST (the card suggests chat; a send from the site counts too), a
+ * first swap.
  *
  * Most accounts finish sign-up and never move anything, so Home points at the
- * three things that make the wallet real. Each step ticks from the account's
- * own data (a sent faucet claim or a balance, a confirmed swap, a confirmed
- * send or claim), the card re-reads after every transaction, and it goes away
- * once all three are done or the person hides it.
+ * four things that make the wallet real. Each step ticks from the account's
+ * own data (a linked WhatsApp or Telegram, a sent faucet claim or a balance,
+ * a confirmed ETH send to the host, a confirmed swap), the card re-reads after
+ * every transaction, and it goes away once all four are done or the person
+ * hides it.
  */
 
 const HIDE_KEY = 'flizy:first-steps-hidden';
 
-type Progress = { funded: boolean; swapped: boolean; sent: boolean };
+type Progress = { chatLinked: boolean; funded: boolean; paidHost: boolean; swapped: boolean };
 
 function hiddenBefore(): boolean {
   try {
@@ -38,14 +42,21 @@ export function FirstSteps() {
 
   const load = useCallback(async () => {
     try {
-      const [statsRes, faucetRes] = await Promise.all([fetch('/api/account/stats'), fetch('/api/faucet')]);
+      const [statsRes, faucetRes, starterRes] = await Promise.all([
+        fetch('/api/account/stats'),
+        fetch('/api/faucet'),
+        fetch('/api/account/starter'),
+      ]);
       const stats = await statsRes.json().catch(() => null);
       const faucet = await faucetRes.json().catch(() => null);
-      if (!statsRes.ok || typeof stats?.swaps !== 'number' || typeof stats?.sends !== 'number') return;
+      const starter = await starterRes.json().catch(() => null);
+      if (!statsRes.ok || typeof stats?.swaps !== 'number') return;
+      if (!starterRes.ok || typeof starter?.chatLinked !== 'boolean' || typeof starter?.paidHost !== 'boolean') return;
       setProgress({
+        chatLinked: starter.chatLinked,
         funded: faucetRes.ok && (faucet?.lastClaim?.status === 'sent' || faucet?.lastClaim?.status === 'confirmed'),
+        paidHost: starter.paidHost,
         swapped: stats.swaps > 0,
-        sent: stats.sends > 0,
       });
     } catch {
       // Without the figures the card stays away rather than guessing.
@@ -68,22 +79,28 @@ export function FirstSteps() {
 
   const steps = [
     {
+      done: progress.chatLinked,
+      title: 'Link WhatsApp or Telegram',
+      sub: 'Use Flizy from the chat you already have.',
+      href: '/dashboard/account?s=chat',
+    },
+    {
       done: progress.funded || balance > 0,
       title: 'Get free test ETH',
       sub: 'One tap in Wallet, Fund.',
       href: '/dashboard/wallet?s=fund',
     },
     {
+      done: progress.paidHost,
+      title: `Send ${STARTER_AMOUNT_ETH} ETH to @${STARTER_HOST}`,
+      sub: `In your chat, type: send ${STARTER_AMOUNT_ETH} to @${STARTER_HOST}`,
+      href: '/dashboard/account?s=chat',
+    },
+    {
       done: progress.swapped,
       title: 'Make your first swap',
       sub: 'Trade a little ETH for FLZ.',
       href: '/dashboard/swap',
-    },
-    {
-      done: progress.sent,
-      title: 'Pay someone',
-      sub: "Send from WhatsApp or Telegram, or open a friend's pay link.",
-      href: '/dashboard/account?s=chat',
     },
   ];
   const doneCount = steps.filter((s) => s.done).length;
@@ -99,10 +116,10 @@ export function FirstSteps() {
   }
 
   return (
-    <section className="rounded-[6px] border border-[#2a2b30] bg-[#0f0f10] px-[12px] pb-[10px] pt-[12px]" aria-label="First steps">
+    <section className="rounded-[6px] border border-[#2a2b30] bg-[#0f0f10] px-[12px] pb-[10px] pt-[12px]" aria-label="Starter pack">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="m-0 font-sans text-[13px] font-semibold text-white">First steps</p>
+          <p className="m-0 font-sans text-[13px] font-semibold text-white">Starter pack</p>
           <p className="m-0 font-sans text-[11px] text-[#a9a9a9]">
             {doneCount} of {steps.length} done
           </p>
