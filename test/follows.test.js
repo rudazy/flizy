@@ -234,6 +234,14 @@ describe('profile visibility', () => {
     assert.match(src, /4000/);
     assert.doesNotMatch(src, /console\./);
   });
+
+  it('shows Available as the portfolio value, never a total that counts Savings', () => {
+    const src = read('web/lib/profileShare.ts');
+    assert.match(src, /Promise\.all\(\[nativeBalance\(raw\), ethInSavings\(accountId\)\]\)/);
+    assert.match(src, /if \(wei !== null && saved !== null\) portfolioEth = toEth\(availableBase\(wei, saved\)\);/);
+    // A Savings read that fails shows no value, not the chain total.
+    assert.match(src, /if \(!loaded\.ok\) return null;/);
+  });
 });
 
 describe('swap lines and volume', () => {
@@ -418,9 +426,9 @@ describe('follow screens', () => {
     assert.doesNotMatch(read('web/app/robots.ts'), /disallow: \[[^\]]*\/people|disallow: \[[^\]]*\/u\//);
     assert.match(read('web/public/llms.txt'), /\/u\/:username/);
     assert.match(read('web/public/llms.txt'), /flizy\.app\/people/);
-    assert.match(read('web/app/privacy/page.tsx'), /28 October 2026/);
+    assert.match(read('web/app/privacy/page.tsx'), /3 November 2026/);
     assert.match(read('web/app/privacy/page.tsx'), /Show wallet address/);
-    assert.match(read('web/app/privacy/page.tsx'), /Show portfolio value/);
+    assert.match(read('web/app/privacy/page.tsx'), /Show portfolio value shows that wallet's available ETH balance; ETH\s+you moved to Savings is not included\./);
     assert.match(read('web/app/privacy/page.tsx'), /Following does not send a payment/);
     assert.match(read('web/app/privacy/page.tsx'), /nothing is copied yet/);
     assert.match(read('web/app/privacy/page.tsx'), /Show activity/);

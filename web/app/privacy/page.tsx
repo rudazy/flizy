@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '28 October 2026';
+const UPDATED = '3 November 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -134,7 +134,8 @@ export default function PrivacyPage() {
               stats. Activity on a profile stays hidden unless you turn on Show activity.
               Choosing Private turns those switches off and removes the profile from search.
               Choosing Public turns them on. Show wallet address shows the wallet on the
-              profile. Show portfolio value shows that wallet's ETH balance. The profile
+              profile. Show portfolio value shows that wallet's available ETH balance; ETH
+              you moved to Savings is not included. The profile
               link still opens when the profile is private.
               Following does not send a payment and does not open a chat.
             </li>
