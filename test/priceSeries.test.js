@@ -117,6 +117,15 @@ describe('listTokens', () => {
     assert.equal(flz.spark.length, S.SPARK_POINTS);
   });
 
+  it('uses the index only for a pair it holds, and the chain read for one that is behind', () => {
+    const DCAT_PAIR = '0x3083C7Aa86Bc20256439c102156E7fCbe7b91797';
+    const indexed = { now: NOW, windows: { [FLZ_PAIR.toLowerCase()]: { prices: [], trades: 2 } } };
+    const dcat = day('DCAT', DCAT_PAIR, { prints: [{ time: NOW - 100, priceEth: 0.002, volumeEth: 1 }] });
+    const rows = R.listTokens({ flzDay: day('FLZ', FLZ_PAIR), listedDays: [dcat, null, null, null], indexed, watched: [], oneHour: () => ({ change1hPct: null }) });
+    assert.equal(rows[0].trades24h, 2, 'FLZ from the index');
+    assert.equal(rows[1].trades24h, 1, 'DCAT from its own chain read, not a false zero');
+  });
+
   it('falls back to the chain prints when the index is not there, and drops the count when that read failed', () => {
     const prints = [{ time: NOW - 100, priceEth: 0.002, volumeEth: 1 }];
     const [ok] = R.listTokens({ flzDay: day('FLZ', FLZ_PAIR, { prints }), listedDays: [], indexed: null, watched: [], oneHour: () => ({ change1hPct: null }) });

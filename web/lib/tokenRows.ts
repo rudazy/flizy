@@ -7,9 +7,9 @@ import type { PairWindow } from './pairEvents.ts';
  *
  * The pool figures (price, liquidity, market cap) come from the pool itself,
  * read now, exactly as before. The 24-hour line, change and trade count come
- * from the event index when it can be read (indexed, keyed by lower-case pair
- * address), and otherwise from the swap prints the chain read returned, so the
- * row still has a line when the index is down. change1hPct stays as it was for
+ * from the event index when it holds that pair and is current (indexed, keyed
+ * by lower-case pair address), and otherwise from the swap prints the chain
+ * read returned, so a row never reads an index that has not caught up. change1hPct stays as it was for
  * the trending strip and the Gainers filter.
  */
 

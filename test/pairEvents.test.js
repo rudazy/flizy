@@ -56,7 +56,7 @@ function syncLog(pair, block, tx, index, r0, r1) {
 }
 
 /** A chain stand-in: logs by block, refusals by chunk start, receipts by hash. */
-function chain({ head = 200_000, logs = [], refuse = new Set(), receipts = {} } = {}) {
+function chain({ head = 200_000, logs = [], refuse = new Set(), maxRange = Infinity, receipts = {} } = {}) {
   const calls = [];
   return {
     calls,
@@ -65,6 +65,7 @@ function chain({ head = 200_000, logs = [], refuse = new Set(), receipts = {} } 
     getLogs: async ({ address, fromBlock, toBlock }) => {
       calls.push([fromBlock, toBlock]);
       if (refuse.has(fromBlock)) throw new Error('range refused');
+      if (toBlock - fromBlock + 1 > maxRange) throw new Error('range too large');
       const want = new Set([].concat(address).map((a) => a.toLowerCase()));
       return logs.filter((l) => l.blockNumber >= fromBlock && l.blockNumber <= toBlock && want.has(l.address.toLowerCase()));
     },
@@ -144,14 +145,53 @@ describe('indexRange', () => {
 });
 
 describe('pollPairs and the cursor', () => {
-  it('starts a day back with no cursor, then resumes after it', async () => {
+  it('starts a day back with no cursor, reads a bounded slice per call, then resumes after it', async () => {
     const provider = chain({ head: 200_000 });
-    await E.pollPairs({ provider, db: fake.client, chainId: CHAIN, pairs: [flz] });
-    assert.equal(provider.calls[0][0], 200_000 - E.DAY_BLOCKS);
+    const first = await E.pollPairs({ provider, db: fake.client, chainId: CHAIN, pairs: [flz] });
+    const start = 200_000 - E.DAY_BLOCKS;
+    assert.equal(provider.calls[0][0], start);
+    const sliceEnd = start + E.MAX_POLL_BLOCKS - 1;
+    assert.equal(fake.db.tables.pair_index_cursors[0].indexed_to, sliceEnd);
+    assert.equal(first.indexedTo.get(flz.pair), sliceEnd);
+    assert.equal(E.isCurrent(first.indexedTo.get(flz.pair), first.head), false, 'not current yet: its row reads the chain');
+    // Later calls catch up to the head, then read only what is new.
+    for (let i = 0; i < 5; i += 1) await E.pollPairs({ provider: chain({ head: 200_000 }), db: fake.client, chainId: CHAIN, pairs: [flz] });
     assert.equal(fake.db.tables.pair_index_cursors[0].indexed_to, 200_000);
     const later = chain({ head: 200_050 });
-    await E.pollPairs({ provider: later, db: fake.client, chainId: CHAIN, pairs: [flz] });
+    const caught = await E.pollPairs({ provider: later, db: fake.client, chainId: CHAIN, pairs: [flz] });
     assert.deepEqual(later.calls, [[200_001, 200_050]]);
+    assert.equal(E.isCurrent(caught.indexedTo.get(flz.pair), caught.head), true);
+  });
+
+  it('counts a pair as current only within FRESH_BLOCKS of the head, and never with no cursor', () => {
+    assert.equal(E.isCurrent(undefined, 1000), false);
+    assert.equal(E.isCurrent(1000 - E.FRESH_BLOCKS, 1000), true);
+    assert.equal(E.isCurrent(1000 - E.FRESH_BLOCKS - 1, 1000), false);
+  });
+
+  it('asks for one pair address per request, the shape the chart read already uses', async () => {
+    const seen = [];
+    const provider = chain();
+    const getLogs = provider.getLogs;
+    provider.getLogs = async (q) => {
+      seen.push(q.address);
+      return getLogs(q);
+    };
+    await E.indexRange({ provider, db: fake.client, chainId: CHAIN, pairs: pairs.slice(0, 2), from: 0, to: 10 });
+    assert.ok(seen.length === 2 && seen.every((a) => typeof a === 'string'));
+  });
+
+  it('splits a range the node refuses and reads it in smaller pieces before giving up', async () => {
+    // A node that caps a log request at 2,000 blocks.
+    const provider = chain({ logs: [swapLog(DEX.pair, 4_500, 1, 0)], maxRange: 2_000 });
+    const r = await E.indexRange({ provider, db: fake.client, chainId: CHAIN, pairs: [flz], from: 0, to: 8_999 });
+    assert.deepEqual(r.failed, []);
+    assert.equal(r.contiguousTo, 8_999);
+    assert.equal(rows().length, 1);
+    // Below MIN_SPLIT it gives up and reports the chunk.
+    const tight = chain({ maxRange: 500 });
+    const t = await E.indexRange({ provider: tight, db: fake.client, chainId: CHAIN, pairs: [flz], from: 0, to: 8_999 });
+    assert.deepEqual(t.failed, [[0, 8_999]]);
   });
 
   it('never moves a cursor back', async () => {

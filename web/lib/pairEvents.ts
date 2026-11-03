@@ -4,7 +4,8 @@
  *
  * Three writers share this file and none of them is trusted on its own word:
  *   - the poller reads logs with eth_getLogs from where the pair's cursor
- *     stopped (never further back than 24 hours) to the chain head;
+ *     stopped (never further back than 24 hours) toward the chain head, a
+ *     bounded slice per call;
  *   - the backfill script reads them from a pair's deploy block;
  *   - the Nodit webhook only names transactions. Each is re-read here with
  *     eth_getTransactionReceipt, and only a successful transaction's logs that
@@ -12,8 +13,9 @@
  * Every row is keyed by chain, tx hash and log index and inserted with
  * ignoreDuplicates, so a log written twice lands once.
  *
- * A log chunk the node refuses twice is skipped: the other chunks are still
- * written, and the cursor stops before the gap so the next run reads it again.
+ * A log range the node refuses twice is split and read in smaller pieces; one
+ * that still cannot be read is skipped: the other chunks are still written,
+ * and the cursor stops before the gap so the next run reads it again.
  *
  * The database and the provider arrive as arguments; nothing here reaches for
  * a global client, so a script and the tests can drive it.
@@ -34,6 +36,16 @@ export const SYNC_TOPIC = iface.getEvent('Sync')!.topicHash;
 
 /** Under GIWA's refusal point (about 10,000 blocks per log request). */
 export const LOG_CHUNK = 9_000;
+/** The smallest range a refused log request is split down to before it counts as failed. */
+export const MIN_SPLIT = 1_000;
+/**
+ * Blocks one poll reads at most (three chunks, 7.5 hours). A request that
+ * refreshes the index stays short; a pair that is further behind catches up
+ * over the next polls, and until then its row reads the chain directly.
+ */
+export const MAX_POLL_BLOCKS = 3 * LOG_CHUNK;
+/** A pair's index is used for its row only when its cursor is this close to the head (two minutes). */
+export const FRESH_BLOCKS = 120;
 /** GIWA closes a block every second, so a day is this many blocks. */
 export const DAY_BLOCKS = 86_400;
 /** Transactions one webhook call may ask about. */
@@ -163,8 +175,32 @@ export type RangeResult = {
 };
 
 /**
+ * One pair's Swap and Sync logs over [a, b]: one address per request, the
+ * shape the chart's own read already uses on every RPC. Tried twice; a range
+ * still refused is split in half and each half read the same way, down to
+ * MIN_SPLIT blocks, in case the node caps the range below LOG_CHUNK. Null when
+ * some part could not be read.
+ */
+async function pairLogs(provider: ChainReader, address: string, a: number, b: number): Promise<RawLog[] | null> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return (await provider.getLogs({ address, topics: [[SWAP_TOPIC, SYNC_TOPIC]], fromBlock: a, toBlock: b })) as unknown as RawLog[];
+    } catch {
+      // Retried once, then split below.
+    }
+  }
+  if (b - a + 1 <= MIN_SPLIT) return null;
+  const mid = a + Math.floor((b - a) / 2);
+  const left = await pairLogs(provider, address, a, mid);
+  if (left === null) return null;
+  const right = await pairLogs(provider, address, mid + 1, b);
+  return right === null ? null : [...left, ...right];
+}
+
+/**
  * Swap and Sync logs of the pairs over [from, to], written to pair_events.
- * Chunks run in order; a refused chunk is skipped and reported, and the rest
+ * Chunks run in order, each pair read in parallel within a chunk; a chunk
+ * that cannot be read for some pair is skipped and reported, and the rest
  * still land.
  */
 export async function indexRange(args: {
@@ -186,14 +222,8 @@ export async function indexRange(args: {
   let rows = 0;
   for (let a = from; a <= to; a += size) {
     const b = Math.min(to, a + size - 1);
-    let logs: RawLog[] | null = null;
-    for (let attempt = 0; attempt < 2 && logs === null; attempt += 1) {
-      try {
-        logs = (await provider.getLogs({ address: addresses, topics: [[SWAP_TOPIC, SYNC_TOPIC]], fromBlock: a, toBlock: b })) as unknown as RawLog[];
-      } catch {
-        logs = null;
-      }
-    }
+    const parts = await Promise.all(addresses.map((address) => pairLogs(provider, address, a, b)));
+    const logs = parts.some((p) => p === null) ? null : parts.flatMap((p) => p as RawLog[]);
     if (logs === null) {
       failed.push([a, b]);
       gap = true;
@@ -236,21 +266,25 @@ export async function advanceCursor(db: EventDb, chainId: number, pair: string, 
 }
 
 /**
- * Brings every pair up to the head. A pair starts where its cursor stopped, or
- * a day back when it has none or fell more than a day behind (the backfill
- * fills older history). Pairs at the same block are read in one request.
+ * Moves every pair toward the head, at most MAX_POLL_BLOCKS per call. A pair
+ * starts where its cursor stopped, or a day back when it has none or fell more
+ * than a day behind (the backfill fills older history). Pairs at the same
+ * block are read together. Returns the head and where each pair's cursor now
+ * stands, so the caller can tell which pairs are current.
  */
 export async function pollPairs(args: { provider: ChainReader; db: EventDb; chainId: number; pairs: ListedPair[] }): Promise<{
   rows: number;
   failed: number;
+  head: number;
+  indexedTo: Map<string, number>;
 }> {
   const { provider, db, chainId, pairs } = args;
   const head = await provider.getBlockNumber();
-  const cursors = await readCursors(db, chainId);
+  const indexedTo = await readCursors(db, chainId);
   const floor = Math.max(0, head - DAY_BLOCKS);
   const groups = new Map<number, ListedPair[]>();
   for (const p of pairs) {
-    const at = cursors.get(p.pair);
+    const at = indexedTo.get(p.pair);
     const from = at == null ? floor : Math.max(at + 1, floor);
     if (from > head) continue;
     groups.set(from, [...(groups.get(from) || []), p]);
@@ -258,14 +292,23 @@ export async function pollPairs(args: { provider: ChainReader; db: EventDb; chai
   let rows = 0;
   let failed = 0;
   for (const [from, group] of groups) {
-    const result = await indexRange({ provider, db, chainId, pairs: group, from, to: head });
+    const to = Math.min(head, from + MAX_POLL_BLOCKS - 1);
+    const result = await indexRange({ provider, db, chainId, pairs: group, from, to });
     rows += result.rows;
     failed += result.failed.length;
     if (result.contiguousTo >= from) {
-      for (const p of group) await advanceCursor(db, chainId, p.pair, result.contiguousTo);
+      for (const p of group) {
+        await advanceCursor(db, chainId, p.pair, result.contiguousTo);
+        indexedTo.set(p.pair, Math.max(indexedTo.get(p.pair) ?? -1, result.contiguousTo));
+      }
     }
   }
-  return { rows, failed };
+  return { rows, failed, head, indexedTo };
+}
+
+/** Whether a pair's index reaches close enough to the head to be shown as it is. */
+export function isCurrent(indexedTo: number | undefined, head: number): boolean {
+  return indexedTo != null && indexedTo >= head - FRESH_BLOCKS;
 }
 
 /** Transaction hashes anywhere in a webhook body, lower case, at most MAX_WEBHOOK_TXS. */
