@@ -525,11 +525,19 @@ describe('the site mirror agrees with the engine', () => {
     assert.match(button, /\{busy \? 'Moving\.\.\.' : 'Confirm'\}/);
   });
 
+  it('ends on a done step that says what moved and what is left in Savings, from the server', () => {
+    const button = read('web/components/SavingsButton.tsx');
+    assert.match(button, /'Move complete' : 'Transfer complete'/);
+    assert.match(button, /'Now in Savings' : 'Remaining in Savings'/);
+    assert.match(button, /saved: typeof body\.saved === 'string' \? body\.saved : null/);
+    assert.match(read('web/app/api/reserves/route.ts'), /saved: formatAmount\(formatUnits\(BigInt\(next\), decimals\)\),/);
+  });
+
   it('shows the same helper in the sheet', () => {
     const card = read('web/components/SavingsButton.tsx');
     assert.match(card, /SAVINGS_HELPER/);
     assert.match(card, /Move to Savings/);
-    assert.match(card, /tab\('to_spending', 'Transfer'\)/);
+    assert.match(card, /tab\('to_spending', 'Transfer to Spending'\)/);
     assert.match(read('web/lib/reservesMath.ts'), /This is not a bank account and it does not earn yield\./);
     assert.match(read('web/components/WalletBalances.tsx'), />Available</);
     assert.match(read('web/app/dashboard/page.tsx'), />Available</);

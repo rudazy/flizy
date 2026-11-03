@@ -162,6 +162,8 @@ export async function POST(req: Request) {
         direction,
         amount: formatAmount(formatUnits(base, decimals)),
         available: formatAmount(formatUnits(left, decimals)),
+        // What Savings holds of this asset after the move, for the sheet's done step.
+        saved: formatAmount(formatUnits(BigInt(next), decimals)),
       });
     } finally {
       await releaseAccountTxLock(supabase, accountId);
