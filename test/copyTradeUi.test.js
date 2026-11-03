@@ -19,7 +19,7 @@ describe('copy trade screen', () => {
   it('is the copy tab, and the token list still has no dollar figures', () => {
     assert.match(TOKENS, /tab === 'copy' \? <CopyTradePanel \/>/);
     assert.doesNotMatch(TOKENS, /CopySetupPanel/);
-    assert.doesNotMatch(TOKENS, /\$\d|USD|24h/);
+    assert.doesNotMatch(TOKENS, /\$\d|USD/);
   });
 
   it('offers paste, defaults, a per-wallet switch, and a sheet rather than a new page', () => {

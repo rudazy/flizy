@@ -44,8 +44,12 @@ export type DiscoveryToken = {
   /** Pool figures for the Explore row, all in ETH. Absent from older responses. */
   flzPerEth?: string | null;
   marketCapEth?: string | null;
-  /** Closing prices of recent candles, oldest first, for the sparkline. */
+  /** The pool price over the last 24 hours, carried forward between trades, oldest first. */
   spark?: number[];
+  /** Percent change over 24 hours against the last price before it; null when nothing traded. */
+  change24hPct?: number | null;
+  /** Swaps in the last 24 hours; null when they could not be read. */
+  trades24h?: number | null;
   /** This account starred it. */
   watched?: boolean;
 };

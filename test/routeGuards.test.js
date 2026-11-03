@@ -40,6 +40,7 @@ describe('every state-changing route checks the request Origin', () => {
     withdraw: 'disabled: every method answers a fixed 403 and reads nothing',
     'internal/security-mail': 'server to server: no cookie, a bearer secret instead (checked below)',
     'internal/payment-notice': 'server to server: no cookie, a bearer secret instead (checked below)',
+    'webhooks/nodit': 'server to server: no cookie, Nodit signs the body with x-signature (checked below)',
   };
   const ORIGIN_CHECK = /rejectIfCrossOrigin\(|generationCaller\(/;
 

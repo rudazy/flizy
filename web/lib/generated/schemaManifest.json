@@ -784,6 +784,60 @@
     },
     {
       "kind": "check",
+      "name": "pair_events.pair_events_block_check",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "check on pair_events"
+    },
+    {
+      "kind": "check",
+      "name": "pair_events.pair_events_kind_check",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "check on pair_events"
+    },
+    {
+      "kind": "check",
+      "name": "pair_events.pair_events_log_index_check",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "check on pair_events"
+    },
+    {
+      "kind": "check",
+      "name": "pair_events.pair_events_pair_check",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "check on pair_events"
+    },
+    {
+      "kind": "check",
+      "name": "pair_events.pair_events_swap_amounts_check",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "check on pair_events"
+    },
+    {
+      "kind": "check",
+      "name": "pair_events.pair_events_sync_reserves_check",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "check on pair_events"
+    },
+    {
+      "kind": "check",
+      "name": "pair_events.pair_events_tx_hash_check",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "check on pair_events"
+    },
+    {
+      "kind": "check",
+      "name": "pair_index_cursors.pair_index_cursors_block_check",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "check on pair_index_cursors"
+    },
+    {
+      "kind": "check",
+      "name": "pair_index_cursors.pair_index_cursors_pair_check",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "check on pair_index_cursors"
+    },
+    {
+      "kind": "check",
       "name": "pay_codes.pay_codes_code_format_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on pay_codes"
@@ -1525,6 +1579,18 @@
       "name": "oauth_callback_attempts",
       "providedBy": "20260802170000_identity_bind_attempts.sql",
       "requiredBy": "web/lib/callbackLimiter.ts"
+    },
+    {
+      "kind": "table",
+      "name": "pair_events",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "web/lib/pairEvents.ts"
+    },
+    {
+      "kind": "table",
+      "name": "pair_index_cursors",
+      "providedBy": "20261103120000_pair_events.sql",
+      "requiredBy": "web/lib/pairEvents.ts"
     },
     {
       "kind": "table",

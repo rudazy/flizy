@@ -142,7 +142,8 @@ describe('listed tokens on the site', () => {
   it('are listed by /api/tokens from their own pools, with their verified flag', () => {
     const route = read('web/app/api/tokens/route.ts');
     assert.match(route, /LISTED_TOKENS\.map\(\(token\) => cachedListedDay\(token\.address\)\.catch\(\(\) => null\)\)/);
-    assert.match(route, /address: token\.address, verified: token\.verified \}/);
+    assert.match(route, /listTokens\(\{ flzDay: day, listedDays, indexed, watched,/);
+    assert.match(read('web/lib/tokenRows.ts'), /address: token\.address, verified: token\.verified \}/);
     const cache = read('web/lib/flzMarketCache.ts');
     assert.match(cache, /loadTokenDay\(\{ token: listed\.address, pair: listed\.pair/);
   });

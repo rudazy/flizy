@@ -28,21 +28,23 @@ describe('tabs', () => {
 });
 
 describe('figures', () => {
-  it('shows no dollar amounts and no 24h figures the pool does not have', () => {
-    assert.doesNotMatch(TOKENS, /\$\d|USD|24h/);
+  it('shows no dollar amounts', () => {
+    assert.doesNotMatch(TOKENS, /\$\d|USD/);
   });
 
-  it('prices ETH from the same pool, as the inverse of FLZ', () => {
-    assert.match(TOKENS, /100 \/ \(1 \+ flz\.change1hPct \/ 100\) - 100/);
+  it('prices ETH from the same pool, as the inverse of FLZ, over the same 24 hours', () => {
+    assert.match(TOKENS, /100 \/ \(1 \+ flzChange \/ 100\) - 100/);
     assert.match(TOKENS, /\.map\(\(v\) => 1 \/ v\)/);
+    assert.match(TOKENS, /trades: flz\.trades24h \?\? null/);
   });
 
-  it('gets the row figures from /api/tokens, which reads them from the FLZ pool', () => {
-    const route = read('app', 'api', 'tokens', 'route.ts');
-    for (const field of ['marketCapEth: market.marketCapEth', 'flzPerEth: market.flzPerEth']) {
-      assert.ok(route.includes(field), field);
+  it('gets the row figures from /api/tokens: pool figures as before, the 24 hours from the index', () => {
+    const rows = fs.readFileSync(path.join(WEB, 'lib', 'tokenRows.ts'), 'utf8');
+    for (const field of ['marketCapEth: day.pool.marketCapEth', 'flzPerEth: day.pool.flzPerEth', 'liquidityEth: day.pool.liquidityEth']) {
+      assert.ok(rows.includes(field), field);
     }
-    assert.match(route, /spark: market\.candles\.slice\(-SPARK_POINTS\)\.map\(\(c\) => c\.close\)/);
+    assert.match(rows, /daySeries\(window\.prices, window\.trades, indexed\.now, current\)/);
+    assert.match(read('app', 'api', 'tokens', 'route.ts'), /cachedIndexedDays\(\)/);
   });
 });
 

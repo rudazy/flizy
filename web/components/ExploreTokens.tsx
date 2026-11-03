@@ -14,6 +14,7 @@ import {
   type TokenFilterId,
 } from '../lib/tokenDiscovery';
 import { formatEthDisplay } from '../lib/tokenFormat';
+import { tradesLabel } from '../lib/priceSeries';
 import { useComingSoon } from './ComingSoon';
 import { CopyTradePanel } from './CopyTradePanel';
 import { AmmoraTokens, ammoraUiEnabled } from './AmmoraTokens';
@@ -77,7 +78,10 @@ type Row = {
   verified: boolean;
   /** The price and the unit it is counted in. */
   price: Figure;
+  /** Percent change over 24 hours, null when nothing traded. */
   change: number | null;
+  /** Swaps in the last 24 hours, null when they could not be read. */
+  trades: number | null;
   spark: number[];
   /** Two figures for the middle of the row. */
   stats: Array<Figure & { label: string }>;
@@ -103,7 +107,8 @@ function flzRow(t: DiscoveryToken): Row {
     name: t.symbol === 'FLZ' ? 'Flizy' : t.name,
     verified: t.verified,
     price: eth(t.priceEth),
-    change: t.change1hPct,
+    change: t.change24hPct ?? null,
+    trades: t.trades24h ?? null,
     spark: t.spark || [],
     stats: [
       { ...eth(t.marketCapEth), label: 'Market cap' },
@@ -125,14 +130,13 @@ function listedRow(t: DiscoveryToken, address: string): Row {
 
 /**
  * ETH priced against FLZ from the same pool: its move is the inverse of FLZ's,
- * and its sparkline is the same candles turned over.
+ * and its sparkline is the same 24-hour line turned over.
  */
 function ethRow(flz: DiscoveryToken): Row {
   const per = Number(flz.flzPerEth);
+  const flzChange = flz.change24hPct ?? null;
   const change =
-    flz.change1hPct != null && Number.isFinite(flz.change1hPct) && flz.change1hPct > -100
-      ? (100 / (1 + flz.change1hPct / 100) - 100)
-      : null;
+    flzChange != null && Number.isFinite(flzChange) && flzChange > -100 ? 100 / (1 + flzChange / 100) - 100 : null;
   return {
     symbol: 'ETH',
     name: 'Ethereum',
@@ -142,6 +146,8 @@ function ethRow(flz: DiscoveryToken): Row {
         ? { value: per.toLocaleString('en-US', { maximumFractionDigits: 2 }), unit: 'FLZ' }
         : { value: '-', unit: null },
     change,
+    // Every FLZ trade is an ETH trade on the same pool.
+    trades: flz.trades24h ?? null,
     spark: (flz.spark || []).filter((v) => v > 0).map((v) => 1 / v),
     stats: [
       // The pool prices ETH in FLZ. It does not give ETH a market cap.
@@ -427,16 +433,27 @@ function TokenLogo({ symbol }: { symbol: string }) {
 }
 
 /**
- * One token on one line: who it is, two pool figures, the last hour as a line,
- * the price, and Trade, which opens the swap with this token selected.
+ * The columns of a row, Trade aside. The name and the price share what is
+ * left, and the price never drops below what "0.001097 ETH" and its change
+ * line need, so a 360px screen cuts the token name before it cuts the price.
+ */
+const ROW_GRID =
+  'grid min-w-0 flex-1 grid-cols-[8px_25px_minmax(36px,1fr)_46px_40px_30px_minmax(66px,1fr)] items-center gap-[4px]';
+
+/**
+ * One token on one line: who it is, two pool figures, the last 24 hours as a
+ * line, the price with its 24-hour change and trade count, and Trade, which
+ * opens the swap with this token selected.
  */
 function TokenRow({ rank, row }: { rank: number; row: Row }) {
-  const up = row.change != null && row.change >= 0;
+  const traded = row.trades != null && row.trades > 0;
+  const up = traded && row.change != null && row.change >= 0;
+  const down = traded && row.change != null && row.change < 0;
   const head = (
     <>
-      <span className="w-[8px] shrink-0 text-center font-sans text-[9.5px] font-semibold text-white">{rank}</span>
+      <span className="text-center font-sans text-[9.5px] font-semibold text-white">{rank}</span>
       <TokenLogo symbol={row.symbol} />
-      <span className="w-[46px] min-w-0 shrink-0">
+      <span className="min-w-0">
         <span className="flex items-center gap-[3px] font-sans text-[9.6px] font-semibold text-white">
           {row.symbol}
           {row.verified ? (
@@ -448,20 +465,33 @@ function TokenRow({ rank, row }: { rank: number; row: Row }) {
         <span className="block truncate font-sans text-[7.6px] text-[#a9a9a9]">{row.name}</span>
       </span>
       {row.stats.map((s, i) => (
-        <span key={s.label} className={`w-[44px] min-w-0 shrink-0 ${i ? '' : 'box-content border-l border-[#2a2b30] pl-[6px]'}`}>
+        <span key={s.label} className={`min-w-0 ${i ? '' : 'border-l border-[#2a2b30] pl-[5px]'}`}>
           <span className="block truncate font-sans text-[8.6px] font-semibold text-white">
             <FigureText figure={s} />
           </span>
           <span className="block truncate font-sans text-[7px] text-[#a9a9a9]">{s.label}</span>
         </span>
       ))}
-      <Sparkline points={row.spark} up={up} />
-      <span className="min-w-0 flex-1">
+      <Sparkline points={row.spark} tone={up ? 'up' : down ? 'down' : 'flat'} />
+      <span className="min-w-0">
         <span className="block truncate font-sans text-[8.6px] font-semibold text-white">
           <FigureText figure={row.price} />
         </span>
-        <span className={`block truncate font-sans text-[8px] ${row.change == null ? 'text-[#a9a9a9]' : up ? 'text-[#2fd27a]' : 'text-[#f05252]'}`}>
-          {row.change == null ? 'No trades' : `${up ? UP : DOWN} ${Math.abs(row.change).toFixed(1)}%`}
+        <span className="block truncate font-sans text-[7.5px] text-[#a9a9a9]">
+          {row.trades == null ? (
+            '-'
+          ) : !traded ? (
+            'No trades in 24h'
+          ) : (
+            <>
+              {row.change != null ? (
+                <span className={up ? 'text-[#2fd27a]' : 'text-[#f05252]'}>
+                  {`${up ? UP : DOWN} ${Math.abs(row.change).toFixed(1)}%`}{' '}
+                </span>
+              ) : null}
+              {tradesLabel(row.trades as number)}
+            </>
+          )}
         </span>
       </span>
     </>
@@ -469,11 +499,11 @@ function TokenRow({ rank, row }: { rank: number; row: Row }) {
   return (
     <article className="flex h-[38.5px] min-w-0 items-center gap-[6px] rounded-[6px] border border-[#23242a] bg-[#0d0d0e] pl-[7px] pr-[5px]">
       {row.href ? (
-        <Link href={row.href} className="flex min-w-0 flex-1 items-center gap-[6px] no-underline">
+        <Link href={row.href} className={`${ROW_GRID} no-underline`}>
           {head}
         </Link>
       ) : (
-        <span className="flex min-w-0 flex-1 items-center gap-[6px]">{head}</span>
+        <span className={ROW_GRID}>{head}</span>
       )}
       <Link
         href={row.trade}
@@ -491,28 +521,27 @@ function FigureText({ figure }: { figure: Figure }) {
   return <>{figure.unit ? `${figure.value} ${figure.unit}` : figure.value}</>;
 }
 
-/** The recent closes as a line. Nothing to draw with fewer than two points. */
-function Sparkline({ points, up }: { points: number[]; up: boolean }) {
-  const w = 36;
+/**
+ * The last 24 hours as a step line: the price holds between trades and steps
+ * on each one. A price that did not move draws flat across the middle, and a
+ * row with no price at all still gets that flat line, never an empty chart.
+ */
+function Sparkline({ points, tone }: { points: number[]; tone: 'up' | 'down' | 'flat' }) {
+  const w = 30;
   const h = 18;
-  // No trades in the window: a flat grey line, so the row keeps its shape.
-  if (points.length < 2) {
-    return (
-      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0" aria-hidden>
-        <path d={`M0 ${h / 2} L${w} ${h / 2}`} stroke="#5c5c60" strokeWidth="1.2" strokeDasharray="2 2" />
-      </svg>
-    );
-  }
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const span = max - min || 1;
-  const xy = points.map((p, i) => [(i / (points.length - 1)) * w, h - 2 - ((p - min) / span) * (h - 4)]);
-  const line = xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
-  const color = up ? '#2fd27a' : '#f05252';
+  const color = tone === 'up' ? '#2fd27a' : tone === 'down' ? '#f05252' : '#8a8a8f';
+  const min = points.length ? Math.min(...points) : 0;
+  const max = points.length ? Math.max(...points) : 0;
+  const flat = points.length < 2 || !(max > min);
+  const y = (p: number) => (flat ? h / 2 : h - 2 - ((p - min) / (max - min)) * (h - 4));
+  const x = (i: number) => (points.length < 2 ? (i ? w : 0) : (i / (points.length - 1)) * w);
+  const line = flat
+    ? `M0 ${h / 2} H${w}`
+    : points.map((p, i) => (i ? `H${x(i).toFixed(1)} V${y(p).toFixed(1)}` : `M0 ${y(p).toFixed(1)}`)).join(' ');
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0" aria-hidden>
-      <path d={`${line} L${w} ${h} L0 ${h} Z`} fill={color} fillOpacity="0.12" />
-      <path d={line} fill="none" stroke={color} strokeWidth="1.3" strokeLinejoin="round" />
+      {flat ? null : <path d={`${line} V${h} H0 Z`} fill={color} fillOpacity="0.12" />}
+      <path d={line} fill="none" stroke={color} strokeWidth="1.2" strokeLinejoin="round" />
     </svg>
   );
 }

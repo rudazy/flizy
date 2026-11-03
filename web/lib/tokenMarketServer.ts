@@ -116,6 +116,11 @@ export type TokenDay = {
   activity: ActivityRow[];
   now: number;
   chartError: boolean;
+  /**
+   * Some log chunks were refused, so the prints are incomplete: the chart is
+   * still drawn from them, but trade counts and volume are not stated.
+   */
+  partial: boolean;
 };
 
 /** Kept for the FLZ callers; the shape is the same for every token. */
@@ -148,19 +153,26 @@ async function inBatches<T, R>(items: T[], size: number, fn: (item: T) => Promis
   return out;
 }
 
-/** Swap logs over [from, to], read in chunks GIWA accepts. One failed chunk fails the read. */
+/**
+ * Swap logs over [from, to], read in chunks GIWA accepts. A chunk refused twice
+ * is left out and the others are kept, so one bad chunk cannot blank the chart;
+ * only when every chunk fails does the read fail.
+ */
 async function swapLogs(provider: ethers.JsonRpcProvider, pair: string, from: number, to: number) {
   const topic = iface.getEvent('Swap')!.topicHash;
   const chunks = blockChunks(from, to, LOG_CHUNK);
   const parts = await inBatches(chunks, CHUNK_PARALLEL, async ([a, b]) => {
-    try {
-      return await provider.getLogs({ address: pair, topics: [topic], fromBlock: a, toBlock: b });
-    } catch {
-      // One retry: a single refused chunk should not blank the chart.
-      return provider.getLogs({ address: pair, topics: [topic], fromBlock: a, toBlock: b });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await provider.getLogs({ address: pair, topics: [topic], fromBlock: a, toBlock: b });
+      } catch {
+        // Retried once below; a second refusal leaves this chunk out.
+      }
     }
+    return null;
   });
-  return parts.flat();
+  if (chunks.length && parts.every((p) => p === null)) throw new Error('every log chunk failed');
+  return { logs: parts.flatMap((p) => p ?? []), missed: parts.filter((p) => p === null).length };
 }
 
 export async function loadFlzDay(): Promise<FlzDay> {
@@ -193,6 +205,7 @@ export async function loadTokenDay(target: TokenPool): Promise<TokenDay> {
     activity: [],
     now: Math.floor(Date.now() / 1000),
     chartError: false,
+    partial: false,
   };
 
   const pair = new ethers.Contract(target.pair, SWAP_ABI, provider);
@@ -236,7 +249,8 @@ export async function loadTokenDay(target: TokenPool): Promise<TokenDay> {
     const timeOf = (blockNumber: number) => Math.round(head.timestamp - (headNumber - blockNumber) * secondsPerBlock);
     day.now = head.timestamp;
 
-    const logs = await swapLogs(provider, target.pair, fromNumber, headNumber);
+    const { logs, missed } = await swapLogs(provider, target.pair, fromNumber, headNumber);
+    day.partial = missed > 0;
     const withPrints: Array<{ log: ethers.Log; print: Print }> = [];
     for (const log of logs) {
       let parsed: ethers.LogDescription | null = null;
@@ -310,17 +324,19 @@ export function snapshotFor(day: FlzDay, range: ChartRange): TokenSnapshot {
       ? windowPrints[0].priceEth
       : poolPrice;
   const volume = windowPrints.reduce((total, p) => total + (Number.isFinite(p.volumeEth) && p.volumeEth > 0 ? p.volumeEth : 0), 0);
+  // A partial read still draws the chart, but a count or a total from it would undercount.
+  const unknown = day.chartError || Boolean(day.partial);
   return {
     ...day.pool,
     change1hPct: changePct(since(rangeSeconds('1h'))),
-    volumeEth: day.chartError ? null : String(volume),
-    trades: day.chartError ? null : windowPrints.length,
+    volumeEth: unknown ? null : String(volume),
+    trades: unknown ? null : windowPrints.length,
     range,
     candles: buildCandles(windowPrints, bucketForRange(range)),
     windowStart,
     windowEnd: day.now,
     startPriceEth,
-    day: day.chartError ? null : dayStats(since(DAY_SECONDS)),
+    day: unknown ? null : dayStats(since(DAY_SECONDS)),
     activity: day.activity,
     chartError: day.chartError,
   };
