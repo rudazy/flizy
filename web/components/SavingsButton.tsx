@@ -2,12 +2,9 @@
 
 import { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
 import { CloseIcon, PlusIcon } from './ExploreIcons';
 import { formatAmount } from '../lib/amountDisplay';
 import { SAVINGS_ASSET, SAVINGS_HELPER } from '../lib/reservesMath';
-
-const HIDDEN = '••••';
 
 /** ETH kept out of Max when moving into Savings, so later sends can still pay gas. The server keeps its own. */
 const GAS_KEEP_ETH = 0.0002;
@@ -24,19 +21,19 @@ type Status = 'loading' | 'error' | 'missing' | 'ready';
 type Direction = 'to_savings' | 'to_spending';
 
 /**
- * Money moved off Spending. The hero above this card is Available. Savings
- * takes ETH only; a token put there before that rule can still be moved back.
- * The + opens a sheet to move ETH in or transfer it back: amount, review, confirm.
- * Amounts follow the same eye as the rest of the wallet.
+ * Savings, kept out of sight: money moved off Spending. The wallet shows only
+ * Available and a small + beside it. Nothing about Savings, not even whether
+ * it holds anything, is on the page until the + is tapped. The sheet it opens
+ * shows what is in Savings and moves ETH in or transfers it back: amount,
+ * review, confirm. Savings takes ETH only; a token put there before that rule
+ * can still be transferred back.
  */
-export function SavingsCard({
-  hidden,
+export function SavingsButton({
   status,
   rows,
   available,
   onMoved,
 }: {
-  hidden: boolean;
   status: Status;
   rows: SavingsRow[];
   /** Available ETH (chain balance minus Savings), or null while it is not known. */
@@ -44,68 +41,38 @@ export function SavingsCard({
   onMoved: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const held = rows.filter((row) => row.amountBase !== '0');
-
   return (
-    <Card className="px-[13.5px] pb-[12px] pt-[12px]">
-      <CardHeader
-        icon={<span className="font-mono text-[11px] tracking-[0.04em]">S</span>}
-        title="Savings"
-        subtitle="Set aside from spending. It stays there until you move it back."
-        action={
-          status === 'ready' ? (
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              aria-label="Move funds to or from Savings"
-              aria-haspopup="dialog"
-              className="hit-44 flex h-[29.5px] w-[29.5px] items-center justify-center rounded-[5px] border border-[#3a3017] bg-[#1c180c] text-sun hover:border-sun/60"
-            >
-              <PlusIcon size={14} />
-            </button>
-          ) : null
-        }
-      />
-      {status === 'loading' ? <p className="m-0 mt-[10px] font-sans text-[11px] text-[#a9a9a9]">...</p> : null}
-      {status === 'error' ? <p className="m-0 mt-[10px] font-sans text-[11px] text-[#a9a9a9]">Could not read Savings.</p> : null}
-      {status === 'missing' ? (
-        <p className="m-0 mt-[10px] font-sans text-[11px] text-[#a9a9a9]">Savings is not available yet.</p>
-      ) : null}
-      {status === 'ready' ? (
-        <>
-          <ul className="m-0 mt-[12px] grid list-none gap-[6px] p-0">
-            {held.length === 0 ? (
-              <li className="font-sans text-[12px] text-[#cfcfcf]">Nothing is in Savings. Tap + to set some ETH aside.</li>
-            ) : (
-              held.map((row) => (
-                <li key={row.asset} className="flex items-baseline justify-between gap-3">
-                  <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-[#cfcfcf]">{row.label}</span>
-                  <span className="font-sans text-[13px] text-[#f5f5f5]">{hidden ? HIDDEN : formatAmount(row.amount)}</span>
-                </li>
-              ))
-            )}
-          </ul>
-          <p className="m-0 mt-[12px] font-sans text-[11px] leading-[1.45] text-[#8a8a8a]">{SAVINGS_HELPER}</p>
-        </>
-      ) : null}
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Savings"
+        aria-haspopup="dialog"
+        className="hit-44 flex h-[14px] w-[14px] items-center justify-center text-[#6f6f6f] hover:text-[#cfcfcf]"
+      >
+        <PlusIcon size={11} />
+      </button>
       {open ? (
         <SavingsSheet
-          rows={held}
+          status={status}
+          rows={rows.filter((row) => row.amountBase !== '0')}
           available={available}
           onClose={() => setOpen(false)}
           onMoved={onMoved}
         />
       ) : null}
-    </Card>
+    </>
   );
 }
 
 function SavingsSheet({
+  status,
   rows,
   available,
   onClose,
   onMoved,
 }: {
+  status: Status;
   rows: SavingsRow[];
   available: string | null;
   onClose: () => void;
@@ -228,12 +195,36 @@ function SavingsSheet({
             Savings holds ETH. Money in Savings cannot be sent, swapped or traded until you transfer it back to Spending.
           </p>
 
-          <div role="tablist" aria-label="Direction" className="mt-4 grid grid-cols-2 gap-[6px] rounded-[6px] border border-[#2a2b30] bg-[#0f0f10] p-[4px]">
-            {tab('to_savings', 'Move to Savings')}
-            {tab('to_spending', 'Transfer')}
-          </div>
+          {status === 'ready' ? (
+            <>
+              <div className="mt-4 rounded-[6px] border border-[#2a2b30] bg-[#0f0f10] p-3">
+                <p className="m-0 font-mono text-[10px] uppercase tracking-[0.12em] text-[#a9a9a9]">In Savings</p>
+                {rows.length === 0 ? (
+                  <p className="m-0 mt-2 font-sans text-[13px] text-[#cfcfcf]">Nothing yet.</p>
+                ) : (
+                  <ul className="m-0 mt-2 grid list-none gap-[6px] p-0">
+                    {rows.map((r) => (
+                      <li key={r.asset} className="flex items-baseline justify-between gap-3">
+                        <span className="font-mono text-[12px] uppercase tracking-[0.06em] text-[#cfcfcf]">{r.label}</span>
+                        <span className="font-sans text-[16px] font-semibold text-white">{formatAmount(r.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
-          {stage === 'done' ? (
+              <div role="tablist" aria-label="Direction" className="mt-4 grid grid-cols-2 gap-[6px] rounded-[6px] border border-[#2a2b30] bg-[#0f0f10] p-[4px]">
+                {tab('to_savings', 'Move to Savings')}
+                {tab('to_spending', 'Transfer')}
+              </div>
+            </>
+          ) : null}
+
+          {status !== 'ready' ? (
+            <p className="m-0 mt-5 font-sans text-[13px] text-[#cfcfcf]">
+              {status === 'loading' ? 'Reading Savings...' : status === 'missing' ? 'Savings is not available yet.' : 'Could not read Savings.'}
+            </p>
+          ) : stage === 'done' ? (
             <div className="mt-5 grid gap-3">
               <p className="m-0 font-sans text-[15px] font-semibold text-white">Done</p>
               <p className="m-0 font-sans text-[13px] text-[#cfcfcf]">{doneText}</p>
@@ -352,6 +343,7 @@ function SavingsSheet({
               </button>
             </form>
           )}
+          <p className="m-0 mt-4 font-sans text-[11px] leading-[1.45] text-[#8a8a8a]">{SAVINGS_HELPER}</p>
         </div>
       </div>
     </div>,

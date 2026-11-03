@@ -10,7 +10,7 @@ import { VerifiedMark } from './VerifiedMark';
 import { tokenLogo } from '../lib/tokenLogos';
 import { symbolLabel } from '../lib/listedTokens';
 import { subtractHolding } from '../lib/reservesMath';
-import { SavingsCard, type SavingsRow } from './SavingsCard';
+import { SavingsButton, type SavingsRow } from './SavingsButton';
 import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
 import { WalletNfts } from './WalletNfts';
 import { WalletOffers } from './WalletOffers';
@@ -240,6 +240,15 @@ export function WalletBalances() {
             >
               <EyeMark hidden={hidden} className="h-[15px] w-[15px]" />
             </button>
+            <SavingsButton
+              status={reserveStatus}
+              rows={reserveRows}
+              available={reserveReady && native?.balance != null && native.balance !== '' ? String(native.balance) : null}
+              onMoved={() => {
+                setReserveTick((n) => n + 1);
+                void refreshAll();
+              }}
+            />
           </div>
           <div className="mt-[7px] flex items-center gap-[13px]">
             <span className="font-sans text-[28.5px] font-semibold leading-[34px] tracking-[-0.01em] text-white">
@@ -281,17 +290,6 @@ export function WalletBalances() {
           </span>
         </div>
       </section>
-
-      <SavingsCard
-        hidden={hidden}
-        status={reserveStatus}
-        rows={reserveRows}
-        available={reserveReady && native?.balance != null && native.balance !== '' ? String(native.balance) : null}
-        onMoved={() => {
-          setReserveTick((n) => n + 1);
-          void refreshAll();
-        }}
-      />
 
       {/* Address */}
       <Card className="px-[13.5px] pb-[9.5px] pt-[14px]">

@@ -492,8 +492,8 @@ describe('the site mirror agrees with the engine', () => {
     const chat = read('lib/reservesChat.js');
     assert.match(chat, /if \(move\.direction === 'to_savings' && info\.asset !== SAVINGS_ASSET\) \{\s*await reply\(ctx, SAVINGS_ETH_ONLY\);/);
     assert.match(chat, /if \(pending\.direction === 'to_savings' && info\.asset !== SAVINGS_ASSET\) \{/);
-    // The card sends ETH in, and only a transfer back names another asset.
-    assert.match(read('web/components/SavingsCard.tsx'), /asset: saving \? SAVINGS_ASSET : asset/);
+    // The sheet sends ETH in, and only a transfer back names another asset.
+    assert.match(read('web/components/SavingsButton.tsx'), /asset: saving \? SAVINGS_ASSET : asset/);
   });
 
   it('points a send to @savings at an ETH move, and a token send at the ETH-only rule', () => {
@@ -505,17 +505,28 @@ describe('the site mirror agrees with the engine', () => {
     assert.equal(bot.reserveTargetRefusal('5', 'TUSD', cmd), `Savings is not a person.\n${bot.SAVINGS_ETH_ONLY}`);
   });
 
-  it('opens the move from a + on the card, with a review step before anything moves', () => {
-    const card = read('web/components/SavingsCard.tsx');
-    assert.match(card, /<PlusIcon size=\{14\} \/>/);
-    assert.match(card, /aria-label="Move funds to or from Savings"/);
-    assert.match(card, /setStage\('review'\)/);
-    assert.match(card, /\{busy \? 'Moving\.\.\.' : 'Confirm'\}/);
-    assert.match(read('web/components/WalletBalances.tsx'), /available=\{reserveReady && native\?\.balance != null/);
+  it('keeps Savings off the page: only a small + beside Available, which opens it', () => {
+    const button = read('web/components/SavingsButton.tsx');
+    const wallet = read('web/components/WalletBalances.tsx');
+    assert.match(button, /<PlusIcon size=\{11\} \/>/);
+    assert.match(button, /aria-label="Savings"/);
+    // Nothing about Savings renders outside the sheet: no card, no amount, no row count.
+    assert.doesNotMatch(button, /AppCard/);
+    assert.match(button, /\{open \? \(\s*<SavingsSheet/);
+    assert.doesNotMatch(wallet, /SavingsCard/);
+    assert.match(wallet, /<EyeMark[^]*?<SavingsButton/);
+    assert.match(wallet, /available=\{reserveReady && native\?\.balance != null/);
   });
 
-  it('shows the same helper on the card', () => {
-    const card = read('web/components/SavingsCard.tsx');
+  it('shows what is in Savings inside the sheet, with a review step before anything moves', () => {
+    const button = read('web/components/SavingsButton.tsx');
+    assert.match(button, /In Savings/);
+    assert.match(button, /setStage\('review'\)/);
+    assert.match(button, /\{busy \? 'Moving\.\.\.' : 'Confirm'\}/);
+  });
+
+  it('shows the same helper in the sheet', () => {
+    const card = read('web/components/SavingsButton.tsx');
     assert.match(card, /SAVINGS_HELPER/);
     assert.match(card, /Move to Savings/);
     assert.match(card, /tab\('to_spending', 'Transfer'\)/);
