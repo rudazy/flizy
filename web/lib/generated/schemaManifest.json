@@ -166,6 +166,84 @@
     },
     {
       "kind": "check",
+      "name": "api_control.api_control_single_row",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_control"
+    },
+    {
+      "kind": "check",
+      "name": "api_idempotency.api_idempotency_key_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_idempotency"
+    },
+    {
+      "kind": "check",
+      "name": "api_idempotency.api_idempotency_state_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_idempotency"
+    },
+    {
+      "kind": "check",
+      "name": "api_key_events.api_key_events_kind_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_key_events"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_hash_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_ip_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_label_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_mode_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_scopes_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_platforms.api_platforms_expiry_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
+      "name": "api_platforms.api_platforms_fee_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
+      "name": "api_platforms.api_platforms_name_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
+      "name": "api_platforms.api_platforms_wallet_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
       "name": "channel_identities.channel_identities_channel_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on channel_identities"
@@ -1162,6 +1240,18 @@
     },
     {
       "kind": "function",
+      "name": "api_key_event_trigger",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "executed by trigger api_keys_events"
+    },
+    {
+      "kind": "function",
+      "name": "api_keys_cap_trigger",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "executed by trigger api_keys_cap"
+    },
+    {
+      "kind": "function",
       "name": "bump_generation_usage",
       "providedBy": "20261007120000_generation_usage.sql",
       "requiredBy": "web/lib/generationFee.ts"
@@ -1399,6 +1489,42 @@
       "name": "ammora_pools",
       "providedBy": "20261016140000_ammora_venue.sql",
       "requiredBy": "web/lib/ammora/routes.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_control",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/lib/apiAuth.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_idempotency",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/lib/apiIdempotency.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_key_events",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/lib/apiPlatforms.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_keys",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/lib/apiAuth.ts, web/lib/apiPlatforms.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_platforms",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/lib/apiAuth.ts, web/lib/apiPlatforms.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_requests",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/lib/apiAuth.ts"
     },
     {
       "kind": "table",
@@ -1753,6 +1879,18 @@
       "name": "ammora_pools_set_updated_at",
       "providedBy": "20261016140000_ammora_venue.sql",
       "requiredBy": "trigger on ammora_pools"
+    },
+    {
+      "kind": "trigger",
+      "name": "api_keys_cap",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "trigger on api_keys"
+    },
+    {
+      "kind": "trigger",
+      "name": "api_keys_events",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "trigger on api_keys"
     },
     {
       "kind": "trigger",

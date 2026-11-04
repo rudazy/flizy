@@ -22,18 +22,18 @@
 
 import { createHash } from 'crypto';
 
-export function clientIpKey(headers: Pick<Headers, 'get'>): string {
+/** The client address itself, read the same way, or '' when there is none. */
+export function clientIp(headers: Pick<Headers, 'get'>): string {
   const real = (headers.get('x-real-ip') || '').trim();
-  let ip = real;
+  if (real) return real;
+  const forwarded = headers.get('x-forwarded-for') || '';
+  const parts = forwarded
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
 
-  if (!ip) {
-    const forwarded = headers.get('x-forwarded-for') || '';
-    const parts = forwarded
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean);
-    ip = parts.length ? parts[parts.length - 1] : '';
-  }
-
-  return createHash('sha256').update(ip || 'unknown').digest('hex');
+export function clientIpKey(headers: Pick<Headers, 'get'>): string {
+  return createHash('sha256').update(clientIp(headers) || 'unknown').digest('hex');
 }

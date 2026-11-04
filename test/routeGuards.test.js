@@ -40,6 +40,7 @@ describe('every state-changing route checks the request Origin', () => {
     withdraw: 'disabled: every method answers a fixed 403 and reads nothing',
     'internal/security-mail': 'server to server: no cookie, a bearer secret instead (checked below)',
     'internal/payment-notice': 'server to server: no cookie, a bearer secret instead (checked below)',
+    'internal/api-key-notices': 'server to server: no cookie, a bearer secret instead (checked below)',
     'webhooks/nodit': 'server to server: no cookie, Nodit signs the body with x-signature (checked below)',
   };
   const ORIGIN_CHECK = /rejectIfCrossOrigin\(|generationCaller\(/;
@@ -82,6 +83,9 @@ describe('the tiers hold: account changes take the password, money takes the PIN
     'account/password',
     'account/username',
     'custody/passkey',
+    'developers/keys',
+    'developers/keys/[id]/revoke',
+    'developers/keys/[id]/rotate',
     'identity',
     'limits',
     'link/create',

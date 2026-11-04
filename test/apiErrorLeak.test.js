@@ -164,6 +164,12 @@ describe('no route sends a raw error message', () => {
         lineMustMatch: /error:\s*err\.message/,
         reason: 'BindError product copy (IDENTITY_TAKEN, LOCKED, ...)',
       },
+      {
+        file: 'developers/keys/route.ts',
+        // KeyRequestError: messages set in web/lib/apiPlatforms.ts createKey, not DB errors.
+        lineMustMatch: /err instanceof KeyRequestError\) return NextResponse\.json\(\{ error: err\.message \}/,
+        reason: 'KeyRequestError product copy (payout granted by Flizy, active key cap)',
+      },
       ...[
         'follow/route.ts',
         'people/route.ts',

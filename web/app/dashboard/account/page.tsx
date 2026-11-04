@@ -23,6 +23,7 @@ import { CountryPanel, LanguagePanel } from '../../../components/AccountPrefs';
 import { ChatAppsPanel, SecretInput, TrustedPanel } from '../../../components/AccountConnections';
 import { LimitsPanel, PinPanel, QuickSendPanel, SecurityPanel } from '../../../components/AccountSecurity';
 import { AccountProjects } from '../../../components/AccountProjects';
+import { AccountDevelopers, loadDevelopers } from '../../../components/AccountDevelopers';
 import type { LocaleCode } from '../../../lib/locale';
 import { SITE_PHONE_COUNTRIES, countryByIso, countryFlag } from '../../../lib/phoneFormat';
 import {
@@ -44,6 +45,7 @@ const SLIDES = [
   'pin',
   'limits',
   'security',
+  'developers',
 ] as const;
 
 type SlideId = (typeof SLIDES)[number];
@@ -113,6 +115,18 @@ export default function AccountPage() {
   }, [search]);
 
   const [slide, setSlide] = useSlide(SLIDES, defaultSlide);
+
+  // Developers shows only for an account Flizy approved as an API platform.
+  const [isPlatform, setIsPlatform] = useState(false);
+  useEffect(() => {
+    let live = true;
+    loadDevelopers()
+      .then((d) => live && setIsPlatform(d != null))
+      .catch(() => live && setIsPlatform(false));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (data?.account?.username) {
@@ -568,6 +582,7 @@ export default function AccountPage() {
           { id: 'pin', label: 'PIN', badge: data.account.has_pin ? undefined : '!' },
           { id: 'limits', label: 'Limits' },
           { id: 'security', label: 'Security' },
+          ...(isPlatform ? [{ id: 'developers', label: 'Developers' }] : []),
         ]}
         activeId={slide}
         onSelect={setSlide}
@@ -1020,6 +1035,8 @@ export default function AccountPage() {
           wallet={<SecureWalletPanel />}
         />
       ) : null}
+
+      {slide === 'developers' && isPlatform ? <AccountDevelopers /> : null}
     </AppPage>
   );
 }

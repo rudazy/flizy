@@ -39,6 +39,7 @@ const { startApprovalWatcher } = require('./lib/chatApprovals');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const { startReconciler } = require('./lib/reconcile');
 const { startApprovalWorker } = require('./lib/custody/approvals');
+const { startApiKeyNoticePump } = require('./lib/apiKeyNotices');
 const { startAmmora } = require('./lib/ammora/boot');
 const router = require('./lib/router');
 
@@ -466,6 +467,9 @@ async function main() {
   // sent from here, where the relayer key lives; late ones expire
   // (lib/custody/approvals.js). Each approval is claimed before it is sent.
   startApprovalWorker({ supabase, provider });
+  // API key permission changes made directly in the database are emailed to
+  // the platform owner through the site (lib/apiKeyNotices.js).
+  startApiKeyNoticePump();
   // Ammora venue, only with AMMORA_ENABLED (lib/ammora/boot.js). The pool
   // inventory runs from this process only. Never awaited: a slow RPC must not
   // hold up WhatsApp.
