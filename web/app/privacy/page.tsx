@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '3 November 2026';
+const UPDATED = '4 November 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -232,7 +232,9 @@ export default function PrivacyPage() {
             You can also connect a wallet of your own, with or without a Flizy account. No
             account is made for it. Our servers see its address when a page asks for something
             on its behalf, such as which NFTs it owns or the steps of a trade it is about to
-            sign, and the address is not saved from those requests. To stop those pages being
+            sign, and the address is not saved from those requests. NFTs you heart without an
+            account are kept in this browser only, never sent to us; if you later sign in, My
+            NFTs offers to save them to your account, and they reach us only if you choose to. To stop those pages being
             overused, we count requests per network address, kept as a hash; counts older than
             a day are cleared as new requests come in. After a swap, an NFT trade or a deposit
             into a Flizy wallet, we keep its transaction hash so the Flizy accounts it touched

@@ -77,6 +77,9 @@ export function WalletModeBar() {
       <span className="font-mono text-white">{shortAddress(wallet.address)}</span>
       <span className="hidden text-[#8d8d8d] sm:inline">Your wallet signs every trade.</span>
       <span className="ml-auto flex items-center gap-3">
+        <Link href="/dashboard/explore/nfts/me" className="text-white no-underline hover:opacity-80">
+          My NFTs
+        </Link>
         <Link href="/signup" className="text-sun no-underline hover:opacity-80">
           Create a Flizy account
         </Link>

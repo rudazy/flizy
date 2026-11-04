@@ -72,6 +72,15 @@ export async function routeViewer(
   return { address: ethers.ZeroAddress, viaGator: false, signedIn: false };
 }
 
+/**
+ * The wallet a signed-out visitor named with ?viewer= (wallet mode), or null.
+ * Only public chain data is ever read for it, and it is not saved.
+ */
+export function guestViewer(req: Request): string | null {
+  const raw = new URL(req.url).searchParams.get('viewer') || '';
+  return /^0x[0-9a-fA-F]{40}$/.test(raw) ? ethers.getAddress(raw) : null;
+}
+
 /** viewerWallet for an account row already in hand (agent_wallet_address as stored). */
 export function walletForAccount(
   accountId: string,

@@ -41,6 +41,8 @@ describe('the wallet-mode pages', () => {
       '/dashboard/explore/nfts',
       '/dashboard/explore/nfts/0x0000000000000000000000000000000000000001',
       '/dashboard/explore/nfts/0x0000000000000000000000000000000000000001/7',
+      // My NFTs: held NFTs and offers by address, likes kept in this browser.
+      '/dashboard/explore/nfts/me',
     ]) {
       assert.equal(mode.isWalletModePath(p), true, p);
     }
@@ -54,7 +56,6 @@ describe('the wallet-mode pages', () => {
       '/dashboard/pay',
       '/dashboard/requests',
       '/dashboard/explore/nfts/create',
-      '/dashboard/explore/nfts/me',
       '/dashboard/explore/nfts/mints',
       '/dashboard/explore/nfts/mint/abc',
       '/dashboard/explore/nfts/mints/abc',
@@ -193,7 +194,8 @@ describe('a signed-in account can trade from its connected wallet', () => {
   it('account features still follow the session, not the trading wallet', () => {
     assert.ok(read('web', 'components', 'TokenDetail.tsx').includes('const walletMode = useWalletMode();'));
     const col = read('web', 'components', 'NftCollection.tsx');
-    assert.ok(col.includes('const noAccount = useWalletMode() != null;'));
+    // Wallet mode is read from the session: hearts then go to this browser (lib/guestLikes.ts).
+    assert.ok(col.includes('const guestAddress = useWalletMode()?.address ?? null;'));
     assert.ok(col.includes('const walletViewer = useTradeWallet()?.address ?? null;'));
   });
 });

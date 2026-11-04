@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { parseEther } from 'ethers';
 import { PinField, pinReady } from './PinField';
 import { txPin } from '../lib/txPin';
+import Link from 'next/link';
 import { TradeWalletSwitch, useTradeWallet } from './WalletModeBits';
 import { walletMarketTrade } from '../lib/walletTrade';
 import { walletErrorText } from '../lib/walletChain';
@@ -87,9 +88,13 @@ export function NftTradeSheet({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const { refreshAll } = useDashboard();
+  const { refreshAll, signedOut, data: dash } = useDashboard();
   // From an outside wallet (wallet mode, or the account's connected wallet): it signs; no PIN, since no Flizy wallet is involved.
   const tradeWallet = useTradeWallet();
+  // No Flizy account at all (wallet mode): after a listing, one line on what an
+  // account adds. Read from the session, not the trading wallet, which a
+  // signed-in account can also use.
+  const guest = signedOut && !dash && tradeWallet != null;
   const [amount, setAmount] = useState(() =>
     intent.action === 'list' && intent.currentWei ? ethFromWei(intent.currentWei)?.replace(/,/g, '') || '' : ''
   );
@@ -209,6 +214,14 @@ export function NftTradeSheet({
             <a href={done.explorerUrl} target="_blank" rel="noreferrer noopener" className="font-sans text-[12px] text-sun no-underline">
               View the transaction
             </a>
+            {guest && intent.action === 'list' ? (
+              <p className="m-0 font-sans text-[12px] leading-[1.5] text-[#cfcfcf]">
+                A free Flizy account adds payments by @username in WhatsApp and Telegram.{' '}
+                <Link href="/signup" className="text-sun no-underline hover:opacity-80">
+                  Create one
+                </Link>
+              </p>
+            ) : null}
             <button type="button" onClick={onClose} className="btn-sun h-[42px] rounded-[6px] font-sans text-[13px]">
               Close
             </button>

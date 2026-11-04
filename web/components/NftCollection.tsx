@@ -24,6 +24,7 @@ import {
 } from './ExploreIcons';
 import { NftTradeSheet, type TradeIntent } from './NftTradeSheet';
 import { useTradeWallet, useWalletMode } from './WalletModeBits';
+import { readGuestLikes, setGuestLike } from '../lib/guestLikes';
 import { MintPanel, MintStatusPill, type MintDrop } from './MintPanel';
 import { FloorChartSheet, FloorSparkline, type SalePoint } from './NftFloorChart';
 import { bpsLabel, compactCount, ethFromWei, monthYear, shortAddr, timeAgo, usdLabel } from '../lib/nftFormat';
@@ -266,8 +267,9 @@ export function NftCollection({ address }: { address: string }) {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   // Whose NFTs "mine" means: the wallet this account trades from.
   const walletViewer = useTradeWallet()?.address ?? null;
-  /** Wallet mode: no Flizy account, so no favorites to read or save. */
-  const noAccount = useWalletMode() != null;
+  /** Wallet mode: no Flizy account, so hearts are kept in this browser (lib/guestLikes.ts). */
+  const guestAddress = useWalletMode()?.address ?? null;
+  const [guestNudge, setGuestNudge] = useState(false);
   const [compact, setCompact] = useState(false);
   const [copied, setCopied] = useState(false);
   const nameRef = useRef<HTMLDivElement | null>(null);
@@ -330,7 +332,11 @@ export function NftCollection({ address }: { address: string }) {
   }, [loadItems]);
 
   useEffect(() => {
-    if (noAccount) return;
+    if (guestAddress) {
+      const mine = readGuestLikes(guestAddress).filter((l) => l.collection === address.toLowerCase());
+      setFavorites(new Set(mine.map((l) => l.tokenId)));
+      return;
+    }
     let cancelled = false;
     getJson<{ favorites: Array<{ collection: string; tokenId: string }> }>(`/api/nfts/favorites?collection=${address}`)
       .then((r) => {
@@ -340,7 +346,7 @@ export function NftCollection({ address }: { address: string }) {
     return () => {
       cancelled = true;
     };
-  }, [address, noAccount]);
+  }, [address, guestAddress]);
 
   // The header shrinks to the compact form once the name scrolls under it.
   useEffect(() => {
@@ -359,10 +365,20 @@ export function NftCollection({ address }: { address: string }) {
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
-  async function toggleFavorite(tokenId: string) {
-    // Favorites belong to a Flizy account; wallet mode has none to save to.
-    if (noAccount) return;
+  async function toggleFavorite(card: NftCardData, collectionName: string) {
+    const tokenId = card.tokenId;
     const on = !favorites.has(tokenId);
+    // Wallet mode: no account to save to, so the heart is kept in this browser.
+    if (guestAddress) {
+      const mine = setGuestLike(
+        guestAddress,
+        { collection: address, collectionName, tokenId, name: card.name, image: card.image },
+        on
+      ).filter((l) => l.collection === address.toLowerCase());
+      setFavorites(new Set(mine.map((l) => l.tokenId)));
+      if (on) setGuestNudge(true);
+      return;
+    }
     setFavorites((prev) => {
       const next = new Set(prev);
       if (on) next.add(tokenId);
@@ -823,6 +839,14 @@ export function NftCollection({ address }: { address: string }) {
             </button>
           </div>
 
+          {guestNudge ? (
+            <p className="m-0 flex flex-wrap items-center gap-x-2 rounded-[10px] border border-[#3a3017] bg-[#16130b] px-[12px] py-[9px] font-sans text-[12.5px] text-[#d9d4ca]">
+              Saved to My NFTs on this device.
+              <Link href="/signup" className="text-sun no-underline hover:opacity-80">
+                Create a free account to keep likes everywhere
+              </Link>
+            </p>
+          ) : null}
           {itemsError ? <p className="alert alert-error m-0">{itemsError}</p> : null}
           {!items && !itemsError ? <p className="m-0 font-sans text-[12px] text-[#a9a9a9]">Loading items...</p> : null}
           {items && visible.length === 0 ? (
@@ -840,7 +864,7 @@ export function NftCollection({ address }: { address: string }) {
                   collectionName={c.name}
                   usdPerEth={usd}
                   favorite={favorites.has(card.tokenId)}
-                  onFavorite={() => toggleFavorite(card.tokenId)}
+                  onFavorite={() => toggleFavorite(card, c.name)}
                   action={cardAction(card)}
                 />
               ))}

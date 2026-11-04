@@ -426,7 +426,7 @@ describe('follow screens', () => {
     assert.doesNotMatch(read('web/app/robots.ts'), /disallow: \[[^\]]*\/people|disallow: \[[^\]]*\/u\//);
     assert.match(read('web/public/llms.txt'), /\/u\/:username/);
     assert.match(read('web/public/llms.txt'), /flizy\.app\/people/);
-    assert.match(read('web/app/privacy/page.tsx'), /3 November 2026/);
+    assert.match(read('web/app/privacy/page.tsx'), /4 November 2026/);
     assert.match(read('web/app/privacy/page.tsx'), /Show wallet address/);
     assert.match(read('web/app/privacy/page.tsx'), /Show portfolio value shows that wallet's available ETH balance; ETH\s+you moved to Savings is not included\./);
     assert.match(read('web/app/privacy/page.tsx'), /Following does not send a payment/);

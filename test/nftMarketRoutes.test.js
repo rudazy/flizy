@@ -31,8 +31,12 @@ const READ_ROUTES = [
   ['nfts', 'mine', 'route.ts'],
 ];
 
-/** The viewer's own NFTs: a Flizy wallet only. Wallet mode reads its wallet through ?viewer= on the others. */
-const ACCOUNT_ONLY = new Set(['nfts/mine/route.ts']);
+/**
+ * Read routes that need a Flizy session. None now: My NFTs (nfts/mine) reads a
+ * wallet-mode visitor's wallet through ?viewer=, like the others, under the
+ * anonymous read cap (test/guestNftProfile.test.js).
+ */
+const ACCOUNT_ONLY = new Set();
 
 describe('read routes', () => {
   for (const parts of READ_ROUTES) {

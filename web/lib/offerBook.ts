@@ -77,7 +77,12 @@ export async function declinedOfferIds(accountId: string, marketplace: string): 
   return new Set((data || []).map((r) => String(r.offer_id)));
 }
 
-/** "@ada" for a maker who is on Flizy, else null and the page shows the address. */
+/**
+ * "@ada" for a maker who is on Flizy and chose to be named on Scan
+ * (accounts.scan_show_username), else null and the page shows the address.
+ * The offer book can be read for any wallet in wallet mode, so a username is
+ * tied to a wallet here only with that account's consent.
+ */
 async function makerLabels(makers: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const supabase = getSupabase();
@@ -85,10 +90,10 @@ async function makerLabels(makers: string[]): Promise<Map<string, string>> {
     [...new Set(makers)].slice(0, 25).map(async (maker) => {
       const { data } = await supabase
         .from('accounts')
-        .select('username')
+        .select('username, scan_show_username')
         .ilike('agent_wallet_address', maker.toLowerCase())
         .maybeSingle();
-      if (data?.username) out.set(maker, `@${data.username}`);
+      if (data?.username && data.scan_show_username === true) out.set(maker, `@${data.username}`);
     })
   );
   return out;
@@ -96,7 +101,7 @@ async function makerLabels(makers: string[]): Promise<Map<string, string>> {
 
 export async function offerBook(
   ctx: NftContext,
-  accountId: string,
+  accountId: string | null,
   wallet: string
 ): Promise<{ made: BookOffer[]; received: BookOffer[]; past: PastBid[] }> {
   if (!ctx.market) return { made: [], received: [], past: [] };
@@ -120,7 +125,8 @@ export async function offerBook(
   for (const t of heldTokens.values()) {
     heldByCollection.set(t.collection, [...(heldByCollection.get(t.collection) ?? []), t.tokenId]);
   }
-  const declined = await declinedOfferIds(accountId, ctx.market.address);
+  // Declining is an account action: a wallet-mode visitor has none to hide.
+  const declined = accountId ? await declinedOfferIds(accountId, ctx.market.address) : new Set<string>();
 
   const newest = (a: OpenOffer, b: OpenOffer) => Date.parse(b.madeAt || '0') - Date.parse(a.madeAt || '0');
   const madeCandidates = all.filter((o) => o.maker === wallet).sort(newest).slice(0, MAX_OFFERS);

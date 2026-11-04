@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAccountIdFromCookie } from '../../../../lib/cookies';
 import { apiErrorBody } from '../../../../lib/apiError';
-import { listingFor, marketView, nftContext, viewerWallet } from '../../../../lib/nftApi.ts';
+import { guestViewer, listingFor, marketView, nftContext, viewerWallet } from '../../../../lib/nftApi.ts';
+import { anonymousReadLimit } from '../../../../lib/readLimit';
 import { listingKey } from '../../../../lib/nftMarket.ts';
 import { checkCursor } from '../../../../lib/nftIndex.ts';
 import { verifiedCollection } from '../../../../lib/listedNfts';
@@ -11,17 +12,24 @@ const ROUTE = 'GET /api/nfts/mine';
 /**
  * Every NFT in the viewer's wallet, any collection. Verified ones can be sent
  * in chat; the rest can be traded here but not sent on socials.
+ *
+ * A signed-in account reads its own wallet. A signed-out visitor in wallet
+ * mode names theirs with ?viewer=: what an address holds is public on the
+ * chain, nothing is saved, and the read counts against the anonymous cap.
  */
 export async function GET(req: Request) {
   try {
     const accountId = await getAccountIdFromCookie();
-    if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    const guest = accountId ? null : guestViewer(req);
+    if (!accountId && !guest) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+    const limited = await anonymousReadLimit(accountId);
+    if (limited) return limited;
     const rawCursor = new URL(req.url).searchParams.get('cursor');
     const cursor = rawCursor ? checkCursor(rawCursor) : null;
     if (rawCursor && !cursor) return NextResponse.json({ error: 'Bad cursor' }, { status: 400 });
 
     const ctx = nftContext();
-    const viewer = await viewerWallet(accountId);
+    const viewer = accountId ? await viewerWallet(accountId) : { address: guest as string, viaGator: false };
     const page = await ctx.index.walletNfts(viewer.address, cursor);
     // Only this wallet's own listings on this page are checked on-chain.
     const held = new Set(page.items.map((n) => listingKey(n.collection, n.tokenId)));

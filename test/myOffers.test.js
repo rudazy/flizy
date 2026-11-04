@@ -32,10 +32,10 @@ const MIGRATION = fs.readFileSync(
 );
 
 describe('GET /api/nfts/offers', () => {
-  it('needs a session, hides internal errors, and answers with both sides of the book', () => {
-    assert.match(ROUTE, /if \(!accountId\) return NextResponse\.json\(\{ error: 'Not logged in' \}, \{ status: 401 \}\)/);
+  it('needs a session or a wallet-mode viewer, hides internal errors, and answers with both sides of the book', () => {
+    assert.match(ROUTE, /if \(!accountId && !guest\) return NextResponse\.json\(\{ error: 'Not logged in' \}, \{ status: 401 \}\)/);
     assert.match(ROUTE, /apiErrorBody\(ROUTE, err\)/);
-    assert.match(ROUTE, /offerBook\(ctx, accountId, viewer\.address\)/);
+    assert.match(ROUTE, /offerBook\(ctx, accountId, address\)/);
   });
 });
 

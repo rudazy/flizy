@@ -8,6 +8,8 @@ import { ArrowLeftIcon, CheckIcon } from './ExploreIcons';
 import { NftArt } from './NftCollection';
 import { NftTradeSheet, type TradeIntent } from './NftTradeSheet';
 import { ethFromWei, shortAddr, usdLabel } from '../lib/nftFormat';
+import { useWalletMode } from './WalletModeBits';
+import { allGuestLikes, clearGuestLikes, readGuestLikes, type GuestLike } from '../lib/guestLikes';
 
 type BookOffer = {
   offerId: string;
@@ -67,6 +69,11 @@ function endsLabel(o: BookOffer): string {
  * The viewer's own NFT page: what they hold, the offers they can accept or
  * decline, the offers they made (each cancellable for its full amount), their
  * past bids, accepted or cancelled, and the NFTs they hearted.
+ *
+ * In wallet mode (a connected wallet, no account) the same page reads that
+ * wallet by address from the public chain, keeps its hearts in this browser
+ * (lib/guestLikes.ts), signs every trade with the wallet, and invites the
+ * visitor to make an account without requiring one.
  */
 export function NftProfile() {
   const router = useRouter();
@@ -75,6 +82,13 @@ export function NftProfile() {
   const raw = search.get('tab');
   const tab: TabId = TABS.some((t) => t.id === raw) ? (raw as TabId) : 'items';
   const { data: dash, explorerBase } = useDashboard();
+  // Wallet mode: no account, so this page reads the connected wallet by address
+  // and its likes from this browser.
+  const guestAddress = useWalletMode()?.address ?? null;
+  const viewerQuery = guestAddress ? `?viewer=${guestAddress}` : '';
+  // Hearts given as a guest, offered for saving once signed in.
+  const [carried, setCarried] = useState<GuestLike[]>([]);
+  const [carryState, setCarryState] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
 
   const [nfts, setNfts] = useState<MyNft[] | null>(null);
   const [book, setBook] = useState<{ made: BookOffer[]; received: BookOffer[]; past: PastBid[] } | null>(null);
@@ -89,7 +103,7 @@ export function NftProfile() {
 
   const loadBook = useCallback(async () => {
     try {
-      const res = await fetch('/api/nfts/offers');
+      const res = await fetch(`/api/nfts/offers${viewerQuery}`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Could not load your offers.');
       setBook({ made: body.made ?? [], received: body.received ?? [], past: body.past ?? [] });
@@ -100,11 +114,11 @@ export function NftProfile() {
     } catch (e) {
       setBookError(e instanceof Error ? e.message : 'Could not load your offers.');
     }
-  }, []);
+  }, [viewerQuery]);
 
   const loadNfts = useCallback(async () => {
     try {
-      const res = await fetch('/api/nfts/mine');
+      const res = await fetch(`/api/nfts/mine${viewerQuery}`);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Could not load your NFTs.');
       setNfts(Array.isArray(body.nfts) ? body.nfts : []);
@@ -112,9 +126,25 @@ export function NftProfile() {
     } catch (e) {
       setNftsError(e instanceof Error ? e.message : 'Could not load your NFTs.');
     }
-  }, []);
+  }, [viewerQuery]);
 
   const loadLiked = useCallback(async () => {
+    if (guestAddress) {
+      setLiked(
+        readGuestLikes(guestAddress).map((l) => ({
+          collection: l.collection,
+          collectionName: l.collectionName,
+          tokenId: l.tokenId,
+          name: l.name,
+          image: l.image,
+          verified: false,
+          listedWei: null,
+          likedAt: l.likedAt,
+        }))
+      );
+      setLikedError('');
+      return;
+    }
     try {
       const res = await fetch('/api/nfts/liked');
       const body = await res.json().catch(() => ({}));
@@ -124,13 +154,38 @@ export function NftProfile() {
     } catch (e) {
       setLikedError(e instanceof Error ? e.message : 'Could not load your likes.');
     }
-  }, []);
+  }, [guestAddress]);
 
   useEffect(() => {
     loadBook();
     loadNfts();
     loadLiked();
   }, [loadBook, loadNfts, loadLiked]);
+
+  // Signed in with hearts left from browsing as a guest in this browser.
+  useEffect(() => {
+    if (!guestAddress && dash) setCarried(allGuestLikes());
+  }, [guestAddress, dash]);
+
+  async function saveCarried() {
+    setCarryState('saving');
+    try {
+      for (const l of carried) {
+        const res = await fetch('/api/nfts/favorites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ collection: l.collection, tokenId: l.tokenId, on: true }),
+        });
+        if (!res.ok) throw new Error('save failed');
+      }
+      clearGuestLikes();
+      setCarried([]);
+      setCarryState('done');
+      loadLiked();
+    } catch {
+      setCarryState('error');
+    }
+  }
 
   function setTab(next: TabId) {
     const params = new URLSearchParams(search.toString());
@@ -140,8 +195,10 @@ export function NftProfile() {
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
-  const name = dash?.account.display_name || (dash?.account.username ? `@${dash.account.username}` : 'Your NFTs');
-  const wallet = dash?.account.agent_wallet_address || null;
+  const name = guestAddress
+    ? 'Your wallet'
+    : dash?.account.display_name || (dash?.account.username ? `@${dash.account.username}` : 'Your NFTs');
+  const wallet = guestAddress || dash?.account.agent_wallet_address || null;
   const counts: Record<TabId, number | null> = {
     items: nfts?.length ?? null,
     received: book?.received.length ?? null,
@@ -179,6 +236,26 @@ export function NftProfile() {
           ))}
         </div>
       </section>
+
+      {guestAddress ? <GuestCard /> : null}
+
+      {!guestAddress && carried.length > 0 ? (
+        <section className="mt-[10px] flex flex-wrap items-center justify-between gap-[10px] rounded-[12px] border border-[#3a3017] bg-[#16130b] p-[14px]">
+          <p className="m-0 min-w-0 flex-1 font-sans text-[13px] leading-[1.45] text-[#e6e6e6]">
+            You liked {carried.length} {carried.length === 1 ? 'NFT' : 'NFTs'} before signing in. Save {carried.length === 1 ? 'it' : 'them'} to your
+            account to see {carried.length === 1 ? 'it' : 'them'} on every device.
+          </p>
+          <button
+            type="button"
+            onClick={() => void saveCarried()}
+            disabled={carryState === 'saving'}
+            className="btn-sun h-[38px] shrink-0 rounded-[8px] px-[14px] font-sans text-[13px]"
+          >
+            {carryState === 'saving' ? 'Saving...' : 'Save likes'}
+          </button>
+          {carryState === 'error' ? <p className="m-0 w-full font-sans text-[12px] text-[#cfcfcf]">Some likes could not be saved. Try again.</p> : null}
+        </section>
+      ) : null}
 
       <div className="mt-[16px] flex overflow-x-auto border-b border-[#23242a] [scrollbar-width:none]" role="tablist" aria-label="My NFTs sections">
         {TABS.map((t) => (
@@ -236,6 +313,7 @@ export function NftProfile() {
                 })
               }
               onDeclined={loadBook}
+              canDecline={!guestAddress}
             />
           ))}
         </div>
@@ -275,7 +353,13 @@ export function NftProfile() {
       {tab === 'liked' ? (
         <div className="mt-[14px]">
           {!liked && !likedError ? <Muted>Loading...</Muted> : null}
-          {liked && liked.length === 0 && !likedError ? <Muted>NFTs you heart on a collection page show here.</Muted> : null}
+          {liked && liked.length === 0 && !likedError ? (
+            <Muted>
+              {guestAddress
+                ? 'NFTs you heart on a collection page show here. They are kept on this device until you create an account.'
+                : 'NFTs you heart on a collection page show here.'}
+            </Muted>
+          ) : null}
           <div className={GRID}>
             {(liked ?? []).map((n) => (
               <NftTile key={`${n.collection}:${n.tokenId}`} nft={n} />
@@ -298,6 +382,47 @@ export function NftProfile() {
         />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Wallet mode only: what a free account adds to what the wallet already does
+ * here. An invitation, never a gate: everything on this page works without it.
+ */
+function GuestCard() {
+  const perks = [
+    'Likes on every device, not just this one',
+    'Pay and get paid by @username, in WhatsApp or Telegram',
+    'Offers you decline stay hidden',
+  ];
+  return (
+    <section
+      className="mt-[10px] rounded-[12px] border border-[#3a3017] p-[14px]"
+      style={{ background: 'linear-gradient(135deg, #1a160c 0%, #12100b 60%, #0f0e0b 100%)' }}
+    >
+      <p className="m-0 font-sans text-[15px] font-semibold text-white">Your wallet, at home on Flizy</p>
+      <p className="m-0 mt-[4px] font-sans text-[12.5px] leading-[1.5] text-[#cfcfcf]">
+        Everything you hold on GIWA is here to list, trade and make offers on. Your wallet signs every trade, and Flizy never holds its keys.
+      </p>
+      <ul className="m-0 mt-[10px] grid list-none gap-[6px] p-0">
+        {perks.map((p) => (
+          <li key={p} className="flex items-start gap-[8px] font-sans text-[12.5px] text-[#e6e6e6]">
+            <span className="mt-[3px] flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full bg-sun text-[#1a1405]" aria-hidden>
+              <CheckIcon size={9} strokeWidth={3} />
+            </span>
+            {p}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-[12px] flex flex-wrap items-center gap-[12px]">
+        <Link href="/signup" className="btn-sun h-[40px] rounded-[8px] px-[16px] font-sans text-[13px] no-underline">
+          Create a free account
+        </Link>
+        <Link href="/login?next=%2Fdashboard%2Fexplore%2Fnfts%2Fme" className="font-sans text-[13px] text-[#cfcfcf] no-underline hover:text-white">
+          Log in
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -421,11 +546,14 @@ function ReceivedRow({
   usdPerEth,
   onAccept,
   onDeclined,
+  canDecline,
 }: {
   offer: BookOffer;
   usdPerEth: number | null;
   onAccept: (tokenId: string) => void;
   onDeclined: () => void;
+  /** Declining is saved to an account; a wallet-mode visitor can still accept. */
+  canDecline: boolean;
 }) {
   const [pick, setPick] = useState(offer.tokenId ?? offer.myTokenIds[0] ?? '');
   const [confirming, setConfirming] = useState(false);
@@ -469,14 +597,16 @@ function ReceivedRow({
         >
           Accept
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={decline}
-          className={`h-[34px] rounded-[8px] border px-[12px] font-sans text-[12.5px] ${confirming ? 'border-sun text-sun' : 'border-[#3a3b40] text-white'}`}
-        >
-          {busy ? '...' : confirming ? 'Sure?' : 'Decline'}
-        </button>
+        {canDecline ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={decline}
+            className={`h-[34px] rounded-[8px] border px-[12px] font-sans text-[12.5px] ${confirming ? 'border-sun text-sun' : 'border-[#3a3b40] text-white'}`}
+          >
+            {busy ? '...' : confirming ? 'Sure?' : 'Decline'}
+          </button>
+        ) : null}
       </OfferRow>
       {!offer.tokenId && offer.myTokenIds.length > 1 ? (
         <label className="flex items-center gap-[8px] px-[8px] font-sans text-[12px] text-[#a9a9a9]">
