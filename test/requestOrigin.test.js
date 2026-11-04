@@ -140,7 +140,8 @@ describe('login asks for the emailed code on every runtime', () => {
   );
 
   it('only a remembered browser skips the code', () => {
-    assert.match(SRC, /const remembered = hasTrustedLoginDevice\(data\.id\);/);
+    // Awaited: un-awaited, the Promise is always truthy and every login would skip the code.
+    assert.match(SRC, /const remembered = await hasTrustedLoginDevice\(data\.id\);/);
   });
 
   it('there is no environment switch around it', () => {

@@ -15,7 +15,7 @@ import { ReceiptCard } from '../../../components/ReceiptCard';
  * a receipt is shared by hand, not found by search.
  */
 
-type Props = { params: { token: string } };
+type Props = { params: Promise<{ token: string }> };
 
 const readReceipt = cache(async (token: string) => {
   try {
@@ -25,7 +25,8 @@ const readReceipt = cache(async (token: string) => {
   }
 });
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params: paramsIn }: Props): Promise<Metadata> {
+  const params = await paramsIn;
   const r = await readReceipt(params.token);
   const base = pageMetadata({
     title: r ? `Paid ${r.amount} ${r.unit} on Flizy` : 'Receipt on Flizy',
@@ -44,7 +45,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ReceiptPage({ params }: Props) {
+export default async function ReceiptPage({ params: paramsIn }: Props) {
+  const params = await paramsIn;
   const r = await readReceipt(params.token);
 
   if (!r) {

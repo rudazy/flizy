@@ -12,9 +12,9 @@ const ROUTE = 'GET /api/tasks/[ref]';
  * whether they have already entered. Entries themselves are never in the
  * response until the task is completed, and then only as the winner list.
  */
-export async function GET(_req: Request, ctx: { params: { ref: string } }) {
+export async function GET(_req: Request, ctx: { params: Promise<{ ref: string }> }) {
   try {
-    const ref = Number(ctx.params.ref);
+    const ref = Number((await ctx.params).ref);
     if (!Number.isInteger(ref) || ref <= 0) {
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }

@@ -7,9 +7,10 @@ import { listTheses, listedTokenKey, postThesis } from '../../../../../lib/token
 const GET_ROUTE = 'GET /api/tokens/[symbol]/theses';
 const POST_ROUTE = 'POST /api/tokens/[symbol]/theses';
 
-type Params = { params: { symbol: string } };
+type Params = { params: Promise<{ symbol: string }> };
 
-export async function GET(req: Request, { params }: Params) {
+export async function GET(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
@@ -22,7 +23,8 @@ export async function GET(req: Request, { params }: Params) {
   }
 }
 
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

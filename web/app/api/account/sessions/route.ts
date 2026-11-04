@@ -45,7 +45,7 @@ export async function GET() {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     const rows = await loadRows(accountId);
-    return NextResponse.json({ sessions: presentSessions(rows, getSessionKey() || '') });
+    return NextResponse.json({ sessions: presentSessions(rows, (await getSessionKey()) || '') });
   } catch (err) {
     return NextResponse.json(apiErrorBody(GET_ROUTE, err), { status: 500 });
   }
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;
     const accountId = await getAccountIdFromCookie();
-    const hash = getSessionKey() || '';
+    const hash = (await getSessionKey()) || '';
     if (!accountId || !hash) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
 
     const supabase = getSupabase();

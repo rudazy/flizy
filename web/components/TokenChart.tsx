@@ -22,7 +22,7 @@ const TOP_PAD = 10;
 /** Share of the plot the volume bars may use, at the bottom. */
 const VOLUME_SHARE = 0.18;
 
-function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
+function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {

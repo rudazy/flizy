@@ -7,9 +7,10 @@ import { listComments, listedTokenKey, postComment } from '../../../../../../../
 const GET_ROUTE = 'GET /api/tokens/[symbol]/theses/[id]/comments';
 const POST_ROUTE = 'POST /api/tokens/[symbol]/theses/[id]/comments';
 
-type Params = { params: { symbol: string; id: string } };
+type Params = { params: Promise<{ symbol: string; id: string }> };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(_req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
@@ -22,7 +23,8 @@ export async function GET(_req: Request, { params }: Params) {
   }
 }
 
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

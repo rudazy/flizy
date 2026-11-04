@@ -372,7 +372,8 @@ async function planForWallet(req: Request, rawAction: string) {
  * buys and offers, which send ETH to someone else), the account lock, and is
  * logged in transfers before it is sent.
  */
-export async function POST(req: Request, { params }: { params: { action: string } }) {
+export async function POST(req: Request, { params: paramsIn }: { params: Promise<{ action: string }> }) {
+  const params = await paramsIn;
   const route = `POST /api/market/${ACTIONS.includes(params.action as Action) ? params.action : '[action]'}`;
   try {
     const denied = rejectIfCrossOrigin(req);

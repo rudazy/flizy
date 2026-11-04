@@ -11,7 +11,8 @@ const MAX_PAGES = 4;
  * Trait types and values with how many tokens carry each, from token metadata.
  * Large collections are sampled; the response says how many tokens were read.
  */
-export async function GET(_req: Request, { params }: { params: { address: string } }) {
+export async function GET(_req: Request, { params: paramsIn }: { params: Promise<{ address: string }> }) {
+  const params = await paramsIn;
   try {
     // Public chain data, open without a Flizy session for wallet mode, capped per caller.
     const limited = await anonymousReadLimit();

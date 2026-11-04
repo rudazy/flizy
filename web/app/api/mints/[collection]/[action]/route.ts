@@ -153,7 +153,8 @@ async function planPause(ctx: NftContext, cfg: MintConfig | null, row: DropRow, 
  * then runMintTx takes the PIN, the account lock, the daily ETH limit
  * and logs it in transfers before sending.
  */
-export async function POST(req: Request, { params }: { params: { collection: string; action: string } }) {
+export async function POST(req: Request, { params: paramsIn }: { params: Promise<{ collection: string; action: string }> }) {
+  const params = await paramsIn;
   const route = `POST /api/mints/[collection]/${ACTIONS.includes(params.action as Action) ? params.action : '[action]'}`;
   try {
     const denied = rejectIfCrossOrigin(req);

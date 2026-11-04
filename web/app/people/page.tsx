@@ -16,7 +16,8 @@ export const metadata: Metadata = pageMetadata({
   noindex: true,
 });
 
-export default async function PeoplePage({ searchParams }: { searchParams?: { q?: string } }) {
+export default async function PeoplePage(props: { searchParams: Promise<{ q?: string }> }) {
+  const searchParams = await props.searchParams;
   // A username is at most 24 characters. Anything longer is not a search.
   const raw = typeof searchParams?.q === 'string' ? searchParams.q.trim() : '';
   return <PeopleFinder initialQuery={raw.slice(0, 24)} />;

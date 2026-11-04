@@ -16,7 +16,8 @@ const ROUTE = 'GET /api/tokens/[symbol]';
  * read from its own pool. Without a Flizy session (wallet mode) only FLZ and
  * listed tokens open; a token only a Flizy wallet holds needs the account.
  */
-export async function GET(req: Request, { params }: { params: { symbol: string } }) {
+export async function GET(req: Request, { params: paramsIn }: { params: Promise<{ symbol: string }> }) {
+  const params = await paramsIn;
   try {
     const accountId = await getAccountIdFromCookie();
     const limited = await anonymousReadLimit(accountId);

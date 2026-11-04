@@ -7,13 +7,14 @@ import { getProjectWorkspace, updateProject } from '../../../../../lib/tasks';
 const GET_ROUTE = 'GET /api/projects/workspace/[handle]';
 const PATCH_ROUTE = 'PATCH /api/projects/workspace/[handle]';
 
-type Params = { params: { handle: string } };
+type Params = { params: Promise<{ handle: string }> };
 
 /**
  * One project's workspace, for its owner or a member. Anyone else gets the
  * same 404 as a handle that does not exist.
  */
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(_req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) {
@@ -30,7 +31,8 @@ export async function GET(_req: Request, { params }: Params) {
 }
 
 /** Edit name, description, links, picture or banner. Fields left out are not changed. */
-export async function PATCH(req: Request, { params }: Params) {
+export async function PATCH(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

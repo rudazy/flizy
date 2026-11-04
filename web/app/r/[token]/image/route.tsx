@@ -14,7 +14,8 @@ const SIZE = { width: 1080, height: 1440 };
 const GOLD = '#f7d047';
 const MUTED = '#a8a29a';
 
-export async function GET(_req: Request, { params }: { params: { token: string } }) {
+export async function GET(_req: Request, { params: paramsIn }: { params: Promise<{ token: string }> }) {
+  const params = await paramsIn;
   let r = null;
   try {
     r = await loadReceipt(params.token, getWebChain().name);

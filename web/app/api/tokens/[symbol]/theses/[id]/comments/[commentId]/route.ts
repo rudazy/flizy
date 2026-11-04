@@ -7,7 +7,8 @@ import { deleteComment, listedTokenKey } from '../../../../../../../../lib/token
 const ROUTE = 'DELETE /api/tokens/[symbol]/theses/[id]/comments/[commentId]';
 
 /** The author or an admin removes a comment. */
-export async function DELETE(req: Request, { params }: { params: { symbol: string; id: string; commentId: string } }) {
+export async function DELETE(req: Request, { params: paramsIn }: { params: Promise<{ symbol: string; id: string; commentId: string }> }) {
+  const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

@@ -1,7 +1,8 @@
 import { AppPage } from '../../../../../../components/AppSection';
 import { NftItem } from '../../../../../../components/NftItem';
 
-export default function NftItemPage({ params }: { params: { collection: string; tokenId: string } }) {
+export default async function NftItemPage({ params: paramsIn }: { params: Promise<{ collection: string; tokenId: string }> }) {
+  const params = await paramsIn;
   const address = /^0x[0-9a-fA-F]{40}$/.test(params.collection || '') ? params.collection : null;
   const tokenId = /^[0-9]{1,78}$/.test(params.tokenId || '') ? params.tokenId : null;
   return (

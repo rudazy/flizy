@@ -90,7 +90,7 @@ describe('POST /api/account/sessions', () => {
     assert.doesNotMatch(SRC, /requirePassword/);
     assert.match(SRC, /\.neq\('token_hash', hash\)/);
     assert.match(SRC, /\.gt\('expires_at', now\)/);
-    assert.match(SRC, /sessions: presentSessions\(rows, getSessionKey\(\) \|\| ''\)/);
+    assert.match(SRC, /sessions: presentSessions\(rows, \(await getSessionKey\(\)\) \|\| ''\)/);
     assert.doesNotMatch(SRC, /NextResponse\.json\(\{[^}]*token_hash/);
   });
 });

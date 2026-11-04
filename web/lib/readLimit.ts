@@ -13,6 +13,6 @@ import { CALLER_LIMITED, takeCallerAttempt } from './callerLimit.ts';
 export async function anonymousReadLimit(accountId?: string | null): Promise<NextResponse | null> {
   const id = accountId === undefined ? await getAccountIdFromCookie() : accountId;
   if (id) return null;
-  if (await takeCallerAttempt(getSupabase(), headers(), 'read')) return null;
+  if (await takeCallerAttempt(getSupabase(), await headers(), 'read')) return null;
   return NextResponse.json(CALLER_LIMITED, { status: 429 });
 }

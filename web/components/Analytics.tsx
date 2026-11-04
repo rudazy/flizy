@@ -70,13 +70,13 @@ export function analyticsConfigured(): boolean {
   return Boolean(ga || clarity || umami);
 }
 
-export function Analytics() {
+export async function Analytics() {
   if (!isMeasurableEnv()) return null;
 
   // Read on the server so a tracker is never in the document before it is
   // allowed. A client-side suppression would still have shipped the script.
   // Undecided is not consent: readConsent returns null and this refuses.
-  if (!analyticsAllowed(cookies().get(CONSENT_COOKIE)?.value)) return null;
+  if (!analyticsAllowed((await cookies()).get(CONSENT_COOKIE)?.value)) return null;
 
   const { ga, clarity, umami } = configuredIds();
 

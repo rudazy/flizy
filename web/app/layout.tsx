@@ -103,14 +103,14 @@ export const viewport: Viewport = {
   colorScheme: 'dark',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const signedIn = hasSessionCookie();
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const signedIn = await hasSessionCookie();
 
   // Ask only when there is something to ask about, and only once. Deciding this
   // on the server means a visitor who already answered never sees the banner
   // render and dismiss itself.
   const askConsent =
-    analyticsConfigured() && readConsent(cookies().get(CONSENT_COOKIE)?.value) === null;
+    analyticsConfigured() && readConsent((await cookies()).get(CONSENT_COOKIE)?.value) === null;
 
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>

@@ -67,7 +67,8 @@ async function readRow(token: string): Promise<Row | null> {
   return (data as Row | null) || null;
 }
 
-export async function GET(_req: Request, { params }: { params: { token: string } }) {
+export async function GET(_req: Request, { params: paramsIn }: { params: Promise<{ token: string }> }) {
+  const params = await paramsIn;
   try {
     const row = await readRow(String(params.token || ''));
     const status = statusOf(row);
@@ -90,7 +91,8 @@ export async function GET(_req: Request, { params }: { params: { token: string }
   }
 }
 
-export async function POST(req: Request, { params }: { params: { token: string } }) {
+export async function POST(req: Request, { params: paramsIn }: { params: Promise<{ token: string }> }) {
+  const params = await paramsIn;
   const denied = rejectIfCrossOrigin(req);
   if (denied) return denied;
   try {

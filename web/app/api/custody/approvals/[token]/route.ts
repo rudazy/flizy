@@ -24,7 +24,7 @@ const ROUTE = '/api/custody/approvals/[token]';
 
 export const dynamic = 'force-dynamic';
 
-type Ctx = { params: { token: string } };
+type Ctx = { params: Promise<{ token: string }> };
 
 function deps(): ApprovalDeps {
   const chain = getWebChain();
@@ -36,7 +36,8 @@ function failure(err: unknown) {
   return NextResponse.json(apiErrorBodyAllowingClientError(ROUTE, err), { status: err instanceof ClientError ? 400 : 500 });
 }
 
-export async function GET(_req: Request, { params }: Ctx) {
+export async function GET(_req: Request, { params: paramsIn }: Ctx) {
+  const params = await paramsIn;
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
@@ -47,7 +48,8 @@ export async function GET(_req: Request, { params }: Ctx) {
   }
 }
 
-export async function POST(req: Request, { params }: Ctx) {
+export async function POST(req: Request, { params: paramsIn }: Ctx) {
+  const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

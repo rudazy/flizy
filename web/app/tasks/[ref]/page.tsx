@@ -64,7 +64,8 @@ const loadTask = cache((ref: number, viewerAccountId: string | null) =>
 // A signed-out reader is the normal case, so a missing cookie is not an error.
 const viewerId = cache(() => getAccountIdFromCookie().catch(() => null));
 
-export async function generateMetadata({ params }: { params: { ref: string } }): Promise<Metadata> {
+export async function generateMetadata({ params: paramsIn }: { params: Promise<{ ref: string }> }): Promise<Metadata> {
+  const params = await paramsIn;
   const ref = refFrom(params.ref);
   if (ref === null) return { title: 'Task not found' };
 
@@ -86,7 +87,8 @@ export async function generateMetadata({ params }: { params: { ref: string } }):
   };
 }
 
-export default async function TaskPage({ params }: { params: { ref: string } }) {
+export default async function TaskPage({ params: paramsIn }: { params: Promise<{ ref: string }> }) {
+  const params = await paramsIn;
   const ref = refFrom(params.ref);
   if (ref === null) notFound();
 

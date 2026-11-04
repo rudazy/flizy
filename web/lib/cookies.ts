@@ -40,8 +40,8 @@ function warnMissingClosureOnce(): void {
  * Cookie present, not a live session. Use only for chrome (hide Log in).
  * Auth still goes through getAccountIdFromCookie.
  */
-export function hasSessionCookie(): boolean {
-  return Boolean(cookies().get(COOKIE)?.value);
+export async function hasSessionCookie(): Promise<boolean> {
+  return Boolean((await cookies()).get(COOKIE)?.value);
 }
 
 function hashToken(token: string): string {
@@ -81,7 +81,7 @@ export async function createSession(accountId: string, sink?: SessionCookieSink)
     expires_at: expiresAt.toISOString(),
   };
   try {
-    const seen = sessionClientFrom(headers());
+    const seen = sessionClientFrom(await headers());
     if (seen.label) row.client_label = seen.label;
     if (seen.place) row.client_place = seen.place;
   } catch {
@@ -97,7 +97,7 @@ export async function createSession(accountId: string, sink?: SessionCookieSink)
   }
   if (error) throw new Error(`Could not start session: ${error.message}`);
 
-  const jar = sink ? sink.cookies : cookies();
+  const jar = sink ? sink.cookies : await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
     // Off in local dev, where Next serves plain http and a secure cookie would
@@ -120,8 +120,8 @@ export async function createSession(accountId: string, sink?: SessionCookieSink)
   }
 }
 
-export function hasTrustedLoginDevice(accountId: string): boolean {
-  return loginDeviceMatches(cookies().get(LOGIN_DEVICE_COOKIE)?.value || '', accountId);
+export async function hasTrustedLoginDevice(accountId: string): Promise<boolean> {
+  return loginDeviceMatches((await cookies()).get(LOGIN_DEVICE_COOKIE)?.value || '', accountId);
 }
 
 /**
@@ -129,7 +129,7 @@ export function hasTrustedLoginDevice(accountId: string): boolean {
  * Absolute expiry is enforced server side; the cookie maxAge is only a hint.
  */
 export async function getAccountIdFromCookie(): Promise<string | null> {
-  const token = cookies().get(COOKIE)?.value;
+  const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
 
   const supabase = getSupabase();
@@ -171,8 +171,8 @@ export async function getAccountIdFromCookie(): Promise<string | null> {
  * limiter. Safe to store and compare; useless to replay, because the cookie
  * still has to carry the token this hashes from.
  */
-export function getSessionKey(): string | null {
-  const token = cookies().get(COOKIE)?.value;
+export async function getSessionKey(): Promise<string | null> {
+  const token = (await cookies()).get(COOKIE)?.value;
   return token ? hashToken(token) : null;
 }
 
@@ -180,7 +180,7 @@ export function getSessionKey(): string | null {
  * End the current session (server row and cookie).
  */
 export async function clearAccountCookie(): Promise<void> {
-  const jar = cookies();
+  const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
 
   if (token) {

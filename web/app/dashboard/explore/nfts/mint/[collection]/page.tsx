@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { AppPage } from '../../../../../../components/AppSection';
 import { MintPanel } from '../../../../../../components/MintPanel';
 
-export default function MintPage({ params }: { params: { collection: string } }) {
+export default async function MintPage({ params: paramsIn }: { params: Promise<{ collection: string }> }) {
+  const params = await paramsIn;
   const address = /^0x[0-9a-fA-F]{40}$/.test(params.collection || '') ? params.collection : null;
   return (
     <AppPage>

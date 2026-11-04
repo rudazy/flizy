@@ -7,8 +7,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   _req: Request,
-  { params }: { params: { code: string } }
+  { params: paramsIn }: { params: Promise<{ code: string }> }
 ) {
+  const params = await paramsIn;
   const supabase = getSupabase();
   let owned = null;
   try {

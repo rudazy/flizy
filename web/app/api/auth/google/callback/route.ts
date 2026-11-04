@@ -108,7 +108,7 @@ export async function GET(req: Request) {
     }
 
     const url = new URL(req.url);
-    const ticket = unpackGoogleTicket(cookies().get(GOOGLE_LOGIN_COOKIE)?.value);
+    const ticket = unpackGoogleTicket((await cookies()).get(GOOGLE_LOGIN_COOKIE)?.value);
     const state = url.searchParams.get('state') || '';
     // The state we mint is short. A huge query is refused before the HMAC.
     if (state.length > 2000) return formAgain(ticket, 'expired', false);

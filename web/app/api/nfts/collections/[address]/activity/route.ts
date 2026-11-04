@@ -23,7 +23,8 @@ export type ActivityRow = {
  * through the explorer; marketplace events come on the first page only, and
  * every page drops the transfer that a marketplace sale already explains.
  */
-export async function GET(req: Request, { params }: { params: { address: string } }) {
+export async function GET(req: Request, { params: paramsIn }: { params: Promise<{ address: string }> }) {
+  const params = await paramsIn;
   try {
     // Public chain data, open without a Flizy session for wallet mode, capped per caller.
     const limited = await anonymousReadLimit();

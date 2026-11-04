@@ -399,7 +399,7 @@ describe('anonymous callers are capped', () => {
     }
     const helper = read('web', 'lib', 'readLimit.ts');
     assert.ok(helper.includes('if (id) return null;'));
-    assert.ok(helper.includes("takeCallerAttempt(getSupabase(), headers(), 'read')"));
+    assert.ok(helper.includes("takeCallerAttempt(getSupabase(), await headers(), 'read')"));
   });
 });
 

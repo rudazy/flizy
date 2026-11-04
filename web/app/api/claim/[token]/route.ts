@@ -7,9 +7,9 @@ import { attachInviteCookie } from '../../../../lib/inviteCookie.ts';
 
 const ROUTE = 'GET /api/claim/[token]';
 
-export async function GET(_req: Request, ctx: { params: { token: string } }) {
+export async function GET(_req: Request, ctx: { params: Promise<{ token: string }> }) {
   try {
-    const claim = await getClaimByToken(ctx.params.token);
+    const claim = await getClaimByToken((await ctx.params).token);
     if (!claim) return NextResponse.json({ error: 'Claim not found' }, { status: 404 });
     const access = publicClaimAccess(claim);
     const stored = normalizeInviteCode(claim.invite_code);

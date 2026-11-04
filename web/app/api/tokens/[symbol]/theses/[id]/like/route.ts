@@ -7,7 +7,8 @@ import { listedTokenKey, toggleLike } from '../../../../../../../lib/tokenSocial
 const ROUTE = 'POST /api/tokens/[symbol]/theses/[id]/like';
 
 /** Like a thesis, or take the like back. */
-export async function POST(req: Request, { params }: { params: { symbol: string; id: string } }) {
+export async function POST(req: Request, { params: paramsIn }: { params: Promise<{ symbol: string; id: string }> }) {
+  const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

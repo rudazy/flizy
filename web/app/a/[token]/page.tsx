@@ -14,6 +14,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function ApprovalPage({ params }: { params: { token: string } }) {
+export default async function ApprovalPage({ params: paramsIn }: { params: Promise<{ token: string }> }) {
+  const params = await paramsIn;
   return <ApprovalForm token={params.token} />;
 }

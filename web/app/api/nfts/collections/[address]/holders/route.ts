@@ -7,7 +7,8 @@ import { anonymousReadLimit } from '../../../../../../lib/readLimit';
 const ROUTE = 'GET /api/nfts/collections/[address]/holders';
 
 /** Holders with how many tokens each holds, largest first, paged. */
-export async function GET(req: Request, { params }: { params: { address: string } }) {
+export async function GET(req: Request, { params: paramsIn }: { params: Promise<{ address: string }> }) {
+  const params = await paramsIn;
   try {
     // Public chain data, open without a Flizy session for wallet mode, capped per caller.
     const limited = await anonymousReadLimit();

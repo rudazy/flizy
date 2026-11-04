@@ -6,7 +6,7 @@ import { listedTokenKey, setWatched } from '../../../../../lib/tokenSocial';
 
 const ROUTE = 'POST|DELETE /api/tokens/[symbol]/watch';
 
-type Params = { params: { symbol: string } };
+type Params = { params: Promise<{ symbol: string }> };
 
 async function set(req: Request, symbol: string, on: boolean): Promise<Response> {
   try {
@@ -23,11 +23,13 @@ async function set(req: Request, symbol: string, on: boolean): Promise<Response>
 }
 
 /** Star the token. */
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   return set(req, params.symbol, true);
 }
 
 /** Unstar it. */
-export async function DELETE(req: Request, { params }: Params) {
+export async function DELETE(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   return set(req, params.symbol, false);
 }

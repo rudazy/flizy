@@ -83,7 +83,7 @@ describe('the consent cookie', () => {
 
 describe('Analytics refuses before it renders', () => {
   it('asks the gate, and asks it about the cookie', () => {
-    assert.match(ANALYTICS_SRC, /analyticsAllowed\(cookies\(\)\.get\(CONSENT_COOKIE\)\?\.value\)/);
+    assert.match(ANALYTICS_SRC, /analyticsAllowed\(\(await cookies\(\)\)\.get\(CONSENT_COOKIE\)\?\.value\)/);
   });
 
   it('returns nothing when the answer is not yes', () => {
@@ -146,7 +146,7 @@ describe('the banner offers a real choice', () => {
 
 describe('the layout asks once, and only when there is something to ask', () => {
   it('shows the banner only while the choice is undecided', () => {
-    assert.match(LAYOUT_SRC, /readConsent\(cookies\(\)\.get\(CONSENT_COOKIE\)\?\.value\) === null/);
+    assert.match(LAYOUT_SRC, /readConsent\(\(await cookies\(\)\)\.get\(CONSENT_COOKIE\)\?\.value\) === null/);
   });
 
   it('does not ask when no analytics is configured at all', () => {

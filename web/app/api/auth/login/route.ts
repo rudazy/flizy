@@ -98,7 +98,7 @@ export async function POST(req: Request) {
      * code as `devCode` there and LoginForm shows it; the step itself is never
      * skipped, so development exercises the same path production does.
      */
-    const remembered = hasTrustedLoginDevice(data.id);
+    const remembered = await hasTrustedLoginDevice(data.id);
     if (!remembered && !code) {
       const issued = await issueEmailVerificationCode({
         accountId: data.id,

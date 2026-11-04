@@ -52,7 +52,8 @@ function counts(rows: Array<{ source: string; allowance: number }>) {
  * The allowlist for the creator: each entry, its allowance and where it came
  * from. Entries added by Flizy username come back as the username only.
  */
-export async function GET(_req: Request, { params }: { params: { collection: string } }) {
+export async function GET(_req: Request, { params: paramsIn }: { params: Promise<{ collection: string }> }) {
+  const params = await paramsIn;
   const route = 'GET /api/mints/[collection]/allowlist';
   try {
     const accountId = await getAccountIdFromCookie();
@@ -77,7 +78,8 @@ export async function GET(_req: Request, { params }: { params: { collection: str
  * account's wallet now. Unknown names and bad lines are returned, not added.
  * The saved root changes; the creator publishes it to make it live.
  */
-export async function POST(req: Request, { params }: { params: { collection: string } }) {
+export async function POST(req: Request, { params: paramsIn }: { params: Promise<{ collection: string }> }) {
+  const params = await paramsIn;
   const route = 'POST /api/mints/[collection]/allowlist';
   try {
     const denied = rejectIfCrossOrigin(req);
@@ -119,7 +121,8 @@ export async function POST(req: Request, { params }: { params: { collection: str
 }
 
 /** Remove entries: { keys: ["@name" | "0x..."] }, as GET lists them. */
-export async function DELETE(req: Request, { params }: { params: { collection: string } }) {
+export async function DELETE(req: Request, { params: paramsIn }: { params: Promise<{ collection: string }> }) {
+  const params = await paramsIn;
   const route = 'DELETE /api/mints/[collection]/allowlist';
   try {
     const denied = rejectIfCrossOrigin(req);

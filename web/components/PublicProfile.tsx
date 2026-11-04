@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type JSX } from 'react';
 import Link from 'next/link';
 import { PersonRow } from './PersonRow';
 import { formatVolumeEth, profilePath, type ProfilePayload, type PublicPerson } from '../lib/follows.ts';

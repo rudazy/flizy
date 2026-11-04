@@ -59,9 +59,11 @@ const PRIVY_OPTIONAL_PEERS = [
 
 const nextConfig = {
   reactStrictMode: true,
-  // Required on Next 14 for instrumentation.ts. Runs the cold start schema
-  // check once per server instance, not per request.
-  experimental: { instrumentationHook: true },
+  // instrumentation.ts (the cold start schema check, once per server instance)
+  // is on by default from Next 15; the old experimental flag is gone.
+  // The site is web/ (the Vercel root directory). The repo root has its own
+  // lockfile for the bot, so name this folder rather than let Next guess.
+  outputFileTracingRoot: path.dirname(fileURLToPath(import.meta.url)),
   webpack(config) {
     const alias = config.resolve.alias || {};
     for (const spec of PRIVY_OPTIONAL_PEERS) {

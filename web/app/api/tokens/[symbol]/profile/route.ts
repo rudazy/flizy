@@ -7,10 +7,11 @@ import { canEditTokenProfile, getTokenProfile, isWatched, listedTokenKey, update
 const GET_ROUTE = 'GET /api/tokens/[symbol]/profile';
 const PATCH_ROUTE = 'PATCH /api/tokens/[symbol]/profile';
 
-type Params = { params: { symbol: string } };
+type Params = { params: Promise<{ symbol: string }> };
 
 /** The token's profile, whether this account has it on its watchlist, and whether it may edit it. */
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(_req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
@@ -28,7 +29,8 @@ export async function GET(_req: Request, { params }: Params) {
 }
 
 /** Admins only. Fields left out are not changed. */
-export async function PATCH(req: Request, { params }: Params) {
+export async function PATCH(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

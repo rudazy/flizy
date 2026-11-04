@@ -212,7 +212,7 @@ export async function POST(req: Request) {
 
     try {
       const typed = body.inviteCode ?? body.invite ?? '';
-      const resolved = resolveSignupInvite(typed, readInviteCookie(), readInviteSource());
+      const resolved = resolveSignupInvite(typed, await readInviteCookie(), await readInviteSource());
       // Inviter id from the body is ignored. Only a public code is accepted.
       await attributeSignup(supabase, {
         inviteeAccountId: data.id,

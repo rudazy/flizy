@@ -25,9 +25,10 @@ import { symbolLabel } from '../../../../lib/listedTokens';
  * links.
  */
 
-type Props = { params: { code: string }; searchParams?: Record<string, string | string[] | undefined> };
+type Props = { params: Promise<{ code: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-export function generateMetadata({ params, searchParams }: Props): Metadata {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
   // A link with an amount says so in its chat preview. The note is left out:
   // it is anyone's text, and a preview card reads as Flizy speaking.
   const preset = parsePayPreset(searchParams);
@@ -41,7 +42,8 @@ export function generateMetadata({ params, searchParams }: Props): Metadata {
   });
 }
 
-export default async function PayByCodePage({ params, searchParams }: Props) {
+export default async function PayByCodePage(props: Props) {
+  const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
   const raw = decodeRouteParam(params.code);
 
   let found: Awaited<ReturnType<typeof resolvePayCode>> = null;

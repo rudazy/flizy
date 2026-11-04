@@ -1,7 +1,8 @@
 import { AppPage } from '../../../../../components/AppSection';
 import { NftCollection } from '../../../../../components/NftCollection';
 
-export default function CollectionPage({ params }: { params: { collection: string } }) {
+export default async function CollectionPage({ params: paramsIn }: { params: Promise<{ collection: string }> }) {
+  const params = await paramsIn;
   const address = /^0x[0-9a-fA-F]{40}$/.test(params.collection || '') ? params.collection : null;
   return (
     <AppPage>

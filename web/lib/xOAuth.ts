@@ -69,8 +69,8 @@ export function attachPkceCookie(res: NextResponse, verifier: string): void {
   });
 }
 
-export function takePkceVerifier(): string | null {
-  const jar = cookies();
+export async function takePkceVerifier(): Promise<string | null> {
+  const jar = await cookies();
   const v = jar.get(PKCE_COOKIE)?.value || null;
   try {
     jar.set(PKCE_COOKIE, '', {

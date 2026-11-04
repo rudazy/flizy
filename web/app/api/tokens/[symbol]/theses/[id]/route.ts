@@ -7,7 +7,8 @@ import { deleteThesis, listedTokenKey } from '../../../../../../lib/tokenSocial'
 const ROUTE = 'DELETE /api/tokens/[symbol]/theses/[id]';
 
 /** The author or an admin removes a thesis. */
-export async function DELETE(req: Request, { params }: { params: { symbol: string; id: string } }) {
+export async function DELETE(req: Request, { params: paramsIn }: { params: Promise<{ symbol: string; id: string }> }) {
+  const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

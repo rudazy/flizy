@@ -11,7 +11,7 @@ import { ApprovePayment } from '../../../components/ApprovePayment';
  * Never indexed.
  */
 
-type Props = { params: { token: string } };
+type Props = { params: Promise<{ token: string }> };
 
 export const metadata: Metadata = pageMetadata({
   title: 'Approve a payment on Flizy',
@@ -20,7 +20,8 @@ export const metadata: Metadata = pageMetadata({
   noindex: true,
 });
 
-export default async function ApprovePage({ params }: Props) {
+export default async function ApprovePage({ params: paramsIn }: Props) {
+  const params = await paramsIn;
   // Live mainnet ETH rate for the dollar line under the amount. Omitted when the rate is down.
   const usdPerEth = await ethUsd().catch(() => null);
   return <ApprovePayment token={params.token} usdPerEth={usdPerEth} />;

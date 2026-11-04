@@ -14,11 +14,8 @@ export const metadata: Metadata = pageMetadata({
 });
 
 /** Already signed in: go where the link was headed instead of logging in twice. */
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams?: { next?: string; door?: string };
-}) {
+export default async function LoginPage(props: { searchParams: Promise<{ next?: string; door?: string }> }) {
+  const searchParams = await props.searchParams;
   if (await getAccountIdFromCookie()) redirect(safeNext(searchParams?.next));
   // Email and password sign in on this page, in the form above the other options.
   // door=password is the same form, so an older link still lands here.

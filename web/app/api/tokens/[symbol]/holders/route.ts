@@ -27,7 +27,8 @@ const cachedTokenHolders = unstable_cache(
  * come from the explorer, amounts from the chain. Without a Flizy session (wallet mode)
  * only FLZ and listed tokens open, as on GET /api/tokens/[symbol].
  */
-export async function GET(_req: Request, { params }: { params: { symbol: string } }) {
+export async function GET(_req: Request, { params: paramsIn }: { params: Promise<{ symbol: string }> }) {
+  const params = await paramsIn;
   try {
     const accountId = await getAccountIdFromCookie();
     const limited = await anonymousReadLimit(accountId);

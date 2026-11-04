@@ -15,7 +15,7 @@ const ROUTE = 'POST /api/tasks/[ref]/winners';
  * tell somebody they won is recoverable; a task left half-finished because a
  * message failed is not.
  */
-export async function POST(req: Request, ctx: { params: { ref: string } }) {
+export async function POST(req: Request, ctx: { params: Promise<{ ref: string }> }) {
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;
@@ -25,7 +25,7 @@ export async function POST(req: Request, ctx: { params: { ref: string } }) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     }
 
-    const ref = Number(ctx.params.ref);
+    const ref = Number((await ctx.params).ref);
     if (!Number.isInteger(ref) || ref <= 0) {
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }

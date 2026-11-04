@@ -6,7 +6,7 @@ import { setTaskSaved } from '../../../../../lib/tasks';
 
 const ROUTE = 'POST|DELETE /api/tasks/[ref]/save';
 
-type Params = { params: { ref: string } };
+type Params = { params: Promise<{ ref: string }> };
 
 async function set(req: Request, rawRef: string, on: boolean): Promise<Response> {
   try {
@@ -28,11 +28,13 @@ async function set(req: Request, rawRef: string, on: boolean): Promise<Response>
 }
 
 /** Save the task to My tasks. */
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   return set(req, params.ref, true);
 }
 
 /** Remove the save. */
-export async function DELETE(req: Request, { params }: Params) {
+export async function DELETE(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   return set(req, params.ref, false);
 }

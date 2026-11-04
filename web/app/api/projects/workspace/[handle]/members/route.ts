@@ -7,11 +7,11 @@ import { addProjectMember, removeProjectMember } from '../../../../../../lib/tas
 const ADD_ROUTE = 'POST /api/projects/workspace/[handle]/members';
 const REMOVE_ROUTE = 'DELETE /api/projects/workspace/[handle]/members';
 
-type Params = { params: { handle: string } };
+type Params = { params: Promise<{ handle: string }> };
 
 async function change(
   req: Request,
-  params: Params['params'],
+  params: Awaited<Params['params']>,
   route: string,
   act: typeof addProjectMember
 ): Promise<Response> {
@@ -33,11 +33,13 @@ async function change(
 }
 
 /** Add a member by @username. Owner only. */
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   return change(req, params, ADD_ROUTE, addProjectMember);
 }
 
 /** Remove a member by @username: the owner removes anyone, a member only themselves. */
-export async function DELETE(req: Request, { params }: Params) {
+export async function DELETE(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   return change(req, params, REMOVE_ROUTE, removeProjectMember);
 }

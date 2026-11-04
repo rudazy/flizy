@@ -39,14 +39,14 @@ export function attachInviteCookie(
   res.cookies.set(INVITE_COOKIE_SRC, normalizeInviteSource(source), opts);
 }
 
-export function readInviteCookie(): string | null {
-  const raw = cookies().get(INVITE_COOKIE)?.value || '';
+export async function readInviteCookie(): Promise<string | null> {
+  const raw = (await cookies()).get(INVITE_COOKIE)?.value || '';
   const slug = normalizeInviteCode(raw);
   return isInviteCodeFormat(slug) ? slug : null;
 }
 
-export function readInviteSource(): string {
-  return normalizeInviteSource(cookies().get(INVITE_COOKIE_SRC)?.value || INVITE_SOURCE);
+export async function readInviteSource(): Promise<string> {
+  return normalizeInviteSource((await cookies()).get(INVITE_COOKIE_SRC)?.value || INVITE_SOURCE);
 }
 
 export function clearInviteCookieOn(res: NextResponse): void {

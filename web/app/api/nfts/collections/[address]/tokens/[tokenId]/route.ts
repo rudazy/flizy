@@ -27,7 +27,8 @@ const NFT_ABI = [
  * One token: art, traits, owner (read from the chain), its listing if live,
  * open offers that can buy it, royalty, history, and what the viewer can do.
  */
-export async function GET(req: Request, { params }: { params: { address: string; tokenId: string } }) {
+export async function GET(req: Request, { params: paramsIn }: { params: Promise<{ address: string; tokenId: string }> }) {
+  const params = await paramsIn;
   try {
     // Open without a Flizy session for wallet mode; the viewer is then ?viewer=.
     const accountId = await getAccountIdFromCookie();

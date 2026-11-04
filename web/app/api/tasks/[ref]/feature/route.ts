@@ -6,7 +6,7 @@ import { setTaskFeatured } from '../../../../../lib/tasks';
 
 const ROUTE = 'POST|DELETE /api/tasks/[ref]/feature';
 
-type Params = { params: { ref: string } };
+type Params = { params: Promise<{ ref: string }> };
 
 /** Flizy admins only. setTaskFeatured checks the flag before it writes. */
 async function set(req: Request, rawRef: string, on: boolean): Promise<Response> {
@@ -29,11 +29,13 @@ async function set(req: Request, rawRef: string, on: boolean): Promise<Response>
 }
 
 /** Feature the task. */
-export async function POST(req: Request, { params }: Params) {
+export async function POST(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   return set(req, params.ref, true);
 }
 
 /** Take the Featured mark off. */
-export async function DELETE(req: Request, { params }: Params) {
+export async function DELETE(req: Request, { params: paramsIn }: Params) {
+  const params = await paramsIn;
   return set(req, params.ref, false);
 }

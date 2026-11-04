@@ -12,9 +12,10 @@ import { loadProfile } from '../../../../lib/followStore.ts';
 
 const ROUTE = 'GET /api/u/[username]';
 
-type Props = { params: { username: string } };
+type Props = { params: Promise<{ username: string }> };
 
-export async function GET(req: Request, { params }: Props) {
+export async function GET(req: Request, { params: paramsIn }: Props) {
+  const params = await paramsIn;
   try {
     const viewerId = await getAccountIdFromCookie();
     const key = viewerId || clientIpKey(req.headers);

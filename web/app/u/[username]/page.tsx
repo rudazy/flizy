@@ -14,9 +14,10 @@ import { validateUsername } from '../../../lib/username.ts';
 
 export const dynamic = 'force-dynamic';
 
-type Props = { params: { username: string }; searchParams?: { list?: string } };
+type Props = { params: Promise<{ username: string }>; searchParams: Promise<{ list?: string }> };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params: paramsIn }: Props): Promise<Metadata> {
+  const params = await paramsIn;
   const checked = validateUsername(params.username);
   const name = checked.ok ? checked.username : 'profile';
   return pageMetadata({
@@ -27,7 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function UserProfilePage({ params, searchParams }: Props) {
+export default async function UserProfilePage(props: Props) {
+  const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
   const list = searchParams?.list === 'followers' || searchParams?.list === 'following' ? searchParams.list : null;
   const viewerId = await getAccountIdFromCookie().catch(() => null);
   try {

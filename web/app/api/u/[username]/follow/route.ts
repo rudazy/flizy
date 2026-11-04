@@ -15,7 +15,7 @@ import { rejectIfCrossOrigin } from '../../../../../lib/requestOrigin.ts';
 
 const ROUTE = 'POST|DELETE|PATCH /api/u/[username]/follow';
 
-type Props = { params: { username: string } };
+type Props = { params: Promise<{ username: string }> };
 
 function answered(err: unknown) {
   if (err instanceof ClientError) {
@@ -54,7 +54,8 @@ async function run(req: Request, username: string, action: 'follow' | 'unfollow'
   return saved(result);
 }
 
-export async function POST(req: Request, { params }: Props) {
+export async function POST(req: Request, { params: paramsIn }: Props) {
+  const params = await paramsIn;
   try {
     return await run(req, params.username, 'follow');
   } catch (err) {
@@ -62,7 +63,8 @@ export async function POST(req: Request, { params }: Props) {
   }
 }
 
-export async function DELETE(req: Request, { params }: Props) {
+export async function DELETE(req: Request, { params: paramsIn }: Props) {
+  const params = await paramsIn;
   try {
     return await run(req, params.username, 'unfollow');
   } catch (err) {
@@ -70,7 +72,8 @@ export async function DELETE(req: Request, { params }: Props) {
   }
 }
 
-export async function PATCH(req: Request, { params }: Props) {
+export async function PATCH(req: Request, { params: paramsIn }: Props) {
+  const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

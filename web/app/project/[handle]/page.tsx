@@ -16,9 +16,10 @@ import { ProjectPage } from '../../../components/ProjectPage';
 
 export const dynamic = 'force-dynamic';
 
-type Props = { params: { handle: string } };
+type Props = { params: Promise<{ handle: string }> };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params: paramsIn }: Props): Promise<Metadata> {
+  const params = await paramsIn;
   const project = await getPublicProject(params.handle).catch(() => null);
   if (!project) {
     return pageMetadata({
@@ -35,7 +36,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function PublicProjectPage({ params }: Props) {
+export default async function PublicProjectPage({ params: paramsIn }: Props) {
+  const params = await paramsIn;
   const viewerAccountId = await getAccountIdFromCookie().catch(() => null);
   const project = await getPublicProject(params.handle, undefined, { viewerAccountId }).catch(() => null);
   if (!project) notFound();

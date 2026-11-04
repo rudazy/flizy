@@ -28,7 +28,7 @@ function postOAuthUrl(status: string): string {
 
 export async function GET(req: Request) {
   try {
-    const sessionKey = getSessionKey();
+    const sessionKey = (await getSessionKey());
 
     if (sessionKey) {
       const limit = await callbackLimitState(sessionKey);
@@ -62,7 +62,7 @@ export async function GET(req: Request) {
       return NextResponse.redirect(postOAuthUrl('state_invalid'));
     }
 
-    const codeVerifier = takePkceVerifier();
+    const codeVerifier = await takePkceVerifier();
     if (!code || !codeVerifier) {
       await recordCallbackFailure(sessionKey);
       return NextResponse.redirect(postOAuthUrl('state_invalid'));

@@ -15,7 +15,8 @@ const ROUTE = 'GET /api/mints/[collection]';
  * 404 with { drop: null } when the collection does not mint through Flizy, so
  * the collection page can simply show no Mint tab.
  */
-export async function GET(_req: Request, { params }: { params: { collection: string } }) {
+export async function GET(_req: Request, { params: paramsIn }: { params: Promise<{ collection: string }> }) {
+  const params = await paramsIn;
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });

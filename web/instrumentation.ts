@@ -15,6 +15,15 @@
  * Supabase client pulls in, and the build fails.
  */
 
+import * as Sentry from '@sentry/nextjs';
+
+/**
+ * Errors thrown while a server component or route renders, sent to Sentry
+ * (Next 15 calls this hook). It does nothing until Sentry is started, which
+ * instrumentation-node.ts does only in production with a DSN.
+ */
+export const onRequestError = Sentry.captureRequestError;
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('./instrumentation-node');

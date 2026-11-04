@@ -56,7 +56,8 @@ function sortCards(cards: NftCard[], sort: Sort): NftCard[] {
  * Items in a collection. Listed tokens (checked on-chain) come first, sorted;
  * the rest page through the explorer. "mine" reads the viewer's wallet.
  */
-export async function GET(req: Request, { params }: { params: { address: string } }) {
+export async function GET(req: Request, { params: paramsIn }: { params: Promise<{ address: string }> }) {
+  const params = await paramsIn;
   try {
     // Open without a Flizy session for wallet mode; "mine" then reads ?viewer=.
     const accountId = await getAccountIdFromCookie();

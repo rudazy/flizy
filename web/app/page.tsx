@@ -65,8 +65,8 @@ const FUND_STEPS = [
   },
 ];
 
-export default function HomePage() {
-  const signedIn = hasSessionCookie();
+export default async function HomePage() {
+  const signedIn = await hasSessionCookie();
   return (
     <div className="fade-up space-y-16 md:space-y-24">
       {signedIn ? <ResumeChatLink /> : null}

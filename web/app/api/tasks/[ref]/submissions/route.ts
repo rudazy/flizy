@@ -13,14 +13,14 @@ const ROUTE = 'GET /api/tasks/[ref]/submissions';
  * not exist. This is the one endpoint that exposes entries at all, which is why
  * it carries no public shape.
  */
-export async function GET(_req: Request, ctx: { params: { ref: string } }) {
+export async function GET(_req: Request, ctx: { params: Promise<{ ref: string }> }) {
   try {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     }
 
-    const ref = Number(ctx.params.ref);
+    const ref = Number((await ctx.params).ref);
     if (!Number.isInteger(ref) || ref <= 0) {
       return NextResponse.json({ error: 'Task not found.' }, { status: 404 });
     }
