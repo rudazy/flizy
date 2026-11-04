@@ -39,7 +39,7 @@ export default function ExplorePage() {
 
   return (
     <AppPage>
-      <AppTopBar title="Explore" />
+      <AppTopBar title="Explore" people />
       {/* The header's padding and margin suit the other pages; here the tabs
           sit closer under it. */}
       <div className="!-mt-[17px]">
@@ -53,12 +53,6 @@ export default function ExplorePage() {
           activeId={slide}
           onSelect={setSlide}
         />
-      </div>
-      <div className="mt-1 flex justify-end">
-        <Link href="/people" className="inline-flex min-h-[44px] items-center gap-1.5 font-sans text-[13px] text-sun no-underline">
-          <PeopleIcon size={14} />
-          Find people
-        </Link>
       </div>
       {slide === 'tasks' ? <TasksSlide /> : null}
       {slide === 'tokens' ? <ExploreTokens /> : null}

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { AppDesktopTabs } from './AppBottomNav';
 import { useDashboard } from './DashboardProvider';
-import { RefreshIcon } from './ExploreIcons';
+import { PeopleIcon, RefreshIcon } from './ExploreIcons';
 import { NoticeBell } from './NoticeBell';
 import { ProfileLink } from './ProfileLink';
 import { SearchButton } from './SiteSearch';
@@ -14,6 +14,8 @@ type AppTopBarProps = {
   onAction?: () => void;
   actionHref?: string;
   actionBusy?: boolean;
+  /** A people button between search and notifications, opening /people. Explore shows it. */
+  people?: boolean;
 };
 
 const ICON_BUTTON =
@@ -25,6 +27,7 @@ export function AppTopBar({
   onAction,
   actionHref,
   actionBusy,
+  people = false,
 }: AppTopBarProps) {
   const { data } = useDashboard();
   // Who is signed in, by @username, else the display name. Never the email: it
@@ -83,6 +86,11 @@ export function AppTopBar({
               </button>
             ) : null}
             <SearchButton className={ICON_BUTTON} />
+            {people ? (
+              <Link href="/people" aria-label="Find people" className={`${ICON_BUTTON} no-underline`}>
+                <PeopleIcon size={16} />
+              </Link>
+            ) : null}
             <NoticeBell className={ICON_BUTTON} />
           </div>
         </div>

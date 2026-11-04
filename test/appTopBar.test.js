@@ -24,3 +24,20 @@ describe('top bar subtitle', () => {
     assert.doesNotMatch(BAR, /account\.email/);
   });
 });
+
+describe('people button', () => {
+  const EXPLORE = fs.readFileSync(path.join(__dirname, '..', 'web', 'app', 'dashboard', 'explore', 'page.tsx'), 'utf8');
+
+  it('sits between search and notifications, as an icon with a name for screen readers', () => {
+    const search = BAR.indexOf('<SearchButton ');
+    const people = BAR.indexOf('<Link href="/people" aria-label="Find people"');
+    const bell = BAR.indexOf('<NoticeBell ');
+    assert.ok(search > 0 && people > search && bell > people);
+    assert.match(BAR, /<PeopleIcon size=\{16\} \/>/);
+  });
+
+  it('shows on Explore, which no longer carries the text link', () => {
+    assert.match(EXPLORE, /<AppTopBar title="Explore" people \/>/);
+    assert.doesNotMatch(EXPLORE, /Find people/);
+  });
+});
