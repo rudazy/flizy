@@ -382,6 +382,15 @@ wallet; it never touches a Flizy-held key.
 - NFT reads take the trading wallet's address as `?viewer=` (`routeViewer`
   in `web/lib/nftApi.ts`), validated as an address. It only shapes what the
   page offers; account data such as declined offers stays keyed on the session.
+- My NFTs opens in wallet mode. Signed out, `GET /api/nfts/mine` and
+  `GET /api/nfts/offers` read the wallet named by `?viewer=` (`guestViewer`)
+  from the chain, behind the anonymous read cap; a signed-in account always
+  reads its own wallet. A guest can accept an offer but not decline one,
+  since declining is saved to an account. An offer's maker is named by
+  @username only when that account shows its username on Scan.
+- NFTs a guest likes are kept in that browser only (`web/lib/guestLikes.ts`),
+  per wallet, checked on every read. Once the visitor signs in, My NFTs offers
+  to save them to the account through the ordinary likes route.
 - NFT trades: `POST /api/market/[action]?plan=1` runs the same chain checks
   and returns the calls; the wallet signs them (`web/lib/walletTrade.ts`).
   The plan never reads the session, so it never involves a Flizy wallet. The
@@ -445,6 +454,7 @@ Representative surfaces:
 | Identity | `/api/identity`, link code create |
 | Money | claim token, withdraw, swap quote/execute, trusted |
 | Read | dashboard, history, holdings, limits |
+| Webhooks | `/api/webhooks/nodit` (signed by Nodit, a hint only; see Explore charts) |
 
 Errors: prefer `web/lib/apiError.ts` patterns — no secret leakage, fail closed.
 
@@ -523,6 +533,28 @@ Sending on socials is a separate fixed list, ETH, FLZ and every listed token mar
 `web/lib/payAsset.ts`. Site liquidity works for every listed pool; limit orders remain FLZ
 only.
 
+### Explore charts (pair event index)
+
+Each Explore row shows its pool's last 24 hours: a step line of the pool price, the
+change since the last price before the window, and the number of swaps. They come from
+`pair_events`, an index of the Swap and Sync logs of FLZ's pool and the listed pools only,
+driven by the token config (`web/lib/listedPairs.ts`); the factory's other pairs are never
+read. A row is keyed by chain, transaction hash and log index, so every writer can write
+the same log and it lands once.
+
+- The poller (`pollPairs` in `web/lib/pairEvents.ts`) runs when `/api/tokens` is read,
+  at most once per 20 seconds, and reads a bounded slice of blocks per call from where
+  each pair's cursor (`pair_index_cursors`) stopped. A refused log range is split and
+  retried in smaller pieces; one that still fails is skipped and the cursor stops before
+  it, so the next run reads it again.
+- A pair's stored data is used only when its cursor is within two minutes of the head
+  (`isCurrent`). Otherwise that row is built from a direct chain read, so an index that
+  is behind never shows a pool as having no trades.
+- The Nodit webhook (`POST /api/webhooks/nodit`) only names transactions. Its signature
+  is checked first, then each transaction is re-read from Flizy's own RPC and only a
+  successful one's logs from a listed pair are stored. The site works without it.
+- `scripts/backfill-pair-events.mjs` fills a pool's history from its deploy block.
+
 ## Payments
 
 Payments are the product; everything below sits on the same engine, Policy and
@@ -538,5 +570,6 @@ transfer log as a chat send.
 | Outside wallets | Off by default (`accounts.accept_outside_pay`). A browser wallet pays through FlizyPaymentReceiver, which forwards to the payee in the same transaction. The server records a payment only after reading the receiver's `PaymentReceived` event from the receipt and matching payee, token and amount, once per `(tx, log)`. The note is kept only when it hashes, with a nonce, to the on-chain invoice id | `contracts/src/pay/FlizyPaymentReceiver.sol`, `web/lib/externalPay.ts` |
 | Pay with ETH | A tUSD or FLZ amount paid in ETH: one exact-in swap whose recipient is the payee and whose minimum out is the full amount asked, padded by 0.5%. The ETH spent is stored in `transfers.eth_in` and counted by `daily_native_sent_eth` | `web/lib/swapPay.ts`, `web/app/api/pay/swap` |
 | Get paid | Confirmed payments into the wallet over 30, 90 or 365 days, totals in each asset's smallest unit, a CSV with formula cells neutralised, and refunds back through the pay page | `web/lib/merchant.ts` |
+| Savings | ETH set aside from Available (`account_reserves`, ETH only; a token saved before that rule can still be moved out). Available is the chain balance minus Savings, read each time. Every spend path refuses a spend that would reach into Savings (`assertSpendable`), and a passkey-approved payment is checked again just before it is sent. The wallet shows only a small + until the owner opens Savings, and a public portfolio value shows Available | `lib/reserves.js`, `web/lib/reserveStore.ts`, `web/lib/spendable.ts`, `web/components/SavingsButton.tsx`, `lib/custody/approvals.js` |
 | Metrics | Weekly and monthly active payers, repeat payer pairs, outside-wallet payments. Aggregates only | `lib/paymentMetrics.js`, `scripts/payment-metrics.js` |
 

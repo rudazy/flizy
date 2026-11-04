@@ -111,11 +111,12 @@ another adapter, not a second product.
 | **Requests** | `request 50 tusd from @ada for design work`. The payer sees who asks, for what, and a warning when they have never paid that person. At most 20 requests an hour per account | Live |
 | **Receipts** | Every confirmed payment can be shared as a receipt page with a link preview. Chat sends reply with the link. Each person is named in full only if they chose to be named on Scan; otherwise the username is masked to five characters, such as l***p | Live |
 | **Pay from any wallet** | Off by default. When the owner turns it on, someone without Flizy can pay their pay link from their own browser wallet through FlizyPaymentReceiver; Flizy records it only after reading the payment from the chain | Live |
-| **Connect a wallet** | Sign in with MetaMask, Coinbase Wallet or any WalletConnect wallet and use Explore, token pages, NFT collections and Swap without a Flizy account. The wallet signs its own trades; the server plans NFT trades with the same checks and keeps nothing about the wallet beyond its transactions on Scan. A Flizy account can connect its own wallet as a second wallet: pick it under "Trade from" to swap and trade NFTs with it, deposit ETH or tUSD from it with a share slider and one approval, and save it as a trusted wallet to send back from chat | Live |
+| **Connect a wallet** | Sign in with MetaMask, Coinbase Wallet or any WalletConnect wallet and use Explore, token pages, NFT collections, My NFTs and Swap without a Flizy account. My NFTs shows what the wallet holds on GIWA and its offers, read from the chain, and the NFTs it liked, kept in that browser until an account saves them. The wallet signs its own trades; the server plans NFT trades with the same checks and keeps nothing about the wallet beyond its transactions on Scan. A Flizy account can connect its own wallet as a second wallet: pick it under "Trade from" to swap and trade NFTs with it, deposit ETH or tUSD from it with a share slider and one approval, and save it as a trusted wallet to send back from chat | Live |
 | **Pay with ETH** | Pay a tUSD or FLZ amount with ETH in one swap that delivers to the payee. They receive at least the amount asked; the ETH counts toward the daily limit | Live |
 | **Get paid** | Payments received over 30, 90 or 365 days, totals per asset, a CSV export, and refunds back through the pay page | Live |
+| **Savings** | Set ETH aside from what can be spent, from a small + beside the balance in the wallet. Savings cannot be sent, swapped, traded or used to pay until it is transferred back; every spend checks it on the server, including a payment approved later with a passkey. Nothing about Savings shows on the page or on a public profile until the owner opens it | Live |
 | **Swap and liquidity** | Trade ETH against FLZ, IZY, MAKI or DCAT, and add liquidity to any of those pools, with fees and slippage shown before confirm | Live |
-| **Listed tokens** | FLZ, IZY, MAKI and tUSD are verified; DCAT is listed. Each trades against an ETH pool Flizy seeded and shows in Explore, Home and the wallet. Only ETH, FLZ and tUSD can be sent on socials | Live |
+| **Listed tokens** | FLZ, IZY, MAKI and tUSD are verified; DCAT is listed. Each trades against an ETH pool Flizy seeded and shows in Explore, Home and the wallet. Explore shows each pool's last 24 hours: a price line, the change and the number of trades, from an index of the pools' own swap events. Only ETH, FLZ and tUSD can be sent on socials | Live |
 | **Test dollars** | Flizy Test USD (tUSD), six decimals, fixed supply. Claim 100 a day from the faucet, then send, pay and request it like any other listed asset. It is test money and pegs to nothing | Live |
 | **Limit orders** | Place an FLZ buy or sell at a price; a watcher fills it when the pool reaches it | Live |
 | **NFT marketplace** | Browse collections, list, buy, make and accept offers, with creator royalties up to 10% | Live |
@@ -125,6 +126,7 @@ another adapter, not a second product.
 | **Scan** | A public ledger of Flizy activity. Every swap and NFT trade through Flizy's contracts shows, and a wallet with no Flizy account shows as a guest. Recipients show as the payment rail, and each person chooses whether their username appears | Live |
 | **Tasks and projects** | Publish tasks with a declared reward, category, level and steps; participants submit, the creator picks winners. Filter by category, save tasks, see saved, joined and published tasks under My tasks; Flizy features tasks at the top of Explore | Live (reward escrow comes later) |
 | **Copy trade** | Choose wallets to follow and set dollar rules | Settings only; nothing copies yet |
+| **Starter pack** | A new account sees four steps on Home: link WhatsApp or Telegram, claim free test ETH, send a first 0.001 ETH from chat, and make a first swap. Each step ticks from the account's own activity | Live |
 | **Account and security** | Trusted wallets, unlock PIN, daily ETH limit, password change that signs out other devices, chat links, platform identities, privacy controls | Live |
 | **Passkey spending limits** | Add a passkey to your wallet and sign Flizy's daily limits with it: 0.1 ETH, 1,000 FLZ and 50 tUSD. Chat payments inside them go out through that signed permission, with the cap enforced by contract. A payment over it is never sent until you approve that one payment with your passkey on flizy.app | Pilot (one account). Flizy still holds the owner key; see below |
 
@@ -264,7 +266,7 @@ flowchart TB
 
 | Layer | Technology |
 | --- | --- |
-| Web | Next.js (App Router), TypeScript, Tailwind CSS, on Vercel |
+| Web | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, on Vercel |
 | Chat | WhatsApp and Telegram clients on a shared Node.js engine |
 | Data | Supabase Postgres, schema in versioned SQL migrations, a build gate that refuses to deploy against a database missing any object the code needs |
 | Chain | Solidity 0.8.24, Foundry, ethers; Uniswap V2 port, ERC-721 marketplace and mints, MetaMask delegation framework accounts |

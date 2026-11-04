@@ -8,7 +8,7 @@ engineering rules the code is held to. Product overview lives in the
 
 ## Prerequisites
 
-- Node.js **18+** (22+ recommended)
+- Node.js **18.18+** (22+ recommended; the site's Next.js 15 needs at least 18.18)
 - Supabase project
 - A WhatsApp account for the bot number (linked device)
 - A Telegram bot token from @BotFather
@@ -137,6 +137,28 @@ the transfer in that file's notes.
 `node scripts/payment-metrics.js` prints weekly and monthly active payers, repeat payer
 pairs and payment counts. It reads whichever database the root `.env` points at, prints
 aggregates only, and writes nothing.
+
+### Explore charts
+
+The Explore rows read `pair_events`
+(`supabase/migrations/20261103120000_pair_events.sql`). The build's schema check requires
+it, so apply it before deploying. With it applied the site fills the index by itself as
+`/api/tokens` is read. Rows fall back to a direct chain read until a pool's index has caught
+up, so nothing shows wrong while it fills.
+
+To load each pool's full history at once, run the backfill. It reads the chain only and
+prints what it would write, unless `--confirm` is given; the database is the one named in
+the file passed as `--env-file`, nothing else:
+
+```bash
+node scripts/backfill-pair-events.mjs --env-file .env
+node scripts/backfill-pair-events.mjs --env-file .env --confirm
+```
+
+The Nodit webhook is optional; it only makes a trade appear sooner. Point it at
+`https://flizy.app/api/webhooks/nodit` for the Swap and Sync logs of the listed pool
+addresses on GIWA Sepolia, and set its signing key as `NODIT_WEBHOOK_SIGNING_KEY` on
+Vercel. With the key unset the route refuses every call.
 
 ### Connect wallet
 
@@ -281,6 +303,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `CUSTODY_RELAYER_KEY` | VPS only. The relayer that sends chat payments through a secured account's signed permissions. Unset: chat payments use the owner key as before. See [Custody relayer](#custody-relayer) |
 | `CUSTODY_PILOT_ACCOUNTS` | Vercel only. Account ids that may secure their wallet with a passkey. Empty: the section is hidden and the routes refuse |
 | `CUSTODY_DELEGATE_ADDRESS` | Vercel only. The relayer's address, written into every permission a passkey signs. Must be the address of `CUSTODY_RELAYER_KEY` |
+| `NODIT_WEBHOOK_SIGNING_KEY` | Vercel only, optional. The signing key of the Nodit webhook for the Explore charts. Server only, never `NEXT_PUBLIC_`. Unset: the webhook route refuses every call and the charts rely on their poller |
 
 Treat `PRIVATE_KEY`, escrow keys and Supabase service keys as production secrets. Rotate
 immediately if one is exposed.
@@ -406,7 +429,7 @@ These are enforced in code review and by tests:
 | `lib/runtime.js` | Shared chain, provider, ops and escrow wallets |
 | `lib/` | Identity, claims, phone, engine, dex, chains, agent wallet, escrow |
 | `lib/engine/` | Intent, Policy, Plan, Execute, Receipt |
-| `web/` | Next.js site and swap API |
+| `web/` | Next.js 15 site, dashboard and API routes |
 | `contracts/src/dex/` | WETH, FLZ, FlizyToken (IZY, MAKI), V2 factory/pair/router, fee router |
 | `contracts/src/` | FlizyWallet and factory |
 | `deployments/` | Live addresses and verification record (GIWA Sepolia) |
