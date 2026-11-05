@@ -559,6 +559,27 @@ function createFakeSupabase(seed = {}, opts = {}) {
       const data = all.slice(0, limit).map((r) => ({ ...r, total_xp, earners: all.length }));
       return { data, error: null };
     },
+
+    /** 20261104130000_relayer_locks.sql. Take the lease when it is free or expired. */
+    try_relayer_lock({ p_relayer, p_holder, p_ttl_seconds }) {
+      if (!p_relayer || !p_holder || !(p_ttl_seconds >= 1 && p_ttl_seconds <= 300)) return { data: false, error: null };
+      const relayer = String(p_relayer).toLowerCase();
+      const locks = (db.tables.relayer_locks = db.tables.relayer_locks || []);
+      const now = Date.now();
+      const held = locks.find((l) => l.relayer === relayer);
+      if (held && new Date(held.expires_at).getTime() >= now) return { data: false, error: null };
+      const row = { relayer, holder: p_holder, expires_at: new Date(now + p_ttl_seconds * 1000).toISOString() };
+      if (held) Object.assign(held, row);
+      else locks.push(row);
+      return { data: true, error: null };
+    },
+
+    /** Release only the caller's own lease. */
+    release_relayer_lock({ p_relayer, p_holder }) {
+      const relayer = String(p_relayer || '').toLowerCase();
+      db.tables.relayer_locks = (db.tables.relayer_locks || []).filter((l) => !(l.relayer === relayer && l.holder === p_holder));
+      return { data: null, error: null };
+    },
   };
 
   return {

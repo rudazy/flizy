@@ -172,12 +172,15 @@ describe('which way a send goes', () => {
 });
 
 describe('sending through the permission', () => {
+  // The relayer lock lives in the database; each send gets a fresh one.
+  const lockDb = () => createFakeSupabase({}).client;
   const signed = { ...R.signedFromRow(row('ETH')), delegation: { ...R.signedFromRow(row('ETH')).delegation, signature: '0x1234' } };
 
   it('records the hash before broadcasting, then waits for the receipt', async () => {
     const p = provider();
     const order = [];
     const out = await R.sendWithPermission({
+      supabase: lockDb(),
       provider: p,
       relayer: fakeRelayer(),
       signed,
@@ -192,28 +195,131 @@ describe('sending through the permission', () => {
 
   it('hands back, having sent nothing, when the permission would refuse or the relayer has no gas', async () => {
     const refused = provider({ estimate: 'transfer-amount-exceeded' });
-    await assert.rejects(() => R.sendWithPermission({ provider: refused, relayer: fakeRelayer(), signed, to: TO, amount: 5n }), R.PermissionNotUsed);
+    await assert.rejects(() => R.sendWithPermission({ supabase: lockDb(), provider: refused, relayer: fakeRelayer(), signed, to: TO, amount: 5n }), R.PermissionNotUsed);
     assert.equal(refused.calls.includes('broadcast'), false);
     const broke = provider({ balance: 0n });
-    await assert.rejects(() => R.sendWithPermission({ provider: broke, relayer: fakeRelayer(), signed, to: TO, amount: 5n }), /out of gas/);
+    await assert.rejects(() => R.sendWithPermission({ supabase: lockDb(), provider: broke, relayer: fakeRelayer(), signed, to: TO, amount: 5n }), /out of gas/);
     assert.equal(broke.calls.includes('broadcast'), false);
   });
 
   it('hands back when the record fails, the node refuses, or the transaction reverts', async () => {
     await assert.rejects(
-      () => R.sendWithPermission({ provider: provider(), relayer: fakeRelayer(), signed, to: TO, amount: 5n, onBroadcast: async () => { throw new Error('db'); } }),
+      () => R.sendWithPermission({ supabase: lockDb(), provider: provider(), relayer: fakeRelayer(), signed, to: TO, amount: 5n, onBroadcast: async () => { throw new Error('db'); } }),
       /could not record/
     );
-    await assert.rejects(() => R.sendWithPermission({ provider: provider({ broadcast: 'rejected' }), relayer: fakeRelayer(), signed, to: TO, amount: 5n }), R.PermissionNotUsed);
-    await assert.rejects(() => R.sendWithPermission({ provider: provider({ receipt: { status: 0 } }), relayer: fakeRelayer(), signed, to: TO, amount: 5n }), /reverted/);
+    await assert.rejects(() => R.sendWithPermission({ supabase: lockDb(), provider: provider({ broadcast: 'rejected' }), relayer: fakeRelayer(), signed, to: TO, amount: 5n }), R.PermissionNotUsed);
+    await assert.rejects(() => R.sendWithPermission({ supabase: lockDb(), provider: provider({ receipt: { status: 0 } }), relayer: fakeRelayer(), signed, to: TO, amount: 5n }), /reverted/);
   });
 
   it('never hands back once the outcome is unknown: the engine sees a submitted send', async () => {
     for (const p of [provider({ broadcast: 'unknown' }), provider({ receipt: null })]) {
-      const err = await R.sendWithPermission({ provider: p, relayer: fakeRelayer(), signed, to: TO, amount: 5n }).catch((e) => e);
+      const err = await R.sendWithPermission({ supabase: lockDb(), provider: p, relayer: fakeRelayer(), signed, to: TO, amount: 5n }).catch((e) => e);
       assert.equal(outcomeUnknown(err), true);
       assert.match(err.txHash, /^0x[0-9a-f]{64}$/);
     }
+  });
+
+  it('holds the relayer lock only around the nonce pick and broadcast, and always releases it', async () => {
+    const fake = createFakeSupabase({});
+    const p = provider();
+    const seen = [];
+    p.waitForTransaction = async () => {
+      seen.push((fake.db.tables.relayer_locks || []).length);
+      return { status: 1 };
+    };
+    await R.sendWithPermission({ supabase: fake.client, provider: p, relayer: fakeRelayer(), signed, to: TO, amount: 5n });
+    assert.deepEqual(seen, [0], 'released before the receipt wait');
+    await assert.rejects(() => R.sendWithPermission({ supabase: fake.client, provider: provider({ broadcast: 'rejected' }), relayer: fakeRelayer(), signed, to: TO, amount: 5n }));
+    assert.equal((fake.db.tables.relayer_locks || []).length, 0, 'released after a refusal');
+  });
+
+  it('refuses as busy, having sent nothing, when the lock cannot be read', async () => {
+    const p = provider();
+    const broken = { rpc: async () => ({ data: null, error: { message: 'relation "relayer_locks" does not exist' } }) };
+    const err = await R.sendWithPermission({ supabase: broken, provider: p, relayer: fakeRelayer(), signed, to: TO, amount: 5n }).catch((e) => e);
+    assert.ok(err instanceof R.PermissionNotUsed);
+    assert.equal(err.busy, true);
+    assert.equal(p.calls.includes('broadcast'), false);
+    const none = await R.sendWithPermission({ provider: p, relayer: fakeRelayer(), signed, to: TO, amount: 5n }).catch((e) => e);
+    assert.equal(none.busy, true, 'no database at all is refused the same way');
+  });
+
+  it('stops before recording or sending when signing outlasts its share of the lease', async () => {
+    const p = provider();
+    const realNow = Date.now;
+    const slow = { ...fakeRelayer(), populateTransaction: async (tx) => {
+      const late = realNow() + 61_000;
+      Date.now = () => late;
+      return tx;
+    } };
+    const recorded = [];
+    try {
+      const err = await R.sendWithPermission({ supabase: lockDb(), provider: p, relayer: slow, signed, to: TO, amount: 5n, onBroadcast: async (h) => recorded.push(h) }).catch((e) => e);
+      assert.ok(err instanceof R.PermissionNotUsed);
+      assert.equal(err.busy, true);
+    } finally {
+      Date.now = realNow;
+    }
+    assert.deepEqual(recorded, []);
+    assert.equal(p.calls.includes('broadcast'), false);
+  });
+
+  it('a broadcast that hangs is given up as outcome unknown, never as nothing sent', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const p = provider();
+    p.broadcastTransaction = () => {
+      queueMicrotask(() => t.mock.timers.tick(60_001));
+      return new Promise(() => {});
+    };
+    const err = await R.sendWithPermission({ supabase: lockDb(), provider: p, relayer: fakeRelayer(), signed, to: TO, amount: 5n }).catch((e) => e);
+    assert.equal(outcomeUnknown(err), true);
+    assert.match(err.txHash, /^0x[0-9a-f]{64}$/);
+  });
+
+  /**
+   * A node that numbers transactions by its pending count and refuses a reused
+   * nonce, as a real one does. Reading the count takes a moment, which is the
+   * window two unlocked sends collide in.
+   */
+  function nonceChain() {
+    let pending = 0;
+    const accepted = [];
+    const p = provider();
+    p.broadcastTransaction = async (raw) => {
+      const nonce = Number(BigInt('0x' + raw.slice(-8)));
+      if (nonce !== pending) throw Object.assign(new Error('nonce too low'), { code: 'NONCE_EXPIRED' });
+      pending += 1;
+      accepted.push(nonce);
+    };
+    const relayerOn = () => ({
+      address: relayer.address,
+      populateTransaction: async (tx) => {
+        const nonce = pending;
+        await new Promise((r) => setTimeout(r, 5));
+        return { ...tx, nonce };
+      },
+      // Unique per nonce, with the nonce readable from the last 4 bytes.
+      signTransaction: async (tx) => '0x' + 'ab'.repeat(36) + tx.nonce.toString(16).padStart(8, '0'),
+    });
+    return { p, accepted, relayerOn };
+  }
+
+  it('two sends at once get two nonces, where without the lock the node would refuse one', async () => {
+    const control = nonceChain();
+    const raced = await Promise.allSettled([1, 2].map(async () => {
+      const r = control.relayerOn();
+      const tx = await r.populateTransaction({});
+      return control.p.broadcastTransaction(await r.signTransaction(tx));
+    }));
+    assert.equal(raced.filter((x) => x.status === 'rejected').length, 1, 'the model collides without the lock');
+
+    const chain = nonceChain();
+    const fake = createFakeSupabase({});
+    const out = await Promise.all([1, 2].map(() =>
+      R.sendWithPermission({ supabase: fake.client, provider: chain.p, relayer: chain.relayerOn(), signed, to: TO, amount: 5n })
+    ));
+    assert.equal(out.length, 2);
+    assert.deepEqual(chain.accepted, [0, 1]);
   });
 });
 

@@ -164,6 +164,19 @@ describe('the worker sends what the passkey signed', () => {
     assert.equal(p.calls.filter((c) => c === 'broadcast').length, 1);
   });
 
+  it('a busy relayer lock hands the payment back to the queue: not failed, not told, sent on the next pass', async () => {
+    await open();
+    sign(approvals()[0]);
+    const p = chain();
+    const busy = { from: (t) => fake.client.from(t), rpc: async () => ({ data: null, error: { message: 'lock unavailable' } }) };
+    assert.equal(await A.sendSignedApprovals({ supabase: busy, provider: p, notify, explorerUrl, relayer: wallet(p), now: NOW, log: quiet }), 0);
+    assert.equal(approvals()[0].status, 'signed');
+    assert.equal(p.calls.includes('broadcast'), false);
+    assert.deepEqual(notices, []);
+    assert.equal(await A.sendSignedApprovals({ supabase: db(), provider: p, notify, explorerUrl, relayer: wallet(p), now: NOW, log: quiet }), 1);
+    assert.equal(approvals()[0].status, 'sent');
+  });
+
   it('waits, sending nothing, while the relayer key is unset', async () => {
     await open();
     sign(approvals()[0]);

@@ -95,7 +95,7 @@ function revertText(err) {
   record('ETH: another recipient is refused', /AllowedTargetsEnforcer:target-address-not-allowed/.test(wrongTo), wrongTo);
   const over = await refusal(C.redeemCalldata(eth, { to: john, amount: ethers.parseEther('0.2') + 1n }));
   record('ETH: more than the approved amount is refused', /NativeTokenTransferAmountEnforcer:allowance-exceeded/.test(over), over);
-  await R.sendWithPermission({ provider, relayer, signed: eth, to: john, amount: ethers.parseEther('0.2') });
+  await R.sendWithPermission({ supabase: createFakeSupabase({}).client, provider, relayer, signed: eth, to: john, amount: ethers.parseEther('0.2') });
   record('ETH: the approved payment goes through once', (await provider.getBalance(john)) === ethers.parseEther('0.2'));
   const twice = await refusal(C.redeemCalldata(eth, { to: john, amount: ethers.parseEther('0.2') }));
   record('ETH: redeeming it a second time is refused on chain', /NativeTokenTransferAmountEnforcer:allowance-exceeded/.test(twice), twice);
@@ -113,7 +113,7 @@ function revertText(err) {
   const riding = ethers.concat([C.ASSETS.TUSD.token, ethers.toBeHex(1n, 32), ERC20.encodeFunctionData('transfer', [kemi, amount])]);
   const tValue = await refusal(raw(tusd, riding));
   record('tUSD: ETH riding on the transfer is refused', /ValueLteEnforcer:value-too-high/.test(tValue), tValue);
-  await R.sendWithPermission({ provider, relayer, signed: tusd, to: kemi, amount });
+  await R.sendWithPermission({ supabase: createFakeSupabase({}).client, provider, relayer, signed: tusd, to: kemi, amount });
   record('tUSD: the approved payment goes through once', (await tusdOf(kemi)) === amount);
   const tTwice = await refusal(C.redeemCalldata(tusd, { to: kemi, amount }));
   record('tUSD: redeeming it a second time is refused on chain', /ERC20TransferAmountEnforcer:allowance-exceeded/.test(tTwice), tTwice);

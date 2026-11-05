@@ -86,7 +86,7 @@ const record = (name, ok, extra = '') => {
   const sink = ethers.Wallet.createRandom().address;
   const first = await plan('ETH', ethers.parseEther('0.06'));
   record('ETH: a send that fits is routed through the permission', first.route === 'permission' && first.available === ethers.parseEther('0.1'), `available ${ethers.formatEther(first.available ?? 0n)}`);
-  const sent = await R.sendWithPermission({ provider, relayer, signed: first.signed, to: sink, amount: ethers.parseEther('0.06') });
+  const sent = await R.sendWithPermission({ supabase, provider, relayer, signed: first.signed, to: sink, amount: ethers.parseEther('0.06') });
   record('ETH: the relayer sends it through the DelegationManager', sent.receipt.status === 1 && (await provider.getBalance(sink)) === ethers.parseEther('0.06'));
   const left = await R.availableToday(provider, first.signed);
   record("ETH: today's allowance drops by exactly that", left === ethers.parseEther('0.04'), ethers.formatEther(left));
@@ -97,7 +97,7 @@ const record = (name, ok, extra = '') => {
   const tusdSink = ethers.Wallet.createRandom().address;
   const t = await plan('TUSD', 50n * 10n ** 6n);
   record('tUSD: the full daily cap is routed through the permission', t.route === 'permission');
-  await R.sendWithPermission({ provider, relayer, signed: t.signed, to: tusdSink, amount: 50n * 10n ** 6n });
+  await R.sendWithPermission({ supabase, provider, relayer, signed: t.signed, to: tusdSink, amount: 50n * 10n ** 6n });
   const got = BigInt(await provider.call({ to: C.ASSETS.TUSD.token, data: ERC20.encodeFunctionData('balanceOf', [tusdSink]) }));
   record('tUSD: the relayer sends it', got === 50n * 10n ** 6n, `${Number(got) / 1e6} tUSD`);
   record('tUSD: one more unit is over_cap', (await plan('TUSD', 1n)).route === 'over_cap');

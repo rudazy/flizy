@@ -358,6 +358,14 @@ refuse without it.
 - **Key.** A dedicated key, never `PRIVATE_KEY`: the ops key also submits UserOps and would
   race them for nonces. Its address is `CUSTODY_DELEGATE_ADDRESS` on Vercel; a permission
   names exactly one relayer, so changing the key means re-signing.
+- **One send at a time.** Chat sends and the approval worker share the relayer key across
+  both bot processes, so each send holds a lease in the database from picking its nonce
+  until the node accepts it (`lib/custody/relayerLock.js`,
+  `supabase/migrations/20261104130000_relayer_locks.sql`); the lease frees itself after
+  two and a half minutes if a process dies. A chat send that cannot get it within 20
+  seconds goes on the owner key (journal: `the relayer is busy with another send`); an
+  approved payment waits for the next worker pass. Apply the migration before deploying
+  this code: the bots' startup check refuses without it.
 - **Gas.** The relayer pays the gas for each permission send. With no gas it is skipped and
   the payment goes on the owner key; the journal says `relayer is out of gas`.
 - **Unknown outcome.** The payment is reported as pending and is never sent again on the
