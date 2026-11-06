@@ -166,6 +166,48 @@
     },
     {
       "kind": "check",
+      "name": "api_allowances.api_allowances_address_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_amount_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_digest_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_salt_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_signed_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_status_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_symbol_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
       "name": "api_control.api_control_single_row",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "check on api_control"
@@ -220,6 +262,18 @@
     },
     {
       "kind": "check",
+      "name": "api_platform_limits.api_platform_limits_amounts_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_platform_limits"
+    },
+    {
+      "kind": "check",
+      "name": "api_platform_limits.api_platform_limits_symbol_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_platform_limits"
+    },
+    {
+      "kind": "check",
       "name": "api_platforms.api_platforms_expiry_check",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "check on api_platforms"
@@ -241,6 +295,30 @@
       "name": "api_platforms.api_platforms_wallet_check",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_amount_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_kind_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_reference_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_state_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
     },
     {
       "kind": "check",
@@ -1492,6 +1570,12 @@
     },
     {
       "kind": "table",
+      "name": "api_allowances",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "web/lib/apiAllowance.ts"
+    },
+    {
+      "kind": "table",
       "name": "api_control",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "web/lib/apiAuth.ts"
@@ -1516,6 +1600,12 @@
     },
     {
       "kind": "table",
+      "name": "api_platform_limits",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "web/app/api/developers/route.ts, web/app/api/v1/payouts/route.ts, web/lib/apiAllowance.ts"
+    },
+    {
+      "kind": "table",
       "name": "api_platforms",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "web/lib/apiAuth.ts, web/lib/apiPlatforms.ts"
@@ -1525,6 +1615,12 @@
       "name": "api_requests",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "web/lib/apiAuth.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_transactions",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/app/api/v1/payouts/[id]/route.ts, web/app/api/v1/payouts/route.ts"
     },
     {
       "kind": "table",
@@ -1578,7 +1674,7 @@
       "kind": "table",
       "name": "custody_passkeys",
       "providedBy": "20261024120000_custody_passkeys.sql",
-      "requiredBy": "web/lib/custody/approvals.ts, web/lib/custody/ceremony.ts"
+      "requiredBy": "web/lib/apiAllowance.ts, web/lib/custody/approvals.ts, web/lib/custody/ceremony.ts"
     },
     {
       "kind": "table",

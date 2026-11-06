@@ -76,16 +76,19 @@ function timestampTerms(expiresAt: number): string {
   return ethers.concat([ethers.toBeHex(0, 16), ethers.toBeHex(expiresAt, 16)]);
 }
 
-export function caveatsFor(symbol: AssetSymbol, signedAt: number): Caveat[] {
+/** The period amount is the asset's daily cap unless one is given (a platform's API payout allowance). */
+export function caveatsFor(symbol: AssetSymbol, signedAt: number, periodAmount?: bigint): Caveat[] {
   const asset = ASSETS[symbol];
   if (!asset) throw new Error(`no delegation is defined for ${symbol}`);
   wholeSeconds(signedAt, 'signedAt');
+  const amount = periodAmount === undefined ? asset.periodAmount : periodAmount;
+  if (typeof amount !== 'bigint' || amount <= 0n) throw new Error(`the period amount for ${symbol} must be a positive bigint`);
   const expiry = { enforcer: CONTRACTS.timestampEnforcer, terms: timestampTerms(signedAt + EXPIRY_SECONDS), args: '0x' };
   if (asset.kind === 'native') {
     return [
       {
         enforcer: CONTRACTS.nativeTokenPeriodTransferEnforcer,
-        terms: ethers.concat([u256(asset.periodAmount), u256(PERIOD_SECONDS), u256(signedAt)]),
+        terms: ethers.concat([u256(amount), u256(PERIOD_SECONDS), u256(signedAt)]),
         args: '0x',
       },
       { enforcer: CONTRACTS.exactCalldataEnforcer, terms: '0x', args: '0x' },
@@ -95,7 +98,7 @@ export function caveatsFor(symbol: AssetSymbol, signedAt: number): Caveat[] {
   return [
     {
       enforcer: CONTRACTS.erc20PeriodTransferEnforcer,
-      terms: ethers.concat([asset.token as string, u256(asset.periodAmount), u256(PERIOD_SECONDS), u256(signedAt)]),
+      terms: ethers.concat([asset.token as string, u256(amount), u256(PERIOD_SECONDS), u256(signedAt)]),
       args: '0x',
     },
     { enforcer: CONTRACTS.valueLteEnforcer, terms: ethers.ZeroHash, args: '0x' },
@@ -160,21 +163,24 @@ export function buildOneOff(p: {
   };
 }
 
+/** periodAmounts, when given, names the assets to build and each one's amount per period (a platform's API allowance). */
 export function buildDelegations(p: {
   account: string;
   delegate: string;
   signedAt: number;
   salts: Partial<Record<AssetSymbol, bigint>>;
+  periodAmounts?: Partial<Record<AssetSymbol, bigint>>;
 }): AssetDelegation[] {
   const delegator = ethers.getAddress(p.account);
   const to = ethers.getAddress(p.delegate);
   if (delegator === to) throw new Error('an account cannot delegate to itself');
-  return ASSET_ORDER.map((symbol) => {
+  const symbols = p.periodAmounts ? ASSET_ORDER.filter((s) => p.periodAmounts?.[s] !== undefined) : ASSET_ORDER;
+  return symbols.map((symbol) => {
     const salt = p.salts?.[symbol];
     if (typeof salt !== 'bigint' || salt <= 0n) throw new Error(`a positive salt is required for ${symbol}`);
     return {
       symbol,
-      delegation: { delegate: to, delegator, authority: ROOT_AUTHORITY, caveats: caveatsFor(symbol, p.signedAt), salt, signature: '0x' },
+      delegation: { delegate: to, delegator, authority: ROOT_AUTHORITY, caveats: caveatsFor(symbol, p.signedAt, p.periodAmounts?.[symbol]), salt, signature: '0x' },
     };
   });
 }

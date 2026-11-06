@@ -384,6 +384,36 @@ refuse without it.
   relayer, not Flizy. Moving ownership to the user's own wallet ships before any mainnet
   launch; until then nothing here may be described as non-custodial.
 
+### Flizy Pay API payouts
+
+An approved platform pays out from its own Flizy wallet over `POST /api/v1/payouts`. The site
+only validates and records the payout as `accepted`; the WhatsApp process
+(`startApiPayoutWorker` in `index.js`, `lib/api/payoutWorker.js`) takes one at a time and runs
+it through the same engine steps as a chat send. The money moves only through the platform's
+passkey-signed allowance, redeemed by a dedicated key: never the owner key, and a payout over
+what is left today fails rather than waiting for anyone. Requires
+`supabase/migrations/20261105120000_api_payouts.sql` before this code is deployed: the bots'
+startup check and the site build both refuse without it.
+
+- **Keys.** `API_RELAYER_KEY` on the VPS, its own key (the worker refuses one shared with
+  `PRIVATE_KEY`, `CUSTODY_RELAYER_KEY` or `ESCROW_PRIVATE_KEY`), funded with a little GIWA
+  Sepolia ETH for gas. Its address is `API_DELEGATE_ADDRESS` on Vercel; every allowance names
+  it, so changing the key means every platform signs again.
+- **Switches.** Nothing is paid unless `API_PAYOUTS_ENABLED=true` on the VPS (and on Vercel,
+  where new payouts are refused while it is off) and the database switch is on
+  (`node scripts/api-platform.mjs --env-file .env payouts on --confirm`). Either one off
+  stops new payouts at once; queued ones wait, unrefused, until both are on.
+- **Turning a platform on.**
+  1. Approve it and grant `payout` to one key (`approve`, `grant-payout`).
+  2. Add its account to `CUSTODY_PILOT_ACCOUNTS`; its owner adds a passkey under Account,
+     Security.
+  3. Set its limits per asset: `limits --username <name> --asset tUSD --max 50 --daily 500
+     --confirm`. No limits row means that asset is refused.
+  4. Its owner signs the allowance on Account, Developers; the allowance is for the daily
+     amount, so changing `--daily` takes effect on chain only after they sign again.
+- **Unknown outcome.** The transaction hash is stored on the payout before the broadcast. A
+  payout with a hash is never taken again; the worker settles it from its receipt.
+
 ### `WALLET_DERIVATION_SECRET`
 
 Every per-account agent wallet key is `keccak256(HMAC-SHA256(secret, "flizy:agent:v2:" + account id))`.

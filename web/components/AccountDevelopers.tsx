@@ -13,6 +13,10 @@ import { displaySafeLabel } from '../lib/sanitize';
  * `read` and `collect`; `payout` is granted by Flizy and shown here once it is.
  * A new or rotated key's secret is shown once, in this session only, and never
  * again. Creating, rotating and revoking take the account password.
+ *
+ * Payout allowance: API payouts spend only through an allowance the account's
+ * passkey signs here, one per asset Flizy enabled, up to that asset's daily
+ * maximum, for 30 days (web/lib/apiAllowance.ts).
  */
 
 type Key = {
@@ -32,6 +36,19 @@ type DevData = {
   mode: 'test' | 'live';
   payoutsEnabled: boolean;
   keys: Key[];
+  limits: Array<{ symbol: string; maxPayout: string; dailyMax: string }>;
+  allowances: Array<{ symbol: string; perDay: string; expiresAt: string }>;
+};
+
+const b64 = (buf: ArrayBuffer | Uint8Array) => {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const fromB64 = (text: string) => {
+  const s = atob(text.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((text.length + 3) % 4));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
 };
 
 const BUTTON = 'h-[44px] rounded-[10px] border border-[#5a4a1f] px-4 font-sans text-[14px] font-medium text-sun hover:border-sun/70 disabled:opacity-50';
@@ -121,6 +138,44 @@ export function AccountDevelopers() {
     await reload();
   }
 
+  /** One passkey tap per asset: each allowance is its own digest. */
+  async function signAllowance() {
+    setBusy('allowance');
+    setError('');
+    try {
+      const begun = await post('/api/developers/allowance', { action: 'begin' });
+      if (!begun.ok) throw new Error(typeof begun.data.error === 'string' ? begun.data.error : 'Could not start the allowance.');
+      const { keyIds, requests } = begun.data as { keyIds: string[]; requests: Array<{ id: string; challenge: string }> };
+      const answers = [];
+      for (const r of requests) {
+        const got = (await navigator.credentials.get({
+          publicKey: {
+            challenge: fromB64(r.challenge),
+            rpId: window.location.hostname,
+            allowCredentials: keyIds.map((id) => ({ type: 'public-key' as const, id: fromB64(id) })),
+            userVerification: 'required',
+          },
+        })) as PublicKeyCredential | null;
+        if (!got) throw new Error('The allowance was not signed.');
+        const a = got.response as AuthenticatorAssertionResponse;
+        answers.push({
+          id: r.id,
+          credentialId: b64(got.rawId),
+          authenticatorData: b64(a.authenticatorData),
+          clientDataJSON: b64(a.clientDataJSON),
+          signature: b64(a.signature),
+        });
+      }
+      const done = await post('/api/developers/allowance', { action: 'finish', answers });
+      if (!done.ok) throw new Error(typeof done.data.error === 'string' ? done.data.error : 'The allowance was not signed.');
+    } catch (err) {
+      setError(err instanceof Error && err.name !== 'NotAllowedError' ? err.message : 'The allowance was not signed.');
+    } finally {
+      setBusy(null);
+      await reload();
+    }
+  }
+
   async function copySecret() {
     if (!secret) return;
     try {
@@ -175,6 +230,38 @@ export function AccountDevelopers() {
       ) : null}
 
       {error ? <p className="alert alert-error m-0">{error}</p> : null}
+
+      <section className="rounded-[14px] border border-[#2a2b30] bg-[#0f0f10] p-4">
+        <p className="m-0 font-sans text-[15px] font-semibold text-white">Payout allowance</p>
+        <p className="m-0 mt-1 font-sans text-[12.5px] leading-relaxed text-[#cfcfcf]">
+          API payouts spend only through an allowance your passkey signs, up to the daily maximum for each asset. The chain enforces
+          it. A payout over what is left today fails; it is never sent another way.
+        </p>
+        {data.limits.length === 0 ? (
+          <p className="m-0 mt-3 font-sans text-[13px] text-[#a9a9a9]">Flizy has not enabled payouts in any asset for your platform yet.</p>
+        ) : (
+          <ul className="m-0 mt-3 grid list-none gap-2 p-0 font-sans text-[13px]">
+            {data.limits.map((l) => {
+              const live = data.allowances.find((a) => a.symbol === l.symbol);
+              return (
+                <li key={l.symbol} className="rounded-[10px] border border-[#24252a] p-3">
+                  <p className="m-0 text-white">
+                    Up to {l.maxPayout} per payout, {l.dailyMax} a day
+                  </p>
+                  <p className="m-0 mt-1 text-[12px] text-[#8a8a8a]">
+                    {live ? `Allowance signed: ${live.perDay} a day, until ${when(live.expiresAt)}` : 'No allowance signed'}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {data.limits.length && platform.enabled ? (
+          <button type="button" disabled={busy != null} onClick={() => void signAllowance()} className={`${BUTTON} mt-3`}>
+            {busy === 'allowance' ? 'Waiting for your passkey...' : data.allowances.length ? 'Renew with passkey' : 'Sign with passkey'}
+          </button>
+        ) : null}
+      </section>
 
       <section className="rounded-[14px] border border-[#2a2b30] bg-[#0f0f10] p-4">
         <p className="m-0 font-sans text-[15px] font-semibold text-white">API keys</p>

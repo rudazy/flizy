@@ -410,11 +410,11 @@ describe('routes', () => {
     assert.match(src, /logApiRequest\(db, req, caller, 200\)/);
   });
 
-  it('moves no money: phase 1 has no payout or collect endpoint', () => {
+  it('moves no money on the site: v1 only records, and there is no collect endpoint yet', () => {
     const v1 = path.join(ROOT, 'web', 'app', 'api', 'v1');
-    assert.deepEqual(fs.readdirSync(v1), ['me']);
-    for (const rel of ['web/lib/apiAuth.ts', 'web/lib/apiPlatforms.ts', 'web/app/api/v1/me/route.ts']) {
-      assert.doesNotMatch(read(rel), /sendTransaction|executeGatorCall|executeClaim|transfers'\)\.insert/, rel);
+    assert.deepEqual(fs.readdirSync(v1).sort(), ['me', 'payouts']);
+    for (const rel of ['web/lib/apiAuth.ts', 'web/lib/apiPlatforms.ts', 'web/lib/apiPayouts.ts', 'web/app/api/v1/me/route.ts', 'web/app/api/v1/payouts/route.ts', 'web/app/api/v1/payouts/[id]/route.ts']) {
+      assert.doesNotMatch(read(rel), /sendTransaction|executeGatorCall|executeClaim|transfers'\)\.insert|redeemDelegations/, rel);
     }
   });
 

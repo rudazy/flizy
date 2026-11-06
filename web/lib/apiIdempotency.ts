@@ -88,6 +88,15 @@ export async function beginIdempotent(
   return { kind: 'unavailable' };
 }
 
+/**
+ * Drop a key whose request failed before anything was recorded (a database
+ * error, not a refusal), so the platform can retry it instead of being told it
+ * is still in progress for 24 hours.
+ */
+export async function abandonIdempotent(db: IdemDb, keyId: string, idempotencyKey: string): Promise<void> {
+  await table(db).delete().eq('key_id', keyId).eq('idempotency_key', idempotencyKey).eq('state', 'in_progress');
+}
+
 /** Store the answer so a repeat gets exactly this back. */
 export async function finishIdempotent(
   db: IdemDb,

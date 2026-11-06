@@ -34,12 +34,14 @@ const { publicErrorMessage } = require('./lib/sanitize');
 const { CHANNELS } = require('./lib/identity');
 const { normalizePhoneNumber, isPlausiblePhone } = require('./lib/phone');
 const { isBotSelfChat } = require('./lib/whatsappSelfChat');
-const { registerChannelSender, startOutboxDrain } = require('./lib/notify');
+const { registerChannelSender, startOutboxDrain, notifyAccount } = require('./lib/notify');
 const { startApprovalWatcher } = require('./lib/chatApprovals');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const { startReconciler } = require('./lib/reconcile');
 const { startApprovalWorker } = require('./lib/custody/approvals');
 const { startApiKeyNoticePump } = require('./lib/apiKeyNotices');
+const { startApiPayoutWorker } = require('./lib/api/payoutWorker');
+const { requestPaymentNotice } = require('./lib/paymentNotice');
 const { startAmmora } = require('./lib/ammora/boot');
 const router = require('./lib/router');
 
@@ -470,6 +472,10 @@ async function main() {
   // API key permission changes made directly in the database are emailed to
   // the platform owner through the site (lib/apiKeyNotices.js).
   startApiKeyNoticePump();
+  // Flizy Pay API payouts, one at a time, from this process only
+  // (lib/api/payoutWorker.js). Nothing is taken while either payout switch is
+  // off; money moves only through the platform's allowance and API_RELAYER_KEY.
+  startApiPayoutWorker({ supabase, provider, chain, notifyAccount, requestPaymentNotice });
   // Ammora venue, only with AMMORA_ENABLED (lib/ammora/boot.js). The pool
   // inventory runs from this process only. Never awaited: a slow RPC must not
   // hold up WhatsApp.

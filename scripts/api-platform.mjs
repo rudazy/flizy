@@ -16,11 +16,18 @@
  *   node scripts\api-platform.mjs --env-file .env revoke-payout --key fz_test_AbCdEf --confirm
  *   node scripts\api-platform.mjs --env-file .env payouts on --confirm
  *   node scripts\api-platform.mjs --env-file .env payouts off --confirm
+ *   node scripts\api-platform.mjs --env-file .env limits --username naru --asset tUSD --max 50 --daily 500 --confirm
+ *   node scripts\api-platform.mjs --env-file .env limits --username naru --asset tUSD --remove --confirm
  *
  * Approval binds the platform to the account's current Flizy wallet. Granting
  * payout is recorded by the api_key_events trigger and emailed to the owner.
  * API payouts also need API_PAYOUTS_ENABLED=true in the environment; this
  * script cannot set that.
+ *
+ * Limits are per asset (ETH, FLZ, tUSD): --max is the most one payout may move,
+ * --daily the most a rolling day may move, and the platform's passkey-signed
+ * allowance is for the daily amount. No limits row means that asset is refused.
+ * Changing --daily takes effect on chain only once the platform signs again.
  */
 
 import { readFileSync } from 'fs';
@@ -32,6 +39,23 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(path.join(ROOT, 'package.json'));
 const dotenv = require('dotenv');
 const { createClient } = require('@supabase/supabase-js');
+const { parseUnits, formatUnits } = require('ethers');
+
+/** Same table as lib/api/payoutWorker.js ASSETS. */
+const ASSETS = { ETH: { label: 'ETH', decimals: 18 }, FLZ: { label: 'FLZ', decimals: 18 }, TUSD: { label: 'tUSD', decimals: 6 } };
+
+function units(name, raw, decimals) {
+  const s = String(raw || '').trim();
+  if (!/^[0-9]+(\.[0-9]+)?$/.test(s)) throw new Error(`${name} must be a positive number`);
+  let v;
+  try {
+    v = parseUnits(s, decimals);
+  } catch {
+    throw new Error(`${name} has more decimal places than the asset`);
+  }
+  if (v <= 0n) throw new Error(`${name} must be more than 0`);
+  return v;
+}
 
 const argv = process.argv.slice(2);
 function flag(name) {
@@ -153,6 +177,35 @@ async function main() {
       });
       return;
     }
+    case 'limits': {
+      const account = await accountByUsername(db, flag('--username'));
+      const symbol = String(flag('--asset') || '').trim().toUpperCase();
+      const asset = ASSETS[symbol];
+      if (!asset) throw new Error('--asset must be ETH, FLZ or tUSD');
+      const { data: platform, error: pErr } = await db.from('api_platforms').select('id').eq('account_id', account.id).maybeSingle();
+      if (pErr) throw new Error(pErr.message);
+      if (!platform) throw new Error(`@${account.username} is not an approved platform`);
+      if (argv.includes('--remove')) {
+        await write(`remove ${asset.label} payouts for @${account.username}`, async () => {
+          const { error } = await db.from('api_platform_limits').delete().eq('platform_id', platform.id).eq('symbol', symbol);
+          if (error) throw new Error(error.message);
+        });
+        return;
+      }
+      const max = units('--max', flag('--max'), asset.decimals);
+      const daily = units('--daily', flag('--daily'), asset.decimals);
+      if (max > daily) throw new Error('--max cannot exceed --daily');
+      await write(
+        `set @${account.username} ${asset.label} limits: ${formatUnits(max, asset.decimals)} per payout, ${formatUnits(daily, asset.decimals)} a day`,
+        async () => {
+          const { error } = await db
+            .from('api_platform_limits')
+            .upsert({ platform_id: platform.id, symbol, max_payout: max.toString(), daily_max: daily.toString(), updated_at: new Date().toISOString() }, { onConflict: 'platform_id,symbol' });
+          if (error) throw new Error(error.message);
+        }
+      );
+      return;
+    }
     case 'payouts': {
       if (arg !== 'on' && arg !== 'off') throw new Error('payouts takes on or off');
       await write(`turn the database payout switch ${arg}`, async () => {
@@ -162,7 +215,7 @@ async function main() {
       return;
     }
     default:
-      throw new Error('commands: list, approve, enable, disable, grant-payout, revoke-payout, payouts on|off');
+      throw new Error('commands: list, approve, enable, disable, grant-payout, revoke-payout, payouts on|off, limits');
   }
 }
 

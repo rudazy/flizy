@@ -88,6 +88,144 @@
     },
     {
       "kind": "check",
+      "name": "api_allowances.api_allowances_address_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_amount_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_digest_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_salt_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_signed_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_status_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_allowances.api_allowances_symbol_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_allowances"
+    },
+    {
+      "kind": "check",
+      "name": "api_control.api_control_single_row",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_control"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_hash_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_ip_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_label_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_mode_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_keys.api_keys_scopes_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_keys"
+    },
+    {
+      "kind": "check",
+      "name": "api_platform_limits.api_platform_limits_amounts_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_platform_limits"
+    },
+    {
+      "kind": "check",
+      "name": "api_platform_limits.api_platform_limits_symbol_check",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "check on api_platform_limits"
+    },
+    {
+      "kind": "check",
+      "name": "api_platforms.api_platforms_expiry_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
+      "name": "api_platforms.api_platforms_fee_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
+      "name": "api_platforms.api_platforms_name_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
+      "name": "api_platforms.api_platforms_wallet_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_amount_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_kind_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_reference_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_state_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
       "name": "channel_identities.channel_identities_channel_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on channel_identities"
@@ -544,6 +682,30 @@
     },
     {
       "kind": "function",
+      "name": "api_claim_payout",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "lib/api/payoutWorker.js"
+    },
+    {
+      "kind": "function",
+      "name": "api_key_event_trigger",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "executed by trigger api_keys_events"
+    },
+    {
+      "kind": "function",
+      "name": "api_keys_cap_trigger",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "executed by trigger api_keys_cap"
+    },
+    {
+      "kind": "function",
+      "name": "api_transition",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "lib/api/payoutWorker.js"
+    },
+    {
+      "kind": "function",
       "name": "channel_identities_enforce_one_phone",
       "providedBy": "20260725100000_channel_identities.sql",
       "requiredBy": "executed by trigger channel_identities_one_phone"
@@ -678,7 +840,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/payoutWorker.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
     },
     {
       "kind": "table",
@@ -691,6 +853,42 @@
       "name": "ammora_scan_state",
       "providedBy": "20261016140000_ammora_venue.sql",
       "requiredBy": "lib/ammora/inventory.js"
+    },
+    {
+      "kind": "table",
+      "name": "api_allowances",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "lib/api/allowanceSend.js"
+    },
+    {
+      "kind": "table",
+      "name": "api_control",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "lib/api/payoutWorker.js"
+    },
+    {
+      "kind": "table",
+      "name": "api_keys",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "lib/api/payoutWorker.js"
+    },
+    {
+      "kind": "table",
+      "name": "api_platform_limits",
+      "providedBy": "20261105120000_api_payouts.sql",
+      "requiredBy": "lib/api/payoutWorker.js"
+    },
+    {
+      "kind": "table",
+      "name": "api_platforms",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "lib/api/payoutWorker.js"
+    },
+    {
+      "kind": "table",
+      "name": "api_transactions",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "lib/api/payoutWorker.js"
     },
     {
       "kind": "table",
@@ -883,6 +1081,18 @@
       "name": "ammora_pools_set_updated_at",
       "providedBy": "20261016140000_ammora_venue.sql",
       "requiredBy": "trigger on ammora_pools"
+    },
+    {
+      "kind": "trigger",
+      "name": "api_keys_cap",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "trigger on api_keys"
+    },
+    {
+      "kind": "trigger",
+      "name": "api_keys_events",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "trigger on api_keys"
     },
     {
       "kind": "trigger",
