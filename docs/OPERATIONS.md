@@ -276,7 +276,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `GIWA_RPC` | GIWA Sepolia RPC endpoint |
 | `WALLET_DERIVATION_SECRET` | Required, min 32 chars. Keys every agent wallet. Same value on the VPS and on Vercel. See below |
 | `PRIVATE_KEY` | Ops hot wallet. Pays gas, and owns the fee router. Not the fee destination |
-| `ESCROW_PRIVATE_KEY` | Optional dedicated claim escrow key |
+| `ESCROW_PRIVATE_KEY` | Optional dedicated claim escrow key. Both bot processes and the site send from it, so each send holds the database lease for its address until the node accepts it (`lib/custody/relayerLock.js`, `web/lib/relayerLock.ts`) |
 | `BOT_WHATSAPP_NUMBER` | Digits for `wa.me` deep links |
 | `TELEGRAM_BOT_TOKEN` | Telegram client. Never commit it, never log it |
 | `TELEGRAM_BOT_USERNAME` | Bot username, no `@`, for `t.me/…?start=CODE` links. Also set on Vercel |

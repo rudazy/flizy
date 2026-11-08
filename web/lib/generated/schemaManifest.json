@@ -1462,6 +1462,12 @@
     },
     {
       "kind": "function",
+      "name": "release_relayer_lock",
+      "providedBy": "20261104130000_relayer_locks.sql",
+      "requiredBy": "web/lib/relayerLock.ts"
+    },
+    {
+      "kind": "function",
       "name": "schema_guard_objects",
       "providedBy": "20261015140000_lock_public_exposure.sql",
       "requiredBy": "web/lib/schemaGuard.mjs"
@@ -1525,6 +1531,12 @@
       "name": "try_faucet_signer_lock",
       "providedBy": "20261010120000_faucet_claims.sql",
       "requiredBy": "web/lib/faucet.ts"
+    },
+    {
+      "kind": "function",
+      "name": "try_relayer_lock",
+      "providedBy": "20261104130000_relayer_locks.sql",
+      "requiredBy": "web/lib/relayerLock.ts"
     },
     {
       "kind": "function",

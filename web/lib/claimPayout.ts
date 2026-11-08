@@ -31,6 +31,7 @@ import {
 } from './claimMatch.ts';
 import { parseEmail } from './email.ts';
 import { isNativeClaim, claimAssetSymbol, nftTokenIdOf } from './claimAmount.ts';
+import { withRelayerLock } from './relayerLock.ts';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -366,7 +367,9 @@ export async function executeWebClaimPayout(p: {
           status: 503,
         };
       }
-      tx = await nft.transferFrom(escrow.address, toAddress, nftId);
+      // Under the escrow's lease (./relayerLock.ts) until the node has it, so a
+      // send from a bot at the same moment never takes the same nonce.
+      tx = await withRelayerLock({ supabase, relayer: escrow.address }, () => nft.transferFrom(escrow.address, toAddress, nftId));
     } else if (native) {
       const amountWei = ethers.parseEther(String(held.amount_eth));
       if (amountWei <= 0n) {
@@ -381,10 +384,12 @@ export async function executeWebClaimPayout(p: {
           status: 503,
         };
       }
-      tx = await escrow.sendTransaction({
-        to: toAddress,
-        value: amountWei,
-      });
+      tx = await withRelayerLock({ supabase, relayer: escrow.address }, () =>
+        escrow.sendTransaction({
+          to: toAddress,
+          value: amountWei,
+        })
+      );
     } else {
       if (!tokenAddr) {
         await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
@@ -418,7 +423,7 @@ export async function executeWebClaimPayout(p: {
           status: 503,
         };
       }
-      tx = await erc20.transfer(toAddress, amountTok);
+      tx = await withRelayerLock({ supabase, relayer: escrow.address }, () => erc20.transfer(toAddress, amountTok));
     }
     submitted = true;
 
