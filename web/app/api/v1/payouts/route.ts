@@ -64,6 +64,15 @@ export async function POST(req: Request) {
     if (parsed.amount > BigInt(limits.max_payout)) {
       return answer(apiError(400, 'over_max_payout', 'The amount is over the most one payout may move for your platform.', caller.requestId));
     }
+    if (parsed.claimExpiryDays != null) {
+      const { data: plat, error: platErr } = await db.from('api_platforms').select('claim_expiry_max_days').eq('id', caller.platformId).maybeSingle();
+      if (platErr || !plat) return answer(apiError(503, 'unavailable', 'Try again shortly.', caller.requestId));
+      if (parsed.claimExpiryDays > Number(plat.claim_expiry_max_days)) {
+        return answer(
+          apiError(400, 'invalid_claim_expiry', `claim_expiry_days can be at most ${plat.claim_expiry_max_days} for your platform.`, caller.requestId)
+        );
+      }
+    }
 
     const idem = await beginIdempotent(db, caller.keyId, idemKey, requestHash('POST', PATH, text));
     if (idem.kind === 'invalid') return answer(apiError(400, 'invalid_idempotency_key', 'Idempotency-Key must be 1 to 255 visible ASCII characters.', caller.requestId));
@@ -87,6 +96,7 @@ export async function POST(req: Request) {
         amount: parsed.amount.toString(),
         asset: parsed.symbol,
         metadata: parsed.metadata,
+        claim_expiry_days: parsed.claimExpiryDays,
       })
       .select(PAYOUT_COLUMNS)
       .single();

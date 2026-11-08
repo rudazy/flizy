@@ -46,7 +46,8 @@ approvals.createApproval = async () => {
   return { url: 'https://flizy.app/approve/x' };
 };
 
-const { executeNativeSend, ALLOWANCE_REASON } = require('../lib/engine/executeTransfer');
+const { executeNativeSend } = require('../lib/engine/executeTransfer');
+const { ALLOWANCE_REASON } = require('../lib/engine/allowance');
 const { predictGatorAddress } = require('../lib/gatorAccount');
 const GATOR = predictGatorAddress(ACCOUNT);
 const chain = { chainId: 91342, name: 'GIWA Sepolia', explorerBaseUrl: 'https://explorer.test' };

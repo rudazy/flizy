@@ -413,6 +413,14 @@ startup check and the site build both refuse without it.
      amount, so changing `--daily` takes effect on chain only after they sign again.
 - **Unknown outcome.** The transaction hash is stored on the payout before the broadcast. A
   payout with a hash is never taken again; the worker settles it from its receipt.
+- **Claims.** A payout to a phone, an email or a Telegram, Discord or GitHub id (numeric id
+  only) is always held in escrow as a claim, member or not, through the same allowance; the
+  claim link comes back on the payout for the platform to deliver. It expires after the
+  platform's default (or the request's `claim_expiry_days`, within the platform's maximum);
+  past that, or after `POST /api/v1/payouts/{id}/cancel`, the worker locks the claim and
+  refunds it from escrow to the platform's wallet, and it counts as refunded only once that
+  transaction is confirmed. The escrow key pays the refund's gas. Requires
+  `supabase/migrations/20261106120000_api_claims.sql`; claims made in chat keep no expiry.
 
 ### `WALLET_DERIVATION_SECRET`
 

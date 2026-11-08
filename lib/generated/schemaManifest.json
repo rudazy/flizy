@@ -208,6 +208,12 @@
     },
     {
       "kind": "check",
+      "name": "api_transactions.api_transactions_claim_expiry_check",
+      "providedBy": "20261106120000_api_claims.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
       "name": "api_transactions.api_transactions_kind_check",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "check on api_transactions"
@@ -216,6 +222,12 @@
       "kind": "check",
       "name": "api_transactions.api_transactions_reference_check",
       "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_refund_hash_check",
+      "providedBy": "20261106120000_api_claims.sql",
       "requiredBy": "check on api_transactions"
     },
     {
@@ -912,7 +924,7 @@
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "lib/claims.js, lib/escrowWallet.js, lib/history.js, lib/reconcile.js"
+      "requiredBy": "lib/api/payoutWorker.js, lib/claims.js, lib/escrowWallet.js, lib/history.js, lib/reconcile.js"
     },
     {
       "kind": "table",

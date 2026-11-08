@@ -357,12 +357,17 @@ describe('payout requests on the site', () => {
     assert.equal(L.payoutSymbol('USDC'), null);
   });
 
-  it('take usernames and addresses, and refuse 2b recipient types for now', () => {
+  it('take usernames and addresses, and phone, email and numeric platform ids as claims', () => {
     assert.deepEqual(L.parseRecipient({ type: 'username', value: '@Alice' }), { type: 'username', value: 'alice' });
     assert.deepEqual(L.parseRecipient({ type: 'address', value: ALICE_WALLET.toUpperCase().replace('0X', '0x') }), { type: 'address', value: ALICE_WALLET });
     assert.throws(() => L.parseRecipient({ type: 'address', value: ethers.ZeroAddress }), /zero address/);
     assert.throws(() => L.parseRecipient({ type: 'username', value: 'a b' }), /valid Flizy username/);
-    assert.throws(() => L.parseRecipient({ type: 'phone', value: '+2348000000000' }), (e) => e.code === 'recipient_type_not_supported');
+    assert.deepEqual(L.parseRecipient({ type: 'phone', value: '+234 800-000 0000' }), { type: 'phone', value: '+2348000000000' });
+    assert.throws(() => L.parseRecipient({ type: 'phone', value: '08000000000' }), /international format/);
+    assert.deepEqual(L.parseRecipient({ type: 'email', value: 'Ada@Example.com' }), { type: 'email', value: 'ada@example.com' });
+    assert.deepEqual(L.parseRecipient({ type: 'telegram', value: '123456789' }), { type: 'telegram', value: '123456789' });
+    assert.throws(() => L.parseRecipient({ type: 'telegram', value: '@ada' }), /numeric telegram user id/);
+    assert.throws(() => L.parseRecipient({ type: 'x', value: '1' }), (e) => e.code === 'invalid_recipient');
   });
 
   it('refuse unknown fields, long references and large metadata', () => {
@@ -391,6 +396,7 @@ describe('payout requests on the site', () => {
       assert.deepEqual({ ...v }, { ...W.ASSETS[k] }, k);
     }
     assert.equal(L.PAYOUT_ASSETS.TUSD.decimals, listedBySymbol('TUSD').decimals);
+    assert.deepEqual([...L.CLAIM_TYPES], [...W.CLAIM_KINDS], 'the site and the worker agree on what becomes a claim');
   });
 
   it('the routes: payout permission, both switches, Idempotency-Key, and a release on a failed insert', () => {

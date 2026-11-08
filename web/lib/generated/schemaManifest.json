@@ -304,6 +304,12 @@
     },
     {
       "kind": "check",
+      "name": "api_transactions.api_transactions_claim_expiry_check",
+      "providedBy": "20261106120000_api_claims.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
       "name": "api_transactions.api_transactions_kind_check",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "check on api_transactions"
@@ -312,6 +318,12 @@
       "kind": "check",
       "name": "api_transactions.api_transactions_reference_check",
       "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_refund_hash_check",
+      "providedBy": "20261106120000_api_claims.sql",
       "requiredBy": "check on api_transactions"
     },
     {
@@ -1330,6 +1342,12 @@
     },
     {
       "kind": "function",
+      "name": "api_transition",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/app/api/v1/payouts/[id]/cancel/route.ts"
+    },
+    {
+      "kind": "function",
       "name": "bump_generation_usage",
       "providedBy": "20261007120000_generation_usage.sql",
       "requiredBy": "web/lib/generationFee.ts"
@@ -1608,7 +1626,7 @@
       "kind": "table",
       "name": "api_platforms",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "web/lib/apiAuth.ts, web/lib/apiPlatforms.ts"
+      "requiredBy": "web/app/api/v1/payouts/route.ts, web/lib/apiAuth.ts, web/lib/apiPlatforms.ts"
     },
     {
       "kind": "table",
@@ -1620,7 +1638,7 @@
       "kind": "table",
       "name": "api_transactions",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "web/app/api/v1/payouts/[id]/route.ts, web/app/api/v1/payouts/route.ts"
+      "requiredBy": "web/app/api/v1/payouts/[id]/cancel/route.ts, web/app/api/v1/payouts/[id]/route.ts, web/app/api/v1/payouts/route.ts"
     },
     {
       "kind": "table",
