@@ -166,6 +166,12 @@
     },
     {
       "kind": "check",
+      "name": "api_payment_cursor.api_payment_cursor_single_row",
+      "providedBy": "20261110120000_api_payments.sql",
+      "requiredBy": "check on api_payment_cursor"
+    },
+    {
+      "kind": "check",
       "name": "api_platform_limits.api_platform_limits_amounts_check",
       "providedBy": "20261105120000_api_payouts.sql",
       "requiredBy": "check on api_platform_limits"
@@ -220,8 +226,20 @@
     },
     {
       "kind": "check",
+      "name": "api_transactions.api_transactions_invoice_check",
+      "providedBy": "20261110120000_api_payments.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
       "name": "api_transactions.api_transactions_kind_check",
       "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_payment_shape_check",
+      "providedBy": "20261110120000_api_payments.sql",
       "requiredBy": "check on api_transactions"
     },
     {
@@ -234,6 +252,12 @@
       "kind": "check",
       "name": "api_transactions.api_transactions_refund_hash_check",
       "providedBy": "20261106120000_api_claims.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_return_url_check",
+      "providedBy": "20261110120000_api_payments.sql",
       "requiredBy": "check on api_transactions"
     },
     {
@@ -754,9 +778,15 @@
     },
     {
       "kind": "function",
+      "name": "api_record_payment",
+      "providedBy": "20261110120000_api_payments.sql",
+      "requiredBy": "lib/api/paymentWatcher.js"
+    },
+    {
+      "kind": "function",
       "name": "api_transition",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "lib/api/payoutWorker.js"
+      "requiredBy": "lib/api/paymentWatcher.js, lib/api/payoutWorker.js"
     },
     {
       "kind": "function",
@@ -928,6 +958,12 @@
     },
     {
       "kind": "table",
+      "name": "api_payment_cursor",
+      "providedBy": "20261110120000_api_payments.sql",
+      "requiredBy": "lib/api/paymentWatcher.js"
+    },
+    {
+      "kind": "table",
       "name": "api_platform_limits",
       "providedBy": "20261105120000_api_payouts.sql",
       "requiredBy": "lib/api/payoutWorker.js"
@@ -936,13 +972,13 @@
       "kind": "table",
       "name": "api_platforms",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "lib/api/payoutWorker.js"
+      "requiredBy": "lib/api/paymentWatcher.js, lib/api/payoutWorker.js"
     },
     {
       "kind": "table",
       "name": "api_transactions",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "lib/api/payoutWorker.js"
+      "requiredBy": "lib/api/paymentWatcher.js, lib/api/payoutWorker.js"
     },
     {
       "kind": "table",

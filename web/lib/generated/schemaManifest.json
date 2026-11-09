@@ -280,6 +280,12 @@
     },
     {
       "kind": "check",
+      "name": "api_platform_origins.api_platform_origins_check",
+      "providedBy": "20261110120000_api_payments.sql",
+      "requiredBy": "check on api_platform_origins"
+    },
+    {
+      "kind": "check",
       "name": "api_platforms.api_platforms_expiry_check",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "check on api_platforms"
@@ -316,8 +322,20 @@
     },
     {
       "kind": "check",
+      "name": "api_transactions.api_transactions_invoice_check",
+      "providedBy": "20261110120000_api_payments.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
       "name": "api_transactions.api_transactions_kind_check",
       "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_payment_shape_check",
+      "providedBy": "20261110120000_api_payments.sql",
       "requiredBy": "check on api_transactions"
     },
     {
@@ -330,6 +348,12 @@
       "kind": "check",
       "name": "api_transactions.api_transactions_refund_hash_check",
       "providedBy": "20261106120000_api_claims.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_return_url_check",
+      "providedBy": "20261110120000_api_payments.sql",
       "requiredBy": "check on api_transactions"
     },
     {
@@ -1384,6 +1408,12 @@
     },
     {
       "kind": "function",
+      "name": "api_record_payment",
+      "providedBy": "20261110120000_api_payments.sql",
+      "requiredBy": "web/lib/checkout.ts"
+    },
+    {
+      "kind": "function",
       "name": "api_transition",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "web/app/api/v1/payouts/[id]/cancel/route.ts"
@@ -1678,9 +1708,15 @@
     },
     {
       "kind": "table",
+      "name": "api_platform_origins",
+      "providedBy": "20261110120000_api_payments.sql",
+      "requiredBy": "web/app/api/v1/payments/route.ts, web/lib/apiPayments.ts"
+    },
+    {
+      "kind": "table",
       "name": "api_platforms",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "web/app/api/v1/payouts/route.ts, web/lib/apiAuth.ts, web/lib/apiPlatforms.ts"
+      "requiredBy": "web/app/api/v1/payouts/route.ts, web/lib/apiAuth.ts, web/lib/apiPlatforms.ts, web/lib/checkout.ts"
     },
     {
       "kind": "table",
@@ -1692,7 +1728,7 @@
       "kind": "table",
       "name": "api_transactions",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "web/app/api/developers/route.ts, web/app/api/v1/payouts/[id]/cancel/route.ts, web/app/api/v1/payouts/[id]/route.ts, web/app/api/v1/payouts/route.ts"
+      "requiredBy": "web/app/api/developers/route.ts, web/app/api/v1/payments/[id]/route.ts, web/app/api/v1/payments/route.ts, web/app/api/v1/payouts/[id]/cancel/route.ts, web/app/api/v1/payouts/[id]/route.ts, web/app/api/v1/payouts/route.ts, web/lib/checkout.ts"
     },
     {
       "kind": "table",

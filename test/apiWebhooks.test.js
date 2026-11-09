@@ -307,7 +307,9 @@ describe('endpoints on the Developers page', () => {
     assert.deepEqual(WH.cleanWebhookEvents([]), []);
     assert.deepEqual(WH.cleanWebhookEvents(['payout.refunded', 'payout.confirmed']), ['payout.confirmed', 'payout.refunded']);
     assert.throws(() => WH.cleanWebhookEvents(['payout.everything']), /Unknown event/);
-    for (const e of WH.WEBHOOK_EVENTS) assert.match(e, /^payout\.(queued|submitted|confirmed|claim_pending|failed|expired|refund_pending|refunded)$/);
+    for (const e of WH.WEBHOOK_EVENTS) {
+      assert.match(e, /^(payout\.(queued|submitted|confirmed|claim_pending|failed|expired|refund_pending|refunded)|payment\.(submitted|confirmed|expired|partially_paid|received_after_expiry|received_after_settlement))$/);
+    }
   });
 
   it('store the secret only encrypted to the new endpoint, and return it once', async () => {

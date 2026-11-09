@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { PAYMENT_RECEIVER, PAYMENT_RECEIVER_CHAIN } from '../lib/paymentReceiver';
+import { PAYMENT_RECEIVER, PAYMENT_RECEIVER_ABI as RECEIVER_ABI, PAYMENT_RECEIVER_CHAIN } from '../lib/paymentReceiver';
 import { useExternalWallet } from './ExternalWalletProvider';
 import { giwaClients, walletErrorText } from '../lib/walletChain';
 import { listedBySymbol, symbolLabel } from '../lib/listedTokens';
@@ -20,31 +20,6 @@ import { PAY_ASSETS, type PayAsset } from '../lib/payAsset';
  * viem is loaded only when a payment starts, so the pay page stays light for
  * the payers who never use this.
  */
-
-const RECEIVER_ABI = [
-  {
-    type: 'function',
-    name: 'payNative',
-    stateMutability: 'payable',
-    inputs: [
-      { name: 'invoiceId', type: 'bytes32' },
-      { name: 'payee', type: 'address' },
-    ],
-    outputs: [],
-  },
-  {
-    type: 'function',
-    name: 'payToken',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'invoiceId', type: 'bytes32' },
-      { name: 'token', type: 'address' },
-      { name: 'payee', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [],
-  },
-] as const;
 
 /** FLZ is not a listed token, so its contract comes with the payee lookup. */
 type Payee = { payee: `0x${string}`; flz: `0x${string}` | null };

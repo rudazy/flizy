@@ -21,6 +21,9 @@ import { displaySafeLabel } from '../lib/sanitize';
  * Webhooks: endpoints are added and removed with the account password; a new
  * endpoint's signing secret is shown once. The latest payouts and webhook
  * deliveries are listed, and a delivery not yet delivered can be sent again.
+ *
+ * Checkouts: the sites a checkout may send the payer back to are registered
+ * and removed here with the account password; the latest payments are listed.
  */
 
 type Key = {
@@ -45,6 +48,8 @@ type DevData = {
   payouts: Array<{ id: string; state: string; amount: string; asset: string; recipient: { type: string; value: string }; error_code: string | null; created_at: string }>;
   endpoints: Array<{ id: string; url: string; label: string; events: string[]; enabled: boolean; secretHint: string | null; createdAt: string }>;
   deliveries: Array<{ id: string; eventType: string; status: string; attempts: number; lastStatus: number | null; lastError: string | null; createdAt: string }>;
+  payments: Array<{ id: string; state: string; amount: string; asset: string; received: string; overpaid: boolean; reference: string | null; created_at: string }>;
+  origins: string[];
 };
 
 const b64 = (buf: ArrayBuffer | Uint8Array) => {
@@ -88,6 +93,8 @@ export function AccountDevelopers() {
   const [hookUrl, setHookUrl] = useState('');
   const [hookLabel, setHookLabel] = useState('');
   const [removing, setRemoving] = useState<string | null>(null);
+  const [newOrigin, setNewOrigin] = useState('');
+  const [removingOrigin, setRemovingOrigin] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState<{ id: string; action: 'revoke' | 'rotate' } | null>(null);
 
@@ -213,6 +220,34 @@ export function AccountDevelopers() {
       return;
     }
     setRemoving(null);
+    setPassword('');
+    await reload();
+  }
+
+  async function addSite() {
+    setBusy('origin');
+    setError('');
+    const { ok, data: out } = await post('/api/developers/origins', { origin: newOrigin, password });
+    setBusy(null);
+    if (!ok) {
+      setError(typeof out.error === 'string' ? out.error : 'Could not add the site.');
+      return;
+    }
+    setNewOrigin('');
+    setPassword('');
+    await reload();
+  }
+
+  async function removeSite(origin: string) {
+    setBusy(`origin:${origin}`);
+    setError('');
+    const { ok, data: out } = await post('/api/developers/origins/remove', { origin, password });
+    setBusy(null);
+    if (!ok) {
+      setError(typeof out.error === 'string' ? out.error : 'Could not remove the site.');
+      return;
+    }
+    setRemovingOrigin(null);
     setPassword('');
     await reload();
   }
@@ -400,6 +435,64 @@ export function AccountDevelopers() {
           </div>
         </section>
       ) : null}
+
+      <section className="rounded-[14px] border border-[#2a2b30] bg-[#0f0f10] p-4">
+        <p className="m-0 font-sans text-[15px] font-semibold text-white">Checkout sites</p>
+        <p className="m-0 mt-1 font-sans text-[12.5px] leading-relaxed text-[#cfcfcf]">
+          A checkout&apos;s return link must be on one of these sites, so Flizy&apos;s checkout page never sends your customers anywhere else.
+        </p>
+        <ul className="m-0 mt-3 grid list-none gap-2 p-0">
+          {data.origins.map((o) => (
+            <li key={o} className="flex flex-wrap items-center justify-between gap-2 border-t border-[#1f2024] pt-2">
+              <span className="font-mono text-[12.5px] text-white">{o}</span>
+              {removingOrigin === o ? (
+                <span className="flex gap-2">
+                  <button type="button" disabled={!password || busy != null} onClick={() => void removeSite(o)} className={BUTTON}>
+                    {busy === `origin:${o}` ? '...' : 'Remove now'}
+                  </button>
+                  <button type="button" onClick={() => setRemovingOrigin(null)} className="h-[44px] px-2 font-sans text-[13px] text-[#a9a9a9]">
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => setRemovingOrigin(o)} className="h-[44px] px-2 font-sans text-[13px] text-sun hover:opacity-80">
+                  Remove
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        {removingOrigin ? <SecretInput value={password} onChange={setPassword} placeholder="Account password" label="Account password" /> : null}
+        {platform.enabled && data.origins.length < 5 && !removingOrigin ? (
+          <div className="mt-3 grid gap-3">
+            <input value={newOrigin} onChange={(e) => setNewOrigin(e.target.value)} placeholder="https://your-shop.example" maxLength={260} className={FIELD} />
+            {confirming || removing ? null : <SecretInput value={password} onChange={setPassword} placeholder="Account password" label="Account password" />}
+            <button type="button" disabled={busy != null || !password || !newOrigin || confirming != null || removing != null} onClick={() => void addSite()} className={BUTTON}>
+              {busy === 'origin' ? 'Adding...' : 'Add site'}
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-[14px] border border-[#2a2b30] bg-[#0f0f10] p-4">
+        <p className="m-0 font-sans text-[15px] font-semibold text-white">Recent payments</p>
+        {data.payments.length === 0 ? <p className="m-0 mt-2 font-sans text-[13px] text-[#a9a9a9]">No checkouts yet.</p> : null}
+        <ul className="m-0 mt-3 grid list-none gap-2 p-0 font-sans text-[12.5px]">
+          {data.payments.map((p) => (
+            <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-[#1f2024] pt-2">
+              <span className="text-white">
+                {p.amount} {p.asset}
+                {p.reference ? ` · ${p.reference}` : ''}
+              </span>
+              <span className="text-[#a9a9a9]">
+                {p.state}
+                {p.received !== '0' && p.state === 'accepted' ? ` (${p.received} received)` : ''}
+                {p.overpaid ? ' (overpaid)' : ''} · {when(p.created_at)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="rounded-[14px] border border-[#2a2b30] bg-[#0f0f10] p-4">
         <p className="m-0 font-sans text-[15px] font-semibold text-white">Webhooks</p>

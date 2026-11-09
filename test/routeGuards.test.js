@@ -43,6 +43,7 @@ describe('every state-changing route checks the request Origin', () => {
     'internal/api-key-notices': 'server to server: no cookie, a bearer secret instead (checked below)',
     'v1/payouts': 'Flizy Pay API: no cookie, an API key with the payout permission instead (test/apiPayouts.test.js)',
     'v1/payouts/[id]/cancel': 'Flizy Pay API: no cookie, an API key with the payout permission instead (test/apiClaims.test.js)',
+    'v1/payments': 'Flizy Pay API: no cookie, an API key with the collect permission instead (test/apiPayments.test.js)',
     'webhooks/nodit': 'server to server: no cookie, Nodit signs the body with x-signature (checked below)',
   };
   const ORIGIN_CHECK = /rejectIfCrossOrigin\(|generationCaller\(/;
@@ -88,6 +89,8 @@ describe('the tiers hold: account changes take the password, money takes the PIN
     'developers/keys',
     'developers/keys/[id]/revoke',
     'developers/keys/[id]/rotate',
+    'developers/origins',
+    'developers/origins/remove',
     'developers/webhooks',
     'developers/webhooks/[id]/delete',
     'identity',

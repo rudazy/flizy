@@ -410,10 +410,20 @@ describe('routes', () => {
     assert.match(src, /logApiRequest\(db, req, caller, 200\)/);
   });
 
-  it('moves no money on the site: v1 only records, and there is no collect endpoint yet', () => {
+  it('moves no money on the site: v1 only records', () => {
     const v1 = path.join(ROOT, 'web', 'app', 'api', 'v1');
-    assert.deepEqual(fs.readdirSync(v1).sort(), ['me', 'payouts']);
-    for (const rel of ['web/lib/apiAuth.ts', 'web/lib/apiPlatforms.ts', 'web/lib/apiPayouts.ts', 'web/app/api/v1/me/route.ts', 'web/app/api/v1/payouts/route.ts', 'web/app/api/v1/payouts/[id]/route.ts']) {
+    assert.deepEqual(fs.readdirSync(v1).sort(), ['me', 'payments', 'payouts']);
+    for (const rel of [
+      'web/lib/apiAuth.ts',
+      'web/lib/apiPlatforms.ts',
+      'web/lib/apiPayouts.ts',
+      'web/lib/apiPayments.ts',
+      'web/app/api/v1/me/route.ts',
+      'web/app/api/v1/payouts/route.ts',
+      'web/app/api/v1/payouts/[id]/route.ts',
+      'web/app/api/v1/payments/route.ts',
+      'web/app/api/v1/payments/[id]/route.ts',
+    ]) {
       assert.doesNotMatch(read(rel), /sendTransaction|executeGatorCall|executeClaim|transfers'\)\.insert|redeemDelegations/, rel);
     }
   });

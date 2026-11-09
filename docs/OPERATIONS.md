@@ -432,6 +432,17 @@ startup check and the site build both refuse without it.
   payout. Requires `supabase/migrations/20261109120000_api_webhooks.sql`.
 - **Large payouts.** `limits ... --notice <amount>` emails the platform's owner when a payout
   of at least that amount is accepted.
+- **Checkouts.** `POST /api/v1/payments` (a key with `collect`) answers a
+  `flizy.app/checkout/<id>` link; the customer pays it from any wallet through
+  FlizyPaymentReceiver, straight to the platform's wallet. Flizy never holds the money, so no
+  allowance or switch is involved. The page reports the transaction, and the WhatsApp process
+  (`startApiPaymentWatcher`, `lib/api/paymentWatcher.js`) also reads the receiver's logs from
+  a saved block (`api_payment_cursor`), so a closed page loses nothing; each payment is
+  recorded once by `api_record_payment`. Payments add up; the checkout settles when they
+  reach the amount, flagged when over. Open checkouts expire (60 minutes by default); a
+  payment after that is still recorded and reported. Return links are accepted only on sites
+  the platform registers on Account, Developers. Requires
+  `supabase/migrations/20261110120000_api_payments.sql`.
 
 ### `WALLET_DERIVATION_SECRET`
 

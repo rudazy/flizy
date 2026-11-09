@@ -19,7 +19,11 @@ import type { Platform } from './apiPlatforms.ts';
  */
 
 export const MAX_ENDPOINTS = 5;
-/** Every event a payout can produce, as api_transition writes them. */
+/**
+ * Every event a payout or a payment can produce: state changes as
+ * api_transition writes them, and the payment reports api_record_payment
+ * writes (supabase/migrations/20261110120000_api_payments.sql).
+ */
 export const WEBHOOK_EVENTS = [
   'payout.queued',
   'payout.submitted',
@@ -29,6 +33,12 @@ export const WEBHOOK_EVENTS = [
   'payout.expired',
   'payout.refund_pending',
   'payout.refunded',
+  'payment.submitted',
+  'payment.confirmed',
+  'payment.expired',
+  'payment.partially_paid',
+  'payment.received_after_expiry',
+  'payment.received_after_settlement',
 ] as const;
 
 export class WebhookRequestError extends Error {}

@@ -42,6 +42,7 @@ const { startApprovalWorker } = require('./lib/custody/approvals');
 const { startApiKeyNoticePump } = require('./lib/apiKeyNotices');
 const { startApiPayoutWorker } = require('./lib/api/payoutWorker');
 const { startApiWebhookWorker } = require('./lib/api/webhookWorker');
+const { startApiPaymentWatcher } = require('./lib/api/paymentWatcher');
 const { requestPaymentNotice } = require('./lib/paymentNotice');
 const { startAmmora } = require('./lib/ammora/boot');
 const router = require('./lib/router');
@@ -480,6 +481,9 @@ async function main() {
   // Their webhooks, signed and sent only to public https addresses
   // (lib/api/webhookWorker.js). A failed delivery never changes a payout.
   startApiWebhookWorker({ supabase });
+  // Checkout payments found in FlizyPaymentReceiver's logs, and open checkouts
+  // expired (lib/api/paymentWatcher.js). The money never passes through Flizy.
+  startApiPaymentWatcher({ supabase, provider, chain });
   // Ammora venue, only with AMMORA_ENABLED (lib/ammora/boot.js). The pool
   // inventory runs from this process only. Never awaited: a slow RPC must not
   // hold up WhatsApp.

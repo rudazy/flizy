@@ -176,6 +176,12 @@ describe('no route sends a raw error message', () => {
         lineMustMatch: /err instanceof WebhookRequestError\) return NextResponse\.json\(\{ error: err\.message \}/,
         reason: 'WebhookRequestError product copy (URL rules, unknown event, endpoint cap)',
       },
+      {
+        file: 'developers/origins/route.ts',
+        // OriginRequestError: messages set in web/lib/apiPayments.ts, not DB errors.
+        lineMustMatch: /err instanceof OriginRequestError\) return NextResponse\.json\(\{ error: err\.message \}/,
+        reason: 'OriginRequestError product copy (site rule, site cap)',
+      },
       ...[
         'follow/route.ts',
         'people/route.ts',

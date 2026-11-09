@@ -19,3 +19,29 @@ export const PAYMENT_RECEIVER_CHAIN = {
 } as const;
 
 export const INVOICE_NONCE_RE = /^0x[0-9a-f]{32}$/;
+
+/** The two calls a payer makes, for the outside-wallet pay and checkout components. */
+export const PAYMENT_RECEIVER_ABI = [
+  {
+    type: 'function',
+    name: 'payNative',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'invoiceId', type: 'bytes32' },
+      { name: 'payee', type: 'address' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'payToken',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'invoiceId', type: 'bytes32' },
+      { name: 'token', type: 'address' },
+      { name: 'payee', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+] as const;
