@@ -1,0 +1,42 @@
+---
+title: "Authentication"
+description: "Secret keys, permissions and IP allowlists."
+---
+
+Every request carries a secret key in the `Authorization` header:
+
+```http
+Authorization: Bearer fz_test_...
+```
+
+## Keys
+
+A key is `fz_test_` (or `fz_live_`) followed by 43 random characters. You create keys on the Developers page of your Flizy account. Each key is **shown once**: Flizy keeps only a fingerprint of it and cannot show it again. If you lose a key, revoke it and create another.
+
+- Call the API from your server only. Never put a key in a browser, an app or a repository.
+- A key's prefix (`fz_test_` and the next 6 characters) is safe to show, and is what the Developers page and `GET /me` display.
+- Revoking a key takes effect on the next request.
+
+## Permissions
+
+| Permission | Allows |
+|---|---|
+| `read` | `GET /me`, and reading and listing payouts and payments |
+| `collect` | Creating payments (checkouts) |
+| `payout` | Creating and cancelling payouts |
+
+You choose `read` and `collect` when you create a key. `payout` is granted per key by Flizy after review, so no one who gets into your Flizy account can give themselves the power to send money.
+
+A key without the permission a call needs gets `403` with code `permission_denied`.
+
+## IP allowlist
+
+A key can carry up to 20 exact IPv4 or IPv6 addresses. Calls from any other address get `403` with code `ip_not_allowed`. Leave the list empty to allow any address.
+
+## Failed authentication
+
+Every failure to prove who is calling gets the same `401` with code `unauthorized`: no header, a malformed key, an unknown or revoked key, a platform Flizy paused, or a key of the other mode. The answer never says which, so nobody can probe which keys exist.
+
+## Large payouts
+
+When a payout at or above your platform's notice amount is accepted, Flizy emails your account's owner. If it was not you, revoke the key on the Developers page and change your password.

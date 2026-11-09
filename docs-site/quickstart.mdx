@@ -1,0 +1,138 @@
+---
+title: "Quickstart"
+description: "From a new key to a first payout and a first checkout."
+---
+
+You need a platform set up by Flizy and a test key from the Developers page of your Flizy account (Account, Developers). Keep the key on your server: it is shown once, and anyone holding it can act as your platform.
+
+<Steps>
+  <Step title="Check your key">
+    `GET /me` answers your platform, the key's permissions and whether payouts are on for it.
+
+    <CodeGroup>
+    ```bash curl
+    curl https://flizy.app/api/v1/me \
+      -H "Authorization: Bearer $FLIZY_API_KEY"
+    ```
+
+    ```javascript JavaScript
+    const res = await fetch('https://flizy.app/api/v1/me', {
+      headers: { Authorization: `Bearer ${process.env.FLIZY_API_KEY}` },
+    });
+    console.log(res.status, await res.json());
+    ```
+
+    ```python Python
+    import os
+    import requests
+
+    res = requests.get(
+        "https://flizy.app/api/v1/me",
+        headers={"Authorization": f"Bearer {os.environ['FLIZY_API_KEY']}"},
+        timeout=30,
+    )
+    print(res.status_code, res.json())
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Send a payout">
+    Needs a key with the `payout` permission, which Flizy grants per key, and a payout allowance signed on the Developers page. Every create carries an `Idempotency-Key`, so a retry never pays twice.
+
+    <CodeGroup>
+    ```bash curl
+    curl https://flizy.app/api/v1/payouts \
+      -H "Authorization: Bearer $FLIZY_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: order_1042-payout" \
+      -d '{"amount":"12.5","asset":"tUSD","recipient":{"type":"username","value":"ada"},"reference":"order_1042"}'
+    ```
+
+    ```javascript JavaScript
+    const res = await fetch('https://flizy.app/api/v1/payouts', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.FLIZY_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'order_1042-payout',
+      },
+      body: JSON.stringify({
+        amount: '12.5',
+        asset: 'tUSD',
+        recipient: { type: 'username', value: 'ada' },
+        reference: 'order_1042',
+      }),
+    });
+    const payout = await res.json(); // 202, state "accepted"
+    ```
+
+    ```python Python
+    res = requests.post(
+        "https://flizy.app/api/v1/payouts",
+        headers={
+            "Authorization": f"Bearer {os.environ['FLIZY_API_KEY']}",
+            "Idempotency-Key": "order_1042-payout",
+        },
+        json={
+            "amount": "12.5",
+            "asset": "tUSD",
+            "recipient": {"type": "username", "value": "ada"},
+            "reference": "order_1042",
+        },
+        timeout=30,
+    )
+    payout = res.json()  # 202, state "accepted"
+    ```
+    </CodeGroup>
+
+    The answer is `202` with the payout in `accepted`. It is sent shortly after; follow it with `GET /payouts/{id}` or the `payout.confirmed` webhook.
+  </Step>
+
+  <Step title="Create a checkout">
+    Needs the `collect` permission. Send your customer to the `checkout_url` in the answer.
+
+    <CodeGroup>
+    ```bash curl
+    curl https://flizy.app/api/v1/payments \
+      -H "Authorization: Bearer $FLIZY_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: invoice_88" \
+      -d '{"amount":"25","asset":"tUSD","reference":"invoice_88"}'
+    ```
+
+    ```javascript JavaScript
+    const res = await fetch('https://flizy.app/api/v1/payments', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.FLIZY_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'invoice_88',
+      },
+      body: JSON.stringify({ amount: '25', asset: 'tUSD', reference: 'invoice_88' }),
+    });
+    const payment = await res.json(); // 201
+    // Redirect the customer to payment.checkout_url
+    ```
+
+    ```python Python
+    res = requests.post(
+        "https://flizy.app/api/v1/payments",
+        headers={
+            "Authorization": f"Bearer {os.environ['FLIZY_API_KEY']}",
+            "Idempotency-Key": "invoice_88",
+        },
+        json={"amount": "25", "asset": "tUSD", "reference": "invoice_88"},
+        timeout=30,
+    )
+    payment = res.json()  # 201
+    # Redirect the customer to payment["checkout_url"]
+    ```
+    </CodeGroup>
+
+    The payment settles (`confirmed`) once what the customer paid reaches the amount. The `payment.confirmed` webhook tells you.
+  </Step>
+
+  <Step title="Add a webhook endpoint">
+    On the Developers page, add an https endpoint and save its signing secret. Then [check every delivery's signature](/guides/webhooks) before you act on it.
+  </Step>
+</Steps>

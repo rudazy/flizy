@@ -1,0 +1,171 @@
+---
+title: "Webhooks"
+description: "Signed events for every change to your payouts and payments."
+---
+
+Flizy sends an event to your endpoints each time a payout or payment changes. Use them instead of polling.
+
+## Endpoints
+
+Add endpoints on the Developers page: up to 5, each an https URL on a host name (no IP address, port 443 only), with the events it wants. Each endpoint gets its own signing secret, shown **once** when you add it. Flizy keeps it encrypted, only to sign deliveries.
+
+## A delivery
+
+Each event is a `POST` with a JSON body:
+
+```json
+{
+  "id": "4b0c6d6e-2f43-4f7a-9a51-0f8a7c3e2d19",
+  "type": "payout.confirmed",
+  "created_at": "2026-11-09T12:00:04.512Z",
+  "data": {
+    "object": "payout",
+    "id": "6f1c2a9e-3b7d-4e8a-9c21-5d0f4b6a8e13",
+    "state": "confirmed",
+    "previous_state": "submitted",
+    "detail": { "tx_hash": "0x9e2f..." }
+  }
+}
+```
+
+and these headers:
+
+| Header | |
+|---|---|
+| `Flizy-Signature` | `t=<unix seconds>,v1=<signature>`. Check it before anything else. |
+| `Flizy-Event-Id` | The event's `id`. |
+| `Flizy-Event-Type` | The event's `type`. |
+| `Content-Type` | `application/json` |
+| `User-Agent` | `Flizy-Webhooks/1` |
+
+`data` says which object changed and its new `state`. `detail` carries what the change produced, such as `tx_hash`, `claim_url` and `expires_at` for a held claim, `error_code` for a failure, or `refund_tx_hash` for a refund. For the full object, read it with `GET /payouts/{id}` or `GET /payments/{id}`.
+
+## Events
+
+| `type` | When |
+|---|---|
+| `payout.queued` | The payout is waiting its turn. |
+| `payout.submitted` | The payout's transaction is on its way. |
+| `payout.confirmed` | The money reached the person, or they collected the claim. |
+| `payout.claim_pending` | The claim is held. `detail.claim_url` is the link to deliver. |
+| `payout.failed` | The payout failed. `detail.error_code` says why. |
+| `payout.expired` | Nobody claimed it in time. |
+| `payout.refund_pending` | The claim is being refunded to your wallet. |
+| `payout.refunded` | The refund arrived. |
+| `payment.submitted` | A payment brought the checkout to its amount. |
+| `payment.confirmed` | The checkout settled. |
+| `payment.expired` | The checkout expired unpaid. |
+| `payment.partially_paid` | Part of the amount arrived. |
+| `payment.received_after_expiry` | A payment arrived after the checkout expired. |
+| `payment.received_after_settlement` | A payment arrived after the checkout settled. |
+
+For the three `payment.partially_paid` and `payment.received_*` events, `detail` holds `tx_hash`, `units` (this payment) and `received_units` (the total so far), both in the asset's smallest unit: tUSD has 6 places, so `"25000000"` is 25 tUSD.
+
+## Check the signature
+
+The signature is an HMAC-SHA256, under your endpoint's secret, of the timestamp, a dot, and the **raw** request body, as hex. Check it over the exact bytes you received, before parsing the JSON, compare in constant time, and refuse a timestamp more than 5 minutes from your clock, so a captured delivery cannot be replayed.
+
+<CodeGroup>
+```javascript JavaScript
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+const TOLERANCE_SECONDS = 300;
+
+/** True when the Flizy-Signature header is valid for this raw body. */
+export function verifyFlizySignature(secret, rawBody, header, now = Math.floor(Date.now() / 1000)) {
+  if (!secret || !header) return false;
+  const parts = Object.fromEntries(
+    header.split(',').map((part) => {
+      const i = part.indexOf('=');
+      return [part.slice(0, i).trim(), part.slice(i + 1).trim()];
+    })
+  );
+  const t = Number(parts.t);
+  const v1 = String(parts.v1 || '');
+  if (!Number.isInteger(t) || !/^[0-9a-f]{64}$/.test(v1)) return false;
+  if (Math.abs(now - t) > TOLERANCE_SECONDS) return false;
+  const expected = createHmac('sha256', secret).update(`${t}.${rawBody}`, 'utf8').digest();
+  return timingSafeEqual(expected, Buffer.from(v1, 'hex'));
+}
+```
+
+```python Python
+import hashlib
+import hmac
+import time
+from typing import Optional
+
+TOLERANCE_SECONDS = 300
+
+
+def verify_flizy_signature(secret: str, raw_body: bytes, header: str, now: Optional[int] = None) -> bool:
+    """True when the Flizy-Signature header is valid for this raw body."""
+    if not secret or not header:
+        return False
+    parts = dict(p.strip().split("=", 1) for p in header.split(",") if "=" in p)
+    try:
+        t = int(parts.get("t", ""))
+    except ValueError:
+        return False
+    v1 = parts.get("v1", "")
+    if len(v1) != 64 or any(c not in "0123456789abcdef" for c in v1):
+        return False
+    if abs((int(time.time()) if now is None else now) - t) > TOLERANCE_SECONDS:
+        return False
+    expected = hmac.new(secret.encode(), str(t).encode() + b"." + raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, v1)
+```
+</CodeGroup>
+
+In a server, keep the raw body for the webhook route:
+
+<CodeGroup>
+```javascript Express
+import express from 'express';
+import { verifyFlizySignature } from './verifyFlizySignature.js';
+
+const app = express();
+
+app.post('/flizy/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
+  const raw = req.body.toString('utf8');
+  if (!verifyFlizySignature(process.env.FLIZY_WEBHOOK_SECRET, raw, req.get('Flizy-Signature'))) {
+    return res.sendStatus(400);
+  }
+  const event = JSON.parse(raw);
+  res.sendStatus(200);
+  queue.push(event); // your own job queue: dedupe by event.id, then act
+});
+```
+
+```python Flask
+import json
+import os
+
+from flask import Flask, request
+
+from verify_flizy_signature import verify_flizy_signature
+
+app = Flask(__name__)
+
+
+@app.post("/flizy/webhooks")
+def flizy_webhook():
+    raw = request.get_data()
+    if not verify_flizy_signature(os.environ["FLIZY_WEBHOOK_SECRET"], raw, request.headers.get("Flizy-Signature", "")):
+        return "", 400
+    event = json.loads(raw)
+    queue.put(event)  # your own job queue: dedupe by event["id"], then act
+    return "", 200
+```
+</CodeGroup>
+
+## Answer fast, and only once per event
+
+- Answer any `2xx` within **10 seconds**. Anything else, a timeout or a redirect (redirects are not followed) counts as a failure.
+- Do the work after answering, from a queue if it is slow.
+- **Dedupe by event `id`.** A retry delivers the same event again, and a delivery you answered can still be retried if your answer was lost.
+- **Do not rely on order.** Events can arrive out of order; use `data.state`, or read the object, rather than assuming the previous event arrived first.
+
+## Retries
+
+A failed delivery is retried with backoff: 30 seconds, then doubling each time, at most 6 hours apart, until 24 hours after the event. After that it stays failed, and you can send it again from the Developers page. A failing endpoint never changes a payout or payment.

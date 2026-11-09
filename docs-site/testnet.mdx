@@ -1,0 +1,26 @@
+---
+title: "Network and assets"
+description: "Where the money moves, and what you can move."
+---
+
+The Flizy Pay API runs on **GIWA Sepolia**, a test network. It accepts only test keys (`fz_test_`), and the assets on it have no real value. Live keys (`fz_live_`) are refused until Flizy opens a live network.
+
+## Assets
+
+| `asset` | What it is | Places |
+|---|---|---|
+| `ETH` | GIWA Sepolia's native coin, also used for gas | 18 |
+| `FLZ` | Flizy's token | 18 |
+| `tUSD` | A test dollar | 6 |
+
+In requests the asset is accepted in any case (`tusd`, `TUSD`); answers always use the labels above. An amount may have at most the asset's number of places: `"0.000001"` is the smallest tUSD amount.
+
+## Wallets
+
+- **Your platform's wallet** is the one Flizy approved for your platform (`wallet` on `GET /me`). Payouts are paid from it and checkout payments are paid to it.
+- Before a payout is sent, the wallet must hold the amount plus a small ETH reserve for gas. A payout it cannot cover fails with `error_code` `insufficient_funds`, and nothing is sent.
+- Money you set aside in Savings in your Flizy account is not spent by payouts: a payout that would dip into it fails with `insufficient_available_balance`.
+
+## Fund your test wallet
+
+Signed in on flizy.app, claim test ETH or test tUSD on Wallet, Fund. Test ETH is also on the [GIWA faucet](https://faucet.giwa.io).

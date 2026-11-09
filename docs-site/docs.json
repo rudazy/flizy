@@ -1,0 +1,46 @@
+{
+  "theme": "mint",
+  "name": "Flizy Pay API",
+  "colors": {
+    "primary": "#e0b84a",
+    "light": "#f7d047",
+    "dark": "#c4893f"
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://flizy.app"
+  },
+  "favicon": "/favicon.svg",
+  "appearance": {
+    "default": "dark"
+  },
+  "background": {
+    "color": {
+      "dark": "#0a0a0a"
+    }
+  },
+  "navbar": {
+    "links": [{ "label": "Flizy", "href": "https://flizy.app" }]
+  },
+  "api": {
+    "playground": { "display": "simple" },
+    "examples": { "languages": ["curl", "javascript", "python"] }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          { "group": "Get started", "pages": ["introduction", "quickstart", "testnet"] },
+          { "group": "Basics", "pages": ["authentication", "idempotency", "errors", "rate-limits"] },
+          { "group": "Guides", "pages": ["guides/payouts", "guides/checkouts", "guides/webhooks"] }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [{ "group": "Endpoints", "openapi": "openapi.json" }]
+      }
+    ]
+  }
+}

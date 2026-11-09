@@ -1,0 +1,104 @@
+---
+title: "Checkouts"
+description: "Collect an exact amount, paid straight to your platform's wallet."
+---
+
+A payment (a checkout) asks a customer for an amount of one asset. You create it, send the customer to its `checkout_url`, and Flizy tells you when it is paid. The money goes from the customer's wallet to your platform's wallet in one transaction; Flizy never holds it.
+
+## Create one
+
+`POST /payments` with the `collect` permission and an `Idempotency-Key`:
+
+| Field | |
+|---|---|
+| `amount` | Required. A decimal string. |
+| `asset` | Required. `ETH`, `FLZ` or `tUSD`. |
+| `reference` | Optional. Your own text, up to 120 characters. |
+| `metadata` | Optional. Your own object, up to 2048 bytes of JSON. |
+| `expires_in_minutes` | Optional. 5 to 10080 (7 days). Default 60. |
+| `return_url` | Optional. Where the page links back to after paying. |
+
+The answer is `201` with the payment in `accepted` and its `checkout_url`. `reference` and `metadata` are never shown to the customer.
+
+## The checkout page
+
+The page at `checkout_url` shows your platform's name, the amount still due and where it goes, and lets the customer pay it:
+
+- **From any wallet**, by connecting it on the page.
+- **From their Flizy account**, when they are signed in on flizy.app.
+- **In chat**, where the page offers it: Telegram or WhatsApp opens Flizy's bot, which pays from the Flizy account that chat is linked to.
+
+Every way pays what is still due, so a second payment never repeats one that already arrived. The page never shows a checkout that is paid or expired as payable, and offers no way to pay while Flizy has paused your platform.
+
+## Return links
+
+A `return_url` must be https on a site you registered under Checkout sites on the Developers page (up to 5). The page shows it as a link back to your site. A `return_url` on any other site is refused with `invalid_return_url`, so a checkout link can never send your customers somewhere you did not choose.
+
+Do not treat a customer arriving at your `return_url` as proof of payment. Read the payment, or wait for `payment.confirmed`.
+
+## Settling
+
+Payments toward one checkout add up in `received`. The checkout settles the moment `received` reaches `amount`:
+
+| What arrives | State | Webhook |
+|---|---|---|
+| Less than what is due | stays `accepted`, `received` grows | `payment.partially_paid` |
+| What is due, or more | `confirmed`, `settled_at` set, `overpaid` if more | `payment.submitted`, then `payment.confirmed` |
+| A payment after it settled | stays `confirmed`, `overpaid` set | `payment.received_after_settlement` |
+
+`completed` is `true` only in `confirmed`. Flizy does not return an overpayment; send the difference back to your customer yourself.
+
+## Expiry
+
+An open checkout that reaches `expires_at` moves to `expired`, with `payment.expired`. A payment that lands after that is still recorded and adds to `received`, and you get `payment.received_after_expiry`, but the checkout stays `expired`: decide yourself whether to honour it or refund it.
+
+## Example
+
+<CodeGroup>
+```javascript JavaScript
+const res = await fetch('https://flizy.app/api/v1/payments', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.FLIZY_API_KEY}`,
+    'Content-Type': 'application/json',
+    'Idempotency-Key': `order-${order.id}`,
+  },
+  body: JSON.stringify({
+    amount: order.total, // a string, e.g. "25"
+    asset: 'tUSD',
+    reference: `order ${order.id}`,
+    expires_in_minutes: 30,
+    return_url: `https://shop.example.com/orders/${order.id}`,
+  }),
+});
+const payment = await res.json();
+// Store payment.id with the order, then send the customer to payment.checkout_url.
+```
+
+```python Python
+import os
+import requests
+
+res = requests.post(
+    "https://flizy.app/api/v1/payments",
+    headers={
+        "Authorization": f"Bearer {os.environ['FLIZY_API_KEY']}",
+        "Idempotency-Key": f"order-{order_id}",
+    },
+    json={
+        "amount": order_total,  # a string, e.g. "25"
+        "asset": "tUSD",
+        "reference": f"order {order_id}",
+        "expires_in_minutes": 30,
+        "return_url": f"https://shop.example.com/orders/{order_id}",
+    },
+    timeout=30,
+)
+payment = res.json()
+# Store payment["id"] with the order, then redirect to payment["checkout_url"]
+```
+</CodeGroup>
+
+## Listing
+
+`GET /payments` lists newest first, `limit` 1 to 100 (default 20). When `has_more` is true, pass the last item's `created_at` as `before` for the next page.

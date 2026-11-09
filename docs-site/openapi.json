@@ -1,0 +1,437 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Flizy Pay API",
+    "version": "1.0.0",
+    "description": "Pay out to people and collect payments on GIWA Sepolia from your platform. Every request is authenticated with a secret API key in the Authorization header."
+  },
+  "servers": [{ "url": "https://flizy.app/api/v1", "description": "Flizy" }],
+  "security": [{ "apiKey": [] }],
+  "tags": [
+    { "name": "Platform", "description": "Check a key and see what it can do." },
+    { "name": "Payouts", "description": "Send money from your platform's wallet to a person." },
+    { "name": "Payments", "description": "Checkouts your customers pay, straight to your platform's wallet." }
+  ],
+  "paths": {
+    "/me": {
+      "get": {
+        "tags": ["Platform"],
+        "operationId": "getMe",
+        "summary": "Get your platform",
+        "description": "Who this key belongs to: your platform's name and wallet, the key's mode, prefix and permissions, and whether API payouts are on for it. Needs the `read` permission.",
+        "responses": {
+          "200": { "description": "Your platform.", "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Platform" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/payouts": {
+      "post": {
+        "tags": ["Payouts"],
+        "operationId": "createPayout",
+        "summary": "Create a payout",
+        "description": "Records a payout as `accepted` and answers 202. The money is sent afterwards, only through your platform's passkey-signed allowance; follow the payout with GET /payouts/{id} or the `payout.*` webhooks. `accepted` is never a completed payment. A username or 0x address is paid directly; a phone, email, Telegram, Discord or GitHub id is paid as a claim the person collects. Needs the `payout` permission and an `Idempotency-Key`.",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayoutRequest" }, "example": { "amount": "12.5", "asset": "tUSD", "recipient": { "type": "username", "value": "ada" }, "reference": "order_1042" } } }
+        },
+        "responses": {
+          "202": { "description": "Accepted. Not yet sent.", "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payout" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      },
+      "get": {
+        "tags": ["Payouts"],
+        "operationId": "listPayouts",
+        "summary": "List payouts",
+        "description": "Your platform's payouts, newest first. For the next page, pass the `created_at` of the last one as `before`. Needs the `read` permission.",
+        "parameters": [{ "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Before" }],
+        "responses": {
+          "200": { "description": "A page of payouts.", "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayoutList" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/payouts/{id}": {
+      "get": {
+        "tags": ["Payouts"],
+        "operationId": "getPayout",
+        "summary": "Get a payout",
+        "description": "One of your platform's payouts. Another platform's payout and an id that does not exist both answer 404. Needs the `read` permission.",
+        "parameters": [{ "$ref": "#/components/parameters/PayoutId" }],
+        "responses": {
+          "200": { "description": "The payout.", "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payout" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/payouts/{id}/cancel": {
+      "post": {
+        "tags": ["Payouts"],
+        "operationId": "cancelPayout",
+        "summary": "Cancel a payout",
+        "description": "Cancels a payout that has not been sent, or an unclaimed claim. `accepted`: it fails with `error_code` `cancelled` and nothing is sent. `claim_pending`: the cancel is recorded and the claim is refunded to your wallet (`refund_pending`, then `refunded`). `expired`, `refund_pending` and `refunded` are answered as they are. Anything else is 409. Asking twice is harmless, so no `Idempotency-Key` is needed. Needs the `payout` permission.",
+        "parameters": [{ "$ref": "#/components/parameters/PayoutId" }],
+        "responses": {
+          "202": { "description": "The payout after the cancel.", "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payout" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/payments": {
+      "post": {
+        "tags": ["Payments"],
+        "operationId": "createPayment",
+        "summary": "Create a payment",
+        "description": "Creates a checkout and answers 201 with its `checkout_url`: send your customer there. They pay from any wallet, or from their Flizy account on the page or in chat, straight to your platform's wallet; Flizy never holds the money. The payment settles (`confirmed`) once what was received reaches the amount. Needs the `collect` permission and an `Idempotency-Key`.",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaymentRequest" }, "example": { "amount": "25", "asset": "tUSD", "reference": "invoice_88", "expires_in_minutes": 60, "return_url": "https://shop.example.com/orders/88" } } }
+        },
+        "responses": {
+          "201": { "description": "Created.", "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payment" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      },
+      "get": {
+        "tags": ["Payments"],
+        "operationId": "listPayments",
+        "summary": "List payments",
+        "description": "Your platform's payments, newest first. For the next page, pass the `created_at` of the last one as `before`. Needs the `read` permission.",
+        "parameters": [{ "$ref": "#/components/parameters/Limit" }, { "$ref": "#/components/parameters/Before" }],
+        "responses": {
+          "200": { "description": "A page of payments.", "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaymentList" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/payments/{id}": {
+      "get": {
+        "tags": ["Payments"],
+        "operationId": "getPayment",
+        "summary": "Get a payment",
+        "description": "One of your platform's payments. Another platform's payment and an id that does not exist both answer 404. Needs the `read` permission.",
+        "parameters": [{ "$ref": "#/components/parameters/PaymentId" }],
+        "responses": {
+          "200": { "description": "The payment.", "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Payment" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": { "type": "http", "scheme": "bearer", "description": "Your secret key: `fz_test_` and 43 characters. Send it as `Authorization: Bearer <key>`, from your server only." }
+    },
+    "headers": {
+      "RequestId": { "description": "This request's id. Quote it when you contact Flizy about a call.", "schema": { "type": "string", "example": "req_8Q2xVb7mT1kLp0aZ" } }
+    },
+    "parameters": {
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "description": "A unique value per new request, 1 to 255 visible ASCII characters. A retry with the same key and the same body gets the first answer back; see Idempotency.", "schema": { "type": "string", "minLength": 1, "maxLength": 255, "example": "order_1042-payout" } },
+      "Limit": { "name": "limit", "in": "query", "required": false, "description": "How many to return, 1 to 100.", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+      "Before": { "name": "before", "in": "query", "required": false, "description": "Only items created before this ISO 8601 time.", "schema": { "type": "string", "format": "date-time" } },
+      "PayoutId": { "name": "id", "in": "path", "required": true, "description": "The payout's id.", "schema": { "type": "string", "format": "uuid" } },
+      "PaymentId": { "name": "id", "in": "path", "required": true, "description": "The payment's id.", "schema": { "type": "string", "format": "uuid" } }
+    },
+    "responses": {
+      "BadRequest": { "description": "The request is not valid. `error.code` says why.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Unauthorized": { "description": "No valid key. The same answer whatever the reason: no header, a malformed, unknown or revoked key, a paused platform, or a key of the other mode.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Forbidden": { "description": "The key lacks the permission this call needs (`permission_denied`), or its IP allowlist does not include this address (`ip_not_allowed`).", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "NotFound": { "description": "No such object for your platform.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Conflict": { "description": "An Idempotency-Key conflict, or a payout that cannot be cancelled in its state.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "TooLarge": { "description": "The body is over 16 KB.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "RateLimited": { "description": "Over 120 calls a minute with this key. Wait and retry.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "InternalError": { "description": "Something went wrong on Flizy. Retry; a POST with the same Idempotency-Key is safe to retry.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Unavailable": { "description": "Flizy could not answer right now (`unavailable`), or payouts are switched off (`payouts_disabled`). Retry later.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "request_id"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Stable and machine-readable. Branch on this, not on the message.",
+                "enum": [
+                  "unauthorized",
+                  "permission_denied",
+                  "ip_not_allowed",
+                  "rate_limited",
+                  "unavailable",
+                  "internal_error",
+                  "payouts_disabled",
+                  "idempotency_key_required",
+                  "invalid_idempotency_key",
+                  "idempotency_conflict",
+                  "idempotency_in_progress",
+                  "idempotency_key_reused",
+                  "body_too_large",
+                  "invalid_json",
+                  "invalid_request",
+                  "invalid_asset",
+                  "invalid_amount",
+                  "invalid_recipient",
+                  "invalid_reference",
+                  "invalid_metadata",
+                  "invalid_claim_expiry",
+                  "invalid_expiry",
+                  "invalid_return_url",
+                  "asset_not_enabled",
+                  "over_max_payout",
+                  "invalid_limit",
+                  "invalid_before",
+                  "not_found",
+                  "in_progress",
+                  "not_cancellable"
+                ]
+              },
+              "message": { "type": "string", "description": "For people. May change." },
+              "request_id": { "type": "string", "description": "Same as the X-Request-Id header." }
+            }
+          }
+        },
+        "example": { "error": { "code": "invalid_amount", "message": "amount must be a positive decimal string with at most 6 places.", "request_id": "req_8Q2xVb7mT1kLp0aZ" } }
+      },
+      "Asset": { "type": "string", "enum": ["ETH", "FLZ", "tUSD"], "description": "In requests, any case is accepted. Answers use these labels." },
+      "Amount": { "type": "string", "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$", "description": "A positive decimal string, never a number, with at most as many places as the asset has: 18 for ETH and FLZ, 6 for tUSD.", "example": "12.5" },
+      "State": {
+        "type": "string",
+        "enum": ["accepted", "queued", "submitted", "confirmed", "claim_pending", "failed", "expired", "refund_pending", "refunded"],
+        "description": "Only `confirmed` and `refunded` are completed. See the payouts and checkouts guides for what each means."
+      },
+      "Platform": {
+        "type": "object",
+        "properties": {
+          "object": { "type": "string", "const": "platform" },
+          "name": { "type": "string", "description": "Your platform's name as Flizy shows it to people." },
+          "wallet": { "type": "string", "description": "Your platform's approved wallet: payouts are paid from it and payments are paid to it." },
+          "key": {
+            "type": "object",
+            "properties": {
+              "prefix": { "type": "string", "description": "The start of the key, safe to show.", "example": "fz_test_Ab12Cd" },
+              "mode": { "type": "string", "enum": ["test", "live"] },
+              "permissions": { "type": "array", "items": { "type": "string", "enum": ["read", "collect", "payout"] } }
+            }
+          },
+          "payouts_enabled": { "type": "boolean", "description": "True when payouts are switched on and this key has the `payout` permission." }
+        },
+        "example": { "object": "platform", "name": "Example Shop", "wallet": "0x5b3e0e2a4c8f1d6b9a7e3c2d1f0a9b8c7d6e5f4a", "key": { "prefix": "fz_test_Ab12Cd", "mode": "test", "permissions": ["read", "collect", "payout"] }, "payouts_enabled": true }
+      },
+      "Recipient": {
+        "type": "object",
+        "required": ["type", "value"],
+        "properties": {
+          "type": { "type": "string", "enum": ["username", "address", "phone", "email", "telegram", "discord", "github"] },
+          "value": {
+            "type": "string",
+            "description": "username: a Flizy username (a leading @ is dropped). address: a 0x address, not the zero address. phone: international format, e.g. +2348012345678. email: an email address. telegram, discord, github: the numeric user id, never a handle."
+          }
+        }
+      },
+      "PayoutRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["amount", "asset", "recipient"],
+        "properties": {
+          "amount": { "$ref": "#/components/schemas/Amount" },
+          "asset": { "$ref": "#/components/schemas/Asset" },
+          "recipient": { "$ref": "#/components/schemas/Recipient" },
+          "reference": { "type": "string", "maxLength": 120, "description": "Your own reference, shown back on the payout. No control characters." },
+          "metadata": { "type": "object", "description": "Your own data, at most 2048 bytes of JSON, shown back on the payout." },
+          "claim_expiry_days": { "type": "integer", "minimum": 1, "maximum": 365, "description": "Claims only (phone, email and platform ids): how many days the person has to claim, up to your platform's maximum. Defaults to your platform's setting." }
+        }
+      },
+      "Payout": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "object": { "type": "string", "const": "payout" },
+          "state": { "$ref": "#/components/schemas/State" },
+          "completed": { "type": "boolean", "description": "True only once the money arrived (`confirmed`) or came back (`refunded`)." },
+          "amount": { "type": "string", "example": "12.5" },
+          "asset": { "$ref": "#/components/schemas/Asset" },
+          "recipient": { "$ref": "#/components/schemas/Recipient" },
+          "reference": { "type": ["string", "null"] },
+          "metadata": { "type": ["object", "null"] },
+          "tx_hash": { "type": ["string", "null"], "description": "The transaction that sent it, or that held the claim." },
+          "error_code": {
+            "type": ["string", "null"],
+            "description": "Why a failed payout failed.",
+            "enum": [
+              null,
+              "cancelled",
+              "invalid_request",
+              "platform_disabled",
+              "key_revoked",
+              "asset_not_enabled",
+              "over_max_payout",
+              "over_daily_max",
+              "invalid_recipient",
+              "recipient_is_platform",
+              "recipient_not_payable",
+              "policy_denied",
+              "wallet_mismatch",
+              "insufficient_available_balance",
+              "insufficient_funds",
+              "account_daily_limit",
+              "no_allowance",
+              "allowance_exceeded",
+              "relayer_unavailable",
+              "relayer_busy",
+              "not_sent",
+              "reverted"
+            ]
+          },
+          "claim": {
+            "type": ["object", "null"],
+            "description": "Claims only (phone, email and platform ids); null for a username or address.",
+            "properties": {
+              "url": { "type": ["string", "null"], "description": "The link to give the person. Set once the claim is held (`claim_pending`)." },
+              "expires_at": { "type": ["string", "null"], "format": "date-time" },
+              "cancel_requested": { "type": "boolean" },
+              "refund_tx_hash": { "type": ["string", "null"] }
+            }
+          },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        },
+        "example": {
+          "id": "6f1c2a9e-3b7d-4e8a-9c21-5d0f4b6a8e13",
+          "object": "payout",
+          "state": "accepted",
+          "completed": false,
+          "amount": "12.5",
+          "asset": "tUSD",
+          "recipient": { "type": "username", "value": "ada" },
+          "reference": "order_1042",
+          "metadata": null,
+          "tx_hash": null,
+          "error_code": null,
+          "claim": null,
+          "created_at": "2026-11-09T12:00:00.000Z",
+          "updated_at": "2026-11-09T12:00:00.000Z"
+        }
+      },
+      "PayoutList": {
+        "type": "object",
+        "properties": {
+          "object": { "type": "string", "const": "list" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Payout" } },
+          "has_more": { "type": "boolean" }
+        }
+      },
+      "PaymentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["amount", "asset"],
+        "properties": {
+          "amount": { "$ref": "#/components/schemas/Amount" },
+          "asset": { "$ref": "#/components/schemas/Asset" },
+          "reference": { "type": "string", "maxLength": 120, "description": "Your own reference. Never shown to the customer." },
+          "metadata": { "type": "object", "description": "Your own data, at most 2048 bytes of JSON. Never shown to the customer." },
+          "expires_in_minutes": { "type": "integer", "minimum": 5, "maximum": 10080, "default": 60, "description": "How long the checkout stays open: 5 minutes to 7 days." },
+          "return_url": { "type": "string", "format": "uri", "maxLength": 2000, "description": "Where the page links back to after paying. https, on a site you registered on the Developers page." }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "object": { "type": "string", "const": "payment" },
+          "state": { "type": "string", "enum": ["accepted", "submitted", "confirmed", "expired"], "description": "`accepted` while open, `confirmed` once settled, `expired` if it closed first." },
+          "completed": { "type": "boolean", "description": "True only once settled (`confirmed`)." },
+          "amount": { "type": "string", "example": "25" },
+          "asset": { "$ref": "#/components/schemas/Asset" },
+          "received": { "type": "string", "description": "Everything received so far, in the asset.", "example": "0" },
+          "overpaid": { "type": "boolean", "description": "More than the amount arrived." },
+          "checkout_url": { "type": "string", "format": "uri", "description": "Send your customer here." },
+          "reference": { "type": ["string", "null"] },
+          "metadata": { "type": ["object", "null"] },
+          "expires_at": { "type": "string", "format": "date-time" },
+          "return_url": { "type": ["string", "null"] },
+          "tx_hash": { "type": ["string", "null"], "description": "The payment that settled it." },
+          "settled_at": { "type": ["string", "null"], "format": "date-time" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        },
+        "example": {
+          "id": "0d2b6c1a-1111-4222-8333-944445555666",
+          "object": "payment",
+          "state": "accepted",
+          "completed": false,
+          "amount": "25",
+          "asset": "tUSD",
+          "received": "0",
+          "overpaid": false,
+          "checkout_url": "https://flizy.app/checkout/0d2b6c1a-1111-4222-8333-944445555666",
+          "reference": "invoice_88",
+          "metadata": null,
+          "expires_at": "2026-11-09T13:00:00.000Z",
+          "return_url": "https://shop.example.com/orders/88",
+          "tx_hash": null,
+          "settled_at": null,
+          "created_at": "2026-11-09T12:00:00.000Z",
+          "updated_at": "2026-11-09T12:00:00.000Z"
+        }
+      },
+      "PaymentList": {
+        "type": "object",
+        "properties": {
+          "object": { "type": "string", "const": "list" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Payment" } },
+          "has_more": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+---
+title: "Idempotency"
+description: "Retry any create safely, without paying or charging twice."
+---
+
+`POST /payouts` and `POST /payments` need an `Idempotency-Key` header: a value unique to that one request, 1 to 255 visible ASCII characters. Use something tied to the action in your system, such as an order id.
+
+```http
+Idempotency-Key: order_1042-payout
+```
+
+## What happens on a retry
+
+| You send | You get |
+|---|---|
+| The same key with the same body, after the first finished | The first answer again, unchanged, with its original status |
+| The same key while the first is still being handled | `409` `idempotency_in_progress`: wait and retry |
+| The same key with a different body | `409` `idempotency_conflict` |
+| No key | `400` `idempotency_key_required` |
+
+"The same body" means byte for byte. Send the same JSON string when you retry, not a rebuilt object whose key order might differ.
+
+A key is remembered for **24 hours**. After that it may be used again, except for a key already attached to a payout or payment you created, which answers `409` `idempotency_key_reused`: use a new one.
+
+## When to retry
+
+Retry with the same key after a timeout, a network error, a `500` or a `503`. A request that never reached Flizy is simply made; one that did gets its first answer back. Do not retry a `400` unchanged: it will fail the same way. A `400` records nothing, so once you fix the request you may send it with the same key.
+
+`POST /payouts/{id}/cancel` needs no key: asking twice is harmless.

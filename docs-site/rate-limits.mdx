@@ -1,0 +1,19 @@
+---
+title: "Rate limits"
+description: "How many calls a key may make."
+---
+
+Each key may make **120 calls a minute**. Over that, calls get `429` with code `rate_limited` until the minute has passed. Every call that gets past authentication counts, including ones answered `400` or `404`; a `429` itself does not.
+
+- Spread bursts out, and retry a `429` after a short wait with some random jitter.
+- Use webhooks instead of polling. To catch up after downtime, list payouts or payments with `limit=100` and page with `before`.
+- Different keys have separate limits, but they all act for the same platform and share its payout caps.
+
+## Payout caps
+
+Separate from the rate limit, Flizy sets for each asset your platform may pay out:
+
+- **The most one payout may move.** Over it, the create is refused with `400` `over_max_payout`.
+- **The most per day.** Payouts spend only through the allowance you sign with your passkey, for that daily amount, and the chain enforces it. A payout over what is left today fails with `error_code` `allowance_exceeded` (or `over_daily_max`), and nothing is sent another way.
+
+An asset Flizy has not enabled for your platform is refused with `400` `asset_not_enabled`.

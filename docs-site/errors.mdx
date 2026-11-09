@@ -1,0 +1,83 @@
+---
+title: "Errors"
+description: "One error shape, and every code it can carry."
+---
+
+Every error has the same shape, with the request's id in the body and in the `X-Request-Id` header:
+
+```json
+{
+  "error": {
+    "code": "invalid_amount",
+    "message": "amount must be a positive decimal string with at most 6 places.",
+    "request_id": "req_8Q2xVb7mT1kLp0aZ"
+  }
+}
+```
+
+Branch on `code`; it is stable. `message` is for people and may change.
+
+## Request errors
+
+| Status | `code` | Meaning |
+|---|---|---|
+| 400 | `idempotency_key_required` | A create was sent without an `Idempotency-Key`. |
+| 400 | `invalid_idempotency_key` | The key is not 1 to 255 visible ASCII characters. |
+| 400 | `invalid_json` | The body is not valid JSON. |
+| 400 | `invalid_request` | The body is not a JSON object, or has a field the call does not take. |
+| 400 | `invalid_asset` | `asset` is not ETH, FLZ or tUSD. |
+| 400 | `invalid_amount` | `amount` is not a positive decimal string with at most the asset's places. |
+| 400 | `invalid_recipient` | `recipient` is missing, of an unknown type, or its value is not valid for the type. |
+| 400 | `invalid_reference` | `reference` is not text of at most 120 characters. |
+| 400 | `invalid_metadata` | `metadata` is not an object of at most 2048 bytes of JSON. |
+| 400 | `invalid_claim_expiry` | `claim_expiry_days` is set on a direct payout, or is outside 1 to your platform's maximum. |
+| 400 | `invalid_expiry` | `expires_in_minutes` is not a whole number from 5 to 10080. |
+| 400 | `invalid_return_url` | `return_url` is not https on a site registered on the Developers page. |
+| 400 | `asset_not_enabled` | Payouts in this asset are not enabled for your platform. |
+| 400 | `over_max_payout` | The amount is over the most one payout may move for your platform. |
+| 400 | `invalid_limit` | `limit` is not a whole number from 1 to 100. |
+| 400 | `invalid_before` | `before` is not an ISO time. |
+| 401 | `unauthorized` | No valid key. See [Authentication](/authentication). |
+| 403 | `permission_denied` | The key lacks the permission this call needs. |
+| 403 | `ip_not_allowed` | The key's IP allowlist does not include this address. |
+| 404 | `not_found` | No such payout or payment for your platform. |
+| 409 | `idempotency_conflict` | The `Idempotency-Key` was used for a different request. |
+| 409 | `idempotency_in_progress` | A request with this key is still being handled. Retry shortly. |
+| 409 | `idempotency_key_reused` | The key is already attached to an earlier payout or payment. Use a new one. |
+| 409 | `in_progress` | The payout is already being sent and cannot be cancelled now. |
+| 409 | `not_cancellable` | The payout's state cannot be cancelled. |
+| 413 | `body_too_large` | The body is over 16 KB. |
+| 429 | `rate_limited` | Over 120 calls a minute with this key. |
+| 500 | `internal_error` | Something went wrong on Flizy. Retry. |
+| 503 | `unavailable` | Flizy could not answer right now. Retry. |
+| 503 | `payouts_disabled` | Payouts are switched off on Flizy. Retry later. |
+
+## Why a payout failed
+
+A payout that was accepted and then could not be sent ends in `failed`, with `error_code` saying why. Nothing was sent unless the payout has a `tx_hash` and the code is `reverted`, in which case the transaction ran on chain and moved nothing.
+
+| `error_code` | Meaning |
+|---|---|
+| `cancelled` | You cancelled it before it was sent. |
+| `invalid_request` | The stored request could not be read. Contact Flizy with the payout id. |
+| `platform_disabled` | Flizy paused your platform. |
+| `key_revoked` | The key that created it was revoked, or lost the `payout` permission, before it was sent. |
+| `asset_not_enabled` | Payouts in this asset were turned off for your platform before it was sent. |
+| `over_max_payout` | Over the most one payout may move, as set when it was sent. |
+| `over_daily_max` | Over what your platform may pay out today in this asset. |
+| `invalid_recipient` | The recipient could not be used. |
+| `recipient_is_platform` | The recipient is your platform itself. |
+| `recipient_not_payable` | The username does not exist or has no wallet yet. |
+| `policy_denied` | Flizy's payment policy refused it. |
+| `wallet_mismatch` | Your platform's wallet changed. Contact Flizy. |
+| `insufficient_available_balance` | Your wallet holds enough, but part of it is set aside in Savings. |
+| `insufficient_funds` | Your wallet does not hold the amount plus the gas reserve. |
+| `account_daily_limit` | Over your Flizy account's own daily ETH limit. |
+| `no_allowance` | There is no live payout allowance for this asset. Sign one on the Developers page. |
+| `allowance_exceeded` | Over what is left of today's allowance. |
+| `relayer_unavailable` | Flizy's relayer could not send it. Create the payout again later. |
+| `relayer_busy` | Flizy's relayer was busy. Create the payout again. |
+| `not_sent` | It could not be sent. Create it again. |
+| `reverted` | The transaction ran on chain and failed. Nothing moved. |
+
+A failed payout is final. To try again, create a new payout with a new `Idempotency-Key`.

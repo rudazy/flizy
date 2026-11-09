@@ -1,0 +1,40 @@
+---
+title: "Flizy Pay API"
+description: "Pay out to people and collect payments from your platform, on chain, without holding anyone's money."
+---
+
+The Flizy Pay API lets a platform do two things:
+
+- **Pay out.** Send ETH, FLZ or tUSD from your platform's wallet to a person: a Flizy username or a wallet address is paid directly; a phone number, an email or a Telegram, Discord or GitHub id gets a claim link they collect with.
+- **Collect.** Create a checkout for an amount, send your customer to its page, and they pay from any wallet or from their Flizy account, straight to your platform's wallet.
+
+Flizy never holds your money or your customers'. Payouts leave your own wallet, and only through a daily allowance you sign with your passkey, so the chain itself caps what the API can send. Checkout payments go from the customer's wallet to yours in one transaction.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" href="/quickstart">
+    Check your key, send a first payout and create a first checkout.
+  </Card>
+  <Card title="Payouts" href="/guides/payouts">
+    Direct payouts, claims, states, cancelling and refunds.
+  </Card>
+  <Card title="Checkouts" href="/guides/checkouts">
+    The hosted page, partial and late payments, return links.
+  </Card>
+  <Card title="Webhooks" href="/guides/webhooks">
+    Signed events for every change, and how to check them.
+  </Card>
+</CardGroup>
+
+## How it fits together
+
+1. Flizy sets up your platform and its approved wallet.
+2. You create keys on the Developers page of your Flizy account (Account, Developers).
+3. Your server calls `https://flizy.app/api/v1` with a key.
+4. Flizy tells your server about every change through webhooks, and you can read any payout or payment at any time.
+
+## Conventions
+
+- Amounts are decimal **strings** in the asset's unit, never numbers: `"12.5"`, not `12.5`.
+- Times are ISO 8601 in UTC.
+- Every answer carries an `X-Request-Id` header. Quote it when you contact Flizy about a call.
+- `accepted` means Flizy took the request. It is never a completed payment: only `confirmed` and `refunded` are, and `completed` on every object says so.
