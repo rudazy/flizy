@@ -109,6 +109,7 @@ describe('the tiers hold: account changes take the password, money takes the PIN
    * payment is what the tiers replace.
    */
   const STEP_UP_ROUTES = [
+    'checkout/[id]/pay',
     'market/[action]',
     'mints/[collection]/[action]',
     'mints/collections',
@@ -124,7 +125,7 @@ describe('the tiers hold: account changes take the password, money takes the PIN
    * the server; every other money route calls requireStepUp and takes the PIN
    * every time.
    */
-  const TIERED_ROUTES = ['pay/execute'];
+  const TIERED_ROUTES = ['checkout/[id]/pay', 'pay/execute'];
 
   /**
    * Trades whose output lands back in the caller's own wallet: on testnet they

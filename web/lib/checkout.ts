@@ -40,6 +40,10 @@ type CheckoutView = {
   returnUrl: string | null;
   /** False while Flizy has paused the platform: the page then offers no way to pay. */
   platformEnabled: boolean;
+  /** Server only, for paying from a Flizy account: base units, and the platform's own account. */
+  amountUnits: bigint;
+  receivedUnits: bigint;
+  platformAccountId: string;
 };
 
 type Row = {
@@ -103,6 +107,9 @@ export async function loadCheckout(db: SupabaseClient, id: string): Promise<Chec
     expiresAt: row.expires_at,
     returnUrl: row.return_url,
     platformEnabled: platform.enabled === true,
+    amountUnits: BigInt(row.amount),
+    receivedUnits: BigInt(String(row.received_units ?? 0)),
+    platformAccountId: platform.account_id,
   };
 }
 

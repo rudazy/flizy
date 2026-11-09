@@ -99,7 +99,7 @@ export function CheckoutPay(p: Props) {
       <div className={settled ? 'alert alert-ok text-sm' : 'alert text-sm'}>
         {settled
           ? `Paid ${p.amount} ${p.assetLabel} to ${p.platformName}.`
-          : `Received ${done.received} ${p.assetLabel} of ${p.amount}. The rest is still to pay.`}
+          : `Received ${done.received} ${p.assetLabel} so far. The rest is still to pay.`}
       </div>
     );
   }

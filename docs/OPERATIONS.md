@@ -434,8 +434,10 @@ startup check and the site build both refuse without it.
   of at least that amount is accepted.
 - **Checkouts.** `POST /api/v1/payments` (a key with `collect`) answers a
   `flizy.app/checkout/<id>` link; the customer pays it from any wallet through
-  FlizyPaymentReceiver, straight to the platform's wallet. Flizy never holds the money, so no
-  allowance or switch is involved. The page reports the transaction, and the WhatsApp process
+  FlizyPaymentReceiver, straight to the platform's wallet, or, signed in, from their Flizy
+  wallet through the same receiver (`/api/checkout/[id]/pay`: the PIN tiers, account lock,
+  Savings fence and daily limit of any Flizy payment). Either way pays what is still due.
+  Flizy never holds the money, so no allowance or switch is involved. The page reports the transaction, and the WhatsApp process
   (`startApiPaymentWatcher`, `lib/api/paymentWatcher.js`) also reads the receiver's logs from
   a saved block (`api_payment_cursor`), so a closed page loses nothing; each payment is
   recorded once by `api_record_payment`. Payments add up; the checkout settles when they

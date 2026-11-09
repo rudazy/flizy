@@ -227,7 +227,43 @@ describe('the checkout page and its routes', () => {
     assert.match(read('web/lib/checkout.ts'), /platformEnabled: platform\.enabled === true/);
     const page = read('web/app/checkout/[id]/page.tsx');
     assert.match(page, /const payable = open && view\.platformEnabled;/);
-    assert.match(page, /\) : payable \? \(\s*<ExternalWalletProvider>/);
+    assert.match(page, /\) : payable \? \(\s*<div className="space-y-4">/);
+    assert.ok(page.indexOf(') : payable ? (') < page.indexOf('<CheckoutAccountPay') && page.indexOf(') : payable ? (') < page.indexOf('<CheckoutPay'), 'both ways to pay only when payable');
+  });
+
+  it('paying from a Flizy account keeps every control a Flizy payment has, and pays only what is due', () => {
+    const src = read('web/app/api/checkout/[id]/pay/route.ts');
+    assert.match(src, /rejectIfCrossOrigin\(req\)/);
+    assert.match(src, /const payerId = await getAccountIdFromCookie\(\);/);
+    assert.match(src, /view\.state !== 'accepted' \|\| Date\.parse\(view\.expiresAt\) <= Date\.now\(\) \|\| !view\.platformEnabled/);
+    assert.match(src, /view\.platformAccountId === payerId/);
+    assert.match(src, /let due = view\.amountUnits - view\.receivedUnits;/);
+    // Read again under the lock, so a double click cannot pay twice.
+    const lock = src.indexOf("tryAccountTxLock(supabase, payerId, 'pay')");
+    const reread = src.indexOf('const fresh = await loadCheckout(supabase, id);');
+    assert.ok(lock > 0 && reread > lock, 'the checkout is read again after the lock is taken');
+    assert.match(src, /due = fresh\.amountUnits - fresh\.receivedUnits;/);
+    // A payment that moved is never answered as a failure.
+    assert.match(src, /try \{\s*await recordCheckoutPayments\(supabase, id, txHash, checkoutPaymentsIn\(receipt, view\)\);\s*\} catch \{/);
+    assert.match(src, /const tier = await sendTier\(supabase, payerId, view\.payee, native, native \? due : 0n\);/);
+    assert.match(src, /requireApproval\(supabase, payerId, String\(body\.pin \|\| ''\), 'pay', tier\)/);
+    assert.match(src, /tryAccountTxLock\(supabase, payerId, 'pay'\)/);
+    assert.match(src, /releaseAccountTxLock\(supabase, payerId\)/);
+    assert.match(src, /checkDailyNativeLimit\(supabase, payerId, due\)/);
+    assert.equal((src.match(/assertSpendable\(/g) || []).length, 3, 'ETH, gas and token fences');
+    assert.match(src, /encodeFunctionData\('payNative', \[view\.invoiceId, view\.payee\]\)/);
+    assert.match(src, /encodeFunctionData\('payToken', \[view\.invoiceId, view\.token, view\.payee, due\]\)/);
+    assert.match(src, /encodeFunctionData\('approve', \[PAYMENT_RECEIVER, due\]\)/, 'an exact approval');
+    assert.match(src, /recordCheckoutPayments\(supabase, id, txHash, checkoutPaymentsIn\(receipt, view\)\)/);
+    assert.doesNotMatch(src, /body\.(amount|asset|to|payee|tier)\b/, 'nothing about the payment comes from the browser but the PIN');
+  });
+
+  it('both ways to pay on the page pay what is still due', () => {
+    const page = read('web/app/checkout/[id]/page.tsx');
+    assert.match(page, /const due = plainAmount\(view\.amountUnits - view\.receivedUnits, /);
+    assert.match(page, /<CheckoutAccountPay id=\{view\.id\} amount=\{due\}/);
+    assert.match(page, /<CheckoutPay\s+id=\{view\.id\}\s+amount=\{due\}/);
+    assert.match(page, /accountId && accountId !== view\.platformAccountId/);
   });
 
   it('the report route takes no session, is capped per caller, and believes only the receipt', () => {

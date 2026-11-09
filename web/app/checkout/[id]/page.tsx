@@ -2,15 +2,18 @@ import type { Metadata } from 'next';
 import { getSupabase } from '../../../lib/supabase';
 import { pageMetadata } from '../../../lib/seo';
 import { loadCheckout } from '../../../lib/checkout.ts';
-import { PAYOUT_ASSETS } from '../../../lib/apiPayouts.ts';
+import { PAYOUT_ASSETS, plainAmount } from '../../../lib/apiPayouts.ts';
 import { ExternalWalletProvider } from '../../../components/ExternalWalletProvider';
 import { CheckoutPay } from '../../../components/CheckoutPay';
+import { CheckoutAccountPay } from '../../../components/CheckoutAccountPay';
+import { getAccountIdFromCookie } from '../../../lib/cookies';
 
 /**
- * A Flizy Pay API checkout: a platform's customer pays it from any wallet,
- * straight to the platform's wallet (web/lib/checkout.ts). Never indexed. A
- * checkout that is paid, expired or unknown, or whose platform Flizy paused,
- * says so and offers nothing to pay.
+ * A Flizy Pay API checkout: a platform's customer pays it from any wallet, or
+ * from their Flizy wallet when signed in, straight to the platform's wallet
+ * (web/lib/checkout.ts). Both pay what is still due. Never indexed. A checkout
+ * that is paid, expired or unknown, or whose platform Flizy paused, says so and
+ * offers nothing to pay.
  */
 
 type Props = { params: Promise<{ id: string }> };
@@ -45,6 +48,10 @@ export default async function CheckoutPage(props: Props) {
   const payable = open && view.platformEnabled;
   const paid = view.state === 'submitted' || view.state === 'confirmed';
   const back = view.returnUrl ? new URL(view.returnUrl) : null;
+  // A signed-in Flizy user other than the platform itself may pay from their Flizy wallet.
+  const accountId = payable ? await getAccountIdFromCookie().catch(() => null) : null;
+  // What is still due: the whole amount, or the rest after a partial payment.
+  const due = plainAmount(view.amountUnits - view.receivedUnits, PAYOUT_ASSETS[view.asset].decimals);
 
   return (
     <div className="fade-up mx-auto max-w-md space-y-5">
@@ -69,10 +76,17 @@ export default async function CheckoutPage(props: Props) {
           {view.overpaid ? ' More than the amount arrived; the shop can send back the difference.' : ''}
         </div>
       ) : payable ? (
+        <div className="space-y-4">
+        {accountId && accountId !== view.platformAccountId ? (
+          <div className="card space-y-3 p-6">
+            <p className="m-0 text-xs uppercase tracking-[0.18em] text-muted">With your Flizy account</p>
+            <CheckoutAccountPay id={view.id} amount={due} assetLabel={view.assetLabel} platformName={view.platformName} />
+          </div>
+        ) : null}
         <ExternalWalletProvider>
           <CheckoutPay
             id={view.id}
-            amount={view.amount}
+            amount={due}
             assetLabel={view.assetLabel}
             asset={view.asset}
             decimals={PAYOUT_ASSETS[view.asset].decimals}
@@ -82,6 +96,7 @@ export default async function CheckoutPage(props: Props) {
             platformName={view.platformName}
           />
         </ExternalWalletProvider>
+        </div>
       ) : open ? (
         <div className="alert text-sm">This checkout is not available. Do not pay it.</div>
       ) : (

@@ -37,7 +37,7 @@ function callers() {
 }
 
 describe('every executor call site is known', () => {
-  it('matches the reviewed list (22 call sites)', () => {
+  it('matches the reviewed list (24 call sites)', () => {
     assert.deepEqual(callers(), {
       'lib/ammora/execute.js': 2,
       'lib/dex.js': 2,
@@ -45,6 +45,7 @@ describe('every executor call site is known', () => {
       'lib/engine/executeClaim.js': 1,
       'lib/engine/executeTransfer.js': 3,
       'lib/listedNfts.js': 1,
+      'web/app/api/checkout/[id]/pay/route.ts': 2,
       'web/app/api/pay/execute/route.ts': 2,
       'web/lib/ammora/execute.ts': 2,
       'web/lib/custody/liveDeps.ts': 1,
@@ -63,6 +64,7 @@ describe('value-moving calls record their hash before broadcast', () => {
     'lib/dex.js': 1,
     'lib/limitOrders.js': 1,
     'web/app/api/pay/execute/route.ts': 2,
+    'web/app/api/checkout/[id]/pay/route.ts': 1,
     'web/app/api/swap/execute/route.ts': 1,
     'web/lib/dexServer.ts': 3,
     'web/lib/marketExecute.ts': 1,
@@ -84,6 +86,10 @@ describe('value-moving calls record their hash before broadcast', () => {
     assert.match(read('lib/dex.js'), /await executeApprovalCall\(\{/);
     assert.equal((read('web/lib/dexServer.ts').match(/await executeApprovalCall\(\{/g) || []).length, 3);
     assert.match(read('web/lib/marketExecute.ts'), /: await executeApprovalCall\(params\)/);
+    // A checkout paid in a token: the approval is its own executeApprovalCall, the payment the only executeGatorCall.
+    const checkout = read('web/app/api/checkout/[id]/pay/route.ts');
+    assert.equal((checkout.match(/executeApprovalCall\(\{/g) || []).length, 1);
+    assert.equal((checkout.match(/executeGatorCall\(\{/g) || []).length, 1);
     // Ammora: every approval step is its own executeApprovalCall, the swap the only executeGatorCall.
     for (const f of ['lib/ammora/execute.js', 'web/lib/ammora/execute.ts']) {
       assert.equal((read(f).match(/executeApprovalCall\(\{/g) || []).length, 1, f);
@@ -102,6 +108,7 @@ describe('an unknown outcome is never marked failed or released', () => {
   const guarded = {
     'lib/engine/executeTransfer.js': /if \(outcomeUnknown\(err\)\) submitted = true;\s*if \(transferRow\?\.id && !submitted\)/g,
     'web/app/api/pay/execute/route.ts': /if \(rowId && !outcomeUnknown\(sendErr\)\)/g,
+    'web/app/api/checkout/[id]/pay/route.ts': /if \(rowId && !outcomeUnknown\(sendErr\)\)/g,
     'web/app/api/swap/execute/route.ts': /if \(logRow\?\.id && !outcomeUnknown\(swapErr\)\)/g,
     'web/app/api/market/[action]/route.ts': /if \(!outcomeUnknown\(sendErr\)\)/g,
     'web/lib/mintExecute.ts': /if \(!outcomeUnknown\(sendErr\)\)/g,
