@@ -436,7 +436,12 @@ startup check and the site build both refuse without it.
   `flizy.app/checkout/<id>` link; the customer pays it from any wallet through
   FlizyPaymentReceiver, straight to the platform's wallet, or, signed in, from their Flizy
   wallet through the same receiver (`/api/checkout/[id]/pay`: the PIN tiers, account lock,
-  Savings fence and daily limit of any Flizy payment). Either way pays what is still due.
+  Savings fence and daily limit of any Flizy payment), or in chat: the page's Telegram link
+  (`?start=co_<id>`) and WhatsApp link (`flizy checkout <id>`, shown only where the bot number
+  may be public) open the bot, which pays through the same receiver after CONFIRM
+  (`lib/api/checkoutPay.js`). A secured account pays in chat only up to what is left of
+  today's passkey allowance, less its checkout payments of the last 24 hours (they go on the
+  owner key, which the allowance never sees); over that the bot points to the page. Every way pays what is still due.
   Flizy never holds the money, so no allowance or switch is involved. The page reports the transaction, and the WhatsApp process
   (`startApiPaymentWatcher`, `lib/api/paymentWatcher.js`) also reads the receiver's logs from
   a saved block (`api_payment_cursor`), so a closed page loses nothing; each payment is

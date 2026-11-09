@@ -972,13 +972,13 @@
       "kind": "table",
       "name": "api_platforms",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "lib/api/paymentWatcher.js, lib/api/payoutWorker.js"
+      "requiredBy": "lib/api/checkoutPay.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js"
     },
     {
       "kind": "table",
       "name": "api_transactions",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "lib/api/paymentWatcher.js, lib/api/payoutWorker.js"
+      "requiredBy": "lib/api/checkoutPay.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js"
     },
     {
       "kind": "table",
@@ -1146,7 +1146,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/custody/approvals.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/receipts.js, lib/reconcile.js, lib/transferLog.js"
+      "requiredBy": "lib/api/checkoutPay.js, lib/custody/approvals.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/receipts.js, lib/reconcile.js, lib/transferLog.js"
     },
     {
       "kind": "table",

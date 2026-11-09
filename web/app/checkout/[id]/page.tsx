@@ -7,13 +7,14 @@ import { ExternalWalletProvider } from '../../../components/ExternalWalletProvid
 import { CheckoutPay } from '../../../components/CheckoutPay';
 import { CheckoutAccountPay } from '../../../components/CheckoutAccountPay';
 import { getAccountIdFromCookie } from '../../../lib/cookies';
+import { checkoutChatLinks } from '../../../lib/checkoutChat.ts';
 
 /**
  * A Flizy Pay API checkout: a platform's customer pays it from any wallet, or
- * from their Flizy wallet when signed in, straight to the platform's wallet
- * (web/lib/checkout.ts). Both pay what is still due. Never indexed. A checkout
- * that is paid, expired or unknown, or whose platform Flizy paused, says so and
- * offers nothing to pay.
+ * from their Flizy wallet when signed in or in chat, straight to the platform's
+ * wallet (web/lib/checkout.ts). Every way pays what is still due. Never indexed.
+ * A checkout that is paid, expired or unknown, or whose platform Flizy paused,
+ * says so and offers nothing to pay.
  */
 
 type Props = { params: Promise<{ id: string }> };
@@ -52,6 +53,7 @@ export default async function CheckoutPage(props: Props) {
   const accountId = payable ? await getAccountIdFromCookie().catch(() => null) : null;
   // What is still due: the whole amount, or the rest after a partial payment.
   const due = plainAmount(view.amountUnits - view.receivedUnits, PAYOUT_ASSETS[view.asset].decimals);
+  const chat = payable ? checkoutChatLinks(view.id) : { telegram: null, whatsapp: null };
 
   return (
     <div className="fade-up mx-auto max-w-md space-y-5">
@@ -81,6 +83,24 @@ export default async function CheckoutPage(props: Props) {
           <div className="card space-y-3 p-6">
             <p className="m-0 text-xs uppercase tracking-[0.18em] text-muted">With your Flizy account</p>
             <CheckoutAccountPay id={view.id} amount={due} assetLabel={view.assetLabel} platformName={view.platformName} />
+          </div>
+        ) : null}
+        {chat.telegram || chat.whatsapp ? (
+          <div className="card space-y-3 p-6">
+            <p className="m-0 text-xs uppercase tracking-[0.18em] text-muted">In chat</p>
+            <p className="m-0 text-sm text-muted">Pay {due} {view.assetLabel} from the Flizy account your chat is linked to.</p>
+            <div className={`grid gap-2.5 ${chat.telegram && chat.whatsapp ? 'sm:grid-cols-2' : ''}`}>
+              {chat.telegram ? (
+                <a href={chat.telegram} target="_blank" rel="noreferrer noopener" className="btn btn-ghost w-full py-3 text-sm no-underline">
+                  Pay in Telegram
+                </a>
+              ) : null}
+              {chat.whatsapp ? (
+                <a href={chat.whatsapp} target="_blank" rel="noreferrer noopener" className="btn btn-ghost w-full py-3 text-sm no-underline">
+                  Pay in WhatsApp
+                </a>
+              ) : null}
+            </div>
           </div>
         ) : null}
         <ExternalWalletProvider>
