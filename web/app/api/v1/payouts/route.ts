@@ -15,7 +15,10 @@
 import { getSupabase } from '../../../../lib/supabase';
 import { apiError, apiJson, authenticateApiRequest, logApiRequest, payoutsEnabled } from '../../../../lib/apiAuth.ts';
 import { abandonIdempotent, beginIdempotent, finishIdempotent, requestHash } from '../../../../lib/apiIdempotency.ts';
-import { PAYOUT_COLUMNS, PayoutRequestError, parsePayoutRequest, payoutView, type PayoutRow } from '../../../../lib/apiPayouts.ts';
+import { PAYOUT_COLUMNS, PayoutRequestError, largePayoutMail, parsePayoutRequest, payoutView, type PayoutRow } from '../../../../lib/apiPayouts.ts';
+import { displaySafeLabel } from '../../../../lib/sanitize.ts';
+import { mailOwner } from '../../../../lib/securityNotice';
+import { siteOrigin } from '../../../../lib/siteOrigin';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -55,7 +58,7 @@ export async function POST(req: Request) {
     // Flizy's limits for this platform: no row means the asset is not enabled.
     const { data: limits, error: limErr } = await db
       .from('api_platform_limits')
-      .select('max_payout')
+      .select('max_payout, notice_at')
       .eq('platform_id', caller.platformId)
       .eq('symbol', parsed.symbol)
       .maybeSingle();
@@ -112,6 +115,16 @@ export async function POST(req: Request) {
     }
     const body = payoutView(row as PayoutRow);
     await finishIdempotent(db, caller.keyId, idemKey, 202, body);
+    // A large payout is mailed to the owner as it is accepted. A failed mail
+    // never changes the answer: the payout is already recorded.
+    if (limits.notice_at && parsed.amount >= BigInt(limits.notice_at)) {
+      try {
+        const { data: plat } = await db.from('api_platforms').select('account_id, display_name').eq('id', caller.platformId).maybeSingle();
+        if (plat) await mailOwner(db, plat.account_id, largePayoutMail(body, displaySafeLabel(plat.display_name, 60), siteOrigin()));
+      } catch {
+        // Best effort, as for key notices.
+      }
+    }
     return answer(apiJson(body, caller.requestId, 202));
   } catch {
     return answer(apiError(500, 'internal_error', 'Something went wrong. Try again.', caller.requestId));

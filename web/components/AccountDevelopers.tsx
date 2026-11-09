@@ -17,6 +17,10 @@ import { displaySafeLabel } from '../lib/sanitize';
  * Payout allowance: API payouts spend only through an allowance the account's
  * passkey signs here, one per asset Flizy enabled, up to that asset's daily
  * maximum, for 30 days (web/lib/apiAllowance.ts).
+ *
+ * Webhooks: endpoints are added and removed with the account password; a new
+ * endpoint's signing secret is shown once. The latest payouts and webhook
+ * deliveries are listed, and a delivery not yet delivered can be sent again.
  */
 
 type Key = {
@@ -38,6 +42,9 @@ type DevData = {
   keys: Key[];
   limits: Array<{ symbol: string; maxPayout: string; dailyMax: string }>;
   allowances: Array<{ symbol: string; perDay: string; expiresAt: string }>;
+  payouts: Array<{ id: string; state: string; amount: string; asset: string; recipient: { type: string; value: string }; error_code: string | null; created_at: string }>;
+  endpoints: Array<{ id: string; url: string; label: string; events: string[]; enabled: boolean; secretHint: string | null; createdAt: string }>;
+  deliveries: Array<{ id: string; eventType: string; status: string; attempts: number; lastStatus: number | null; lastError: string | null; createdAt: string }>;
 };
 
 const b64 = (buf: ArrayBuffer | Uint8Array) => {
@@ -77,7 +84,10 @@ export function AccountDevelopers() {
   const [ips, setIps] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
-  const [secret, setSecret] = useState<{ prefix: string; value: string } | null>(null);
+  const [secret, setSecret] = useState<{ prefix: string; value: string; kind: 'key' | 'webhook' } | null>(null);
+  const [hookUrl, setHookUrl] = useState('');
+  const [hookLabel, setHookLabel] = useState('');
+  const [removing, setRemoving] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirming, setConfirming] = useState<{ id: string; action: 'revoke' | 'rotate' } | null>(null);
 
@@ -111,7 +121,7 @@ export function AccountDevelopers() {
       return;
     }
     const key = out.key as Key;
-    setSecret({ prefix: key.prefix, value: String(out.secret || '') });
+    setSecret({ prefix: key.prefix, value: String(out.secret || ''), kind: 'key' });
     setCopied(false);
     setLabel('');
     setIps('');
@@ -132,7 +142,7 @@ export function AccountDevelopers() {
     setPassword('');
     if (action === 'rotate') {
       const key = out.key as Key;
-      setSecret({ prefix: key.prefix, value: String(out.secret || '') });
+      setSecret({ prefix: key.prefix, value: String(out.secret || ''), kind: 'key' });
       setCopied(false);
     }
     await reload();
@@ -176,6 +186,46 @@ export function AccountDevelopers() {
     }
   }
 
+  async function addEndpoint() {
+    setBusy('hook');
+    setError('');
+    const { ok, data: out } = await post('/api/developers/webhooks', { url: hookUrl, label: hookLabel, password });
+    setBusy(null);
+    if (!ok) {
+      setError(typeof out.error === 'string' ? out.error : 'Could not add the endpoint.');
+      return;
+    }
+    setSecret({ prefix: '', value: String(out.secret || ''), kind: 'webhook' });
+    setCopied(false);
+    setHookUrl('');
+    setHookLabel('');
+    setPassword('');
+    await reload();
+  }
+
+  async function removeEndpoint(id: string) {
+    setBusy(`hook:${id}`);
+    setError('');
+    const { ok, data: out } = await post(`/api/developers/webhooks/${id}/delete`, { password });
+    setBusy(null);
+    if (!ok) {
+      setError(typeof out.error === 'string' ? out.error : 'Could not remove the endpoint.');
+      return;
+    }
+    setRemoving(null);
+    setPassword('');
+    await reload();
+  }
+
+  async function retry(id: string) {
+    setBusy(`retry:${id}`);
+    setError('');
+    const { ok, data: out } = await post(`/api/developers/webhooks/deliveries/${id}/retry`, {});
+    setBusy(null);
+    if (!ok) setError(typeof out.error === 'string' ? out.error : 'Could not send it again.');
+    await reload();
+  }
+
   async function copySecret() {
     if (!secret) return;
     try {
@@ -215,12 +265,18 @@ export function AccountDevelopers() {
 
       {secret ? (
         <section className="rounded-[14px] border border-[#5a4a1f] bg-[#16130b] p-4">
-          <p className="m-0 font-sans text-[14px] font-semibold text-white">Copy your new key now</p>
-          <p className="m-0 mt-1 font-sans text-[12.5px] text-[#cfcfcf]">It is shown once. Flizy keeps only a fingerprint and cannot show it again.</p>
+          <p className="m-0 font-sans text-[14px] font-semibold text-white">
+            {secret.kind === 'webhook' ? 'Copy your webhook signing secret now' : 'Copy your new key now'}
+          </p>
+          <p className="m-0 mt-1 font-sans text-[12.5px] text-[#cfcfcf]">
+            {secret.kind === 'webhook'
+              ? 'It is shown once. Flizy keeps it encrypted, only to sign deliveries, and cannot show it again.'
+              : 'It is shown once. Flizy keeps only a fingerprint and cannot show it again.'}
+          </p>
           <code className="mt-3 block break-all rounded-[8px] bg-[#0b0b0c] p-3 font-mono text-[12.5px] text-white">{secret.value}</code>
           <div className="mt-3 flex gap-3">
             <button type="button" onClick={() => void copySecret()} className={BUTTON}>
-              {copied ? 'Copied' : 'Copy key'}
+              {copied ? 'Copied' : secret.kind === 'webhook' ? 'Copy secret' : 'Copy key'}
             </button>
             <button type="button" onClick={() => setSecret(null)} className="h-[44px] px-2 font-sans text-[13px] text-[#a9a9a9] hover:text-white">
               I saved it
@@ -344,6 +400,91 @@ export function AccountDevelopers() {
           </div>
         </section>
       ) : null}
+
+      <section className="rounded-[14px] border border-[#2a2b30] bg-[#0f0f10] p-4">
+        <p className="m-0 font-sans text-[15px] font-semibold text-white">Webhooks</p>
+        <p className="m-0 mt-1 font-sans text-[12.5px] leading-relaxed text-[#cfcfcf]">
+          Every payout state change is sent to your endpoints, signed with Flizy-Signature. Dedupe by the event id: a retry sends the
+          same event again.
+        </p>
+        {data.endpoints.length === 0 ? <p className="m-0 mt-3 font-sans text-[13px] text-[#a9a9a9]">No endpoints yet.</p> : null}
+        <ul className="m-0 mt-3 grid list-none gap-3 p-0">
+          {data.endpoints.map((e) => (
+            <li key={e.id} className="rounded-[10px] border border-[#24252a] p-3">
+              <p className="m-0 break-all font-mono text-[12.5px] text-white">{e.url}</p>
+              <p className="m-0 mt-1 font-sans text-[12px] text-[#8a8a8a]">
+                {e.label || 'No label'} · {e.events.length ? e.events.join(', ') : 'all events'} · secret ...{e.secretHint || ''}
+              </p>
+              {removing === e.id ? (
+                <div className="mt-3 grid gap-2">
+                  <SecretInput value={password} onChange={setPassword} placeholder="Account password" label="Account password" />
+                  <div className="flex gap-3">
+                    <button type="button" disabled={!password || busy != null} onClick={() => void removeEndpoint(e.id)} className={BUTTON}>
+                      {busy === `hook:${e.id}` ? '...' : 'Remove now'}
+                    </button>
+                    <button type="button" onClick={() => setRemoving(null)} className="h-[44px] px-2 font-sans text-[13px] text-[#a9a9a9]">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setRemoving(e.id)} className={`${BUTTON} mt-3`}>
+                  Remove
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        {platform.enabled && data.endpoints.length < 5 ? (
+          <div className="mt-3 grid gap-3">
+            <input value={hookUrl} onChange={(e) => setHookUrl(e.target.value)} placeholder="https://your-server.example/flizy" maxLength={2000} className={FIELD} />
+            <input value={hookLabel} onChange={(e) => setHookLabel(e.target.value)} placeholder="Label (optional)" maxLength={60} className={FIELD} />
+            {confirming || removing ? null : <SecretInput value={password} onChange={setPassword} placeholder="Account password" label="Account password" />}
+            <button type="button" disabled={busy != null || !password || !hookUrl || confirming != null || removing != null} onClick={() => void addEndpoint()} className={BUTTON}>
+              {busy === 'hook' ? 'Adding...' : 'Add endpoint'}
+            </button>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-[14px] border border-[#2a2b30] bg-[#0f0f10] p-4">
+        <p className="m-0 font-sans text-[15px] font-semibold text-white">Recent payouts</p>
+        {data.payouts.length === 0 ? <p className="m-0 mt-2 font-sans text-[13px] text-[#a9a9a9]">No payouts yet.</p> : null}
+        <ul className="m-0 mt-3 grid list-none gap-2 p-0 font-sans text-[12.5px]">
+          {data.payouts.map((p) => (
+            <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-[#1f2024] pt-2">
+              <span className="text-white">
+                {p.amount} {p.asset} to {p.recipient.type} {p.recipient.value}
+              </span>
+              <span className="text-[#a9a9a9]">
+                {p.state}
+                {p.error_code ? ` (${p.error_code})` : ''} · {when(p.created_at)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="rounded-[14px] border border-[#2a2b30] bg-[#0f0f10] p-4">
+        <p className="m-0 font-sans text-[15px] font-semibold text-white">Recent deliveries</p>
+        {data.deliveries.length === 0 ? <p className="m-0 mt-2 font-sans text-[13px] text-[#a9a9a9]">No deliveries yet.</p> : null}
+        <ul className="m-0 mt-3 grid list-none gap-2 p-0 font-sans text-[12.5px]">
+          {data.deliveries.map((d) => (
+            <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-[#1f2024] pt-2">
+              <span className="text-white">{d.eventType}</span>
+              <span className="text-[#a9a9a9]">
+                {d.status}, {d.attempts} {d.attempts === 1 ? 'try' : 'tries'}
+                {d.lastError ? ` · ${d.lastError}` : ''}
+              </span>
+              {d.status !== 'delivered' ? (
+                <button type="button" disabled={busy != null} onClick={() => void retry(d.id)} className="h-[44px] px-2 font-sans text-[13px] text-sun hover:opacity-80 disabled:opacity-50">
+                  {busy === `retry:${d.id}` ? '...' : 'Send again'}
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

@@ -16,7 +16,7 @@
  *   node scripts\api-platform.mjs --env-file .env revoke-payout --key fz_test_AbCdEf --confirm
  *   node scripts\api-platform.mjs --env-file .env payouts on --confirm
  *   node scripts\api-platform.mjs --env-file .env payouts off --confirm
- *   node scripts\api-platform.mjs --env-file .env limits --username naru --asset tUSD --max 50 --daily 500 --confirm
+ *   node scripts\api-platform.mjs --env-file .env limits --username naru --asset tUSD --max 50 --daily 500 [--notice 25] --confirm
  *   node scripts\api-platform.mjs --env-file .env limits --username naru --asset tUSD --remove --confirm
  *
  * Approval binds the platform to the account's current Flizy wallet. Granting
@@ -28,6 +28,8 @@
  * --daily the most a rolling day may move, and the platform's passkey-signed
  * allowance is for the daily amount. No limits row means that asset is refused.
  * Changing --daily takes effect on chain only once the platform signs again.
+ * --notice, optional: a payout of at least this much is emailed to the
+ * platform's owner when it is accepted; left out, none is.
  */
 
 import { readFileSync } from 'fs';
@@ -195,12 +197,17 @@ async function main() {
       const max = units('--max', flag('--max'), asset.decimals);
       const daily = units('--daily', flag('--daily'), asset.decimals);
       if (max > daily) throw new Error('--max cannot exceed --daily');
+      const notice = flag('--notice') == null ? null : units('--notice', flag('--notice'), asset.decimals);
+      const noticeText = notice == null ? 'no large-payout email' : `email from ${formatUnits(notice, asset.decimals)}`;
       await write(
-        `set @${account.username} ${asset.label} limits: ${formatUnits(max, asset.decimals)} per payout, ${formatUnits(daily, asset.decimals)} a day`,
+        `set @${account.username} ${asset.label} limits: ${formatUnits(max, asset.decimals)} per payout, ${formatUnits(daily, asset.decimals)} a day, ${noticeText}`,
         async () => {
           const { error } = await db
             .from('api_platform_limits')
-            .upsert({ platform_id: platform.id, symbol, max_payout: max.toString(), daily_max: daily.toString(), updated_at: new Date().toISOString() }, { onConflict: 'platform_id,symbol' });
+            .upsert(
+              { platform_id: platform.id, symbol, max_payout: max.toString(), daily_max: daily.toString(), notice_at: notice == null ? null : notice.toString(), updated_at: new Date().toISOString() },
+              { onConflict: 'platform_id,symbol' }
+            );
           if (error) throw new Error(error.message);
         }
       );

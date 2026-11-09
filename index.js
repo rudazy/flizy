@@ -41,6 +41,7 @@ const { startReconciler } = require('./lib/reconcile');
 const { startApprovalWorker } = require('./lib/custody/approvals');
 const { startApiKeyNoticePump } = require('./lib/apiKeyNotices');
 const { startApiPayoutWorker } = require('./lib/api/payoutWorker');
+const { startApiWebhookWorker } = require('./lib/api/webhookWorker');
 const { requestPaymentNotice } = require('./lib/paymentNotice');
 const { startAmmora } = require('./lib/ammora/boot');
 const router = require('./lib/router');
@@ -476,6 +477,9 @@ async function main() {
   // (lib/api/payoutWorker.js). Nothing is taken while either payout switch is
   // off; money moves only through the platform's allowance and API_RELAYER_KEY.
   startApiPayoutWorker({ supabase, provider, chain, notifyAccount, requestPaymentNotice });
+  // Their webhooks, signed and sent only to public https addresses
+  // (lib/api/webhookWorker.js). A failed delivery never changes a payout.
+  startApiWebhookWorker({ supabase });
   // Ammora venue, only with AMMORA_ENABLED (lib/ammora/boot.js). The pool
   // inventory runs from this process only. Never awaited: a slow RPC must not
   // hold up WhatsApp.

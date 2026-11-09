@@ -88,6 +88,8 @@ describe('the tiers hold: account changes take the password, money takes the PIN
     'developers/keys',
     'developers/keys/[id]/revoke',
     'developers/keys/[id]/rotate',
+    'developers/webhooks',
+    'developers/webhooks/[id]/delete',
     'identity',
     'limits',
     'link/create',

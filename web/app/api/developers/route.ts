@@ -1,8 +1,9 @@
 /**
  * The Developers section of Account: the approved platform behind this account,
  * its API keys (prefixes only; secrets are never stored to return), the payout
- * limits Flizy set per asset, and the live payout allowance. 404 for an account
- * Flizy has not approved, which is what hides the section.
+ * limits Flizy set per asset, the live payout allowance, the latest payouts,
+ * the webhook endpoints (never their secrets) and the latest deliveries. 404
+ * for an account Flizy has not approved, which is what hides the section.
  */
 
 import { NextResponse } from 'next/server';
@@ -12,7 +13,8 @@ import { apiErrorBody } from '../../../lib/apiError';
 import { listKeys, platformForAccount } from '../../../lib/apiPlatforms.ts';
 import { payoutsEnabled, serverApiMode } from '../../../lib/apiAuth.ts';
 import { liveAllowances } from '../../../lib/apiAllowance.ts';
-import { PAYOUT_ASSETS, plainAmount, type PayoutSymbol } from '../../../lib/apiPayouts.ts';
+import { PAYOUT_ASSETS, PAYOUT_COLUMNS, payoutView, plainAmount, type PayoutRow, type PayoutSymbol } from '../../../lib/apiPayouts.ts';
+import { listDeliveries, listEndpoints } from '../../../lib/apiWebhooks.ts';
 
 const ROUTE = 'GET /api/developers';
 
@@ -23,13 +25,17 @@ export async function GET() {
     const db = getSupabase();
     const platform = await platformForAccount(db, accountId);
     if (!platform) return NextResponse.json({ error: 'Not an approved platform' }, { status: 404 });
-    const [keys, payouts, allowances, limitsRes] = await Promise.all([
+    const [keys, payouts, allowances, limitsRes, recentRes, endpoints, deliveries] = await Promise.all([
       listKeys(db, platform.id),
       payoutsEnabled(db),
       liveAllowances(db, platform.id),
       db.from('api_platform_limits').select('symbol, max_payout, daily_max').eq('platform_id', platform.id),
+      db.from('api_transactions').select(PAYOUT_COLUMNS).eq('platform_id', platform.id).eq('kind', 'payout').order('created_at', { ascending: false }).limit(20),
+      listEndpoints(db, platform.id),
+      listDeliveries(db, platform.id, 20),
     ]);
     if (limitsRes.error) throw new Error(limitsRes.error.message);
+    if (recentRes.error) throw new Error(recentRes.error.message);
     const show = (symbol: string, raw: string) => {
       const a = PAYOUT_ASSETS[symbol as PayoutSymbol];
       return a ? `${plainAmount(BigInt(raw), a.decimals)} ${a.label}` : raw;
@@ -49,6 +55,9 @@ export async function GET() {
         keys,
         limits: (limitsRes.data || []).map((l) => ({ symbol: l.symbol, maxPayout: show(l.symbol, l.max_payout), dailyMax: show(l.symbol, l.daily_max) })),
         allowances: allowances.map((a) => ({ symbol: a.symbol, perDay: show(a.symbol, a.periodAmount), expiresAt: a.expiresAt })),
+        payouts: ((recentRes.data as PayoutRow[]) || []).map(payoutView),
+        endpoints,
+        deliveries,
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );

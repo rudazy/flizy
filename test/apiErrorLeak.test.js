@@ -170,6 +170,12 @@ describe('no route sends a raw error message', () => {
         lineMustMatch: /err instanceof KeyRequestError\) return NextResponse\.json\(\{ error: err\.message \}/,
         reason: 'KeyRequestError product copy (payout granted by Flizy, active key cap)',
       },
+      {
+        file: 'developers/webhooks/route.ts',
+        // WebhookRequestError: messages set in web/lib/apiWebhooks.ts, not DB errors.
+        lineMustMatch: /err instanceof WebhookRequestError\) return NextResponse\.json\(\{ error: err\.message \}/,
+        reason: 'WebhookRequestError product copy (URL rules, unknown event, endpoint cap)',
+      },
       ...[
         'follow/route.ts',
         'people/route.ts',

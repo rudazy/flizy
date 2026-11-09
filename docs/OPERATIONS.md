@@ -421,6 +421,17 @@ startup check and the site build both refuse without it.
   refunds it from escrow to the platform's wallet, and it counts as refunded only once that
   transaction is confirmed. The escrow key pays the refund's gas. Requires
   `supabase/migrations/20261106120000_api_claims.sql`; claims made in chat keep no expiry.
+- **Webhooks.** A platform adds up to five https endpoints on Account, Developers (password);
+  each one's signing secret is shown once and stored encrypted under `API_WEBHOOK_KEY` (64 hex
+  characters, the same on Vercel and the VPS; changing it means every endpoint is added again).
+  The WhatsApp process (`startApiWebhookWorker`, `lib/api/webhookWorker.js`) sends every payout
+  state change, signed with `Flizy-Signature`, only to a public address on port 443: the host
+  is resolved and any private, loopback or link-local answer is refused, no redirect is
+  followed, and the request is cut off after 10 seconds. A failed delivery is retried with
+  backoff for 24 hours, then left failed for the platform to send again; it never changes a
+  payout. Requires `supabase/migrations/20261109120000_api_webhooks.sql`.
+- **Large payouts.** `limits ... --notice <amount>` emails the platform's owner when a payout
+  of at least that amount is accepted.
 
 ### `WALLET_DERIVATION_SECRET`
 

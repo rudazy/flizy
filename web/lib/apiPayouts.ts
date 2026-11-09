@@ -181,6 +181,33 @@ export function plainAmount(units: bigint, decimals: number): string {
 }
 
 /**
+ * The email to a platform's owner when a payout at or above its notice amount
+ * (api_platform_limits.notice_at) is accepted: early enough to revoke the key
+ * if it was not theirs. Names the payout, never a key or secret.
+ */
+export function largePayoutMail(
+  view: ReturnType<typeof payoutView>,
+  platformName: string,
+  siteUrl: string
+): { subject: string; text: string } {
+  return {
+    subject: `Flizy API payout of ${view.amount} ${view.asset} accepted`,
+    text: [
+      `A payout of ${view.amount} ${view.asset} from ${platformName} was accepted through the Flizy Pay API.`,
+      `To: ${view.recipient.type} ${view.recipient.value}`,
+      view.reference ? `Reference: ${view.reference}` : '',
+      `Payout: ${view.id}`,
+      `Time: ${new Date(view.created_at).toUTCString()}`,
+      '',
+      `If this was not you, revoke the key in Account, Developers: ${siteUrl.replace(/\/$/, '')}/dashboard/account?s=developers`,
+      'and change your password.',
+    ]
+      .filter((line, i, all) => line !== '' || all[i - 1] !== '')
+      .join('\n'),
+  };
+}
+
+/**
  * What the API shows for one payout. `completed` is true only once the money
  * reached its destination (confirmed) or came back (refunded). A claim payout
  * also shows its link, for the platform to deliver to its user, and when it

@@ -268,6 +268,12 @@
     },
     {
       "kind": "check",
+      "name": "api_platform_limits.api_platform_limits_notice_check",
+      "providedBy": "20261109120000_api_webhooks.sql",
+      "requiredBy": "check on api_platform_limits"
+    },
+    {
+      "kind": "check",
       "name": "api_platform_limits.api_platform_limits_symbol_check",
       "providedBy": "20261105120000_api_payouts.sql",
       "requiredBy": "check on api_platform_limits"
@@ -331,6 +337,42 @@
       "name": "api_transactions.api_transactions_state_check",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_webhook_deliveries.api_webhook_deliveries_error_check",
+      "providedBy": "20261109120000_api_webhooks.sql",
+      "requiredBy": "check on api_webhook_deliveries"
+    },
+    {
+      "kind": "check",
+      "name": "api_webhook_deliveries.api_webhook_deliveries_status_check",
+      "providedBy": "20261109120000_api_webhooks.sql",
+      "requiredBy": "check on api_webhook_deliveries"
+    },
+    {
+      "kind": "check",
+      "name": "api_webhook_endpoints.api_webhook_endpoints_label_check",
+      "providedBy": "20261109120000_api_webhooks.sql",
+      "requiredBy": "check on api_webhook_endpoints"
+    },
+    {
+      "kind": "check",
+      "name": "api_webhook_endpoints.api_webhook_endpoints_secret_check",
+      "providedBy": "20261109120000_api_webhooks.sql",
+      "requiredBy": "check on api_webhook_endpoints"
+    },
+    {
+      "kind": "check",
+      "name": "api_webhook_endpoints.api_webhook_endpoints_url_check",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "check on api_webhook_endpoints"
+    },
+    {
+      "kind": "check",
+      "name": "api_webhook_events.api_webhook_events_dispatch_status_check",
+      "providedBy": "20261109120000_api_webhooks.sql",
+      "requiredBy": "check on api_webhook_events"
     },
     {
       "kind": "check",
@@ -1650,7 +1692,25 @@
       "kind": "table",
       "name": "api_transactions",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "web/app/api/v1/payouts/[id]/cancel/route.ts, web/app/api/v1/payouts/[id]/route.ts, web/app/api/v1/payouts/route.ts"
+      "requiredBy": "web/app/api/developers/route.ts, web/app/api/v1/payouts/[id]/cancel/route.ts, web/app/api/v1/payouts/[id]/route.ts, web/app/api/v1/payouts/route.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_webhook_deliveries",
+      "providedBy": "20261109120000_api_webhooks.sql",
+      "requiredBy": "web/lib/apiWebhooks.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_webhook_endpoints",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/lib/apiWebhooks.ts"
+    },
+    {
+      "kind": "table",
+      "name": "api_webhook_events",
+      "providedBy": "20261104120000_api_foundation.sql",
+      "requiredBy": "web/lib/apiWebhooks.ts"
     },
     {
       "kind": "table",
