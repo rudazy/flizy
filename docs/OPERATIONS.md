@@ -385,6 +385,27 @@ refuse without it.
   relayer, not Flizy. Moving ownership to the user's own wallet ships before any mainnet
   launch; until then nothing here may be described as non-custodial.
 
+### Traction dashboard
+
+`/dashboard/admin/traction` is private: it opens only for an account with `accounts.is_admin`
+(checked on the server; anyone else gets a 404), and is never indexed. It shows the weekly
+traction figures from `web/lib/traction.ts`, where every metric is defined, with or without
+the test and team accounts, and `/api/admin/traction` gives the same as CSV. Counts only: no
+phone, email, name or address reaches the page.
+
+- Requires `supabase/migrations/20261111120000_traction_metrics.sql`.
+- Excluded accounts are the rows of `metrics_excluded_accounts`, seeded with the admin
+  accounts and @ludarep. Add one in the SQL editor:
+  `insert into public.metrics_excluded_accounts (account_id, reason) values ('<id>', 'team');`
+- Payments are tagged organic or incentivised from the day the migration runs; older ones
+  read as untagged. A payment to a wallet in `metrics_incentive_wallets` (seeded with
+  @ludarep's, the starter-pack host) is tagged with that wallet's kind.
+- Weekly snapshots: `GET /api/cron/traction-snapshot` with `CRON_SECRET` as a bearer token
+  writes every completed week to `metrics_weekly_snapshots`. It is not scheduled; to run it
+  weekly from Vercel, add `{ "path": "/api/cron/traction-snapshot", "schedule": "0 6 * * 1" }`
+  to the `crons` in `web/vercel.json`. Raise `TRACTION_DEFINITION_VERSION` when a definition
+  changes, so snapshots of the old meaning stay as they were.
+
 ### Flizy Pay API payouts
 
 An approved platform pays out from its own Flizy wallet over `POST /api/v1/payouts`. The site

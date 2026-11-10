@@ -165,6 +165,13 @@ class Query {
     return this;
   }
 
+  /** Rows from index `from` to `to`, inclusive, as supabase-js pages them. */
+  range(from, to) {
+    this.rangeFrom = from;
+    this.limitN = to - from + 1;
+    return this;
+  }
+
   insert(row) {
     this.op = 'insert';
     this.payload = row;
@@ -264,6 +271,7 @@ class Query {
     }
 
     let hits = this.matching().map((r) => this.decorate(r));
+    if (this.rangeFrom) hits = hits.slice(this.rangeFrom);
     if (this.limitN != null) hits = hits.slice(0, this.limitN);
     // head:true means the caller wants the count and no rows, which is what the
     // real client returns: data is null, not an empty array.

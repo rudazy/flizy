@@ -358,6 +358,12 @@
     },
     {
       "kind": "check",
+      "name": "claims.claims_incentive_tag_check",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "check on claims"
+    },
+    {
+      "kind": "check",
       "name": "claims.claims_invite_code_format_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on claims"
@@ -700,6 +706,12 @@
     },
     {
       "kind": "check",
+      "name": "transfers.transfers_incentive_tag_check",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "check on transfers"
+    },
+    {
+      "kind": "check",
       "name": "transfers.transfers_receipt_token_format",
       "providedBy": "20261021140000_transfer_receipts.sql",
       "requiredBy": "check on transfers"
@@ -877,6 +889,12 @@
       "name": "set_updated_at",
       "providedBy": "20260721000000_create_users.sql",
       "requiredBy": "executed by trigger users_set_updated_at"
+    },
+    {
+      "kind": "function",
+      "name": "transfers_tag_incentive",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "executed by trigger transfers_tag_incentive"
     },
     {
       "kind": "function",
@@ -1260,6 +1278,12 @@
       "kind": "trigger",
       "name": "transfers_record_known_recipient",
       "providedBy": "20261018100000_known_recipients.sql",
+      "requiredBy": "trigger on transfers"
+    },
+    {
+      "kind": "trigger",
+      "name": "transfers_tag_incentive",
+      "providedBy": "20261111120000_traction_metrics.sql",
       "requiredBy": "trigger on transfers"
     },
     {

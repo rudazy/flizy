@@ -430,6 +430,12 @@
     },
     {
       "kind": "check",
+      "name": "claims.claims_incentive_tag_check",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "check on claims"
+    },
+    {
+      "kind": "check",
       "name": "claims.claims_invite_code_format_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on claims"
@@ -916,6 +922,18 @@
     },
     {
       "kind": "check",
+      "name": "metrics_excluded_accounts.metrics_excluded_accounts_reason_check",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "check on metrics_excluded_accounts"
+    },
+    {
+      "kind": "check",
+      "name": "metrics_weekly_snapshots.metrics_weekly_snapshots_monday_check",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "check on metrics_weekly_snapshots"
+    },
+    {
+      "kind": "check",
       "name": "nft_drop_allowlist.nft_drop_allowlist_address_check",
       "providedBy": "20261004120000_nft_drops.sql",
       "requiredBy": "check on nft_drop_allowlist"
@@ -1330,6 +1348,12 @@
     },
     {
       "kind": "check",
+      "name": "transfers.transfers_incentive_tag_check",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "check on transfers"
+    },
+    {
+      "kind": "check",
       "name": "transfers.transfers_receipt_token_format",
       "providedBy": "20261021140000_transfer_receipts.sql",
       "requiredBy": "check on transfers"
@@ -1576,6 +1600,12 @@
     },
     {
       "kind": "function",
+      "name": "transfers_tag_incentive",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "executed by trigger transfers_tag_incentive"
+    },
+    {
+      "kind": "function",
       "name": "trusted_addresses_apply_hold",
       "providedBy": "20260923000000_trusted_destination_hold.sql",
       "requiredBy": "executed by trigger trusted_addresses_hold"
@@ -1662,7 +1692,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/outside-pay/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/google/callback/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/auth/signup/verify/route.ts, web/app/api/checkout/[id]/pay/route.ts, web/app/api/custody/passkey/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/external/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pay/swap/route.ts, web/app/api/payments/received/route.ts, web/app/api/pin/route.ts, web/app/api/reserves/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/app/pay/[code]/page.tsx, web/app/pay/c/[code]/page.tsx, web/lib/accountReset.ts, web/lib/accountTokens.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/custody/liveDeps.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/followStore.ts, web/lib/invite.ts, web/lib/merchant.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/pinGate.ts, web/lib/profileShare.ts, web/lib/receipts.ts, web/lib/saleNotice.ts, web/lib/securityNotice.ts, web/lib/siteSearch.ts, web/lib/starterPack.ts, web/lib/tasks.ts, web/lib/tiers.ts, web/lib/tokenSocial.ts, web/lib/walletMarket.ts, web/lib/walletScanRecord.ts"
+      "requiredBy": "web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/outside-pay/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/google/callback/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/auth/signup/verify/route.ts, web/app/api/checkout/[id]/pay/route.ts, web/app/api/custody/passkey/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/external/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pay/swap/route.ts, web/app/api/payments/received/route.ts, web/app/api/pin/route.ts, web/app/api/reserves/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/app/pay/[code]/page.tsx, web/app/pay/c/[code]/page.tsx, web/lib/accountReset.ts, web/lib/accountTokens.ts, web/lib/admin.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/custody/liveDeps.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/followStore.ts, web/lib/invite.ts, web/lib/merchant.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/pinGate.ts, web/lib/profileShare.ts, web/lib/receipts.ts, web/lib/saleNotice.ts, web/lib/securityNotice.ts, web/lib/siteSearch.ts, web/lib/starterPack.ts, web/lib/tasks.ts, web/lib/tiers.ts, web/lib/tokenSocial.ts, web/lib/tractionData.ts, web/lib/walletMarket.ts, web/lib/walletScanRecord.ts"
     },
     {
       "kind": "table",
@@ -1716,19 +1746,19 @@
       "kind": "table",
       "name": "api_platforms",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "web/app/api/v1/payouts/route.ts, web/lib/apiAuth.ts, web/lib/apiPlatforms.ts, web/lib/checkout.ts"
+      "requiredBy": "web/app/api/v1/payouts/route.ts, web/lib/apiAuth.ts, web/lib/apiPlatforms.ts, web/lib/checkout.ts, web/lib/tractionData.ts"
     },
     {
       "kind": "table",
       "name": "api_requests",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "web/lib/apiAuth.ts"
+      "requiredBy": "web/lib/apiAuth.ts, web/lib/tractionData.ts"
     },
     {
       "kind": "table",
       "name": "api_transactions",
       "providedBy": "20261104120000_api_foundation.sql",
-      "requiredBy": "web/app/api/developers/route.ts, web/app/api/v1/payments/[id]/route.ts, web/app/api/v1/payments/route.ts, web/app/api/v1/payouts/[id]/cancel/route.ts, web/app/api/v1/payouts/[id]/route.ts, web/app/api/v1/payouts/route.ts, web/lib/checkout.ts"
+      "requiredBy": "web/app/api/developers/route.ts, web/app/api/v1/payments/[id]/route.ts, web/app/api/v1/payments/route.ts, web/app/api/v1/payouts/[id]/cancel/route.ts, web/app/api/v1/payouts/[id]/route.ts, web/app/api/v1/payouts/route.ts, web/lib/checkout.ts, web/lib/tractionData.ts"
     },
     {
       "kind": "table",
@@ -1752,7 +1782,7 @@
       "kind": "table",
       "name": "channel_identities",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/dashboard/route.ts, web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/invite.ts, web/lib/notifyChannels.ts, web/lib/pendingClaims.ts, web/lib/securityNotice.ts, web/lib/starterPack.ts, web/lib/tasks.ts"
+      "requiredBy": "web/app/api/dashboard/route.ts, web/app/api/identity/route.ts, web/lib/channelBind.ts, web/lib/claimPayout.ts, web/lib/invite.ts, web/lib/notifyChannels.ts, web/lib/pendingClaims.ts, web/lib/securityNotice.ts, web/lib/starterPack.ts, web/lib/tasks.ts, web/lib/tractionData.ts"
     },
     {
       "kind": "table",
@@ -1764,7 +1794,7 @@
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/scan/route.ts, web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts, web/lib/walletScanRecord.ts"
+      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/scan/route.ts, web/lib/claimPayout.ts, web/lib/claims.ts, web/lib/pendingClaims.ts, web/lib/tractionData.ts, web/lib/walletScanRecord.ts"
     },
     {
       "kind": "table",
@@ -1824,7 +1854,7 @@
       "kind": "table",
       "name": "faucet_claims",
       "providedBy": "20261010120000_faucet_claims.sql",
-      "requiredBy": "web/app/api/history/route.ts, web/lib/faucet.ts, web/lib/walletScanRecord.ts"
+      "requiredBy": "web/app/api/history/route.ts, web/lib/faucet.ts, web/lib/tractionData.ts, web/lib/walletScanRecord.ts"
     },
     {
       "kind": "table",
@@ -1836,13 +1866,13 @@
       "kind": "table",
       "name": "identity_events",
       "providedBy": "20260802160000_identity_events.sql",
-      "requiredBy": "web/lib/channelBind.ts, web/lib/securityNotice.ts"
+      "requiredBy": "web/lib/channelBind.ts, web/lib/securityNotice.ts, web/lib/tractionData.ts"
     },
     {
       "kind": "table",
       "name": "invite_attributions",
       "providedBy": "20260813000000_invite_attribution.sql",
-      "requiredBy": "web/lib/invite.ts"
+      "requiredBy": "web/lib/invite.ts, web/lib/tractionData.ts"
     },
     {
       "kind": "table",
@@ -1891,6 +1921,18 @@
       "name": "market_tx_notices",
       "providedBy": "20261022120000_market_tx_notices.sql",
       "requiredBy": "web/lib/walletMarket.ts"
+    },
+    {
+      "kind": "table",
+      "name": "metrics_excluded_accounts",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "web/lib/tractionData.ts"
+    },
+    {
+      "kind": "table",
+      "name": "metrics_weekly_snapshots",
+      "providedBy": "20261111120000_traction_metrics.sql",
+      "requiredBy": "web/lib/tractionSnapshot.ts"
     },
     {
       "kind": "table",
@@ -1998,7 +2040,7 @@
       "kind": "table",
       "name": "task_winners",
       "providedBy": "20260925010000_tasks.sql",
-      "requiredBy": "web/lib/tasks.ts"
+      "requiredBy": "web/lib/tasks.ts, web/lib/tractionData.ts"
     },
     {
       "kind": "table",
@@ -2040,7 +2082,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/checkout/[id]/pay/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/swap/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/custody/approvals.ts, web/lib/externalPay.ts, web/lib/followStore.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/merchant.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/receipts.ts, web/lib/starterPack.ts, web/lib/swapRateLimit.ts, web/lib/walletScanRecord.ts"
+      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/checkout/[id]/pay/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/swap/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/custody/approvals.ts, web/lib/externalPay.ts, web/lib/followStore.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/merchant.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/receipts.ts, web/lib/starterPack.ts, web/lib/swapRateLimit.ts, web/lib/tractionData.ts, web/lib/walletScanRecord.ts"
     },
     {
       "kind": "table",
@@ -2184,6 +2226,12 @@
       "kind": "trigger",
       "name": "transfers_record_known_recipient",
       "providedBy": "20261018100000_known_recipients.sql",
+      "requiredBy": "trigger on transfers"
+    },
+    {
+      "kind": "trigger",
+      "name": "transfers_tag_incentive",
+      "providedBy": "20261111120000_traction_metrics.sql",
       "requiredBy": "trigger on transfers"
     },
     {
