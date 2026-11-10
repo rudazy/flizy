@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { AppTopBar } from '../../../components/AppTopBar';
@@ -8,6 +8,7 @@ import { AppPage, AppSlideNav, useSlide } from '../../../components/AppSection';
 import { TaskCard, type TaskCardData } from '../../../components/TaskCard';
 import { ExploreTokens } from '../../../components/ExploreTokens';
 import { ExploreNfts } from '../../../components/ExploreNfts';
+import { useFeatures } from '../../../components/FeaturesProvider';
 import { ComingSoonPanel, useComingSoon } from '../../../components/ComingSoon';
 import {
   AirdropIcon,
@@ -30,30 +31,40 @@ import {
  * Explore: tokens to look at and trade, tasks to do, collections to compare.
  *
  * Tokens is the open slide: discovery, a token page, and copy trade. Tasks
- * comes second. NFTs is last: the listed set plus copy mint.
+ * comes second. NFTs is last: the listed set plus copy mint. Tasks and NFTs
+ * show only while their features are on (web/lib/features.ts); a link to a
+ * paused slide opens Tokens.
  */
 const SLIDES = ['tokens', 'tasks', 'nfts'] as const;
 
 export default function ExplorePage() {
-  const [slide, setSlide] = useSlide(SLIDES, 'tokens');
+  const features = useFeatures();
+  const nfts = features.nftMarket || features.nftMint;
+  const slides = useMemo(
+    () => SLIDES.filter((id) => id === 'tokens' || (id === 'tasks' && features.tasks) || (id === 'nfts' && nfts)),
+    [features.tasks, nfts]
+  );
+  const [slide, setSlide] = useSlide(slides, 'tokens');
 
   return (
     <AppPage>
-      <AppTopBar title="Explore" people />
+      <AppTopBar title="Explore" people={features.follows} />
       {/* The header's padding and margin suit the other pages; here the tabs
           sit closer under it. */}
-      <div className="!-mt-[17px]">
-        <AppSlideNav
-          variant="tabs"
-          items={[
-            { id: 'tokens', label: 'Tokens', icon: <TokensIcon size={17} /> },
-            { id: 'tasks', label: 'Tasks', icon: <TasksIcon size={17} /> },
-            { id: 'nfts', label: 'NFTs', icon: <NftsIcon size={17} /> },
-          ]}
-          activeId={slide}
-          onSelect={setSlide}
-        />
-      </div>
+      {slides.length > 1 ? (
+        <div className="!-mt-[17px]">
+          <AppSlideNav
+            variant="tabs"
+            items={[
+              { id: 'tokens', label: 'Tokens', icon: <TokensIcon size={17} /> },
+              { id: 'tasks', label: 'Tasks', icon: <TasksIcon size={17} /> },
+              { id: 'nfts', label: 'NFTs', icon: <NftsIcon size={17} /> },
+            ].filter((item) => (slides as readonly string[]).includes(item.id))}
+            activeId={slide}
+            onSelect={setSlide}
+          />
+        </div>
+      ) : null}
       {slide === 'tasks' ? <TasksSlide /> : null}
       {slide === 'tokens' ? <ExploreTokens /> : null}
       {slide === 'nfts' ? <ExploreNfts /> : null}

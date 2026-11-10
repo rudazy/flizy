@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { POPULAR_PLACES, matchHelp, matchPlaces, type SearchResult, type SearchResultKind } from '../lib/searchIndex';
+import { useFeatures } from './FeaturesProvider';
 import {
   ArrowRightIcon,
   CloseIcon,
@@ -166,13 +167,14 @@ function SearchPanel({ onClose }: { onClose: () => void }) {
     return () => window.clearTimeout(timer);
   }, [q]);
 
+  const features = useFeatures();
   const results = useMemo(() => {
-    const local = [...matchPlaces(q), ...matchHelp(q)];
+    const local = [...matchPlaces(q, 6, features), ...matchHelp(q)];
     const live = remote ? [...remote.tokens, ...remote.projects, ...remote.tasks, ...remote.nfts, ...remote.people] : [];
     const all = [...local, ...live];
     // One list in group order, which is also the order the arrow keys walk.
     return GROUP_ORDER.flatMap((g) => all.filter((r) => r.kind === g.kind));
-  }, [q, remote]);
+  }, [q, remote, features]);
 
   useEffect(() => setActive(0), [results.length, q]);
 

@@ -2,6 +2,7 @@ import { profilePath } from './follows.ts';
 import { getSupabase } from './supabase.ts';
 import { validateUsername } from './username.ts';
 import type { SearchResult } from './searchIndex.ts';
+import { featureFlags, type FeatureFlags } from './features.ts';
 import { LISTED_TOKENS as POOL_LISTED } from './listedTokens.ts';
 
 /**
@@ -165,18 +166,24 @@ async function people(q: string, supabase: Db): Promise<SearchResult[]> {
   return [{ kind: 'person', title: `@${row.username}`, subtitle: 'Profile', href: profilePath(row.username) }];
 }
 
+/**
+ * Groups for paused features (web/lib/features.ts) come back empty, without a
+ * query, while their feature is off.
+ */
 export async function siteSearch(
   raw: string,
-  deps: { client?: Db; collections?: CollectionLookup } = {}
+  deps: { client?: Db; collections?: CollectionLookup; flags?: FeatureFlags } = {}
 ): Promise<SearchGroups | null> {
   const q = checkedSearchQuery(raw);
   if (!q) return null;
   const supabase = deps.client ?? getSupabase();
   const lookup = deps.collections ?? defaultCollectionLookup;
+  const flags = deps.flags ?? featureFlags();
+  const none = async (): Promise<SearchResult[]> => [];
   const [p, t, n, who] = await Promise.all([
-    settle(projects(q, supabase)),
-    settle(tasks(q, supabase)),
-    settle(nfts(q, lookup)),
+    settle(flags.projects ? projects(q, supabase) : none()),
+    settle(flags.tasks ? tasks(q, supabase) : none()),
+    settle(flags.nftMarket || flags.nftMint ? nfts(q, lookup) : none()),
     settle(people(q, supabase)),
   ]);
   return { tokens: tokens(q), projects: p, tasks: t, nfts: n, people: who };

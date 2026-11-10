@@ -109,7 +109,9 @@ describe('live search', () => {
   });
 
   const noNfts = async () => [];
-  const run = (q, extra = {}) => S.siteSearch(q, { client: fake.client, collections: noNfts, ...extra });
+  // Every feature on, so each group is searched; paused groups are tested on their own.
+  const allOn = { nftMarket: true, nftMint: true, tasks: true, projects: true, tokenSocial: true, follows: true };
+  const run = (q, extra = {}) => S.siteSearch(q, { client: fake.client, collections: noNfts, flags: allOn, ...extra });
 
   it('refuses a query too short or too long to search', async () => {
     assert.equal(await run('a'), null);

@@ -26,6 +26,7 @@ import {
 } from './nftMarket.ts';
 import { verifiedCollection, type CollectionProfile } from './listedNfts';
 import { ethUsd } from './ethUsd.ts';
+import { featureOn } from './features.ts';
 
 export type NftContext = {
   chain: ReturnType<typeof getWebChain>;
@@ -182,7 +183,9 @@ export async function marketView(ctx: NftContext, scope?: string | ((l: OpenList
     validListingKeys(ctx.provider, ctx.market, candidates),
     contract.paused().then(Boolean).catch(() => false),
   ]);
-  return { enabled: true, address: ctx.market.address, state, valid, paused };
+  // A paused marketplace feature (web/lib/features.ts) reads as a paused
+  // contract: the item page then offers only Cancel and Withdraw.
+  return { enabled: true, address: ctx.market.address, state, valid, paused: paused || !featureOn('nftMarket') };
 }
 
 export function marketStats(view: MarketView, collection: string) {

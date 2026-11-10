@@ -9,6 +9,7 @@ import { AppCard, AppCardHeader, AppCollapsibleCard } from '../../components/App
 import { useDashboard } from '../../components/DashboardProvider';
 import { useLocale } from '../../components/LocaleProvider';
 import { useComingSoon } from '../../components/ComingSoon';
+import { useFeatures } from '../../components/FeaturesProvider';
 import { shortAddr } from '../../lib/dashboardTypes';
 import { CopyButton } from '../../components/CopyButton';
 import { EyeMark } from '../../components/BalanceEye';
@@ -67,6 +68,7 @@ export default function DashboardHomePage() {
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [walletFlash, setWalletFlash] = useState('');
   const [taskCounts, setTaskCounts] = useState<TaskCounts | null>(null);
+  const features = useFeatures();
   const [ethReserve, setEthReserve] = useState<'loading' | 'missing' | 'error' | 'none' | string>('loading');
   // Your tasks and Quick actions start closed; a tap on either header opens it.
   const [tasksOpen, setTasksOpen] = useState(false);
@@ -107,8 +109,10 @@ export default function DashboardHomePage() {
   }, [holdings]);
 
   // Tasks this account has entered, by state. A failure leaves the card on
-  // dashes rather than on zeros that would read as a real answer.
+  // dashes rather than on zeros that would read as a real answer. Not asked
+  // for while tasks are paused, since the card is hidden.
   useEffect(() => {
+    if (!features.tasks) return;
     let cancelled = false;
     (async () => {
       try {
@@ -123,7 +127,7 @@ export default function DashboardHomePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [features.tasks]);
 
   const pendingClaims = data?.pendingClaims || [];
   const needsPin = data ? !data.account.has_pin : false;
@@ -377,6 +381,7 @@ export default function DashboardHomePage() {
 
       {slide === 'overview' ? (
         <div className="!mt-[13.5px] grid gap-[11.5px]">
+          {features.tasks ? (
           <AppCollapsibleCard
             id="home-tasks"
             icon={<ListIcon size={15} />}
@@ -411,13 +416,14 @@ export default function DashboardHomePage() {
               <CardLink href="/dashboard/explore?s=tasks">View all</CardLink>
             </div>
           </AppCollapsibleCard>
+          ) : null}
 
           {needsPin ? (
             <AppCard className="px-[12px] pb-[12px] pt-[12.5px]">
               <AppCardHeader
                 icon={<AlertCircleIcon size={15} />}
                 title="Set unlock PIN"
-                subtitle="Chat asks for it to unlock after flizy lock, and to accept NFT offers."
+                subtitle="Chat asks for it to unlock after flizy lock."
                 action={<Badge>Recommended</Badge>}
               />
               <form onSubmit={onQuickPin} className="mt-[11px] grid grid-cols-2 gap-[7px]">
@@ -525,7 +531,11 @@ export default function DashboardHomePage() {
             <div className="mt-[11px] grid grid-cols-2 gap-[5px]">
               <ActionRow href="/dashboard/wallet?s=fund" icon={<ArrowDownIcon size={13} />} label="Receive" />
               <ActionRow href="/dashboard/swap" icon={<SwapArrowsIcon size={13} />} label="Swap" />
-              <ActionRow href="/dashboard/explore/new" icon={<PlusCircleIcon size={13} />} label="Create task" />
+              {features.tasks ? (
+                <ActionRow href="/dashboard/explore/new" icon={<PlusCircleIcon size={13} />} label="Create task" />
+              ) : (
+                <ActionRow href="/dashboard/wallet?s=history" icon={<HistoryIcon size={13} />} label="History" />
+              )}
               <ActionRow href="/dashboard/account?s=profile" icon={<PersonIcon size={13} />} label="Profile" />
             </div>
           </AppCollapsibleCard>

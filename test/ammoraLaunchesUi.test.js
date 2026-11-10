@@ -17,7 +17,7 @@ describe('ammora launches view', () => {
   const explore = read('web/components/ExploreTokens.tsx');
 
   it('is its own view, and Discover no longer appends it', () => {
-    assert.match(explore, /view === 'ammora' && ammoraOn \? 'ammora'/);
+    assert.match(explore, /view === 'ammora' && ammoraOn\s*\?\s*'ammora'/);
     assert.match(explore, /tab === 'ammora' \? <AmmoraTokens \/>/);
     assert.doesNotMatch(explore, /tab === 'discover' \? <AmmoraTokens/);
     assert.match(ui, /if \(!enabled\) return;[\s\S]*if \(!enabled\) return null;/);

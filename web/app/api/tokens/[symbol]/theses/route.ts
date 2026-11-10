@@ -3,6 +3,7 @@ import { getAccountIdFromCookie } from '../../../../../lib/cookies';
 import { rejectIfCrossOrigin } from '../../../../../lib/requestOrigin.ts';
 import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../../../lib/apiError';
 import { listTheses, listedTokenKey, postThesis } from '../../../../../lib/tokenSocial';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 const GET_ROUTE = 'GET /api/tokens/[symbol]/theses';
 const POST_ROUTE = 'POST /api/tokens/[symbol]/theses';
@@ -24,6 +25,8 @@ export async function GET(req: Request, { params: paramsIn }: Params) {
 }
 
 export async function POST(req: Request, { params: paramsIn }: Params) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('tokenSocial')) return NextResponse.json(pausedBody(), { status: 403 });
   const params = await paramsIn;
   try {
     const denied = rejectIfCrossOrigin(req);

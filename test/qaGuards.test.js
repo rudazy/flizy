@@ -321,7 +321,9 @@ describe('Explore order and Trending tokens', () => {
   it('opens Explore on Tokens, then Tasks, then NFTs', () => {
     const explore = read('web/app/dashboard/explore/page.tsx');
     assert.match(explore, /const SLIDES = \['tokens', 'tasks', 'nfts'\] as const;/);
-    assert.match(explore, /useSlide\(SLIDES, 'tokens'\)/);
+    // Tasks and NFTs drop out while paused (web/lib/features.ts); the order holds.
+    assert.match(explore, /const slides = useMemo\(\s*\(\) => SLIDES\.filter/);
+    assert.match(explore, /useSlide\(slides, 'tokens'\)/);
     const tabs = explore.slice(explore.indexOf('items={['));
     assert.ok(tabs.indexOf("id: 'tokens'") < tabs.indexOf("id: 'tasks'"));
     assert.ok(tabs.indexOf("id: 'tasks'") < tabs.indexOf("id: 'nfts'"));
@@ -396,7 +398,7 @@ describe('any token opens like FLZ', () => {
     assert.equal((detail.match(/disabled=\{!canTrade\}/g) || []).length, 2);
     assert.match(detail, /tokenAddress=\{imported \? contract : null\}/);
     // Theses are FLZ only and need a Flizy account, so wallet mode has no Thesis tab.
-    assert.match(detail, /const social = listed && walletMode == null;/);
+    assert.match(detail, /const social = listed && walletMode == null && tokenSocial;/);
     assert.match(detail, /\.filter\(\(\[id\]\) => social \|\| id !== 'thesis'\)/);
     const route = read('web/app/api/tokens/[symbol]/route.ts');
     // Without a session (wallet mode) only listed tokens open; a held token needs the account.

@@ -5,6 +5,7 @@ import { MintError } from '../../../../../../lib/mintExecute.ts';
 import { clientErrorResponse, field, readJson } from '../../../../../../lib/mintRequest.ts';
 import { drawTraitLayer, imagesReady } from '../../../../../../lib/aiCollection.ts';
 import { generationCaller, spendFromWindow } from '../../../../../../lib/generatedRequest.ts';
+import { featureOn, pausedBody } from '../../../../../../lib/features.ts';
 
 const ROUTE = 'POST /api/mints/generated/ai/image';
 
@@ -21,6 +22,8 @@ function textField(raw: unknown, what: string, max: number): string {
  * against its quota before the image service is called.
  */
 export async function POST(req: Request) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('nftMint')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const caller = await generationCaller(req);
     if ('refuse' in caller) return caller.refuse;

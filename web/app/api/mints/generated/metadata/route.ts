@@ -7,6 +7,7 @@ import { chainText, clientErrorResponse, field, pageText, readJson } from '../..
 import { metadataFiles, pinFolder, storageReady } from '../../../../../lib/collectionStorage.ts';
 import { openFeeWindow } from '../../../../../lib/generationFee.ts';
 import { generationCaller, spendFromWindow } from '../../../../../lib/generatedRequest.ts';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 const ROUTE = 'POST /api/mints/generated/metadata';
 
@@ -18,6 +19,8 @@ export const maxDuration = 60;
  * and traits. Returns the base URI the collection contract is created with.
  */
 export async function POST(req: Request) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('nftMint')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const caller = await generationCaller(req);
     if ('refuse' in caller) return caller.refuse;

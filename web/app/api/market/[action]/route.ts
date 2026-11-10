@@ -24,6 +24,7 @@ import { siteOrigin } from '../../../../lib/siteOrigin';
 import { ethFromWei } from '../../../../lib/nftFormat.ts';
 import { claimNotice } from '../../../../lib/walletMarket.ts';
 import { CALLER_LIMITED, takeCallerAttempt } from '../../../../lib/callerLimit.ts';
+import { featureOn, pausedBody } from '../../../../lib/features.ts';
 
 const ACTIONS = ['list', 'cancel', 'buy', 'offer', 'offer-cancel', 'offer-accept', 'royalty', 'withdraw'] as const;
 type Action = (typeof ACTIONS)[number];
@@ -356,6 +357,9 @@ async function planForWallet(req: Request, rawAction: string) {
   const paused = await marketContract.paused().catch(() => false);
   const exits = action === 'cancel' || action === 'offer-cancel' || action === 'withdraw';
   if (paused && !exits) return NextResponse.json({ error: 'Trading is paused right now.' }, { status: 503 });
+  // The marketplace is a paused feature (web/lib/features.ts): no new trade,
+  // but every way out (cancel, cancel an offer, withdraw) stays open.
+  if (!exits && !featureOn('nftMarket')) return NextResponse.json(pausedBody(), { status: 403 });
 
   const plan = await buildPlan(action, body, ctx, ctx.market.address, wallet);
   return NextResponse.json({
@@ -404,6 +408,7 @@ export async function POST(req: Request, { params: paramsIn }: { params: Promise
     const paused = await marketContract.paused().catch(() => false);
     const exits = action === 'cancel' || action === 'offer-cancel' || action === 'withdraw';
     if (paused && !exits) return NextResponse.json({ error: 'Trading is paused right now.' }, { status: 503 });
+    if (!exits && !featureOn('nftMarket')) return NextResponse.json(pausedBody(), { status: 403 });
 
     const plan = await buildPlan(action, body, ctx, ctx.market.address, viewer.address);
 

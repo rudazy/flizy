@@ -111,6 +111,10 @@ export default function ClaimPage() {
   const pending = data && !data.error && data.status === 'pending';
   const claimed = data?.status === 'claimed';
   const isPhone = data?.recipient_kind === 'phone';
+  const isEmail = data?.recipient_kind === 'email';
+  // The status word as a person reads it, not the database's.
+  const statusLabel =
+    data?.status === 'pending' ? 'Waiting to be claimed' : data?.status === 'claimed' ? 'Claimed' : data?.status === 'cancelled' ? 'Cancelled' : data?.status;
   const canWeb = Boolean(data?.can_claim_on_web);
 
   return (
@@ -146,14 +150,14 @@ export default function ClaimPage() {
             </span>
           </p>
           <p className="text-muted">
-            Status: <span className="text-paper">{data.status}</span>
+            Status: <span className="text-paper">{statusLabel}</span>
           </p>
           {data.recipient ? (
             <p className="text-muted">
               Held for: <span className="text-paper">{data.recipient}</span>
               {isPhone ? (
                 <span className="mt-1 block text-xs">
-                  (Phone — claim only in WhatsApp or Telegram)
+                  (A phone hold is claimed in WhatsApp or Telegram)
                 </span>
               ) : null}
             </p>
@@ -229,7 +233,7 @@ export default function ClaimPage() {
                 ) : null}
               </div>
               <p className="text-xs text-muted">
-                Web payout is off for phone holds on purpose — the number is proven only in chat.
+                Phone holds are not paid out on the web on purpose: the number is proven only in chat.
               </p>
             </>
           ) : null}
@@ -238,8 +242,8 @@ export default function ClaimPage() {
             <>
               <ol className="list-decimal space-y-2 pl-4 text-muted">
                 {loggedIn ? null : <li>Create or log in to your Flizy account</li>}
-                <li>Link the matching platform (Account → Platforms)</li>
-                <li>Claim below — or in chat: flizy claim</li>
+                <li>{isEmail ? 'Verify that email on your Flizy account' : 'Link the matching platform (Account, Platforms)'}</li>
+                <li>Claim below, or in chat: flizy claim</li>
               </ol>
 
               {loggedIn ? (

@@ -3,6 +3,7 @@ import { getAccountIdFromCookie } from '../../../../../../lib/cookies';
 import { rejectIfCrossOrigin } from '../../../../../../lib/requestOrigin.ts';
 import { apiErrorBodyAllowingClientError } from '../../../../../../lib/apiError';
 import { addProjectMember, removeProjectMember } from '../../../../../../lib/tasks';
+import { featureOn, pausedBody } from '../../../../../../lib/features.ts';
 
 const ADD_ROUTE = 'POST /api/projects/workspace/[handle]/members';
 const REMOVE_ROUTE = 'DELETE /api/projects/workspace/[handle]/members';
@@ -34,6 +35,8 @@ async function change(
 
 /** Add a member by @username. Owner only. */
 export async function POST(req: Request, { params: paramsIn }: Params) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('projects')) return NextResponse.json(pausedBody(), { status: 403 });
   const params = await paramsIn;
   return change(req, params, ADD_ROUTE, addProjectMember);
 }

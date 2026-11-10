@@ -1,4 +1,5 @@
 import { FLIZY_FAQ, faqAnchor } from './flizyFaq.ts';
+import type { Feature, FeatureFlags } from './features.ts';
 
 /**
  * Every place in the app search can open, with the words people actually
@@ -7,6 +8,10 @@ import { FLIZY_FAQ, faqAnchor } from './flizyFaq.ts';
  *
  * test/siteSearch.test.js checks every href against the routes and slide ids
  * the pages really have, so a renamed slide cannot leave a dead result here.
+ *
+ * A place that belongs to a paused feature (web/lib/features.ts) names it, and
+ * is offered only while one of its features is on. My NFTs names none: it is
+ * what people own, and stays findable.
  */
 
 export type SearchResultKind = 'place' | 'help' | 'token' | 'project' | 'task' | 'nft' | 'person';
@@ -18,7 +23,7 @@ export type SearchResult = {
   href: string;
 };
 
-type Place = { title: string; subtitle: string; href: string; keywords: string[] };
+type Place = { title: string; subtitle: string; href: string; keywords: string[]; features?: Feature[] };
 
 export const PLACES: Place[] = [
   { title: 'Home', subtitle: 'Your available balance and what needs you', href: '/dashboard', keywords: ['home', 'overview', 'dashboard', 'start', 'available'] },
@@ -34,16 +39,16 @@ export const PLACES: Place[] = [
   { title: 'Scan', subtitle: 'Every Flizy payment, public ledger', href: '/dashboard/wallet?s=scan', keywords: ['scan', 'ledger', 'explorer', 'payments', 'public'] },
   { title: 'Swap', subtitle: 'Trade ETH and tokens', href: '/dashboard/swap', keywords: ['swap', 'trade', 'exchange', 'buy', 'sell', 'convert'] },
 
-  { title: 'Explore tasks', subtitle: 'Live tasks you can enter', href: '/dashboard/explore?s=tasks', keywords: ['explore', 'tasks', 'quests', 'bounties', 'earn', 'rewards', 'xp'] },
-  { title: 'Create a task', subtitle: 'Publish a task for your community', href: '/dashboard/explore/new', keywords: ['create task', 'new task', 'publish', 'bounty', 'campaign'] },
+  { title: 'Explore tasks', subtitle: 'Live tasks you can enter', href: '/dashboard/explore?s=tasks', keywords: ['explore', 'tasks', 'quests', 'bounties', 'earn', 'rewards', 'xp'], features: ['tasks'] },
+  { title: 'Create a task', subtitle: 'Publish a task for your community', href: '/dashboard/explore/new', keywords: ['create task', 'new task', 'publish', 'bounty', 'campaign'], features: ['tasks'] },
   { title: 'Tokens', subtitle: 'Listed tokens, prices and copy trade', href: '/dashboard/explore?s=tokens', keywords: ['tokens', 'coins', 'market', 'prices', 'flz', 'copy trade', 'watchlist'] },
-  { title: 'NFTs', subtitle: 'Collections, listings and mints', href: '/dashboard/explore?s=nfts', keywords: ['nft', 'nfts', 'collections', 'art', 'marketplace'] },
+  { title: 'NFTs', subtitle: 'Collections, listings and mints', href: '/dashboard/explore?s=nfts', keywords: ['nft', 'nfts', 'collections', 'art', 'marketplace'], features: ['nftMarket', 'nftMint'] },
   { title: 'My NFTs', subtitle: 'The NFTs in your wallet', href: '/dashboard/explore/nfts/me', keywords: ['my nfts', 'owned', 'collection', 'gallery'] },
-  { title: 'Mints', subtitle: 'Drops you can mint now', href: '/dashboard/explore/nfts/mints', keywords: ['mint', 'mints', 'drop', 'drops', 'launch'] },
-  { title: 'Create a collection', subtitle: 'Launch an NFT drop', href: '/dashboard/explore/nfts/create', keywords: ['create collection', 'new collection', 'launch nft', 'drop'] },
+  { title: 'Mints', subtitle: 'Drops you can mint now', href: '/dashboard/explore/nfts/mints', keywords: ['mint', 'mints', 'drop', 'drops', 'launch'], features: ['nftMint'] },
+  { title: 'Create a collection', subtitle: 'Launch an NFT drop', href: '/dashboard/explore/nfts/create', keywords: ['create collection', 'new collection', 'launch nft', 'drop'], features: ['nftMint'] },
 
   { title: 'Profile', subtitle: 'Your name, username and email', href: '/dashboard/account', keywords: ['profile', 'account', 'username', 'name', 'email', 'display name'] },
-  { title: 'Projects', subtitle: 'Your projects and their pages', href: '/dashboard/account?s=projects', keywords: ['projects', 'project', 'brand', 'team', 'workspace'] },
+  { title: 'Projects', subtitle: 'Your projects and their pages', href: '/dashboard/account?s=projects', keywords: ['projects', 'project', 'brand', 'team', 'workspace'], features: ['projects'] },
   { title: 'Pay me', subtitle: 'Your pay link, QR and username', href: '/dashboard/account?s=pay', keywords: ['pay me', 'receive', 'qr', 'pay link', 'get paid', 'request'] },
   { title: 'Language', subtitle: 'English or Korean', href: '/dashboard/account?s=language', keywords: ['language', 'korean', 'english', 'translate'] },
   { title: 'Country', subtitle: 'Your phone number country', href: '/dashboard/account?s=country', keywords: ['country', 'region', 'phone code', 'calling code'] },
@@ -57,8 +62,14 @@ export const PLACES: Place[] = [
   { title: 'How Flizy works', subtitle: 'The guide and answers', href: '/how-it-works', keywords: ['help', 'guide', 'how', 'faq', 'support', 'docs'] },
 ];
 
-/** The places shown before anything is typed. */
-export const POPULAR_PLACES: SearchResult[] = ['/dashboard/wallet?s=fund', '/dashboard/account?s=pay', '/dashboard/swap', '/dashboard/explore?s=tasks', '/dashboard/account?s=chat']
+/** Whether a place is offered: it names no paused feature, or one of its features is on. */
+export function placeShown(place: Pick<Place, 'features'>, flags?: FeatureFlags): boolean {
+  if (!place.features || !place.features.length) return true;
+  return Boolean(flags) && place.features.some((f) => flags![f]);
+}
+
+/** The places shown before anything is typed: payments first, swap second. */
+export const POPULAR_PLACES: SearchResult[] = ['/dashboard/account?s=pay', '/dashboard/wallet?s=history', '/dashboard/wallet?s=fund', '/dashboard/swap', '/dashboard/account?s=chat']
   .map((href) => PLACES.find((p) => p.href === href))
   .filter((p): p is Place => p != null)
   .map((p) => ({ kind: 'place', title: p.title, subtitle: p.subtitle, href: p.href }));
@@ -88,10 +99,11 @@ function score(q: string, title: string, words: string[], extra: string): number
   return 0;
 }
 
-export function matchPlaces(raw: string, limit = 6): SearchResult[] {
+export function matchPlaces(raw: string, limit = 6, flags?: FeatureFlags): SearchResult[] {
   const q = normalizeQuery(raw);
   if (!q) return [];
-  return PLACES.map((p) => ({ p, s: score(q, p.title, p.keywords, p.subtitle) }))
+  return PLACES.filter((p) => placeShown(p, flags))
+    .map((p) => ({ p, s: score(q, p.title, p.keywords, p.subtitle) }))
     .filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s)
     .slice(0, limit)

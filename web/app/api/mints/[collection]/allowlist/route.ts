@@ -19,6 +19,7 @@ import {
 import { MintError } from '../../../../../lib/mintExecute.ts';
 import { allowlistEntriesForCreator, parseRemoveKeys } from '../../../../../lib/mintInput.ts';
 import { clientErrorResponse, field, intField, readJson, routeCollection } from '../../../../../lib/mintRequest.ts';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 /** The creator's own Flizy-managed drop, or a refusal. Database edits only; nothing here touches the chain. */
 async function creatorDrop(collectionParam: string, accountId: string): Promise<DropRow> {
@@ -79,6 +80,8 @@ export async function GET(_req: Request, { params: paramsIn }: { params: Promise
  * The saved root changes; the creator publishes it to make it live.
  */
 export async function POST(req: Request, { params: paramsIn }: { params: Promise<{ collection: string }> }) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('nftMint')) return NextResponse.json(pausedBody(), { status: 403 });
   const params = await paramsIn;
   const route = 'POST /api/mints/[collection]/allowlist';
   try {

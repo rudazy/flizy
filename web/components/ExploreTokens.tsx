@@ -17,6 +17,7 @@ import { formatEthDisplay } from '../lib/tokenFormat';
 import { tradesLabel } from '../lib/priceSeries';
 import { useComingSoon } from './ComingSoon';
 import { CopyTradePanel } from './CopyTradePanel';
+import { useFeatures } from './FeaturesProvider';
 import { AmmoraTokens, ammoraUiEnabled } from './AmmoraTokens';
 import { VerifiedMark } from './VerifiedMark';
 import { tokenLogo } from '../lib/tokenLogos';
@@ -42,6 +43,8 @@ type TabId = 'discover' | 'copy' | 'ammora' | TokenFilterId;
 
 const [DISCOVER, COPY] = TOKEN_VIEWS;
 const TABS: Array<{ id: TabId; label: string }> = [DISCOVER, COPY, ...TOKEN_FILTERS];
+/** The watchlist is part of the token social layer, hidden while it is paused. */
+const SOCIAL_TABS: readonly string[] = ['watchlist'];
 
 /** The launches screen opens on this row, in this order. The rest stay one scroll away. */
 const AMMORA_PILLS: TabId[] = ['trending', 'ammora', 'gainers', 'new', 'discover', 'copy', 'held', 'verified', 'watchlist'];
@@ -167,8 +170,15 @@ export function ExploreTokens() {
   const view = search.get('view');
   const requested = search.get('f') || '';
   const ammoraOn = ammoraUiEnabled();
+  const { tokenSocial } = useFeatures();
   const tab: TabId =
-    view === 'copy' ? 'copy' : view === 'ammora' && ammoraOn ? 'ammora' : isTokenFilter(requested) ? requested : 'discover';
+    view === 'copy'
+      ? 'copy'
+      : view === 'ammora' && ammoraOn
+        ? 'ammora'
+        : isTokenFilter(requested) && (tokenSocial || !SOCIAL_TABS.includes(requested))
+          ? requested
+          : 'discover';
   const [tokens, setTokens] = useState<DiscoveryToken[] | null>(null);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
@@ -222,7 +232,7 @@ export function ExploreTokens() {
 
   return (
     <div className="!mt-[9px] grid w-full grid-cols-[minmax(0,1fr)] gap-[12px]">
-      <TokenSectionNav tab={tab} ammoraOn={ammoraOn} onSelect={setTab} />
+      <TokenSectionNav tab={tab} ammoraOn={ammoraOn} social={tokenSocial} onSelect={setTab} />
 
       {tab === 'copy' ? <CopyTradePanel /> : null}
 
@@ -301,14 +311,16 @@ export function ExploreTokens() {
 function TokenSectionNav({
   tab,
   ammoraOn,
+  social,
   onSelect,
 }: {
   tab: TabId;
   ammoraOn: boolean;
+  social: boolean;
   onSelect: (id: TabId) => void;
 }) {
   const pills = tab === 'ammora';
-  const items = pills ? AMMORA_PILLS : sectionTabs(ammoraOn);
+  const items = (pills ? AMMORA_PILLS : sectionTabs(ammoraOn)).filter((id) => social || !SOCIAL_TABS.includes(id));
   return (
     <div
       className={

@@ -3,6 +3,7 @@ import { getAccountIdFromCookie } from '../../../../../lib/cookies';
 import { rejectIfCrossOrigin } from '../../../../../lib/requestOrigin.ts';
 import { apiErrorBodyAllowingClientError } from '../../../../../lib/apiError';
 import { submitToTask } from '../../../../../lib/tasks';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 const ROUTE = 'POST /api/tasks/[ref]/submit';
 
@@ -15,6 +16,8 @@ const ROUTE = 'POST /api/tasks/[ref]/submit';
  * something a person can read.
  */
 export async function POST(req: Request, ctx: { params: Promise<{ ref: string }> }) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('tasks')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

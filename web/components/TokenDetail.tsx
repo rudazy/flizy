@@ -21,6 +21,7 @@ import type { HolderView } from '../lib/tokenHolders';
 import type { ChartRange } from '../lib/tokenMarket';
 import type { ActivityRow, TokenSnapshot } from '../lib/tokenMarketServer';
 import type { Thesis, ThesisComment, TokenProfile } from '../lib/tokenSocial';
+import { useFeatures } from './FeaturesProvider';
 import {
   ArrowLeftIcon,
   BarChartIcon,
@@ -159,9 +160,13 @@ export function TokenDetail({ symbol }: { symbol: string }) {
   const imported = /^0x[0-9a-fA-F]{40}$/.test(symbol);
   const tokenRef = listed ? 'flz' : symbol;
   const ammoraUi = process.env.NEXT_PUBLIC_AMMORA_ENABLED === 'true';
-  /** Theses and the watchlist belong to a Flizy account, so wallet mode leaves them out. */
+  /**
+   * Theses and the watchlist belong to a Flizy account, so wallet mode leaves
+   * them out; they also wait while the token social layer is paused.
+   */
   const walletMode = useWalletMode();
-  const social = listed && walletMode == null;
+  const { tokenSocial } = useFeatures();
+  const social = listed && walletMode == null && tokenSocial;
 
   const [range, setRange] = useState<ChartRange>('1d');
   const [chartMode, setChartMode] = useState<'line' | 'candle'>('line');

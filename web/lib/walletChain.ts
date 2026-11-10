@@ -66,7 +66,8 @@ export async function giwaClients(provider: EIP1193Provider, account: `0x${strin
 /** A wallet's refusal reads plainly; anything else is cut to its first line. */
 export function walletErrorText(err: unknown, fallback: string): string {
   const text = err instanceof Error ? err.message : '';
-  if (/reject|denied|cancel/i.test(text)) return 'Cancelled in your wallet. Nothing was sent.';
+  // Said of this step only: an approval confirmed just before it may already be on chain.
+  if (/reject|denied|cancel/i.test(text)) return 'Cancelled in your wallet, so that step was not sent.';
   return text.split('\n')[0].slice(0, 200) || fallback;
 }
 

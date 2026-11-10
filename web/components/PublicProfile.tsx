@@ -4,6 +4,7 @@ import { useEffect, useId, useState, type JSX } from 'react';
 import Link from 'next/link';
 import { PersonRow } from './PersonRow';
 import { formatVolumeEth, profilePath, type ProfilePayload, type PublicPerson } from '../lib/follows.ts';
+import { useFeatures } from './FeaturesProvider';
 
 type ListSide = 'followers' | 'following';
 
@@ -76,6 +77,9 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
   const loginHref = `/login?next=${encodeURIComponent(profilePath(profile.username))}`;
   const activityOpen = profile.isSelf || profile.showActivity;
   const showCopy = !profile.isSelf && following;
+  // Following is paused (web/lib/features.ts): no new follows and no counts, but
+  // an existing follow can still be ended, and Pay stays.
+  const { follows: followsOn } = useFeatures();
   const openFollowers = socialOpen && followers !== null ? () => setList('followers') : undefined;
   const openFollowing = socialOpen && followingCount !== null ? () => setList('following') : undefined;
 
@@ -118,11 +122,13 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
         {profile.isSelf && !profile.showWallet ? (
           <p className="relative m-0 mt-2 font-sans text-[12px] text-[#8d867c]">Wallet address is hidden from others.</p>
         ) : null}
-        <div className="relative mt-4 flex items-center gap-4">
-          <CountButton value={followers === null ? '-' : String(followers)} label="Followers" onClick={openFollowers} />
-          <span className="h-8 w-px bg-[#3a3424]" aria-hidden />
-          <CountButton value={followingCount === null ? '-' : String(followingCount)} label="Following" onClick={openFollowing} />
-        </div>
+        {followsOn ? (
+          <div className="relative mt-4 flex items-center gap-4">
+            <CountButton value={followers === null ? '-' : String(followers)} label="Followers" onClick={openFollowers} />
+            <span className="h-8 w-px bg-[#3a3424]" aria-hidden />
+            <CountButton value={followingCount === null ? '-' : String(followingCount)} label="Following" onClick={openFollowing} />
+          </div>
+        ) : null}
         {profile.isSelf ? null : (
           <div className="relative mt-4 flex flex-col gap-2 sm:flex-row">
             {following ? (
@@ -136,7 +142,7 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
               >
                 Following
               </button>
-            ) : profile.signedIn ? (
+            ) : !followsOn ? null : profile.signedIn ? (
               <button
                 type="button"
                 disabled={busy}
@@ -199,18 +205,22 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
           icon={<Bars tone="gold" />}
         />
         <Stat value={profile.swaps === null ? '-' : String(profile.swaps)} label="Swaps" icon={<Bars tone="green" />} />
-        <Stat
-          value={followers === null ? '-' : String(followers)}
-          label="Followers"
-          onClick={openFollowers}
-          icon={<PeopleMark />}
-        />
-        <Stat
-          value={followingCount === null ? '-' : String(followingCount)}
-          label="Following"
-          onClick={openFollowing}
-          icon={<PersonMark />}
-        />
+        {followsOn ? (
+          <>
+            <Stat
+              value={followers === null ? '-' : String(followers)}
+              label="Followers"
+              onClick={openFollowers}
+              icon={<PeopleMark />}
+            />
+            <Stat
+              value={followingCount === null ? '-' : String(followingCount)}
+              label="Following"
+              onClick={openFollowing}
+              icon={<PersonMark />}
+            />
+          </>
+        ) : null}
         {profile.isSelf || profile.showPortfolio ? (
           <Stat
             value={profile.portfolioEth === null ? '-' : formatVolumeEth(profile.portfolioEth)}
@@ -221,7 +231,7 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
         ) : null}
       </section>
 
-      {profile.isSelf && !profile.showSocial ? (
+      {followsOn && profile.isSelf && !profile.showSocial ? (
         <p className="m-0 mt-3 font-sans text-[12px] text-[#8d867c]">Follower counts are hidden from others.</p>
       ) : null}
       {profile.isSelf && !profile.showStats ? (
@@ -233,7 +243,7 @@ export function PublicProfile({ profile, initialList }: { profile: ProfilePayloa
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:mt-0">
-        {profile.followedBy.length ? (
+        {followsOn && profile.followedBy.length ? (
           <section className="order-2 rounded-[16px] border border-[#2a2b30] bg-[#101012] px-4 py-4">
             <h2 className="m-0 font-sans text-[11px] font-medium uppercase tracking-[0.16em] text-[#8d867c]">Followed by</h2>
             <p className="m-0 mt-2 font-sans text-[13px] leading-relaxed text-[#c8c2b8]">

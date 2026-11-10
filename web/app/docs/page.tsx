@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { StructuredData, breadcrumbJsonLd } from '../../components/StructuredData';
 import { pageMetadata } from '../../lib/seo';
 import { siteOrigin } from '../../lib/siteOrigin';
+import { featureOn, type Feature } from '../../lib/features.ts';
 
 export const metadata: Metadata = pageMetadata({
   title: 'WhatsApp & Telegram crypto commands | Flizy',
@@ -11,10 +12,11 @@ export const metadata: Metadata = pageMetadata({
   path: '/docs',
 });
 
+/** A row naming a paused feature (web/lib/features.ts) is listed only while it is on. */
 const CMD_GROUPS: Array<{
   title: string;
   blurb: string;
-  rows: Array<{ wa: string; tg: string; meaning: string }>;
+  rows: Array<{ wa: string; tg: string; meaning: string; feature?: Feature }>;
 }> = [
   {
     title: 'Pay someone',
@@ -88,12 +90,14 @@ const CMD_GROUPS: Array<{
         wa: 'mint 1 giwaforge',
         tg: '/mint 1 giwaforge',
         meaning: 'Mint one test NFT to your Flizy wallet. One per wallet. No ETH needed in chat. "mint 1 giwaforge nft" is the same.',
+        feature: 'nftMint',
       },
       {
         wa: 'accept offer',
         tg: '/accept offer',
         meaning:
           'List the open offers on your NFTs, numbered. Reply with a number to see the price, the 2% Flizy fee, the royalty and what you receive, then CONFIRM to sell.',
+        feature: 'nftMarket',
       },
       { wa: 'confirm', tg: 'confirm or tap Confirm', meaning: 'Approve the plan' },
       { wa: 'cancel', tg: 'cancel', meaning: 'Abort the pending plan' },
@@ -144,10 +148,10 @@ const CMD_GROUPS: Array<{
       'arrives; nothing is held.',
     rows: [
       {
-        wa: 'split 30 with @ada @kemi for dinner',
-        tg: '/split 30 with @ada @kemi for dinner',
+        wa: 'split 0.03 with @ada @kemi for dinner',
+        tg: '/split 0.03 with @ada @kemi for dinner',
         meaning:
-          'Three ways including you: two requests go out at 10 each, and your 10 is simply yours to cover',
+          'Three ways including you: two requests go out at 0.01 each, and your 0.01 is simply yours to cover',
       },
       {
         wa: 'requests',
@@ -395,7 +399,7 @@ export default function DocsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {group.rows.map((row) => (
+                  {group.rows.filter((row) => !row.feature || featureOn(row.feature)).map((row) => (
                     <tr key={row.wa} className="border-b border-border last:border-0">
                       <td className="px-3 py-2.5 font-mono text-xs text-paper">{row.wa}</td>
                       <td className="px-3 py-2.5 font-mono text-xs text-paper">

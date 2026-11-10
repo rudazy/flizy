@@ -340,7 +340,8 @@ describe('quick send: a plain CONFIRM, or the PIN on flizy.app', () => {
     const sent = [];
     const ctx = ctxFor(sent);
     await router.handle(ctx, '/send 0.001 to 2348099999999');
-    assert.match(sent.join('\n'), /The person is not on Flizy yet\. After CONFIRM/);
+    // The number may already be on Flizy, so the note no longer says it is not.
+    assert.match(sent.join('\n'), /If they are not on Flizy yet, the money waits for them\. After CONFIRM/);
     await router.handle(ctx, 'confirm');
     assert.equal(moved, 0);
     approveOnPage();

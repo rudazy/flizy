@@ -24,6 +24,7 @@ import {
   pageText,
   readJson,
 } from '../../../../lib/mintRequest.ts';
+import { featureOn, pausedBody } from '../../../../lib/features.ts';
 
 const ROUTE = 'POST /api/mints/collections';
 
@@ -38,6 +39,8 @@ const ROUTE = 'POST /api/mints/collections';
  * still exists and is the creator's: Bring a collection picks it up.
  */
 export async function POST(req: Request) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('nftMint')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

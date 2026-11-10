@@ -11,6 +11,8 @@ import { LocaleProvider } from '../components/LocaleProvider';
 import { CONSENT_COOKIE, readConsent } from '../lib/consent';
 import { hasSessionCookie } from '../lib/cookies';
 import { footerBotLinks } from '../lib/botPublic';
+import { featureFlags } from '../lib/features.ts';
+import { FeaturesProvider } from '../components/FeaturesProvider';
 import { INSTALL_CAPTURE_JS } from '../lib/installCapture';
 import { OG_IMAGE } from '../lib/seo';
 import './globals.css';
@@ -133,9 +135,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Analytics />
         </Suspense>
         <LocaleProvider>
-          <AppChrome signedIn={signedIn} {...footerBotLinks()}>
-            {children}
-          </AppChrome>
+          <FeaturesProvider flags={featureFlags()}>
+            <AppChrome signedIn={signedIn} {...footerBotLinks()}>
+              {children}
+            </AppChrome>
+          </FeaturesProvider>
         </LocaleProvider>
         {askConsent ? <CookieConsent /> : null}
       </body>

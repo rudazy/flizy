@@ -3,6 +3,7 @@ import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { rejectIfCrossOrigin } from '../../../lib/requestOrigin.ts';
 import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../lib/apiError';
 import { createProject, listOwnProjects, canCreateTasks } from '../../../lib/tasks';
+import { featureOn, pausedBody } from '../../../lib/features.ts';
 
 const LIST_ROUTE = 'GET /api/projects';
 const CREATE_ROUTE = 'POST /api/projects';
@@ -37,6 +38,8 @@ export async function GET() {
  * account may hold.
  */
 export async function POST(req: Request) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('projects')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

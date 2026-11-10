@@ -3,6 +3,7 @@ import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { rejectIfCrossOrigin } from '../../../lib/requestOrigin.ts';
 import { apiErrorBody, apiErrorBodyAllowingClientError } from '../../../lib/apiError';
 import { listTasks, listMyTasks, createTask, canCreateTasks } from '../../../lib/tasks';
+import { featureOn, pausedBody } from '../../../lib/features.ts';
 
 const LIST_ROUTE = 'GET /api/tasks';
 const CREATE_ROUTE = 'POST /api/tasks';
@@ -42,6 +43,8 @@ export async function GET(req: Request) {
  * Flizy name unless an admin publishes it.
  */
 export async function POST(req: Request) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('tasks')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

@@ -3,6 +3,7 @@ import { getAccountIdFromCookie } from '../../../lib/cookies';
 import { rejectIfCrossOrigin } from '../../../lib/requestOrigin.ts';
 import { ClientError, apiErrorBodyAllowingClientError } from '../../../lib/apiError';
 import { isCopyKind, readCopySetup, saveCopySetup } from '../../../lib/copySetup';
+import { featureOn, pausedBody } from '../../../lib/features.ts';
 
 const GET_ROUTE = 'GET /api/copy';
 const PUT_ROUTE = 'PUT /api/copy';
@@ -36,6 +37,10 @@ export async function PUT(req: Request) {
     const accountId = await getAccountIdFromCookie();
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     const body = await req.json().catch(() => null);
+    // Copy Mint is paused with NFT minting; Copy Trade stays live.
+    if ((body as { kind?: unknown } | null)?.kind === 'mint' && !featureOn('nftMint')) {
+      return NextResponse.json(pausedBody(), { status: 403 });
+    }
     const setup = await saveCopySetup(accountId, body);
     return NextResponse.json({ ok: true, setup });
   } catch (err) {

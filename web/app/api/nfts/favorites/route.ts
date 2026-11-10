@@ -4,6 +4,7 @@ import { getSupabase } from '../../../../lib/supabase';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { checkAddress, checkTokenId } from '../../../../lib/nftIndex.ts';
+import { featureOn, pausedBody } from '../../../../lib/features.ts';
 
 const ROUTE = 'GET|POST /api/nfts/favorites';
 
@@ -35,6 +36,8 @@ export async function GET(req: Request) {
 
 /** Heart or un-heart one token: { collection, tokenId, on }. */
 export async function POST(req: Request) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('nftMarket')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const denied = rejectIfCrossOrigin(req);
     if (denied) return denied;

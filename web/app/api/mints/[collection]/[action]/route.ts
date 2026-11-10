@@ -30,6 +30,7 @@ import {
   timeField,
 } from '../../../../../lib/mintRequest.ts';
 import type { NftContext } from '../../../../../lib/nftApi.ts';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 const ACTIONS = ['mint', 'configure', 'publish', 'pause'] as const;
 type Action = (typeof ACTIONS)[number];
@@ -163,6 +164,9 @@ export async function POST(req: Request, { params: paramsIn }: { params: Promise
     if (!accountId) return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
     if (!ACTIONS.includes(params.action as Action)) return NextResponse.json({ error: 'Unknown action' }, { status: 404 });
     const action = params.action as Action;
+    // Minting is a paused feature (web/lib/features.ts): a creator may still
+    // pause their own drop, but nothing is minted, configured or published.
+    if (action !== 'pause' && !featureOn('nftMint')) return NextResponse.json(pausedBody(), { status: 403 });
     const collection = routeCollection(params.collection);
     const body = await readJson(req);
 

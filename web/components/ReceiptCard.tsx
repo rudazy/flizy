@@ -124,8 +124,8 @@ export function ReceiptCard(p: ReceiptCardProps) {
       <div className="rounded-[22px] border border-[#2a2620] bg-[#0d0c0b] px-4 pb-6 pt-5 shadow-[0_30px_80px_rgba(0,0,0,0.55)] sm:px-6">
         <header className="mb-4 flex items-start justify-between gap-4 sm:px-2">
           <div>
-            <h1 className="m-0 font-sans text-[24px] font-bold text-white">Share Receipt</h1>
-            <p className="m-0 mt-1 font-sans text-[15px] text-[#a8a29a]">A clean receipt to share with anyone.</p>
+            <h1 className="m-0 font-sans text-[24px] font-bold text-white">Payment receipt</h1>
+            <p className="m-0 mt-1 font-sans text-[15px] text-[#a8a29a]">A record of a payment made on Flizy.</p>
           </div>
           <Link
             href="/"

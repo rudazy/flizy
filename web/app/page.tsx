@@ -16,12 +16,12 @@ const FEATURES = [
     d: 'Pay a username, phone number or email; if they are not on Flizy yet, the money waits. Share a pay link with the amount filled in. Turn it on, and people without Flizy can pay it from their own wallet.',
   },
   {
-    t: 'Trade',
-    d: 'Buy and sell listed tokens from chat or the swap screen. You see the quote before you confirm.',
+    t: 'Ask, split and collect',
+    d: 'Request money from someone, split a bill into a request each, or collect into a named pot from chat, and see who has paid.',
   },
   {
-    t: 'NFTs',
-    d: 'Mint, send and trade NFTs on GIWA. The same wallet is behind the site and the chat.',
+    t: 'Swap',
+    d: 'Swap the tokens you pay with, from chat or the swap screen. You see the quote before you confirm.',
   },
   {
     t: 'One account',
@@ -157,9 +157,9 @@ export default async function HomePage() {
             <div className="border-b border-border p-6 md:border-b-0 md:border-r md:p-8">
               <div className="space-y-3 font-mono text-sm">
                 <p className="text-muted">You</p>
-                <p className="mono-box text-paper">send 0.01 ETH to +234 708 043 7343</p>
+                <p className="mono-box text-paper">send 0.01 ETH to @ada</p>
                 <p className="text-muted">Flizy</p>
-                <p className="mono-box text-lime">Pending. Reply CONFIRM</p>
+                <p className="mono-box text-lime">Transfer plan. Reply CONFIRM</p>
                 <p className="text-muted">You</p>
                 <p className="mono-box text-paper">confirm</p>
                 <p className="text-muted">Flizy</p>
@@ -170,7 +170,7 @@ export default async function HomePage() {
               <p className="font-mono text-sm text-paper">send 0.01 to @ada</p>
               <p className="text-xs text-muted">A Flizy username</p>
               <p className="font-mono text-sm text-paper">send 0.01 ETH to +234 708 043 7343</p>
-              <p className="text-xs text-muted">A phone number, country code included</p>
+              <p className="text-xs text-muted">A phone number, country code included, held until they claim</p>
               <p className="font-mono text-sm text-paper">send 0.01 to ada@email.com</p>
               <p className="text-xs text-muted">An email, held until they claim</p>
               <Link href="/docs" className="mt-2 text-sm text-lime no-underline hover:text-gold">

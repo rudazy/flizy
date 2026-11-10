@@ -15,6 +15,7 @@ import { useComingSoon } from '../../../components/ComingSoon';
 import { useDashboard } from '../../../components/DashboardProvider';
 import { clearAppearanceCache } from '../../../lib/appearanceCache';
 import { useLocale } from '../../../components/LocaleProvider';
+import { useFeatures } from '../../../components/FeaturesProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { PayIdentity } from '../../../components/PayIdentity';
 import { OwnWalletPanel } from '../../../components/OwnWalletPanel';
@@ -114,7 +115,10 @@ export default function AccountPage() {
     return 'profile';
   }, [search]);
 
-  const [slide, setSlide] = useSlide(SLIDES, defaultSlide);
+  // Projects is a paused feature (web/lib/features.ts): no slide while it is off.
+  const { projects: projectsOn } = useFeatures();
+  const slides = useMemo(() => SLIDES.filter((id) => id !== 'projects' || projectsOn), [projectsOn]);
+  const [slide, setSlide] = useSlide(slides, defaultSlide);
 
   // Developers shows only for an account Flizy approved as an API platform.
   const [isPlatform, setIsPlatform] = useState(false);
@@ -562,7 +566,7 @@ export default function AccountPage() {
             label: t('account.profile'),
             badge: data.account.username ? `@${data.account.username}` : undefined,
           },
-          { id: 'projects', label: 'Projects' },
+          ...(projectsOn ? [{ id: 'projects', label: 'Projects' }] : []),
           { id: 'pay', label: 'Pay me', badge: data.pay?.username ? `@${data.pay.username}` : undefined },
           { id: 'language', label: t('account.language') },
           {
@@ -926,7 +930,7 @@ export default function AccountPage() {
         </div>
       ) : null}
 
-      {slide === 'projects' ? <AccountProjects /> : null}
+      {slide === 'projects' && projectsOn ? <AccountProjects /> : null}
 
       {slide === 'pay' ? (
         data.pay ? (

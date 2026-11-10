@@ -110,6 +110,7 @@ describe('the tiers hold: account changes take the password, money takes the PIN
    */
   const STEP_UP_ROUTES = [
     'checkout/[id]/pay',
+    'earnings',
     'market/[action]',
     'mints/[collection]/[action]',
     'mints/collections',

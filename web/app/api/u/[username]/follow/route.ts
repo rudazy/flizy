@@ -12,6 +12,7 @@ import { getAccountIdFromCookie } from '../../../../../lib/cookies';
 import { allowFollowWrite } from '../../../../../lib/followRate.ts';
 import { changeFollow } from '../../../../../lib/followStore.ts';
 import { rejectIfCrossOrigin } from '../../../../../lib/requestOrigin.ts';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 const ROUTE = 'POST|DELETE|PATCH /api/u/[username]/follow';
 
@@ -55,6 +56,8 @@ async function run(req: Request, username: string, action: 'follow' | 'unfollow'
 }
 
 export async function POST(req: Request, { params: paramsIn }: Props) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('follows')) return NextResponse.json(pausedBody(), { status: 403 });
   const params = await paramsIn;
   try {
     return await run(req, params.username, 'follow');

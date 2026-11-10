@@ -9,6 +9,7 @@ import { MintError, runMintTx } from '../../../../../lib/mintExecute.ts';
 import { chainText, clientErrorResponse, field, intField, readJson } from '../../../../../lib/mintRequest.ts';
 import { feeLabel, openFeeWindow } from '../../../../../lib/generationFee.ts';
 import { feeQuote, feeRecipient, generationCaller } from '../../../../../lib/generatedRequest.ts';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 const ROUTE = 'POST /api/mints/generated/pay';
 
@@ -20,6 +21,8 @@ const ROUTE = 'POST /api/mints/generated/pay';
  * the fee up, nothing is sent and the new figure is shown instead.
  */
 export async function POST(req: Request) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('nftMint')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const caller = await generationCaller(req);
     if ('refuse' in caller) return caller.refuse;

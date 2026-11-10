@@ -37,7 +37,8 @@ describe('people button', () => {
   });
 
   it('shows on Explore, which no longer carries the text link', () => {
-    assert.match(EXPLORE, /<AppTopBar title="Explore" people \/>/);
+    // The people button is part of following, a paused feature (web/lib/features.ts).
+    assert.match(EXPLORE, /<AppTopBar title="Explore" people=\{features\.follows\} \/>/);
     assert.doesNotMatch(EXPLORE, /Find people/);
   });
 });

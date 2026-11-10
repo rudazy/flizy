@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDashboard } from './DashboardProvider';
+import { useFeatures } from './FeaturesProvider';
 import { ComingSoonPanel } from './ComingSoon';
 import { CopySetupPanel } from './CopySetupPanel';
 import { MintList } from './MintList';
@@ -76,15 +77,22 @@ function compact(n: number | null): string {
  *
  * The warning stays on the listed view. A collection someone does not hold is
  * still listed, because the address on this page is what a copy has to match.
+ *
+ * The marketplace tabs show only while the NFT market is on, and Copy Mint,
+ * Mint and Collections only while minting is on (web/lib/features.ts). My NFTs
+ * and every item page stay reachable from the wallet either way.
  */
 export function ExploreNfts() {
   const search = useSearchParams();
   const router = useRouter();
   const pathname = usePathname() || '';
+  const features = useFeatures();
+  const tabs = TABS.filter((t) => (t.id === COPY_MINT.id ? features.nftMint : features.nftMarket));
+  const sections = SECTIONS.filter((s) => (s.id === 'discover' ? tabs.length > 0 : features.nftMint));
   const raw = search.get('view');
-  const tab: TabId = TABS.some((t) => t.id === raw) ? (raw as TabId) : 'listed';
+  const tab: TabId = tabs.some((t) => t.id === raw) ? (raw as TabId) : (tabs[0]?.id ?? 'listed');
   const rawSection = search.get('nft');
-  const section: SectionId = SECTIONS.some((s) => s.id === rawSection) ? (rawSection as SectionId) : 'discover';
+  const section: SectionId = sections.some((s) => s.id === rawSection) ? (rawSection as SectionId) : (sections[0]?.id ?? 'discover');
   const { explorerBase } = useDashboard();
   const [collections, setCollections] = useState<Collection[] | null>(null);
   const [error, setError] = useState('');
@@ -129,8 +137,8 @@ export function ExploreNfts() {
   }
 
   const sectionTabs = (
-    <div className="grid grid-cols-3 gap-[4px] rounded-[7px] border border-[#2a2b30] bg-[#0d0d0e] p-[3px]" role="tablist" aria-label="NFTs">
-      {SECTIONS.map((s) => {
+    <div className={`grid ${sections.length === 3 ? 'grid-cols-3' : sections.length === 2 ? 'grid-cols-2' : 'grid-cols-1'} gap-[4px] rounded-[7px] border border-[#2a2b30] bg-[#0d0d0e] p-[3px]`} role="tablist" aria-label="NFTs">
+      {sections.map((s) => {
         const active = section === s.id;
         return (
           <button
@@ -163,7 +171,7 @@ export function ExploreNfts() {
     <div className="!mt-[9px] grid w-full gap-[12px]">
       {sectionTabs}
       <div className="flex border-b border-[#2a2b30]" role="tablist" aria-label="NFT section">
-        {TABS.map((item) => {
+        {tabs.map((item) => {
           const active = tab === item.id;
           return (
             <button

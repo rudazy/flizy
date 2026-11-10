@@ -3,6 +3,7 @@ import { getAccountIdFromCookie } from '../../../../../lib/cookies';
 import { rejectIfCrossOrigin } from '../../../../../lib/requestOrigin.ts';
 import { apiErrorBodyAllowingClientError } from '../../../../../lib/apiError';
 import { setTaskFeatured } from '../../../../../lib/tasks';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 const ROUTE = 'POST|DELETE /api/tasks/[ref]/feature';
 
@@ -30,6 +31,8 @@ async function set(req: Request, rawRef: string, on: boolean): Promise<Response>
 
 /** Feature the task. */
 export async function POST(req: Request, { params: paramsIn }: Params) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('tasks')) return NextResponse.json(pausedBody(), { status: 403 });
   const params = await paramsIn;
   return set(req, params.ref, true);
 }

@@ -15,6 +15,7 @@ import { AppCard as Card, AppCardHeader as CardHeader } from './AppCard';
 import { WalletNfts } from './WalletNfts';
 import { WalletOffers } from './WalletOffers';
 import { AddTokenSheet } from './AddTokenSheet';
+import { WalletEarnings } from './WalletEarnings';
 import { EyeMark } from './BalanceEye';
 import {
   ChevronDownIcon,
@@ -431,9 +432,11 @@ export function WalletBalances() {
         </ul>
       </Card>
 
-      {/* NFTs: every collection the wallet holds, from the explorer. */}
+      {/* NFTs: every collection the wallet holds, from the explorer. Owned NFTs,
+          offers and earnings stay here even while NFT features are paused. */}
       <WalletNfts chainName={chainName} hidden={hidden} />
       <WalletOffers hidden={hidden} />
+      <WalletEarnings hidden={hidden} />
       <AddTokenSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}

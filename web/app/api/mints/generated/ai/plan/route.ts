@@ -7,6 +7,7 @@ import { clientErrorResponse, field, intField, readJson } from '../../../../../.
 import { planCollection, planReady } from '../../../../../../lib/aiCollection.ts';
 import { planWindow, takeUsage, usageQuota } from '../../../../../../lib/generationFee.ts';
 import { generationCaller } from '../../../../../../lib/generatedRequest.ts';
+import { featureOn, pausedBody } from '../../../../../../lib/features.ts';
 
 const ROUTE = 'POST /api/mints/generated/ai/plan';
 
@@ -25,6 +26,8 @@ function textField(raw: unknown, what: string, max: number, required: boolean): 
  * The plan comes back checked and is only a starting point the creator edits.
  */
 export async function POST(req: Request) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('nftMint')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const caller = await generationCaller(req);
     if ('refuse' in caller) return caller.refuse;

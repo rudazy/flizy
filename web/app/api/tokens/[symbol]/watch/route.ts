@@ -3,6 +3,7 @@ import { getAccountIdFromCookie } from '../../../../../lib/cookies';
 import { rejectIfCrossOrigin } from '../../../../../lib/requestOrigin.ts';
 import { apiErrorBodyAllowingClientError } from '../../../../../lib/apiError';
 import { listedTokenKey, setWatched } from '../../../../../lib/tokenSocial';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 const ROUTE = 'POST|DELETE /api/tokens/[symbol]/watch';
 
@@ -24,6 +25,8 @@ async function set(req: Request, symbol: string, on: boolean): Promise<Response>
 
 /** Star the token. */
 export async function POST(req: Request, { params: paramsIn }: Params) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('tokenSocial')) return NextResponse.json(pausedBody(), { status: 403 });
   const params = await paramsIn;
   return set(req, params.symbol, true);
 }

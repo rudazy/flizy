@@ -5,6 +5,7 @@ import { MintError } from '../../../../../lib/mintExecute.ts';
 import { clientErrorResponse, field, readJson } from '../../../../../lib/mintRequest.ts';
 import { decodeImageDataUrl, pinFile, storageReady } from '../../../../../lib/collectionStorage.ts';
 import { generationCaller, spendFromWindow } from '../../../../../lib/generatedRequest.ts';
+import { featureOn, pausedBody } from '../../../../../lib/features.ts';
 
 const ROUTE = 'POST /api/mints/generated/images';
 
@@ -20,6 +21,8 @@ const MAX_REQUEST_BYTES = 3_000_000;
  * uploaded. Each file must really be the PNG, JPEG or WebP it says it is.
  */
 export async function POST(req: Request) {
+  // Paused feature (web/lib/features.ts): nothing new while it is off.
+  if (!featureOn('nftMint')) return NextResponse.json(pausedBody(), { status: 403 });
   try {
     const caller = await generationCaller(req);
     if ('refuse' in caller) return caller.refuse;
