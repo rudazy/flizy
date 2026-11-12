@@ -313,10 +313,24 @@ describe('who can see it', () => {
     assert.match(job, /if \(!bearerMatches\(req\.headers\.get\('authorization'\), process\.env\.CRON_SECRET\)\) \{/);
   });
 
-  it('the page runs no query of its own: it shows only what computeTraction returns', () => {
+  it('the page runs no query of its own: it hands the dashboard only what computeTraction returns', () => {
     const page = read('web/app/dashboard/admin/traction/page.tsx');
     assert.doesNotMatch(page, /\.from\(|\.rpc\(|phone_e164|display_name|agent_wallet/);
-    assert.match(page, /const result = computeTraction\(await loadTractionInput\(db\), \{ exclude \}\);/);
+    assert.match(page, /const without = computeTraction\(input, \{ exclude: true \}\);\s*const everyone = computeTraction\(input, \{ exclude: false \}\);/);
+    assert.match(page, /<TractionDashboard without=\{without\} everyone=\{everyone\} countryNames=\{countryNames\} definitions=\{DEFINITIONS\} \/>/);
+    // The dashboard is a view: it never fetches, so nothing reaches the browser but those results.
+    const view = read('web/components/TractionDashboard.tsx');
+    assert.doesNotMatch(view, /fetch\(|getSupabase|loadTractionInput/);
+  });
+
+  it('the dashboard leads with total and new users, and its tables page, sort and summarise', () => {
+    const view = read('web/components/TractionDashboard.tsx');
+    assert.ok(view.indexOf('label="Total users"') > 0 && view.indexOf('label="Total users"') < view.indexOf('label="New users"'));
+    assert.match(view, /value=\{latest \? latest\.registered_new : 0\}/);
+    assert.match(view, /const PAGE = 5;/);
+    assert.match(view, /aria-sort=\{active \? \(dir === 'asc' \? 'ascending' : 'descending'\) : 'none'\}/);
+    assert.match(view, /if \(col\.kind === 'count'\) return String\(weeks\.reduce/);
+    assert.match(view, /href=\{`\/api\/admin\/traction\$\{mode === 'without' \? '' : '\?exclude=0'\}`\}/);
   });
 });
 
