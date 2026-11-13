@@ -12,7 +12,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ethers } from 'ethers';
 import { ClientError } from '../apiError.ts';
-import { ammoraEnabled, ammoraFeeView, bpsText, checkPrepared, resolveAmmoraToken, shortAddress } from './venue.ts';
+import { ammoraEnabled, ammoraFeeView, bpsText, checkPrepared, impactTooHigh, launchTokens, resolveAmmoraToken, shortAddress } from './venue.ts';
 import { ensureAttested } from './attest.ts';
 import { getRouteClient, loadInventory, prepareAmmora, quoteAmmora, AmmoraQuoteError } from './routes.ts';
 import { flizySymbols, toView } from './catalog.ts';
@@ -31,6 +31,7 @@ export const AMMORA_ROUTE_REFUSALS: Record<string, string> = {
   price_moved: 'The Ammora price moved past your minimum, so nothing was sent. Review the new quote.',
   policy: 'That Ammora route is not one Flizy sends, so nothing was sent.',
   no_gator: 'Ammora swaps need your Flizy smart account.',
+  impact: 'That amount would move the Ammora price by more than half. Try a smaller amount.',
 };
 
 function refuse(reason: string): ClientError {
@@ -48,7 +49,7 @@ async function venue(supabase: SupabaseClient, provider: ethers.Provider, token:
   const inventory = await loadInventory(supabase).catch(() => {
     throw refuse('unavailable');
   });
-  const hit = resolveAmmoraToken(String(token || ''), inventory, flizySymbols());
+  const hit = resolveAmmoraToken(String(token || ''), launchTokens(inventory), flizySymbols());
   if (!hit.ok) throw refuse(hit.reason);
   const { routes } = await getRouteClient(supabase, { inventory }).catch(() => {
     throw refuse('unavailable');
@@ -87,6 +88,7 @@ export async function ammoraSiteQuote(
   } catch (err) {
     throw refuse(err instanceof AmmoraQuoteError ? err.reason : 'unavailable');
   }
+  if (impactTooHigh(quote)) throw refuse('impact');
   const fee = ammoraFeeView(quote, { nativeIn });
   const outDecimals = nativeIn ? token.decimals ?? 18 : 18;
   return {
@@ -156,6 +158,7 @@ export async function ammoraSiteExecute(
     }
     if (quote.minimumAmountOut < reviewed) throw refuse('price_moved');
   }
+  if (impactTooHigh(quote)) throw refuse('impact');
   const prepared = await prepareAmmora(routes, quote, args.gator).catch((err) => {
     throw refuse(err instanceof AmmoraQuoteError ? err.reason : 'unavailable');
   });

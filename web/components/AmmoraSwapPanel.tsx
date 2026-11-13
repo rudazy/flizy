@@ -11,8 +11,9 @@ import { ArrowLeftIcon } from './ExploreIcons';
  * NEXT_PUBLIC_AMMORA_ENABLED is "true".
  *
  * The plan shows what the server will hold the swap to: the minimum received,
- * Ammora's fee with its rate, price impact (unavailable from Ammora, said so
- * rather than guessed), the token's contract and the Ammora source label.
+ * Ammora's fee with its rate, price impact (when Ammora reports it; otherwise
+ * unavailable, said so rather than guessed), the token's contract and the
+ * Ammora source label.
  * On testnet an Ammora swap takes no PIN, like a Flizy swap. The swap goes
  * through /api/swap/execute and Flizy's own executor. Back returns to
  * the Ammora launches view.

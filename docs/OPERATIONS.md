@@ -299,7 +299,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `GAS_BUFFER_ETH` | Reserve kept for gas when checking funding |
 | `AMMORA_ENABLED` | Ammora venue, bots and site server. Default off; off loads nothing and reads nothing. See [Ammora venue](#ammora-venue) |
 | `NEXT_PUBLIC_AMMORA_ENABLED` | Vercel only. Shows the Ammora launches view in Explore. Trade opens the token page, where Buy uses the Ammora venue. Default off |
-| `AMMORA_DATA_API_URL` | Ammora Data API for launch status. Defaults to `https://ammora-giwa-sepolia-data.fly.dev` |
+| `AMMORA_DATA_API_URL` | Ammora Data API for launch flags and logos. Defaults to `https://ammora-giwa-sepolia-data.fly.dev` |
 | `FEATURE_NFT_MARKET` / `FEATURE_NFT_MINT` / `FEATURE_TASKS` / `FEATURE_PROJECTS` / `FEATURE_TOKEN_SOCIAL` / `FEATURE_FOLLOWS` | Paused features, off unless set to `on`; same value on the VPS and on Vercel (`web/lib/features.ts`, `lib/features.js`). Off: hidden from nav, Explore, Home, search, chat help and the docs page, and every route that would start something new answers 403 `feature_paused`. Never gated: owned NFTs in Wallet, NFT send in chat, cancelling listings and offers, withdrawing sale and mint earnings (Wallet, Earnings to withdraw), cancelling a task and publishing its winners, unfollowing, and `/u/<username>` as a pay page |
 | `CUSTODY_RELAYER_KEY` | VPS only. The relayer that sends chat payments through a secured account's signed permissions. Unset: chat payments use the owner key as before. See [Custody relayer](#custody-relayer) |
 | `CUSTODY_PILOT_ACCOUNTS` | Vercel only. Account ids that may secure their wallet with a passkey. Empty: the section is hidden and the routes refuse |
@@ -321,19 +321,27 @@ swap; the SDK only quotes and builds the call.
   10 minutes and warns at prebuild (`web/scripts/verify-ammora.mjs`). A mismatch turns the
   Ammora venue off and nothing else. Regenerate it with `node scripts/ammora-pin.js` after an
   SDK upgrade, and review the diff.
-- **Inventory.** The WhatsApp bot scans the pinned factory for pools and stores them in
-  `ammora_pools` every 10 minutes (the SDK only routes pools with on-chain provenance). The
-  first scan takes a few minutes. The site and the Telegram bot read that table.
+- **Inventory.** The WhatsApp bot scans the pinned launch factory for launches and stores them
+  in `ammora_pools` every 10 minutes (the SDK only routes pools with on-chain provenance). It
+  also scans the pinned deployment's concentrated and compounding factories for the pool each
+  launch graduates to, and stores only the pool the launch's own curve names as canonical. That
+  scan has its own cursor and covers at most 1,000,000 blocks per pass, so the first backfill
+  takes several passes. Launch status is read from each curve's `status()` on chain; the Data
+  API only adds Ammora's flags, and a Data API outage keeps the stored ones. The site and the
+  Telegram bot read that table.
 - **Rules.** Flizy symbols always win: an Ammora token with a Flizy symbol is reached by
   contract address only. An Ammora trade takes no PIN on testnet, pays no Flizy fee, and does not
   count against the daily send limit. Approvals are for the exact amount, reset to zero
   first when an allowance is already there. Every swap is a call to the pinned aggregation
   router only, and its calldata is decoded and checked before sending: paid to the account's
   own smart account, the quoted amounts, no referrer or integrator fee, and only pools
-  discovered from the pinned factory.
+  discovered from the pinned deployment's factories. A quote Ammora reports with a price impact
+  over 50% is refused.
 - **Schema.** `supabase/migrations/20261016140000_ammora_venue.sql` must be applied before
   this code is deployed, even with the flag off: the bots' startup schema check requires
-  `ammora_pools` and `ammora_scan_state`.
+  `ammora_pools` and `ammora_scan_state`. `20261113120000_ammora_graduated_scan.sql` adds the
+  graduated-pool cursor; until it is applied that one step logs an error each pass and the
+  rest of the inventory runs.
 - **Turning it on.** Apply the migration, deploy, restart both bots with
   `AMMORA_ENABLED=true`, wait for the first inventory pass in the WhatsApp journal
   (`[ammora] inventory`), then set `AMMORA_ENABLED` and `NEXT_PUBLIC_AMMORA_ENABLED` on

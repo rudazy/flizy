@@ -100,27 +100,62 @@ export function resolveAmmoraToken<T extends AmmoraToken>(raw: string, inventory
   return matches[0].tradable ? { ok: true, token: matches[0] } : { ok: false, reason: 'not_tradable' };
 }
 
+/**
+ * The launches in an inventory: one row per token, its curve. A graduated
+ * pool is stored for the route client and the pool check only, so a token is
+ * never listed or resolved twice.
+ */
+export function launchTokens<T extends { model: string }>(inventory: T[]): T[] {
+  return inventory.filter((t) => t.model === 'dbc');
+}
+
+/** Above this reported price impact a trade is refused: the pool is too thin for the amount. */
+export const MAX_PRICE_IMPACT_BPS = 5000;
+
+export function impactTooHigh(quote: { priceImpactBps: bigint | number | null }): boolean {
+  return quote.priceImpactBps != null && Number(quote.priceImpactBps) > MAX_PRICE_IMPACT_BPS;
+}
+
 export type FeeQuote = {
   amountIn: bigint;
   expectedAmountOut: bigint;
   priceImpactBps: bigint | null;
+  hops?: ReadonlyArray<{ model?: string }>;
   fees: { total: bigint | null; token: string | null; lp?: bigint | null; protocol?: bigint | null; creator?: bigint | null };
 };
 
-/** The fee and price impact to show for an Ammora quote. */
-export function ammoraFeeView(quote: FeeQuote, side: { nativeIn: boolean }) {
+/** The fee and price impact to show for an Ammora quote. feeWei is in ETH. */
+export function ammoraFeeView(quote: FeeQuote, side: { nativeIn: boolean }, config: VenueConfig = VENUE) {
   const total = BigInt(quote.fees && quote.fees.total != null ? quote.fees.total : 0);
   const fees = (quote.fees || {}) as Record<string, unknown>;
   const classified = ['lp', 'protocol', 'creator'].some((k) => fees[k] != null);
-  // The curve takes its fee in the quote asset (WETH): from the input on a
-  // buy, from the output on a sell.
-  const base = side.nativeIn ? BigInt(quote.amountIn) : BigInt(quote.expectedAmountOut) + total;
+  const amountIn = BigInt(quote.amountIn);
+  const out = BigInt(quote.expectedAmountOut);
+  const feeToken = String((quote.fees && quote.fees.token) || '').toLowerCase();
+  const inEth = !feeToken || feeToken === NATIVE.toLowerCase() || feeToken === config.contracts.wrappedNative.address.toLowerCase();
+  let base: bigint;
+  let feeWei: bigint;
+  if (inEth) {
+    // A launch curve takes its fee in WETH: from the input on a buy, from
+    // the output on a sell.
+    base = side.nativeIn ? amountIn : out + total;
+    feeWei = total;
+  } else if (!side.nativeIn) {
+    // A graduated pool takes its fee from what comes in: the token, on a sell.
+    base = amountIn;
+    feeWei = amountIn > total ? (out * total) / (amountIn - total) : 0n;
+  } else {
+    base = out + total;
+    feeWei = base > 0n ? (amountIn * total) / base : 0n;
+  }
   const rateBps = base > 0n ? Number((total * 10_000n) / base) : null;
+  const pool = (quote.hops || []).some((h) => h && (h.model === 'concentrated' || h.model === 'compounding'));
+  const impactBps = quote.priceImpactBps == null ? null : Number(quote.priceImpactBps);
   return {
-    feeWei: total,
+    feeWei,
     rateBps,
-    label: classified ? 'Ammora fee' : 'Ammora curve fee',
-    priceImpact: quote.priceImpactBps == null ? 'unavailable' : `${(Number(quote.priceImpactBps) / 100).toFixed(2)}%`,
+    label: classified ? 'Ammora fee' : pool ? 'Ammora pool fee' : 'Ammora curve fee',
+    priceImpact: impactBps == null ? 'unavailable' : impactBps >= 10_000 ? 'over 100%' : `${(impactBps / 100).toFixed(2)}%`,
   };
 }
 

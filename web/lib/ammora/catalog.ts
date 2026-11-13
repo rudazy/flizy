@@ -2,12 +2,14 @@
  * Ammora tokens as the site shows them (Explore and the swap token picker).
  *
  * Tokens come from the bot's inventory (ammora_pools: discovered on chain,
- * name, symbol and decimals read from the token contract). Launch status comes
- * from the Data API when it answers, fetched server side with a timeout and a
- * short cache. When that read fails, each pool's stored launch status is used.
- * A launch flagged after that status was written can stay listed until the API
- * answers again. Flagged launches are left out either way. The list is empty
- * and says so only when the venue is off or the inventory cannot be read.
+ * name, symbol and decimals read from the token contract), one per launch: a
+ * pool a launch graduated to is not listed apart. Launch status is the one the
+ * bot stored from each curve's status() on chain. The Data API, fetched server
+ * side with a timeout and a short cache, adds Ammora's flags on top; when it
+ * does not answer, the flags the bot stored are used, so a launch flagged since
+ * can stay listed until the API answers again. Flagged launches are left out
+ * either way. The list is empty and says so only when the venue is off or the
+ * inventory cannot be read.
  * Every name and symbol goes through displaySafeLabel. A logo is the image
  * Ammora published for that token: the token-assets logo, or the image named
  * by Ammora's own media metadata. Any other URL is left out.
@@ -18,7 +20,7 @@ import type { ethers } from 'ethers';
 import { displaySafeLabel } from '../sanitize.ts';
 import { safeImageUrl } from '../nftIndex.ts';
 import { LISTED_TOKENS } from '../listedTokens.ts';
-import { AMMORA_CHAIN_ID, shortAddress } from './venue.ts';
+import { AMMORA_CHAIN_ID, launchTokens, shortAddress } from './venue.ts';
 import { ensureAttested } from './attest.ts';
 import { loadInventory, type InventoryToken } from './routes.ts';
 
@@ -49,7 +51,7 @@ export function flizySymbols(): string[] {
 }
 
 /**
- * Ammora tokens the wallet should read a balance for: every stored pool's
+ * Ammora tokens the wallet should read a balance for: every stored launch's
  * token, symbol sanitized. No Data API call and no attestation (a balance read
  * moves nothing), so the wallet still shows a holding while the venue is off.
  */
@@ -57,7 +59,7 @@ export async function ammoraHoldingCandidates(
   supabase: SupabaseClient
 ): Promise<Array<{ address: string; symbol: string; decimals: number | null }>> {
   const inventory = await loadInventory(supabase);
-  return inventory.map((t) => ({
+  return launchTokens(inventory).map((t) => ({
     address: t.baseToken,
     symbol: displaySafeLabel(t.symbol || 'TOKEN', 16) || 'TOKEN',
     decimals: t.decimals,
@@ -172,34 +174,35 @@ export function toView(t: InventoryToken, status: string | undefined, image?: st
     name: displaySafeLabel(t.name || '', 40),
     decimals: t.decimals,
     status: STATUS_TEXT[String(status)] || 'unknown',
-    tradable: t.tradable && status === 'ACTIVE',
+    // Tradable on its curve while active, or on the pool it graduated to.
+    tradable: t.tradable && (status === 'ACTIVE' || status === 'MIGRATED'),
     label: `${symbol} (${shortAddress(t.baseToken)}, Ammora)`,
     source: 'Ammora launch',
     image: image || null,
   };
 }
 
-/** Last launch status the inventory job stored, keyed by token address. */
+/** Launch status the inventory job stored, keyed by token address. */
 function storedStatuses(inventory: InventoryToken[]): Map<string, string> {
   const map = new Map<string, string>();
-  for (const t of inventory) {
+  for (const t of launchTokens(inventory)) {
     if (t.launchStatus) map.set(t.baseToken.toLowerCase(), t.launchStatus);
   }
   return map;
 }
 
 function project(inventory: InventoryToken[], statuses: Map<string, string>, images: Map<string, string>): AmmoraTokenView[] {
-  return inventory
+  return launchTokens(inventory)
     .filter((t) => statuses.get(t.baseToken.toLowerCase()) !== 'FLAGGED')
     .map((t) => toView(t, statuses.get(t.baseToken.toLowerCase()), images.get(t.baseToken.toLowerCase())))
     .sort((a, b) => Number(b.tradable) - Number(a.tradable) || a.symbol.localeCompare(b.symbol));
 }
 
 /**
- * The Ammora tokens to show. Flagged launches are left out. A live Data API
- * status wins. When that read fails, each pool's stored launch status is used.
- * Empty, with unavailable: true, when the venue is off or the inventory cannot
- * be read.
+ * The Ammora tokens to show. Flagged launches are left out. Each launch's
+ * stored status, from the chain, with a live Data API flag on top when the API
+ * answers. Empty, with unavailable: true, when the venue is off or the
+ * inventory cannot be read.
  */
 export async function listAmmoraTokens(
   supabase: SupabaseClient,
@@ -215,11 +218,16 @@ export async function listAmmoraTokens(
       () => null as LiveLaunches | null
     );
     const [inventory, live] = await Promise.all([inventoryPromise, livePromise]);
-    if (!live) console.warn('[ammora] data API unread, using stored launch status');
-    const statuses = live ? live.statuses : storedStatuses(inventory);
+    if (!live) console.warn('[ammora] data API unread, using stored flags');
+    const statuses = storedStatuses(inventory);
+    if (live) {
+      for (const [address, status] of live.statuses) {
+        if (status === 'FLAGGED') statuses.set(address, 'FLAGGED');
+      }
+    }
     let images = new Map<string, string>();
     if (live) {
-      const shown = inventory.filter((t) => statuses.get(t.baseToken.toLowerCase()) !== 'FLAGGED');
+      const shown = launchTokens(inventory).filter((t) => statuses.get(t.baseToken.toLowerCase()) !== 'FLAGGED');
       const metadata = new Map<string, string>();
       for (const token of shown) {
         const uri = live.metadata.get(token.baseToken.toLowerCase());

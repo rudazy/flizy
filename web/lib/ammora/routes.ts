@@ -16,6 +16,8 @@ const DEFAULT_SLIPPAGE_BPS = 100;
 
 const ROUTE_TTL_MS = 10 * 60_000;
 const TABLE = 'ammora_pools';
+/** Launch curves and the pools they graduate to. The pinned router routes all three. */
+const ROUTED_MODELS = new Set(['dbc', 'concentrated', 'compounding']);
 
 type Sdk = typeof import('@ammora-protocol/sdk');
 let sdkPromise: Promise<Sdk> | null = null;
@@ -154,7 +156,7 @@ export async function getRouteClient(
     routeCatalog: sdk.giwaSepoliaAutoRouteCatalog,
     deploymentCatalog: sdk.giwaSepoliaAutoRouteDeploymentCatalog,
     factoryProfiles: sdk.giwaSepoliaAutoRoutePoolProfiles,
-    aggregationPools: pools.filter((p) => p.model === 'dbc').map(toDiscoveredPool) as never,
+    aggregationPools: pools.filter((p) => ROUTED_MODELS.has(p.model)).map(toDiscoveredPool) as never,
     verificationBlock: await client.getBlockNumber(),
   });
   cached = { key, at: now, routes };
