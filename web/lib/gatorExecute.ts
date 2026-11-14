@@ -11,6 +11,7 @@
 
 import { ethers } from 'ethers';
 import { deriveAgentWallet } from './agentWallet.ts';
+import { topupConfig, topupWouldCover, topUpGasDeposit } from './gasTopup.ts';
 import {
   predictGatorAddress,
   gatorProxyBytecode,
@@ -443,7 +444,29 @@ export async function gatorGasReserveWei(
   } catch {
     deposit = 0n;
   }
-  return prefundShortfallWei(maxFee, deposit);
+  const shortfall = prefundShortfallWei(maxFee, deposit);
+  // Flizy's gas top-up (web/lib/gasTopup.ts) will pay it: the wallet keeps nothing back for gas.
+  if (shortfall > 0n && topupOn() && (await topupWouldCover({ supabase: await topupDb(), wallet: gator, shortfallWei: shortfall }))) {
+    return 0n;
+  }
+  return shortfall;
+}
+
+/**
+ * The database, loaded only once the top-up is on: ./supabase.ts loads the .env
+ * files when it is imported, which nothing on the executor path may do otherwise.
+ */
+async function topupDb() {
+  return (await import('./supabase.ts')).getSupabase();
+}
+
+/** The gas top-up switch, read without throwing: a malformed setting means off here. */
+function topupOn(): boolean {
+  try {
+    return topupConfig().enabled;
+  } catch {
+    return false;
+  }
 }
 
 export function packU128(hi: bigint | number, lo: bigint | number): string {
@@ -628,16 +651,34 @@ export async function executeGatorCall(args: {
 
   let signed: string | null = null;
   let txHash = '';
+  let toppedUp = false;
   for (let attempt = 0; attempt < 2 && !signed; attempt += 1) {
     const floor = lastReceiptBlock.get(gator);
-    const [nonce, balance, deposit] = await Promise.all([
+    const [nonce, balance, depositRead] = await Promise.all([
       readAtLeast(provider, floor, (blockTag) => ep.getNonce(gator, 0, { blockTag }) as Promise<bigint>),
       readAtLeast(provider, floor, (blockTag) => provider.getBalance(gator, blockTag)),
       readAtLeast(provider, floor, (blockTag) => ep.balanceOf(gator, { blockTag }) as Promise<bigint>),
     ]);
+    let deposit = depositRead;
     const fee = await provider.getFeeData();
     const maxPrio = fee.maxPriorityFeePerGas || ethers.parseUnits('1', 'gwei');
     const maxFee = fee.maxFeePerGas || maxPrio * 2n;
+    // With the gas top-up on, Flizy's top-up key pays the prefund into the
+    // deposit first (web/lib/gasTopup.ts), at most once per call. Whatever it
+    // cannot pay, the wallet's own ETH must, as before.
+    const shortfall = prefundRequiredWei(callGas, maxFee, deposit);
+    if (shortfall > 0n && !toppedUp && topupOn()) {
+      toppedUp = true;
+      const topup = await topUpGasDeposit({
+        supabase: await topupDb(),
+        provider,
+        entryPoint: addrs.entryPointV07,
+        wallet: gator,
+        accountId,
+        shortfallWei: shortfall,
+      });
+      if (topup.ok) deposit = await readAtLeast(provider, topup.blockNumber, (blockTag) => ep.balanceOf(gator, { blockTag }) as Promise<bigint>);
+    }
     if (BigInt(balance) < amount + prefundRequiredWei(callGas, maxFee, deposit)) {
       throw new GatorExecError('INSUFFICIENT_GAS_FUNDS', 'Not enough ETH for value plus prefund');
     }

@@ -808,6 +808,36 @@
     },
     {
       "kind": "check",
+      "name": "gas_topups.gas_topups_amount_check",
+      "providedBy": "20261115120000_gas_topups.sql",
+      "requiredBy": "check on gas_topups"
+    },
+    {
+      "kind": "check",
+      "name": "gas_topups.gas_topups_hash_check",
+      "providedBy": "20261115120000_gas_topups.sql",
+      "requiredBy": "check on gas_topups"
+    },
+    {
+      "kind": "check",
+      "name": "gas_topups.gas_topups_reason_check",
+      "providedBy": "20261115120000_gas_topups.sql",
+      "requiredBy": "check on gas_topups"
+    },
+    {
+      "kind": "check",
+      "name": "gas_topups.gas_topups_status_check",
+      "providedBy": "20261115120000_gas_topups.sql",
+      "requiredBy": "check on gas_topups"
+    },
+    {
+      "kind": "check",
+      "name": "gas_topups.gas_topups_wallet_check",
+      "providedBy": "20261115120000_gas_topups.sql",
+      "requiredBy": "check on gas_topups"
+    },
+    {
+      "kind": "check",
       "name": "identity_events.identity_events_channel_check",
       "providedBy": "20260802160000_identity_events.sql",
       "requiredBy": "check on identity_events"
@@ -1858,6 +1888,12 @@
     },
     {
       "kind": "table",
+      "name": "gas_topups",
+      "providedBy": "20261115120000_gas_topups.sql",
+      "requiredBy": "web/lib/gasTopup.ts"
+    },
+    {
+      "kind": "table",
       "name": "identity_bind_attempts",
       "providedBy": "20260802170000_identity_bind_attempts.sql",
       "requiredBy": "web/lib/channelBind.ts"
@@ -2161,6 +2197,12 @@
       "name": "channel_identities_one_phone",
       "providedBy": "20260725100000_channel_identities.sql",
       "requiredBy": "trigger on channel_identities"
+    },
+    {
+      "kind": "trigger",
+      "name": "gas_topups_set_updated_at",
+      "providedBy": "20261115120000_gas_topups.sql",
+      "requiredBy": "trigger on gas_topups"
     },
     {
       "kind": "trigger",
