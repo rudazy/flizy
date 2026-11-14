@@ -103,7 +103,7 @@ function seed() {
 }
 
 const FLZ = '0x308be8f71DA695f18E70D2243a446e1fD1566BA6';
-const hold = (amountEth, asset = 'ETH') =>
+const hold = (amountEth, asset = 'ETH', onSending) =>
   executeClaimHold({
     fromAccountId: ACCOUNT,
     fromWaSender: '2348000000000',
@@ -114,6 +114,7 @@ const hold = (amountEth, asset = 'ETH') =>
     provider,
     chain,
     escrowWallet: { address: ESCROW },
+    onSending,
   });
 
 describe('chat claim hold and the daily passkey limit', () => {
@@ -178,6 +179,43 @@ describe('chat claim hold and the daily passkey limit', () => {
     assert.equal(calls.permission[0].amount, 5n * 10n ** 18n);
     assert.equal(ethers.getAddress(calls.permission[0].to), ESCROW);
     assert.equal(calls.owner.length, 0);
+  });
+});
+
+describe('the "money is moving" notice', () => {
+  const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
+  beforeEach(seed);
+
+  it('a claim hold says it only when the hold can move money', async () => {
+    const said = [];
+    permissionAnswer = { route: 'over_cap', available: 5n * 10n ** 16n, delegate: RELAYER };
+    await hold('0.06', 'ETH', () => said.push('hold'));
+    assert.deepEqual(said, [], 'a refused hold is never announced');
+    permissionAnswer = null;
+    const r = await hold('0.01', 'ETH', () => said.push('hold'));
+    assert.equal(r.ok, true, JSON.stringify(r));
+    assert.deepEqual(said, ['hold']);
+  });
+
+  it('chat says Holding funds and Paying through the engine, not before it', () => {
+    const router = read('lib/router.js');
+    const branch = (open, call) => {
+      const i = router.indexOf(open);
+      return router.slice(i, router.indexOf(call, i));
+    };
+    assert.ok(!branch("if (plan.intent === 'CLAIM_HOLD') {", 'await executeClaimHold({').includes('Holding funds'));
+    assert.ok(router.includes("onSending: () => reply(ctx, 'Holding funds for claim...'),"));
+    assert.ok(!branch("if (plan.intent === 'CHECKOUT') {", 'await checkoutPay.payCheckout({').includes('Paying'));
+    assert.ok(router.includes("onSending: () => reply(ctx, 'Paying...'),"));
+  });
+
+  it('a checkout payment says Paying only after its last refusal', () => {
+    const src = read('lib/api/checkoutPay.js');
+    const body = src.slice(src.indexOf('async function payCheckout('));
+    const said = body.indexOf('await announcer(onSending)()');
+    const lastRefusal = body.lastIndexOf('return { ok: false', body.indexOf('let payBroadcast'));
+    assert.ok(said > lastRefusal, 'after every check');
+    assert.ok(said < body.indexOf('executeGatorCall('), 'before the send');
   });
 });
 

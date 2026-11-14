@@ -118,6 +118,23 @@ export async function takeExternalAttempt(supabase: Db, ipKey: string, now = Dat
   return !insErr;
 }
 
+/** The page's note on a payment the watcher recorded without one, and on its transfers row. */
+async function addMissingNote(supabase: Db, txHash: string, logIndex: number, note: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('external_payments')
+    .update({ note })
+    .eq('tx_hash', txHash.toLowerCase())
+    .eq('log_index', logIndex)
+    .is('note', null)
+    .select('transfer_id');
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (row?.transfer_id) {
+    const { error: tErr } = await supabase.from('transfers').update({ note }).eq('id', row.transfer_id).is('note', null);
+    if (tErr) throw new Error(tErr.message);
+  }
+}
+
 /**
  * Record the payments a confirmed transaction made to this account. Returns
  * the ones recorded by this call; a payment already on record is skipped, so
@@ -151,7 +168,13 @@ export async function recordExternalPayments(
       .select('id');
     if (error) throw new Error(error.message);
     const row = Array.isArray(inserted) ? inserted[0] : inserted;
-    if (!row?.id) continue;
+    if (!row?.id) {
+      // Already on record, by the VPS payment watcher (lib/api/paymentWatcher.js)
+      // when the page was slow to report it. The watcher cannot read the note,
+      // so a note that checks out is added where none is set yet.
+      if (note) await addMissingNote(supabase, p.txHash, pay.logIndex, note);
+      continue;
+    }
 
     // The payee's history reads transfers by the wallet paid. The payer has no
     // account, so the row has none either, and its channel key says where it

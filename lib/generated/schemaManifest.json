@@ -10,6 +10,24 @@
     },
     {
       "kind": "check",
+      "name": "account_notices.account_notices_body_len",
+      "providedBy": "20261027160000_account_notices.sql",
+      "requiredBy": "check on account_notices"
+    },
+    {
+      "kind": "check",
+      "name": "account_notices.account_notices_dedupe_len",
+      "providedBy": "20261027160000_account_notices.sql",
+      "requiredBy": "check on account_notices"
+    },
+    {
+      "kind": "check",
+      "name": "account_notices.account_notices_kind_check",
+      "providedBy": "20261027160000_account_notices.sql",
+      "requiredBy": "check on account_notices"
+    },
+    {
+      "kind": "check",
       "name": "account_reserves.account_reserves_amount_check",
       "providedBy": "20261028140000_account_reserves.sql",
       "requiredBy": "check on account_reserves"
@@ -490,6 +508,54 @@
     },
     {
       "kind": "check",
+      "name": "external_payments.external_payments_amount_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_asset_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_invoice_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_note_len",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_payee_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_payer_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_token_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
+      "name": "external_payments.external_payments_tx_hash_check",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "check on external_payments"
+    },
+    {
+      "kind": "check",
       "name": "identity_events.identity_events_channel_check",
       "providedBy": "20260802160000_identity_events.sql",
       "requiredBy": "check on identity_events"
@@ -934,6 +1000,12 @@
     },
     {
       "kind": "table",
+      "name": "account_notices",
+      "providedBy": "20261027160000_account_notices.sql",
+      "requiredBy": "lib/api/paymentWatcher.js"
+    },
+    {
+      "kind": "table",
       "name": "account_reserves",
       "providedBy": "20261028140000_account_reserves.sql",
       "requiredBy": "lib/reserves.js"
@@ -942,7 +1014,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/payoutWorker.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
     },
     {
       "kind": "table",
@@ -1066,6 +1138,12 @@
     },
     {
       "kind": "table",
+      "name": "external_payments",
+      "providedBy": "20261021150000_external_payments.sql",
+      "requiredBy": "lib/api/paymentWatcher.js"
+    },
+    {
+      "kind": "table",
       "name": "identity_bind_attempts",
       "providedBy": "20260802170000_identity_bind_attempts.sql",
       "requiredBy": "lib/channelBind.js"
@@ -1164,7 +1242,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/custody/approvals.js, lib/custody/ownerKeySpend.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/receipts.js, lib/reconcile.js, lib/transferLog.js"
+      "requiredBy": "lib/api/paymentWatcher.js, lib/custody/approvals.js, lib/custody/ownerKeySpend.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/receipts.js, lib/reconcile.js, lib/transferLog.js"
     },
     {
       "kind": "table",

@@ -492,7 +492,11 @@ startup check and the site build both refuse without it.
   a saved block (`api_payment_cursor`), so a closed page loses nothing; each payment is
   recorded once by `api_record_payment`. Payments add up; the checkout settles when they
   reach the amount, flagged when over. Open checkouts expire (60 minutes by default); a
-  payment after that is still recorded and reported. Return links are accepted only on sites
+  payment after that is still recorded and reported. The same pass records pay page payments
+  from outside wallets (`/pay/<name>`, accounts that turned on outside payments) in
+  `external_payments`, once per log whichever of the page and the watcher sees it first, and
+  only the one that records it tells the payee (chat and site notice; the email goes only from
+  the page). A note is added when the page reports it. Return links are accepted only on sites
   the platform registers on Account, Developers. Requires
   `supabase/migrations/20261110120000_api_payments.sql`.
 
