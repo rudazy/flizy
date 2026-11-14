@@ -4,7 +4,8 @@
  *
  * The same controls as paying any Flizy account (/api/pay/execute): the PIN
  * whenever the tier asks for it (decided here from what will be sent), the
- * account lock, the Savings fence, gas, and the daily ETH limit under the lock.
+ * account lock, the Savings fence, gas, the daily ETH limit under the lock, and
+ * a secured account's daily passkey limit (web/lib/custody/allowanceLeft.ts).
  * The amount is what the checkout still lacks, never a number from the
  * browser, and it goes through FlizyPaymentReceiver with the checkout's invoice
  * id, straight to the platform's wallet, so it settles exactly as a payment
@@ -33,6 +34,8 @@ import { assertSpendable, resolveReserveAsset } from '../../../../../lib/reserve
 import { PAYMENT_RECEIVER, PAYMENT_RECEIVER_ABI } from '../../../../../lib/paymentReceiver.ts';
 import { PAYOUT_ASSETS, plainAmount } from '../../../../../lib/apiPayouts.ts';
 import { checkoutPaymentsIn, loadCheckout, recordCheckoutPayments } from '../../../../../lib/checkout.ts';
+import { passkeyLimitRefusal } from '../../../../../lib/custody/allowanceLeft.ts';
+import { symbolLabel } from '../../../../../lib/listedTokens';
 
 const ROUTE = 'POST /api/checkout/[id]/pay';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -115,6 +118,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const fence = await assertSpendable(supabase, payerId, { asset: info.asset, holding: tokBal, amount: due, gas: 0n, decimals: info.decimals, label: info.label });
         if (!fence.ok) return NextResponse.json({ error: fence.message }, { status: 400 });
         if (tokBal < due) return NextResponse.json({ error: fundingWallText({ kind: 'token', asset: view.asset, address: walletAddr }) }, { status: 400 });
+      }
+      if (viaGator) {
+        const capped = await passkeyLimitRefusal(supabase, provider, {
+          route: ROUTE,
+          accountId: payerId,
+          wallet: walletAddr,
+          symbol: view.asset,
+          label: symbolLabel(view.asset),
+          amount: due,
+          decimals,
+          next: () => 'Pay it from another wallet on this page, or with Flizy once your limit resets.',
+        });
+        if (capped) return NextResponse.json({ error: capped }, { status: 400 });
       }
 
       const { data: logRow } = await supabase

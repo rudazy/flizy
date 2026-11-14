@@ -364,6 +364,17 @@ expires. Requires `supabase/migrations/20261025120000_custody_approvals.sql` on 
 database before this code is deployed: the bots' startup check and the site build both
 refuse without it.
 
+The same limit covers the payments that cannot wait for an approval, which are refused over
+what is left instead:
+- a chat payment to someone not on Flizy yet, whose hold goes to escrow through the
+  permission (`lib/engine/executeClaim.js`);
+- requests and pots in chat;
+- the site's pay page (`/api/pay/execute`) and a checkout paid from the Flizy wallet, on
+  the site or in chat. These go on the owner key, which the permission never sees, so
+  every payment under the limit, chat sends included, counts what the permission reports
+  less these payments of the last 24 hours (`lib/custody/ownerKeySpend.js`,
+  `web/lib/custody/allowanceLeft.ts`). A site payment whose limit cannot be read is refused.
+
 - **Key.** A dedicated key, never `PRIVATE_KEY`: the ops key also submits UserOps and would
   race them for nonces. Its address is `CUSTODY_DELEGATE_ADDRESS` on Vercel; a permission
   names exactly one relayer, so changing the key means re-signing.
@@ -466,12 +477,13 @@ startup check and the site build both refuse without it.
   `flizy.app/checkout/<id>` link; the customer pays it from any wallet through
   FlizyPaymentReceiver, straight to the platform's wallet, or, signed in, from their Flizy
   wallet through the same receiver (`/api/checkout/[id]/pay`: the PIN tiers, account lock,
-  Savings fence and daily limit of any Flizy payment), or in chat: the page's Telegram link
+  Savings fence, daily limit and passkey limit of any Flizy payment), or in chat: the page's Telegram link
   (`?start=co_<id>`) and WhatsApp link (`flizy checkout <id>`, shown only where the bot number
   may be public) open the bot, which pays through the same receiver after CONFIRM
   (`lib/api/checkoutPay.js`). A secured account pays in chat only up to what is left of
-  today's passkey allowance, less its checkout payments of the last 24 hours (they go on the
-  owner key, which the allowance never sees); over that the bot points to the page. Every way pays what is still due.
+  today's passkey allowance, less its checkout and pay-page payments of the last 24 hours (they
+  go on the owner key, which the allowance never sees); over that the bot points to the page,
+  where it can be paid from another wallet. Every way pays what is still due.
   Flizy never holds the money, so no allowance or switch is involved. The page reports the transaction, and the WhatsApp process
   (`startApiPaymentWatcher`, `lib/api/paymentWatcher.js`) also reads the receiver's logs from
   a saved block (`api_payment_cursor`), so a closed page loses nothing; each payment is

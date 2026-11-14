@@ -1164,7 +1164,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/api/checkoutPay.js, lib/custody/approvals.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/receipts.js, lib/reconcile.js, lib/transferLog.js"
+      "requiredBy": "lib/custody/approvals.js, lib/custody/ownerKeySpend.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/receipts.js, lib/reconcile.js, lib/transferLog.js"
     },
     {
       "kind": "table",

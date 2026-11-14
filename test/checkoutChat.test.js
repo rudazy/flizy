@@ -152,7 +152,7 @@ describe('the checkout chat sees and pays', () => {
       { account_id: 'other', note: 'Checkout', asset: 'TUSD', status: 'confirmed', amount_eth: '9', created_at: hourAgo },
     ];
     const supabase = createFakeSupabase({ transfers }).client;
-    assert.equal(await CP.recentCheckoutUnits(supabase, 'payer', 'TUSD', 6), 35000000n);
+    assert.equal(await CP.ownerKeyUnitsToday(supabase, 'payer', 'TUSD', 6), 35000000n);
     const ask = (route, available, amount) =>
       CP.overPasskeyAllowance({ supabase, provider: null, accountId: 'payer', wallet: payee, asset: 'TUSD', amount, planSend: async () => ({ route, available }) });
     // The permission says 50 left; 35 went to checkouts it never saw: 15 is left.

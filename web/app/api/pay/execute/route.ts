@@ -28,6 +28,7 @@ import { siteOrigin } from '../../../../lib/siteOrigin';
 import { symbolLabel } from '../../../../lib/listedTokens';
 import { cleanPayNote } from '../../../../lib/payLink.ts';
 import { assertSpendable, resolveReserveAsset } from '../../../../lib/reserveStore';
+import { passkeyLimitRefusal } from '../../../../lib/custody/allowanceLeft.ts';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -36,6 +37,22 @@ const ERC20_ABI = [
 ];
 
 const ROUTE = 'POST /api/pay/execute';
+
+/**
+ * A secured account's daily passkey limit counts this payment, though it goes
+ * on the owner key: over what is left today it is refused. Chat can send a
+ * larger payment once the passkey approves it; this page cannot wait for that.
+ */
+function passkeyCheck(accountId: string, wallet: string, asset: PayAsset) {
+  return {
+    route: ROUTE,
+    accountId,
+    wallet,
+    symbol: asset,
+    label: symbolLabel(asset),
+    next: (left: string) => `Pay ${left} or less, or send it in chat, where a larger payment can be approved with your passkey.`,
+  };
+}
 
 function gasBufferWei(): bigint {
   try {
@@ -156,6 +173,14 @@ export async function POST(req: Request) {
       if (!daily.ok) {
         return NextResponse.json({ error: daily.message }, { status: 400 });
       }
+      if (viaGator) {
+        const capped = await passkeyLimitRefusal(supabase, provider, {
+          ...passkeyCheck(payerId, walletAddr, asset),
+          amount: amountWei,
+          decimals: 18,
+        });
+        if (capped) return NextResponse.json({ error: capped }, { status: 400 });
+      }
       amountHuman = ethers.formatEther(amountWei);
       const { data: logRow } = await supabase
         .from('transfers')
@@ -275,6 +300,14 @@ export async function POST(req: Request) {
           { error: fundingWallText({ kind: 'token', asset, address: walletAddr }) },
           { status: 400 }
         );
+      }
+      if (viaGator) {
+        const capped = await passkeyLimitRefusal(supabase, provider, {
+          ...passkeyCheck(payerId, walletAddr, asset),
+          amount: amountTok,
+          decimals,
+        });
+        if (capped) return NextResponse.json({ error: capped }, { status: 400 });
       }
       amountHuman = ethers.formatUnits(amountTok, decimals);
       const { data: logRow } = await supabase

@@ -1824,7 +1824,7 @@
       "kind": "table",
       "name": "custody_delegations",
       "providedBy": "20261024120000_custody_passkeys.sql",
-      "requiredBy": "web/lib/custody/ceremony.ts"
+      "requiredBy": "web/lib/custody/allowanceLeft.ts, web/lib/custody/ceremony.ts"
     },
     {
       "kind": "table",
@@ -2082,7 +2082,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/checkout/[id]/pay/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/swap/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/custody/approvals.ts, web/lib/externalPay.ts, web/lib/followStore.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/merchant.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/receipts.ts, web/lib/starterPack.ts, web/lib/swapRateLimit.ts, web/lib/tractionData.ts, web/lib/walletScanRecord.ts"
+      "requiredBy": "web/app/api/account/stats/route.ts, web/app/api/checkout/[id]/pay/route.ts, web/app/api/market/[action]/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/swap/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/lib/ammora/siteSwap.ts, web/lib/custody/allowanceLeft.ts, web/lib/custody/approvals.ts, web/lib/externalPay.ts, web/lib/followStore.ts, web/lib/gatorOutcome.ts, web/lib/generationFee.ts, web/lib/marketRateLimit.ts, web/lib/merchant.ts, web/lib/mintExecute.ts, web/lib/payCode.ts, web/lib/receipts.ts, web/lib/starterPack.ts, web/lib/swapRateLimit.ts, web/lib/tractionData.ts, web/lib/walletScanRecord.ts"
     },
     {
       "kind": "table",
