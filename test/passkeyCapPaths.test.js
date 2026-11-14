@@ -66,6 +66,7 @@ redeem.trySendWithPermission = async (args) => {
 
 const { predictGatorAddress } = require('../lib/gatorAccount');
 const { executeClaimHold } = require('../lib/engine/executeClaim');
+const { executeNativeSend } = require('../lib/engine/executeTransfer');
 const CP = require('../lib/api/checkoutPay');
 
 const ACCOUNT = 'acct-cap';
@@ -158,6 +159,16 @@ describe('chat claim hold and the daily passkey limit', () => {
     assert.equal(calls.owner[0].target, ESCROW);
   });
 
+  it('a limit that cannot be read: refused, nothing sent', async () => {
+    permissionAnswer = { route: 'unchecked' };
+    const r = await hold('0.01');
+    assert.equal(r.ok, false);
+    assert.equal(r.submitted, false);
+    assert.match(r.error, /Could not check your passkey limit right now, so it was not sent/);
+    assert.equal(calls.owner.length, 0);
+    assert.equal(fake.db.tables.claim_hold_attempts[0].status, 'refused');
+  });
+
   it('a FLZ hold is checked against the FLZ permission', async () => {
     permissionAnswer = { route: 'over_cap', available: 10n ** 18n, delegate: RELAYER };
     const r = await hold('5', 'FLZ');
@@ -166,6 +177,37 @@ describe('chat claim hold and the daily passkey limit', () => {
     assert.equal(calls.permission[0].symbol, 'FLZ');
     assert.equal(calls.permission[0].amount, 5n * 10n ** 18n);
     assert.equal(ethers.getAddress(calls.permission[0].to), ESCROW);
+    assert.equal(calls.owner.length, 0);
+  });
+});
+
+describe('a chat send that cannot wait', () => {
+  beforeEach(seed);
+  const sendPlan = () => ({
+    intent: 'SEND',
+    expiresAt: Date.now() + 60000,
+    input: { amount: '0.06', asset: 'ETH', recipientLabel: 'john' },
+    route: { kind: 'native_transfer', toAddress: '0x1111111111111111111111111111111111111111', fromAddress: GATOR },
+    actor: { accountId: ACCOUNT, userId: USER, waSenderId: '2348000000000' },
+  });
+  const send = () => executeNativeSend({ plan: sendPlan(), provider, chain, user: { id: USER, balance_eth: 1, is_admin: false }, supabase: fake.client });
+
+  it('over the limit with no relayer to send an approval: refused with what is left', async () => {
+    permissionAnswer = { route: 'over_cap', available: 5n * 10n ** 16n, delegate: RELAYER, approvable: false };
+    const out = await send();
+    assert.equal(out.ok, false);
+    assert.equal(out.submitted, false);
+    assert.equal(out.approvalPending, undefined);
+    assert.ok(out.error.startsWith('This is more than your passkey allows today (0.05 ETH left of 0.1 ETH), so it was not sent. Larger payments cannot be approved right now. Send 0.05 ETH or less'), out.error);
+    assert.equal(calls.owner.length, 0);
+  });
+
+  it('a limit that cannot be read: refused, nothing sent', async () => {
+    permissionAnswer = { route: 'unchecked' };
+    const out = await send();
+    assert.equal(out.ok, false);
+    assert.equal(out.submitted, false);
+    assert.match(out.error, /Could not check your passkey limit right now, so it was not sent/);
     assert.equal(calls.owner.length, 0);
   });
 });
@@ -228,6 +270,59 @@ describe('chat sends and holds see the owner-key payments too', () => {
       expires_at: new Date((signedAt + C.EXPIRY_SECONDS) * 1000).toISOString(),
     };
   }
+
+const decide = async ({ rows, available = 5n * 10n ** 16n, key, amount, transfers = [] }) => {
+    const saved = process.env.CUSTODY_RELAYER_KEY;
+    process.env.CUSTODY_RELAYER_KEY = key;
+    const lines = [];
+    try {
+      const out = await realTrySend({
+        supabase: createFakeSupabase({ custody_delegations: rows, transfers }).client,
+        provider: {
+          call: async ({ data }) => {
+            if (available instanceof Error) throw available;
+            ENF.decodeFunctionData('getAvailableAmount', data);
+            return ENF.encodeFunctionResult('getAvailableAmount', [available, false, 1n]);
+          },
+        },
+        accountId: ACCOUNT,
+        wallet: GATOR,
+        symbol: 'ETH',
+        amount,
+        to: ESCROW,
+        log: { warn: (l) => lines.push(l), info: (l) => lines.push(l) },
+      });
+      return { out, lines };
+    } finally {
+      if (saved === undefined) delete process.env.CUSTODY_RELAYER_KEY;
+      else process.env.CUSTODY_RELAYER_KEY = saved;
+    }
+  };
+
+  it('no passkey on the account: the owner key, unchanged', async () => {
+    const { out } = await decide({ rows: [], key: '', amount: 10n ** 18n });
+    assert.equal(out, null);
+  });
+
+  it('relayer unavailable, within the limit: the owner key, no friction', async () => {
+    for (const key of ['', 'not-a-key', ethers.Wallet.createRandom().privateKey]) {
+      const { out, lines } = await decide({ rows: [ethRow()], key, amount: 10n ** 16n });
+      assert.equal(out, null, key);
+      assert.match(lines[0], /send on the owner key/);
+    }
+  });
+
+  it('relayer unavailable, over the limit: refused, never the owner key', async () => {
+    const { out, lines } = await decide({ rows: [ethRow()], key: '', amount: 6n * 10n ** 16n });
+    assert.deepEqual(out, { route: 'over_cap', available: 5n * 10n ** 16n, delegate: relayer.address, approvable: false });
+    assert.ok(lines[0].includes('cannot wait for an approval (relayer key unset): refused'), lines[0]);
+  });
+
+  it('a permission whose limit cannot be read: refused, never the owner key', async () => {
+    const broken = { ...ethRow(), salt: '99' };
+    assert.deepEqual((await decide({ rows: [broken], key: relayer.privateKey, amount: 1n })).out, { route: 'unchecked' });
+    assert.deepEqual((await decide({ rows: [ethRow()], key: relayer.privateKey, amount: 1n, available: new Error('rpc down') })).out, { route: 'unchecked' });
+  });
 
   it('a pay-page payment today leaves less for a chat send: over that, it waits for the passkey', async () => {
     const saved = process.env.CUSTODY_RELAYER_KEY;
