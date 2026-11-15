@@ -4,9 +4,10 @@
  * Mirror of lib/gasTopup.js (web/ cannot import root lib/), which documents the
  * rules: the GAS_TOPUP_ENABLED switch and its own key (never PRIVATE_KEY), one
  * top-up in flight per key through the relayer lease, the per-wallet daily cap
- * at FEE_ETH_USD_RATE, the gas_topups row written before each top-up, and that
- * a top-up which cannot be made never fails the payment. test/gasTopup.test.js
- * runs both.
+ * and the daily cap across every wallet at FEE_ETH_USD_RATE (both checked
+ * again once the pending row is written), the gas_topups row written before
+ * each top-up, and that a top-up which cannot be made never fails the
+ * payment. test/gasTopup.test.js runs both.
  *
  * Testnet stopgap: a deposit can be withdrawn by the wallet's owner, so this is
  * replaced with a paymaster before ownership moves to users.
@@ -24,13 +25,16 @@ export const TOPUP_MARGIN_BPS = 12_500n;
 const DEPOSIT_GAS_LIMIT = 80_000n;
 const RECEIPT_TIMEOUT_MS = 60_000;
 const DEFAULT_WALLET_DAILY_CAP_USD = '0.5';
+const DEFAULT_DAILY_CAP_USD = '10';
+const COUNT_PAGE = 1000;
+const COUNT_MAX_PAGES = 50;
 
 const EP_IFACE = new ethers.Interface(['function depositTo(address account) payable', 'function balanceOf(address account) view returns (uint256)']);
 
 type Env = Record<string, string | undefined>;
 type Log = { warn: (line: string) => void; info: (line: string) => void };
 
-export type TopupConfig = Readonly<{ enabled: boolean; address: string | null; walletDailyCap: bigint; ethUsd: bigint }>;
+export type TopupConfig = Readonly<{ enabled: boolean; address: string | null; walletDailyCap: bigint; dailyCap: bigint; ethUsd: bigint }>;
 
 /** Error text for a log line: URLs (which can carry an RPC key) dropped, capped. */
 function short(err: unknown): string {
@@ -54,10 +58,17 @@ export function topupConfig(env: Env = process.env): TopupConfig {
   }
   if (enabled && !address) throw new Error('GAS_TOPUP_ENABLED needs GAS_TOPUP_PRIVATE_KEY');
   const capRaw = String(env.GAS_TOPUP_WALLET_DAILY_CAP_USD || '').trim() || DEFAULT_WALLET_DAILY_CAP_USD;
+  const dailyRaw = String(env.GAS_TOPUP_DAILY_CAP_USD || '').trim() || DEFAULT_DAILY_CAP_USD;
   const rateRaw = String(env.FEE_ETH_USD_RATE || '').trim() || FEE_DEFAULTS.FEE_ETH_USD_RATE;
   const ethUsd = parseUsdMicro(rateRaw, 'FEE_ETH_USD_RATE');
   if (ethUsd === 0n) throw new Error('FEE_ETH_USD_RATE must be above zero');
-  return Object.freeze({ enabled, address, walletDailyCap: parseUsdMicro(capRaw, 'GAS_TOPUP_WALLET_DAILY_CAP_USD'), ethUsd });
+  return Object.freeze({
+    enabled,
+    address,
+    walletDailyCap: parseUsdMicro(capRaw, 'GAS_TOPUP_WALLET_DAILY_CAP_USD'),
+    dailyCap: parseUsdMicro(dailyRaw, 'GAS_TOPUP_DAILY_CAP_USD'),
+    ethUsd,
+  });
 }
 
 export function topupAmountWei(shortfallWei: bigint): bigint {
@@ -80,13 +91,60 @@ export async function toppedUpToday(supabase: SupabaseClient, wallet: string, no
   return ((data || []) as Array<{ usd_micro: string | number }>).reduce((sum, r) => sum + BigInt(r.usd_micro), 0n);
 }
 
+/** micro-USD topped up for every wallet in the last 24 hours, pending or sent, read in pages. Throws when it cannot be read or counted. */
+export async function toppedUpTotalToday(supabase: SupabaseClient, now: number = Date.now()): Promise<bigint> {
+  let sum = 0n;
+  for (let page = 0; page < COUNT_MAX_PAGES; page += 1) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('usd_micro')
+      .in('status', ['pending', 'sent'])
+      .gte('created_at', new Date(now - DAY_MS).toISOString())
+      .order('id', { ascending: true })
+      .range(page * COUNT_PAGE, (page + 1) * COUNT_PAGE - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data || []) as Array<{ usd_micro: string | number }>;
+    sum += rows.reduce((total, r) => total + BigInt(r.usd_micro), 0n);
+    if (rows.length < COUNT_PAGE) return sum;
+  }
+  throw new Error('too many top-ups today to count');
+}
+
+/** The UTC day the daily cap was last reported, in this process. */
+let capAlertDay: string | null = null;
+
+/** Tests only: forget that the cap was reported today. */
+export function resetCapAlert(): void {
+  capAlertDay = null;
+}
+
+/** The daily cap was reached: reported to Sentry once per UTC day, per process. Never throws. */
+async function alertDailyCap(cfg: TopupConfig, log: Log, alert?: (text: string) => Promise<void> | void, now: number = Date.now()): Promise<void> {
+  const day = new Date(now).toISOString().slice(0, 10);
+  if (capAlertDay === day) return;
+  capAlertDay = day;
+  const text = `the daily cap of $${(Number(cfg.dailyCap) / 1e6).toFixed(2)} across all wallets is reached, so no wallet is topped up until it frees. Wallets pay their own gas meanwhile.`;
+  log.warn(`[gas-topup] ${text}`);
+  try {
+    if (alert) {
+      await alert(text);
+    } else {
+      const Sentry = await import('@sentry/nextjs');
+      Sentry.captureException(new Error(`[gas-topup] ${text}`));
+    }
+  } catch (err) {
+    log.warn(`[gas-topup] cap alert failed: ${short(err)}`);
+  }
+}
+
 /** Whether a top-up would cover this shortfall right now. Reads only; never throws. */
 export async function topupWouldCover(p: { supabase: SupabaseClient; wallet: string; shortfallWei: bigint; env?: Env }): Promise<boolean> {
   try {
     const cfg = topupConfig(p.env ?? process.env);
     if (!cfg.enabled || BigInt(p.shortfallWei) <= 0n) return false;
     const usd = weiToUsdMicro(topupAmountWei(p.shortfallWei), cfg.ethUsd);
-    return (await toppedUpToday(p.supabase, p.wallet)) + usd <= cfg.walletDailyCap;
+    if ((await toppedUpToday(p.supabase, p.wallet)) + usd > cfg.walletDailyCap) return false;
+    return (await toppedUpTotalToday(p.supabase)) + usd <= cfg.dailyCap;
   } catch {
     return false;
   }
@@ -106,6 +164,8 @@ export async function topUpGasDeposit(p: {
   log?: Log;
   /** Tests hand in a recording signer; live, it is always the top-up key. */
   signer?: Pick<ethers.Wallet, 'address' | 'populateTransaction' | 'signTransaction'>;
+  /** Told when the daily cap across all wallets is reached; Sentry by default. */
+  alert?: (text: string) => Promise<void> | void;
 }): Promise<TopupResult> {
   const env = p.env ?? process.env;
   const log = p.log ?? console;
@@ -139,6 +199,16 @@ export async function topUpGasDeposit(p: {
     return fail(null, `could not read today's top-ups (${short(err)})`);
   }
   if (spent + usdMicro > cfg.walletDailyCap) return fail(null, 'daily cap reached');
+  let total: bigint;
+  try {
+    total = await toppedUpTotalToday(supabase);
+  } catch (err) {
+    return fail(null, `could not read today's total (${short(err)})`);
+  }
+  if (total + usdMicro > cfg.dailyCap) {
+    await alertDailyCap(cfg, log, p.alert);
+    return fail(null, 'daily cap across all wallets reached');
+  }
 
   const key = p.signer ?? new ethers.Wallet(String(env.GAS_TOPUP_PRIVATE_KEY).trim(), provider);
   const data = EP_IFACE.encodeFunctionData('depositTo', [ethers.getAddress(p.wallet)]);
@@ -157,6 +227,17 @@ export async function topUpGasDeposit(p: {
     .maybeSingle();
   if (insErr || !row || !row.id) return fail(null, `could not record the top-up (${insErr ? insErr.message : 'no row'})`);
   const rowId = String(row.id);
+  // Counted again with this row in: a top-up written in between is seen, and
+  // over either cap this one is not sent.
+  try {
+    if ((await toppedUpToday(supabase, walletLower)) > cfg.walletDailyCap) return fail(rowId, 'daily cap reached');
+    if ((await toppedUpTotalToday(supabase)) > cfg.dailyCap) {
+      await alertDailyCap(cfg, log, p.alert);
+      return fail(rowId, 'daily cap across all wallets reached');
+    }
+  } catch (err) {
+    return fail(rowId, `could not read today's top-ups (${short(err)})`);
+  }
 
   let sent: { hash: string; kind: 'accepted' | 'rejected' | 'unknown'; err?: unknown };
   try {

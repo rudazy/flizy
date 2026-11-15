@@ -295,7 +295,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `SESSION_TTL_MS` / `SESSION_MAX_MS` | Chat unlock: ends after this long without a message (default 30 min), and never later than this after the PIN was entered (default 8 h) |
 | `FEES_ENABLED` / `FEE_TREASURY_ADDRESS` | Payment fees, off unless `FEES_ENABLED=true`; on needs the treasury address: the wallet that receives the swap fees (`feeRouter.treasury`), whose key is never on a server. Same values on the VPS and Vercel. Rules and rates: `lib/fees.js` (mirror `web/lib/fees.ts`). With it on, chat sends charge the fee; see [Payment fees](#payment-fees) for what is covered |
 | `FEE_P2P_BASE_USD` / `FEE_P2P_STEP_USD` / `FEE_P2P_STEP_SIZE_USD` / `FEE_MERCHANT_BPS` / `FEE_GAS_MARGIN_BPS` / `FEE_ABSORB_MAX_MULTIPLE` / `FEE_ABSORB_DAILY_CAP_USD` / `FEE_ETH_USD_RATE` | Fee rates. Defaults: $0.02 up to $100 plus $0.01 per started $100, merchants 1%, gas margin 20%, absorb up to 2x the tier fee within $5 a day, testnet ETH at $3,000. `feeConfig` refuses a malformed value rather than falling back |
-| `GAS_TOPUP_ENABLED` / `GAS_TOPUP_PRIVATE_KEY` / `GAS_TOPUP_WALLET_DAILY_CAP_USD` | Gas paid for wallets through their EntryPoint deposit, off unless `GAS_TOPUP_ENABLED=true`; on needs its own key (never `PRIVATE_KEY`), on the VPS and Vercel. $0.50 per wallet per day by default. See [Gas top-up](#gas-top-up) |
+| `GAS_TOPUP_ENABLED` / `GAS_TOPUP_PRIVATE_KEY` / `GAS_TOPUP_WALLET_DAILY_CAP_USD` / `GAS_TOPUP_DAILY_CAP_USD` | Gas paid for wallets through their EntryPoint deposit, off unless `GAS_TOPUP_ENABLED=true`; on needs its own key (never `PRIVATE_KEY`), on the VPS and Vercel. $0.50 per wallet and $10 across all wallets per day by default. See [Gas top-up](#gas-top-up) |
 | `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes. Slippage above 500 (5%) is cut to 500 by every quote; an unreadable value is 100 |
 | `CHAIN_GIWA_SEPOLIA_*` | Optional overrides for WETH, routers, FLZ, pair |
 | `FLIZY_TREASURY` | Treasury passed at DEX deploy time (defaults to ops). The live fee destination is `feeRouter.treasury` on chain, changed with `setTreasury`, not with this variable |
@@ -405,6 +405,13 @@ the site and chat keep back for gas is zero for it.
 - **Cap.** At most `GAS_TOPUP_WALLET_DAILY_CAP_USD` per wallet over 24 hours ($0.50 by default),
   priced at `FEE_ETH_USD_RATE`. Each top-up is a row in `gas_topups` (pending, sent or failed),
   written before it is sent so a second send counts it.
+- **Daily cap.** At most `GAS_TOPUP_DAILY_CAP_USD` across all wallets over 24 hours ($10 by
+  default), so many wallets together cannot drain the key. Both caps are counted again once the
+  row is written, so two top-ups racing past a cap are never both sent. When it is
+  reached, no wallet is topped up until older top-ups leave the 24-hour window, and it is
+  reported once a day per process: from the bots to the admins in chat and to Sentry, from the
+  site to Sentry. `supabase/migrations/20261115150000_gas_topups_created_idx.sql` indexes that
+  read; the code works without it, only slower.
 - **Never a failure.** A top-up that cannot be made (off, over the cap, key out of ETH, lease
   busy, refused, unmined, reverted) only means the wallet pays its own gas as before, or the send
   refuses for want of it. Each one logs `[gas-topup] not topped up: <reason>`.

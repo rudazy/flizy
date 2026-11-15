@@ -4,7 +4,10 @@
  *
  * Covers: off unless GAS_TOPUP_ENABLED is exactly true, on needs a key of its
  * own (never PRIVATE_KEY); the per-wallet daily cap, counting pending and sent
- * top-ups of the last 24 hours only; a row written before anything is sent; a
+ * top-ups of the last 24 hours only; the daily cap across every wallet ($10 by
+ * default), counted in pages, refusing when it cannot be counted, checked
+ * again once the row is written so racing top-ups are never both sent, and the
+ * admins told once a day; a row written before anything is sent; a
  * refused broadcast marked failed, an unanswered one kept as sent; a key out
  * of ETH tops up nothing; the reserve a covered wallet keeps back for gas is
  * zero; and both executors top up before their funds check, only when on.
@@ -164,6 +167,114 @@ describe('a top-up', () => {
       const out = await run(m, fake.client, chain({ receipt: { status: 0, blockNumber: 78 } }));
       assert.deepEqual(out, { ok: false, reason: 'the deposit reverted' });
       assert.equal(fake.db.tables.gas_topups[0].status, 'failed');
+    }
+  });
+});
+
+describe('the daily cap across all wallets', () => {
+  const hourAgo = () => new Date(Date.now() - 3600e3).toISOString();
+  const other = (usd, over = {}) => ({ wallet: '0x' + 'cd'.repeat(20), usd_micro: String(usd), status: 'sent', created_at: hourAgo(), ...over });
+  const signer = { address: KEY.address, populateTransaction: async (tx) => tx, signTransaction: async () => '0x' + 'ab'.repeat(40) };
+  const chain = () => {
+    const calls = { broadcast: 0 };
+    return {
+      calls,
+      provider: {
+        getFeeData: async () => ({ maxFeePerGas: 10n ** 9n, gasPrice: 10n ** 9n }),
+        getBalance: async () => 10n ** 18n,
+        broadcastTransaction: async () => {
+          calls.broadcast += 1;
+        },
+        waitForTransaction: async () => ({ status: 1, blockNumber: 77 }),
+      },
+    };
+  };
+  // 8e12 wei x 1.25 = 1e13 wei = $0.03.
+  const run = (m, supabase, c, extra = {}) =>
+    m.topUpGasDeposit({ supabase, provider: c.provider, entryPoint: ENTRY_POINT, wallet: WALLET, shortfallWei: 8n * 10n ** 12n, env: ON, log: quiet, signer, ...extra });
+
+  it('$10 by default, set by GAS_TOPUP_DAILY_CAP_USD, a malformed value refused', () => {
+    for (const m of sides()) {
+      assert.equal(m.topupConfig(ON).dailyCap, 10_000_000n);
+      assert.equal(m.topupConfig({ ...ON, GAS_TOPUP_DAILY_CAP_USD: '2.5' }).dailyCap, 2_500_000n);
+      assert.throws(() => m.topupConfig({ ...ON, GAS_TOPUP_DAILY_CAP_USD: 'ten' }));
+    }
+  });
+
+  it('counts every wallet, pending and sent, over the last 24 hours, past one page of rows', async () => {
+    for (const m of sides()) {
+      const rows = Array.from({ length: 2500 }, () => other(1));
+      rows.push(other(500, { status: 'pending', wallet: WALLET.toLowerCase() }));
+      rows.push(other(900_000, { status: 'failed' }));
+      rows.push(other(900_000, { created_at: new Date(Date.now() - 25 * 3600e3).toISOString() }));
+      assert.equal(await m.toppedUpTotalToday(createFakeSupabase({ gas_topups: rows }).client), 3000n);
+    }
+  });
+
+  it('too many rows to count, or a read that fails: refused, nothing topped up', async () => {
+    for (const m of sides()) {
+      const many = createFakeSupabase({ gas_topups: Array.from({ length: 50_000 }, () => other(1)) }).client;
+      await assert.rejects(m.toppedUpTotalToday(many), /too many top-ups/);
+      const fake = createFakeSupabase({ gas_topups: [] });
+      const realFrom = fake.client.from.bind(fake.client);
+      fake.client.from = (t) => {
+        const q = realFrom(t);
+        const realRange = q.range.bind(q);
+        q.range = (...a) => Object.assign(realRange(...a), { then: (ok) => ok({ data: null, error: { message: 'down' } }) });
+        return q;
+      };
+      const c = chain();
+      const out = await run(m, fake.client, c);
+      assert.equal(out.ok, false);
+      assert.match(out.reason, /could not read today's total/);
+      assert.equal(fake.db.tables.gas_topups.length, 0);
+      assert.equal(c.calls.broadcast, 0);
+    }
+  });
+
+  it('other wallets near the cap: this wallet is not topped up though its own cap has room, and the admins are told once', async () => {
+    for (const m of sides()) {
+      m.resetCapAlert();
+      const told = [];
+      const alert = async (text) => told.push(text);
+      const fake = createFakeSupabase({ gas_topups: [other(9_980_000)] });
+      assert.equal(await m.topupWouldCover({ supabase: fake.client, wallet: WALLET, shortfallWei: 8n * 10n ** 12n, env: ON }), false);
+      assert.equal(await m.topupWouldCover({ supabase: fake.client, wallet: WALLET, shortfallWei: 8n * 10n ** 12n, env: { ...ON, GAS_TOPUP_DAILY_CAP_USD: '20' } }), true);
+      const c = chain();
+      for (let i = 0; i < 2; i += 1) {
+        assert.deepEqual(await run(m, fake.client, c, { alert }), { ok: false, reason: 'daily cap across all wallets reached' });
+      }
+      assert.equal(fake.db.tables.gas_topups.length, 1);
+      assert.equal(c.calls.broadcast, 0);
+      assert.equal(told.length, 1);
+      assert.match(told[0], /daily cap of \$10\.00 across all wallets is reached/);
+      // Exactly at the cap still fits.
+      const edge = createFakeSupabase({ gas_topups: [other(9_970_000)] });
+      assert.equal((await run(m, edge.client, chain(), { alert })).ok, true);
+    }
+  });
+
+  it('a top-up written by another process in between: counted again after this row, and this one is not sent', async () => {
+    for (const m of sides()) {
+      m.resetCapAlert();
+      const fake = createFakeSupabase({ gas_topups: [other(9_960_000)] });
+      const realFrom = fake.client.from.bind(fake.client);
+      fake.client.from = (t) => {
+        const q = realFrom(t);
+        const realInsert = q.insert.bind(q);
+        // The racing top-up lands just as this one's row is written.
+        q.insert = (row) => {
+          fake.db.tables.gas_topups.push(other(30_000));
+          return realInsert(row);
+        };
+        return q;
+      };
+      const c = chain();
+      const out = await run(m, fake.client, c, { alert: async () => {} });
+      assert.deepEqual(out, { ok: false, reason: 'daily cap across all wallets reached' });
+      const mine = fake.db.tables.gas_topups.find((r) => r.wallet === WALLET.toLowerCase());
+      assert.equal(mine.status, 'failed');
+      assert.equal(c.calls.broadcast, 0);
     }
   });
 });
