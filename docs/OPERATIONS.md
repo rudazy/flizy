@@ -350,6 +350,25 @@ swap; the SDK only quotes and builds the call.
   (`[ammora] inventory`), then set `AMMORA_ENABLED` and `NEXT_PUBLIC_AMMORA_ENABLED` on
   Vercel and redeploy.
 
+### Payment fees
+
+Off unless `FEES_ENABLED=true`, and no payment charges a fee yet: the pieces are built, the
+payment paths are not wired to them.
+
+- **Rules.** `lib/fees.js` (mirror `web/lib/fees.ts`): the person-to-person tiers, merchants 1%,
+  the busy-network rule and its daily absorption cap, rounding. Settings: the `FEE_*` rows above.
+- **Quote.** `lib/feeQuote.js` prices the fee (ETH at `FEE_ETH_USD_RATE`, tUSD at $1, FLZ from the
+  Flizy FLZ/WETH pool's reserves), estimates the gas of a payment carrying its fee, and reads what
+  Flizy absorbed today from the ledger.
+- **Carrying the fee.** A wallet pays the payment and the fee in one all-or-nothing UserOp
+  (`executeGatorCall` with `calls`, the account's ERC-7579 batch mode); a permission send makes
+  both transfers in one `redeemDelegations` (`redeemCalldataMany`), so both count against the
+  daily passkey limit. Both are proven on a local fork: `scripts/fees-fork-check.js`.
+- **Ledger.** `fee_ledger`, one row per fee once its payment lands, unique per source, never
+  edited: the fee, the price and its source, the gas estimate, what was absorbed, and the gas
+  Flizy actually paid with the fee net of it. `supabase/migrations/20261115130000_fee_ledger.sql`
+  must be applied before this code is deployed: the bots' startup schema check requires it.
+
 ### Gas top-up
 
 Off unless `GAS_TOPUP_ENABLED=true`. With it on, a wallet's UserOp gas is paid by Flizy: just

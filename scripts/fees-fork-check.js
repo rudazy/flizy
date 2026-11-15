@@ -11,6 +11,10 @@
  *   3. An EntryPoint deposit paid by someone else (depositTo) funds a UserOp
  *      from an account that holds no ETH for gas.
  *
+ * The batch and the two-execution redeem are built with Flizy's own encoders
+ * (encodeBatchExecuteCall, redeemCalldataMany), so what passes here is the
+ * exact bytes the payment code sends. The FLZ fee price is read from the pool.
+ *
  * Local only. It deploys a throwaway HybridDeleGator owned by a random key,
  * funds it with fork-only balances, and refuses any RPC that is not a local
  * fork of chain 91342. Nothing here reaches the live chain.
@@ -23,7 +27,9 @@
 const { ethers } = require('ethers');
 const C = require('../lib/custody/delegations');
 const { gatorProxyBytecode, gatorAddresses } = require('../lib/gatorAccount');
-const { encodeExecuteCall, signUserOp, packU128, userOpSucceeded } = require('../lib/gatorExecute');
+const { encodeExecuteCall, encodeBatchExecuteCall, signUserOp, packU128, userOpSucceeded } = require('../lib/gatorExecute');
+const { priceMicroFor } = require('../lib/feeQuote');
+const { feeConfig } = require('../lib/fees');
 
 const RPC = process.env.FORK_RPC || '';
 
@@ -39,10 +45,6 @@ const EP = new ethers.Interface([
   'function balanceOf(address account) view returns (uint256)',
   'event UserOperationEvent(bytes32 indexed userOpHash, address indexed sender, address indexed paymaster, uint256 nonce, bool success, uint256 actualGasCost, uint256 actualGasUsed)',
 ]);
-/** ERC-7579 execute as HybridDeleGator v1.3.0 exposes it, and its batch mode (call type 0x01, default exec type). */
-const MODE_EXEC = new ethers.Interface(['function execute(bytes32 _mode, bytes _executionCalldata) payable']);
-const BATCH_MODE = '0x01' + '00'.repeat(31);
-const DM = new ethers.Interface(['function redeemDelegations(bytes[] _permissionContexts, bytes32[] _modes, bytes[] _executionCallDatas)']);
 const FAILED_OP = new ethers.Interface(['error FailedOp(uint256 opIndex, string reason)']);
 
 /** A liquidity pair holds real tUSD; on a fork it can be impersonated to fund the test account. */
@@ -60,11 +62,6 @@ function revertText(err) {
     return ethers.AbiCoder.defaultAbiCoder().decode(['string'], '0x' + data.slice(10))[0];
   }
   return String(err?.shortMessage || err?.message || err);
-}
-
-/** abi.encode(Execution[]), the batch encoding ERC-7579 ExecutionLib decodes. */
-function encodeBatch(calls) {
-  return ethers.AbiCoder.defaultAbiCoder().encode(['tuple(address target, uint256 value, bytes callData)[]'], [calls.map((c) => [c.target, c.value, c.data])]);
 }
 
 async function main() {
@@ -142,7 +139,8 @@ async function main() {
     }
     return { ok: rcpt.status === 1 && userOpSucceeded(rcpt, entryPoint, account), landed: rcpt.status === 1, gas, outerGas: rcpt.gasUsed, reason: '' };
   }
-  const batch = (calls) => MODE_EXEC.encodeFunctionData('execute', [BATCH_MODE, encodeBatch(calls)]);
+  // The bytes Flizy itself builds (lib/gatorExecute.js, lib/custody/delegations.js).
+  const batch = (calls) => encodeBatchExecuteCall(calls);
 
   // ---- 1. Batch mode
   await setBalance(account, ethers.parseEther('1'));
@@ -197,14 +195,7 @@ async function main() {
       const digest = C.delegationDigest(s.delegation);
       return { ...s, delegation: { ...s.delegation, signature: owner.signingKey.sign(digest).serialized } };
     });
-  const contextOf = (amount) => DM.decodeFunctionData('redeemDelegations', C.redeemCalldata(eth, { to: recipient, amount }))[0][0];
-  const executionTo = (to, amount) => DM.decodeFunctionData('redeemDelegations', C.redeemCalldata(eth, { to, amount }))[2][0];
-  const twoOf = (payAmount, feeAmount) =>
-    DM.encodeFunctionData('redeemDelegations', [
-      [contextOf(payAmount), contextOf(feeAmount)],
-      [ethers.ZeroHash, ethers.ZeroHash],
-      [executionTo(recipient, payAmount), executionTo(treasury, feeAmount)],
-    ]);
+  const twoOf = (payAmount, feeAmount) => C.redeemCalldataMany(eth, [{ to: recipient, amount: payAmount }, { to: treasury, amount: feeAmount }]);
   async function redeem(data) {
     try {
       await provider.call({ from: relayer.address, to: C.CONTRACTS.delegationManager, data });
@@ -261,6 +252,10 @@ async function main() {
     tokenSponsored.ok && (await tokenBalance(recipient)) - t1 === 10n ** 6n,
     tokenSponsored.reason
   );
+
+  // ---- The FLZ price a fee is charged at, read from the Flizy pool on the fork.
+  const flz = await priceMicroFor('FLZ', { provider, cfg: feeConfig({}), chainKey: 'giwa_sepolia' });
+  record('price: FLZ is priced from the Flizy pool', flz.priceMicro > 0n && flz.source === 'Flizy FLZ/WETH pool', `${flz.priceMicro} micro-USD per FLZ`);
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${results.length - failed}/${results.length} passed`);

@@ -556,6 +556,42 @@
     },
     {
       "kind": "check",
+      "name": "fee_ledger.fee_ledger_amounts_check",
+      "providedBy": "20261115130000_fee_ledger.sql",
+      "requiredBy": "check on fee_ledger"
+    },
+    {
+      "kind": "check",
+      "name": "fee_ledger.fee_ledger_asset_check",
+      "providedBy": "20261115130000_fee_ledger.sql",
+      "requiredBy": "check on fee_ledger"
+    },
+    {
+      "kind": "check",
+      "name": "fee_ledger.fee_ledger_hash_check",
+      "providedBy": "20261115130000_fee_ledger.sql",
+      "requiredBy": "check on fee_ledger"
+    },
+    {
+      "kind": "check",
+      "name": "fee_ledger.fee_ledger_kind_check",
+      "providedBy": "20261115130000_fee_ledger.sql",
+      "requiredBy": "check on fee_ledger"
+    },
+    {
+      "kind": "check",
+      "name": "fee_ledger.fee_ledger_price_source_check",
+      "providedBy": "20261115130000_fee_ledger.sql",
+      "requiredBy": "check on fee_ledger"
+    },
+    {
+      "kind": "check",
+      "name": "fee_ledger.fee_ledger_source_kind_check",
+      "providedBy": "20261115130000_fee_ledger.sql",
+      "requiredBy": "check on fee_ledger"
+    },
+    {
+      "kind": "check",
       "name": "gas_topups.gas_topups_amount_check",
       "providedBy": "20261115120000_gas_topups.sql",
       "requiredBy": "check on gas_topups"
@@ -1171,6 +1207,12 @@
       "name": "external_payments",
       "providedBy": "20261021150000_external_payments.sql",
       "requiredBy": "lib/api/paymentWatcher.js"
+    },
+    {
+      "kind": "table",
+      "name": "fee_ledger",
+      "providedBy": "20261115130000_fee_ledger.sql",
+      "requiredBy": "lib/feeQuote.js"
     },
     {
       "kind": "table",
