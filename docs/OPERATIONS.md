@@ -293,7 +293,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `DEFAULT_QUICK_SEND_ETH` | Most one ETH payment to a known recipient may be without the PIN (default 0.005), and the ceiling on an account's own value. Only applies while the transaction PIN is on (`txPin` in `lib/tiers.js` and `web/lib/txPin.ts`; off on testnet). Set the same on the VPS and on Vercel |
 | `PENDING_TTL_MS` / `LINK_CODE_TTL_MS` | Plan and link code lifetimes |
 | `SESSION_TTL_MS` / `SESSION_MAX_MS` | Chat unlock: ends after this long without a message (default 30 min), and never later than this after the PIN was entered (default 8 h) |
-| `FEES_ENABLED` / `FEE_TREASURY_ADDRESS` | Payment fees, off unless `FEES_ENABLED=true`; on needs the treasury address, a separate wallet from `FLIZY_TREASURY` whose key is never on a server. Same values on the VPS and Vercel. Rules and rates: `lib/fees.js` (mirror `web/lib/fees.ts`). No payment charges a fee yet: the engine is not wired in |
+| `FEES_ENABLED` / `FEE_TREASURY_ADDRESS` | Payment fees, off unless `FEES_ENABLED=true`; on needs the treasury address, a separate wallet from `FLIZY_TREASURY` whose key is never on a server. Same values on the VPS and Vercel. Rules and rates: `lib/fees.js` (mirror `web/lib/fees.ts`). With it on, chat sends charge the fee; see [Payment fees](#payment-fees) for what is covered |
 | `FEE_P2P_BASE_USD` / `FEE_P2P_STEP_USD` / `FEE_P2P_STEP_SIZE_USD` / `FEE_MERCHANT_BPS` / `FEE_GAS_MARGIN_BPS` / `FEE_ABSORB_MAX_MULTIPLE` / `FEE_ABSORB_DAILY_CAP_USD` / `FEE_ETH_USD_RATE` | Fee rates. Defaults: $0.02 up to $100 plus $0.01 per started $100, merchants 1%, gas margin 20%, absorb up to 2x the tier fee within $5 a day, testnet ETH at $3,000. `feeConfig` refuses a malformed value rather than falling back |
 | `GAS_TOPUP_ENABLED` / `GAS_TOPUP_PRIVATE_KEY` / `GAS_TOPUP_WALLET_DAILY_CAP_USD` | Gas paid for wallets through their EntryPoint deposit, off unless `GAS_TOPUP_ENABLED=true`; on needs its own key (never `PRIVATE_KEY`), on the VPS and Vercel. $0.50 per wallet per day by default. See [Gas top-up](#gas-top-up) |
 | `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes. Slippage above 500 (5%) is cut to 500 by every quote; an unreadable value is 100 |
@@ -352,8 +352,17 @@ swap; the SDK only quotes and builds the call.
 
 ### Payment fees
 
-Off unless `FEES_ENABLED=true`, and no payment charges a fee yet: the pieces are built, the
-payment paths are not wired to them.
+Off unless `FEES_ENABLED=true`. With it on, a chat send of ETH, FLZ or tUSD from a smart-account
+wallet charges the person-to-person fee (`lib/engine/sendFee.js`). Not yet: request and pot
+payments, payments to someone not on Flizy, the site, checkouts and API payouts; NFTs and older
+plain wallets never carry one. A send over the daily passkey limit that is approved with the
+passkey goes without its fee for now: the approval covers the payment only.
+
+- **In chat.** The fee is quoted when the plan is made and shown in the preview (fee, total, and
+  what the recipient gets when the fee comes out of the amount); CONFIRM sends exactly that. The
+  balance, Savings, daily ETH limit and passkey limit checks all count the payment plus the fee.
+  When the spendable balance does not cover both, the fee comes out of the amount; below the fee
+  the send is refused. The receipt names the fee.
 
 - **Rules.** `lib/fees.js` (mirror `web/lib/fees.ts`): the person-to-person tiers, merchants 1%,
   the busy-network rule and its daily absorption cap, rounding. Settings: the `FEE_*` rows above.

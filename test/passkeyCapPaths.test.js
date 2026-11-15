@@ -309,7 +309,7 @@ describe('chat sends and holds see the owner-key payments too', () => {
     };
   }
 
-const decide = async ({ rows, available = 5n * 10n ** 16n, key, amount, transfers = [] }) => {
+const decide = async ({ rows, available = 5n * 10n ** 16n, key, amount, transfers = [], fee }) => {
     const saved = process.env.CUSTODY_RELAYER_KEY;
     process.env.CUSTODY_RELAYER_KEY = key;
     const lines = [];
@@ -328,6 +328,7 @@ const decide = async ({ rows, available = 5n * 10n ** 16n, key, amount, transfer
         symbol: 'ETH',
         amount,
         to: ESCROW,
+        fee,
         log: { warn: (l) => lines.push(l), info: (l) => lines.push(l) },
       });
       return { out, lines };
@@ -354,6 +355,14 @@ const decide = async ({ rows, available = 5n * 10n ** 16n, key, amount, transfer
     const { out, lines } = await decide({ rows: [ethRow()], key: '', amount: 6n * 10n ** 16n });
     assert.deepEqual(out, { route: 'over_cap', available: 5n * 10n ** 16n, delegate: relayer.address, approvable: false });
     assert.ok(lines[0].includes('cannot wait for an approval (relayer key unset): refused'), lines[0]);
+  });
+
+  it('a fee counts with the payment: a payment that fits alone but not with its fee waits for the passkey', async () => {
+    const fee = { to: '0x' + '7e'.repeat(20), amount: 2n * 10n ** 15n };
+    const { out } = await decide({ rows: [ethRow()], key: relayer.privateKey, amount: 49n * 10n ** 15n, fee });
+    assert.deepEqual(out, { route: 'over_cap', available: 5n * 10n ** 16n, delegate: relayer.address });
+    const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'custody', 'redeem.js'), 'utf8');
+    assert.ok(src.includes('const data = fee ? C.redeemCalldataMany(signed, [{ to, amount }, { to: fee.to, amount: fee.amount }]) : C.redeemCalldata(signed, { to, amount });'));
   });
 
   it('a permission whose limit cannot be read: refused, never the owner key', async () => {
