@@ -4,8 +4,10 @@
  *
  * Covers: with fees off nothing changes a plan; on without a treasury, no send
  * is planned; the fee on top when it fits, out of the amount when it does not
- * (Savings and the gas reserve counted), refused below the fee; no fee on a
- * request or pot payment, an NFT or an older plain wallet; the preview and the
+ * (Savings and the gas reserve counted), refused below the fee; a request or
+ * pot payment pays it on top only, never from the amount; a claim hold carries
+ * it, with a preview that says it is not refunded; no fee on an NFT or from an
+ * older plain wallet; the preview and the
  * receipt name the fee; the plan-stage checks count it; the executors send the
  * payment and the fee in one UserOp, hand the fee to the permission path, and
  * write one ledger row once it lands; and the router quotes the fee before its
@@ -43,7 +45,7 @@ redeem.trySendWithPermission = async (args) => {
 };
 
 const SF = require('../lib/engine/sendFee');
-const { assertPlanFunded, formatPlanPreview } = require('../lib/engine/plan');
+const { assertPlanFunded, formatPlanPreview, formatClaimPlanPreview } = require('../lib/engine/plan');
 const { formatSendReceipt } = require('../lib/engine/receipt');
 const { refusePlanSpend } = require('../lib/reserves');
 const { executeNativeSend } = require('../lib/engine/executeTransfer');
@@ -113,6 +115,62 @@ beforeEach(() => seed());
 const attach = (p, extra = {}) =>
   SF.attachSendFee({ plan: p, supabase: fake.client, provider, chainKey: 'giwa_sepolia', accountId: ACCOUNT, ethBalanceWei: 10n ** 18n, gasBufferWei: 0n, env: ON, log: quiet, ...extra });
 
+/** A chat claim hold plan, shaped as lib/engine/plan.js buildClaimPlan makes it. */
+function claimPlan(over = {}) {
+  const token = over.asset === 'TUSD';
+  return {
+    intent: 'CLAIM_HOLD',
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 5 * 60_000,
+    input: { amount: over.amount || (token ? '10' : '0.01'), asset: over.asset || 'ETH', recipient: '+2348099999999', recipientKind: 'phone' },
+    route: { kind: 'claim_hold', chainId: 91342, chainName: 'GIWA Sepolia', fromAddress: GATOR, toWaHint: '2348099999999', tokenAddress: token ? TUSD : null, nftTokenId: over.nftTokenId || null },
+    actor: { accountId: ACCOUNT, userId: USER, waSenderId: '2348000000000' },
+    policyChecks: {},
+  };
+}
+
+describe('a claim hold at plan time', () => {
+  it('ETH: the fee on top, in the preview, with the not-refunded line', async () => {
+    const p = claimPlan();
+    assert.deepEqual(await attach(p), { ok: true });
+    assert.deepEqual([p.fee.asset, p.fee.feeUnits, p.fee.feeFromAmount], ['ETH', String(ETH_FEE), false]);
+    const preview = formatClaimPlanPreview(p);
+    assert.match(preview, /Fee: {5}0\.000006666666666667 ETH \(\$0\.02\)/);
+    assert.match(preview, /Total: {3}0\.010006666666666667 ETH/);
+    assert.match(preview, /The fee is not refunded if the claim is cancelled or expires\./);
+    assert.equal(SF.planFee(p).units, ETH_FEE);
+  });
+
+  it('a token hold pays the fee in the token, from the token balance', async () => {
+    const p = claimPlan({ asset: 'TUSD' });
+    assert.deepEqual(await attach(p, { tokenBalanceUnits: 100n * 10n ** 6n }), { ok: true });
+    assert.deepEqual([p.fee.asset, p.fee.feeUnits], ['TUSD', '20000']);
+    const none = claimPlan({ asset: 'TUSD' });
+    assert.equal((await attach(none, { tokenBalanceUnits: null })).ok, false);
+  });
+
+  it('no fee on an NFT hold, and fees off leaves the preview as it was', async () => {
+    const nft = claimPlan({ nftTokenId: '7' });
+    assert.deepEqual(await attach(nft), { ok: true });
+    assert.equal(nft.fee, undefined);
+    const off = claimPlan();
+    assert.deepEqual(await attach(off, { env: {} }), { ok: true });
+    assert.equal(off.fee, undefined);
+    assert.doesNotMatch(formatClaimPlanPreview(off), /Fee:|not refunded/);
+  });
+
+  it('the planning handler quotes it and the router hands it to the hold', () => {
+    const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+    const handler = read('lib/handlers/claims.js');
+    const body = handler.slice(handler.indexOf('async function openClaimHold('));
+    const quoted = body.indexOf('await attachSendFee(');
+    assert.ok(quoted > 0 && quoted < body.indexOf('await refusePlanSpend('), 'before the balance checks');
+    const router = read('lib/router.js');
+    const call = router.slice(router.indexOf('await executeClaimHold({'));
+    assert.ok(call.slice(0, call.indexOf('});')).includes('fee: planFee(plan),'));
+  });
+});
+
 describe('at plan time', () => {
   it('fees off: the plan is left exactly as it was', async () => {
     const p = plan();
@@ -163,11 +221,27 @@ describe('at plan time', () => {
     assert.match(tiny.message, /has to be more than the \$0\.02 fee/);
   });
 
-  it('no fee on a request or pot payment, or from an older plain wallet', async () => {
-    for (const p of [plan({ paymentRequestId: 'req-1' }), plan({ potId: 'pot-1' }), plan({ fromAddress: '0x' + '55'.repeat(20) })]) {
+  it('a request or pot payment pays the fee on top, and is refused rather than paid short', async () => {
+    for (const over of [{ paymentRequestId: 'req-1' }, { potId: 'pot-1' }]) {
+      const p = plan(over);
       assert.deepEqual(await attach(p), { ok: true });
-      assert.equal(p.fee, undefined);
+      assert.equal(p.fee.feeFromAmount, false);
+      assert.equal(p.input.amount, '0.01');
+      assert.equal(p.fee.totalUnits, String(10n ** 16n + ETH_FEE));
+      // Exactly the amount spendable: the fee would come from it, so nothing is planned.
+      const short = plan(over);
+      const out = await attach(short, { ethBalanceWei: 10n ** 16n });
+      assert.equal(out.ok, false);
+      assert.match(out.message, /^This needs 0\.01 ETH plus the \$0\.02 fee \(0\.000006666666666667 ETH\), and your balance does not cover both, so nothing was sent\.$/);
+      assert.equal(short.fee, undefined);
+      assert.equal(short.input.amount, '0.01');
     }
+  });
+
+  it('no fee from an older plain wallet', async () => {
+    const p = plan({ fromAddress: '0x' + '55'.repeat(20) });
+    assert.deepEqual(await attach(p), { ok: true });
+    assert.equal(p.fee, undefined);
   });
 
   it('the balance and Savings checks count the fee', async () => {
