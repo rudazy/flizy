@@ -355,8 +355,9 @@ swap; the SDK only quotes and builds the call.
 Off unless `FEES_ENABLED=true`. With it on, a chat send of ETH, FLZ or tUSD from a smart-account
 wallet charges the person-to-person fee (`lib/engine/sendFee.js`). Not yet: request and pot
 payments, payments to someone not on Flizy, the site, checkouts and API payouts; NFTs and older
-plain wallets never carry one. A send over the daily passkey limit that is approved with the
-passkey goes without its fee for now: the approval covers the payment only.
+plain wallets never carry one. A send over the daily passkey limit is approved with the passkey for
+exactly the payment; once it lands, its fee is collected through the daily permission, or waived
+when the permission cannot take it. It is never sent on the owner key.
 
 - **In chat.** The fee is quoted when the plan is made and shown in the preview (fee, total, and
   what the recipient gets when the fee comes out of the amount); CONFIRM sends exactly that. The
@@ -373,10 +374,15 @@ passkey goes without its fee for now: the approval covers the payment only.
   (`executeGatorCall` with `calls`, the account's ERC-7579 batch mode); a permission send makes
   both transfers in one `redeemDelegations` (`redeemCalldataMany`), so both count against the
   daily passkey limit. Both are proven on a local fork: `scripts/fees-fork-check.js`.
-- **Ledger.** `fee_ledger`, one row per fee once its payment lands, unique per source, never
-  edited: the fee, the price and its source, the gas estimate, what was absorbed, and the gas
-  Flizy actually paid with the fee net of it. `supabase/migrations/20261115130000_fee_ledger.sql`
-  must be applied before this code is deployed: the bots' startup schema check requires it.
+- **Ledger.** `fee_ledger`, one row per fee, unique per source: the fee, the price and its
+  source, the gas estimate, what was absorbed, and the gas Flizy actually paid with the fee net of
+  it. A row is written as `pending` before its payment is sent (nothing is sent without it), then
+  moves once: `charged` when the payment lands, `waived` (with a reason) when it is not sent,
+  reverts or the fee cannot be collected. A payment with no answer stays pending until the
+  reconciler settles it, and settles its fee with it. Amounts are never edited.
+  `supabase/migrations/20261115130000_fee_ledger.sql` and
+  `supabase/migrations/20261115140000_fee_ledger_state.sql` must be applied before this code is
+  deployed: the bots' startup schema check requires both.
 
 ### Gas top-up
 
