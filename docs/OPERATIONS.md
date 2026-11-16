@@ -355,8 +355,8 @@ swap; the SDK only quotes and builds the call.
 Off unless `FEES_ENABLED=true`. With it on, a chat send of ETH, FLZ or tUSD from a smart-account
 wallet charges the person-to-person fee (`lib/engine/sendFee.js`), including a request or pot
 payment and a claim hold for someone not on Flizy, and a payment on the site pay page
-(`web/lib/payFee.ts`). Not yet: checkouts and API payouts; NFTs and older plain wallets never
-carry one. A send over the daily passkey limit is approved with the passkey for
+(`web/lib/payFee.ts`), and every Flizy Pay API payout (paid by the platform). Not yet:
+checkouts; NFTs and older plain wallets never carry one. A send over the daily passkey limit is approved with the passkey for
 exactly the payment; once it lands, its fee is collected through the daily permission, or waived
 when the permission cannot take it. It is never sent on the owner key.
 
@@ -370,6 +370,16 @@ when the permission cannot take it. It is never sent on the owner key.
 - **Claim holds.** The fee goes in the same transaction as the hold, and the preview says it is
   not refunded: a cancelled or expired claim returns the amount and keeps the fee. Its ledger
   source is the hold attempt (`claim_hold_attempts`), and the reconciler settles it with the hold.
+- **API payouts.** The platform pays the fee on each payout, on top, in the payout's asset, in the
+  same redeem as the payout through its allowance (`lib/api/payoutFee.js`,
+  `lib/api/allowanceSend.js`); the recipient always gets the full amount, so a payout whose
+  allowance or balance cannot cover both fails rather than paying less. Per platform, set only by
+  Flizy with `scripts/api-platform.mjs payout-fee` (`api_platforms.payout_fee_mode`): `tier` (the
+  person-to-person tiers, the default), `bps` (`fee_bps` of each payout) or `none`. The fee is
+  stored on the payout (`api_transactions.fee_amount`), recorded as kind `api_payout`, and shown
+  on the platform's Developers page. A claim payout's fee is kept if the claim is refunded.
+  `supabase/migrations/20261116150000_api_payout_fee.sql` must be applied before deploying: the
+  schema checks require its constraints.
 - **Business accounts.** An account turns Business on from Account > Business after accepting
   the business terms (`web/lib/businessTerms.ts`, versioned; `accounts.is_business`,
   `business_terms_version`, `business_since`, migration

@@ -46,6 +46,8 @@ export type Platform = {
   wallet_address: string;
   enabled: boolean;
   fee_bps: number;
+  /** How Flizy charges this platform's payouts (lib/api/payoutFee.js): 'tier', 'bps' or 'none'. */
+  payout_fee_mode: string;
   claim_expiry_default_days: number;
   claim_expiry_max_days: number;
 };
@@ -62,7 +64,7 @@ export type KeyView = {
   revokedAt: string | null;
 };
 
-const PLATFORM_COLS = 'id, account_id, display_name, wallet_address, enabled, fee_bps, claim_expiry_default_days, claim_expiry_max_days';
+const PLATFORM_COLS = 'id, account_id, display_name, wallet_address, enabled, fee_bps, payout_fee_mode, claim_expiry_default_days, claim_expiry_max_days';
 const KEY_COLS = 'id, label, prefix, mode, scopes, ip_allowlist, created_at, last_used_at, revoked_at';
 /** Live keys a platform may hold at once. The api_keys_cap trigger enforces the same number. */
 export const MAX_ACTIVE_KEYS = 10;

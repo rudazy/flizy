@@ -18,11 +18,18 @@
  *   node scripts\api-platform.mjs --env-file .env payouts off --confirm
  *   node scripts\api-platform.mjs --env-file .env limits --username naru --asset tUSD --max 50 --daily 500 [--notice 25] --confirm
  *   node scripts\api-platform.mjs --env-file .env limits --username naru --asset tUSD --remove --confirm
+ *   node scripts\api-platform.mjs --env-file .env payout-fee --username naru --mode tier --confirm
+ *   node scripts\api-platform.mjs --env-file .env payout-fee --username naru --mode bps --bps 50 --confirm
+ *   node scripts\api-platform.mjs --env-file .env payout-fee --username naru --mode none --confirm
  *
  * Approval binds the platform to the account's current Flizy wallet. Granting
  * payout is recorded by the api_key_events trigger and emailed to the owner.
  * API payouts also need API_PAYOUTS_ENABLED=true in the environment; this
  * script cannot set that.
+ *
+ * payout-fee sets what the platform pays per payout, on top, while Flizy fees
+ * are on (lib/api/payoutFee.js): tier (the person-to-person tiers, the
+ * default), bps (--bps of each payout, 1 to 1000) or none.
  *
  * Limits are per asset (ETH, FLZ, tUSD): --max is the most one payout may move,
  * --daily the most a rolling day may move, and the platform's passkey-signed
@@ -118,10 +125,11 @@ async function main() {
     case 'list': {
       const { data: control } = await db.from('api_control').select('payouts_enabled').eq('id', true).maybeSingle();
       console.log(`Database payout switch: ${control?.payouts_enabled ? 'on' : 'off'}`);
-      const { data, error } = await db.from('api_platforms').select('id, display_name, wallet_address, enabled, fee_bps, claim_expiry_default_days, claim_expiry_max_days');
+      const { data, error } = await db.from('api_platforms').select('id, display_name, wallet_address, enabled, fee_bps, payout_fee_mode, claim_expiry_default_days, claim_expiry_max_days');
       if (error) throw new Error(error.message);
       for (const p of data || []) {
-        console.log(`${p.enabled ? 'enabled ' : 'disabled'} ${p.display_name} wallet ${p.wallet_address} fee ${p.fee_bps}bps claims ${p.claim_expiry_default_days}/${p.claim_expiry_max_days}d`);
+        const fee = p.payout_fee_mode === 'bps' ? `${p.fee_bps}bps` : p.payout_fee_mode;
+        console.log(`${p.enabled ? 'enabled ' : 'disabled'} ${p.display_name} wallet ${p.wallet_address} payout fee ${fee} claims ${p.claim_expiry_default_days}/${p.claim_expiry_max_days}d`);
         const { data: keys } = await db.from('api_keys').select('prefix, mode, scopes, revoked_at').eq('platform_id', p.id);
         for (const k of keys || []) console.log(`    ${k.prefix} ${k.mode} [${k.scopes.join(', ')}]${k.revoked_at ? ' revoked' : ''}`);
       }
@@ -158,6 +166,21 @@ async function main() {
           .update({ enabled: command === 'enable', updated_at: new Date().toISOString() })
           .eq('account_id', account.id)
           .select('id');
+        if (error) throw new Error(error.message);
+        if (!data || data.length === 0) throw new Error(`@${account.username} is not an approved platform`);
+      });
+      return;
+    }
+    case 'payout-fee': {
+      const account = await accountByUsername(db, flag('--username'));
+      const mode = String(flag('--mode') || '');
+      if (!['tier', 'bps', 'none'].includes(mode)) throw new Error('--mode is tier, bps or none');
+      const patch = { payout_fee_mode: mode, updated_at: new Date().toISOString() };
+      if (mode === 'bps') patch.fee_bps = intFlag('--bps', 0, 1, 1000);
+      else if (flag('--bps') != null) throw new Error('--bps goes with --mode bps only');
+      const label = mode === 'bps' ? `${patch.fee_bps}bps of each payout` : mode === 'tier' ? 'the person-to-person tiers' : 'no fee';
+      await write(`set the payout fee of @${account.username} to ${label}`, async () => {
+        const { data, error } = await db.from('api_platforms').update(patch).eq('account_id', account.id).select('id');
         if (error) throw new Error(error.message);
         if (!data || data.length === 0) throw new Error(`@${account.username} is not an approved platform`);
       });

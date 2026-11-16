@@ -18,6 +18,7 @@ import { PAYOUT_ASSETS, PAYOUT_COLUMNS, payoutView, plainAmount, type PayoutRow,
 import { listDeliveries, listEndpoints } from '../../../lib/apiWebhooks.ts';
 import { PAYMENT_COLUMNS, listOrigins, paymentView, type PaymentRow } from '../../../lib/apiPayments.ts';
 import { siteOrigin } from '../../../lib/siteOrigin';
+import { payoutFeeText } from '../../../lib/payoutFeeText.ts';
 
 const ROUTE = 'GET /api/developers';
 
@@ -53,6 +54,7 @@ export async function GET() {
           wallet: platform.wallet_address,
           enabled: platform.enabled,
           feeBps: platform.fee_bps,
+          payoutFee: payoutFeeText(platform.payout_fee_mode, platform.fee_bps),
           claimExpiryDays: platform.claim_expiry_default_days,
           claimExpiryMaxDays: platform.claim_expiry_max_days,
         },

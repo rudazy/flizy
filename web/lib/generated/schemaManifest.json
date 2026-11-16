@@ -316,6 +316,12 @@
     },
     {
       "kind": "check",
+      "name": "api_platforms.api_platforms_payout_fee_mode_check",
+      "providedBy": "20261116150000_api_payout_fee.sql",
+      "requiredBy": "check on api_platforms"
+    },
+    {
+      "kind": "check",
       "name": "api_platforms.api_platforms_wallet_check",
       "providedBy": "20261104120000_api_foundation.sql",
       "requiredBy": "check on api_platforms"
@@ -330,6 +336,12 @@
       "kind": "check",
       "name": "api_transactions.api_transactions_claim_expiry_check",
       "providedBy": "20261106120000_api_claims.sql",
+      "requiredBy": "check on api_transactions"
+    },
+    {
+      "kind": "check",
+      "name": "api_transactions.api_transactions_fee_amount_check",
+      "providedBy": "20261116150000_api_payout_fee.sql",
       "requiredBy": "check on api_transactions"
     },
     {

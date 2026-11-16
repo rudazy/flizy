@@ -7,7 +7,8 @@
  * UserOp (ETH by value, a token by transfer); the permission path is handed
  * the fee; a hold that lands charges it, one refused or reverted waives it,
  * one with no answer leaves it pending; a fee is never taken by a plain wallet
- * or with an NFT; and the reconciler charges or waives the pending fee of a
+ * or with an NFT; an API claim payout's allowance carries the fee in the same
+ * redeem, and one that refuses waives it; and the reconciler charges or waives the pending fee of a
  * hold it settles, keyed by the hold attempt.
  *
  * Run: node --test test/claimHoldFee.test.js
@@ -256,12 +257,26 @@ describe('a chat claim hold with a fee', () => {
     assert.equal(ledger().length, 0);
   });
 
-  it('a payout allowance with a fee: refused, nothing sent or recorded', async () => {
-    const r = await hold({ permission: { ownerKey: false, send: async () => { throw new Error('must not send'); } } });
+  it('a payout allowance (an API claim payout): the hold and its fee in the same redeem, charged, relayer gas', async () => {
+    const sends = [];
+    const send = async (args) => {
+      sends.push(args);
+      await args.onBroadcast(HASH);
+      return { route: 'permission', txHash: HASH, receipt: { status: 1, blockNumber: 9, gasUsed: 1n, gasPrice: 1n, logs: [] } };
+    };
+    const r = await hold({ permission: { ownerKey: false, send } });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    assert.equal(calls.owner.length, 0);
+    assert.deepEqual([sends[0].amount, sends[0].to, sends[0].fee], [10n ** 16n, ESCROW, { to: TREASURY, amount: FEE_UNITS }]);
+    assert.deepEqual([ledger()[0].state, ledger()[0].gas_paid_wei], ['charged', '1']);
+  });
+
+  it('a payout allowance that refuses: nothing sent, the fee waived', async () => {
+    const r = await hold({ permission: { ownerKey: false, send: async () => null } });
     assert.equal(r.ok, false);
     assert.equal(r.submitted, false);
-    assert.equal(calls.owner.length + calls.permission.length, 0);
-    assert.equal(ledger().length, 0);
+    assert.equal(calls.owner.length, 0);
+    assert.equal(ledger()[0].state, 'waived');
   });
 
   it('no fee: the hold is a single call, as before, and the ledger untouched', async () => {

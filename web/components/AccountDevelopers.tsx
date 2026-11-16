@@ -39,7 +39,7 @@ type Key = {
 };
 
 type DevData = {
-  platform: { name: string; wallet: string; enabled: boolean; feeBps: number; claimExpiryDays: number; claimExpiryMaxDays: number };
+  platform: { name: string; wallet: string; enabled: boolean; feeBps: number; payoutFee: string; claimExpiryDays: number; claimExpiryMaxDays: number };
   mode: 'test' | 'live';
   payoutsEnabled: boolean;
   keys: Key[];
@@ -292,7 +292,7 @@ export function AccountDevelopers() {
           <Row name="Status" value={platform.enabled ? 'Approved' : 'Paused by Flizy'} />
           <Row name="Payout wallet" value={`${platform.wallet.slice(0, 6)}...${platform.wallet.slice(-4)}`} />
           <Row name="Mode" value={data.mode === 'test' ? 'Test (GIWA Sepolia)' : 'Live'} />
-          <Row name="Fee" value={`${(platform.feeBps / 100).toFixed(2)}%`} />
+          <Row name="Payout fee" value={platform.payoutFee} />
           <Row name="Claim expiry" value={`${platform.claimExpiryDays} days (up to ${platform.claimExpiryMaxDays})`} />
           <Row name="API payouts" value={data.payoutsEnabled ? 'On' : 'Off'} />
         </dl>
