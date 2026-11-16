@@ -10,6 +10,10 @@
  * here are the ones that refuse: a pasted wallet must never open a buy, and a
  * token with no pool must say so rather than quote against nothing.
  *
+ * The question under a token offers quick amounts (lib/buyAmounts.js):
+ * buttons on Telegram, a list on WhatsApp, editable per account. A button only
+ * answers the token it was made for, and a pick is the same as typing it.
+ *
  * Run: node --test test/pasteBuy.test.js
  */
 
@@ -189,7 +193,7 @@ describe('what the paste answers with', () => {
     assert.match(out, /MOON/);
     assert.match(out, /Liquidity/);
     assert.match(out, /has not reviewed this token\. You can still buy it/);
-    assert.match(out, /How much ETH/i);
+    assert.match(out, /Buy MOON with ETH\./);
     assert.equal(router.pendingFlowFor(KEY).tokenBuy, true);
   });
 
@@ -254,5 +258,188 @@ describe('the amount step', () => {
     await router.handle(ctx, '0x2222222222222222222222222222222222222222');
     assert.match(sent.join('\n'), /OTHER/);
     assert.equal(router.pendingFlowFor(KEY).tokenBuy, true);
+  });
+});
+
+const buyAmounts = require('../lib/buyAmounts');
+const { TelegramBot } = require('../lib/telegram/bot');
+
+const WA = '2348011112222';
+const WA_KEY = `whatsapp:${WA}`;
+const TAG = TOKEN.toLowerCase().slice(-8);
+
+/** A ctx that keeps each reply with its options, for the buttons. */
+function recordingCtx(channel = 'telegram') {
+  const sent = [];
+  const tg = channel === 'telegram';
+  return {
+    sent,
+    ctx: {
+      channel,
+      externalId: tg ? TG : WA,
+      key: tg ? KEY : WA_KEY,
+      raw: {},
+      reply: async (text, opts) => {
+        sent.push({ text, opts });
+      },
+      resolveVerifiedPhone: async () => null,
+      requestPhone: async () => {},
+    },
+  };
+}
+const lastText = (sent) => sent[sent.length - 1].text;
+const lastButtons = (sent) => sent[sent.length - 1].opts && sent[sent.length - 1].opts.buttons;
+const account = () => fake.db.tables.accounts.find((a) => a.id === 'acc-buyer');
+
+describe('quick buy amounts', () => {
+  beforeEach(() => {
+    seed();
+    fake.db.tables.channel_identities.push({ id: 'i2', account_id: 'acc-buyer', channel: 'whatsapp', external_id: WA, phone_e164: `+${WA}` });
+    router.discardPendingFlows(KEY);
+    router.discardPendingFlows(WA_KEY);
+    codeAt = '0x60806040';
+    overview = withPool();
+  });
+
+  it('Telegram: the default amounts as buttons, then Edit, then Cancel', async () => {
+    const { sent, ctx } = recordingCtx();
+    await router.handle(ctx, TOKEN);
+    assert.match(lastText(sent), /Buy MOON with ETH\.\nTap an amount, or type your own\.$/);
+    assert.deepEqual(lastButtons(sent), [
+      [
+        { label: '0.005 ETH', value: `buy:0.005:${TAG}` },
+        { label: '0.01 ETH', value: `buy:0.01:${TAG}` },
+        { label: '0.05 ETH', value: `buy:0.05:${TAG}` },
+      ],
+      [
+        { label: '0.1 ETH', value: `buy:0.1:${TAG}` },
+        { label: '1 ETH', value: `buy:1:${TAG}` },
+        { label: 'Edit', value: `buy:edit:${TAG}` },
+      ],
+      [{ label: 'Cancel', value: 'cancel' }],
+    ]);
+    for (const row of lastButtons(sent)) for (const b of row) assert.equal(TelegramBot.isAllowedCallback(b.value), true, b.value);
+  });
+
+  it('WhatsApp: the same amounts as a list, with edit and cancel, and no buttons', async () => {
+    const { sent, ctx } = recordingCtx('whatsapp');
+    await router.handle(ctx, TOKEN);
+    assert.match(lastText(sent), /Buy MOON with ETH\. Reply with an amount:\n0\.005 \| 0\.01 \| 0\.05 \| 0\.1 \| 1\nOr type your own\. To change these: edit\nOr: cancel$/);
+    assert.equal(lastButtons(sent), undefined);
+  });
+
+  it('a pressed amount does exactly what typing it does', async () => {
+    const pressed = recordingCtx();
+    await router.handle(pressed.ctx, TOKEN);
+    await router.handle(pressed.ctx, `buy:0.05:${TAG}`);
+    assert.equal(router.pendingFlowFor(KEY).tokenBuy, false);
+    const typed = recordingCtx();
+    await router.handle(typed.ctx, TOKEN);
+    await router.handle(typed.ctx, '0.05');
+    assert.equal(lastText(pressed.sent), lastText(typed.sent));
+    // Both reached the swap path, whose first gate stops this test account
+    // (no unlock PIN) before any quote.
+    assert.match(lastText(pressed.sent), /until your account has an unlock PIN/);
+  });
+
+  it('a button with no buy open, or from another token, has expired and buys nothing', async () => {
+    const { sent, ctx } = recordingCtx();
+    await router.handle(ctx, `buy:0.05:${TAG}`);
+    assert.equal(lastText(sent), 'That button has expired. Paste the contract again.');
+    await router.handle(ctx, TOKEN);
+    await router.handle(ctx, 'buy:0.05:0badc0de');
+    assert.equal(lastText(sent), 'That button has expired. Paste the contract again.');
+    assert.equal(router.pendingFlowFor(KEY).tokenBuy, true, 'the open buy stays open');
+  });
+
+  it('Edit, then a list: saved to the account, sorted, and offered from then on', async () => {
+    const { sent, ctx } = recordingCtx();
+    await router.handle(ctx, TOKEN);
+    await router.handle(ctx, `buy:edit:${TAG}`);
+    assert.match(lastText(sent), /^Send up to 5 amounts in ETH, separated by spaces\./);
+    await router.handle(ctx, '0.2 0.02');
+    assert.deepEqual(account().buy_amounts_eth, ['0.02', '0.2']);
+    assert.match(lastText(sent), /^Saved\.\n\nBuy MOON with ETH\./);
+    assert.deepEqual(lastButtons(sent)[0].map((b) => b.label), ['0.02 ETH', '0.2 ETH', 'Edit']);
+    // Still the same buy: an amount buys it.
+    assert.equal(router.pendingFlowFor(KEY).tokenBuy, true);
+    // The next paste, on either channel, offers them.
+    const wa = recordingCtx('whatsapp');
+    await router.handle(wa.ctx, TOKEN);
+    assert.match(lastText(wa.sent), /\n0\.02 \| 0\.2\n/);
+  });
+
+  it('WhatsApp: edit, a list that does not read is refused and the question stays, reset goes back to the defaults', async () => {
+    account().buy_amounts_eth = ['0.3'];
+    const { sent, ctx } = recordingCtx('whatsapp');
+    await router.handle(ctx, TOKEN);
+    assert.notEqual(router.normalizeInput(ctx, 'edit'), null);
+    await router.handle(ctx, 'edit');
+    for (const body of ['reset', '0.01 500', '0.01, 0.05 eth']) assert.notEqual(router.normalizeInput(ctx, body), null, body);
+    // Chatter is not a list.
+    assert.equal(router.normalizeInput(ctx, 'ok thanks'), null);
+    await router.handle(ctx, '0.01 500');
+    assert.match(lastText(sent), /^Each amount can be at most 100 ETH\.\nOr: cancel$/);
+    assert.deepEqual(account().buy_amounts_eth, ['0.3']);
+    await router.handle(ctx, 'reset');
+    assert.equal(account().buy_amounts_eth, null);
+    assert.match(lastText(sent), /^Back to the default amounts\.\n\nBuy MOON with ETH\. Reply with an amount:\n0\.005 \| 0\.01/);
+  });
+
+  it('WhatsApp: a list wakes the bot only after edit', async () => {
+    const { ctx } = recordingCtx('whatsapp');
+    await router.handle(ctx, TOKEN);
+    assert.equal(router.normalizeInput(ctx, 'reset'), null);
+    assert.equal(router.normalizeInput(ctx, '0.01 0.05'), null);
+  });
+
+  it('a save that fails leaves the amounts as they were, and says so', async () => {
+    const { sent, ctx } = recordingCtx();
+    await router.handle(ctx, TOKEN);
+    await router.handle(ctx, 'edit');
+    const realFrom = fake.client.from.bind(fake.client);
+    fake.client.from = (t) => {
+      const q = realFrom(t);
+      if (t === 'accounts') q.update = () => ({ eq: () => ({ select: async () => ({ data: null, error: { message: 'column does not exist' } }) }) });
+      return q;
+    };
+    try {
+      await router.handle(ctx, '0.02');
+    } finally {
+      fake.client.from = realFrom;
+    }
+    assert.match(lastText(sent), /^Could not save them right now, so your amounts are unchanged\./);
+    assert.deepEqual(lastButtons(sent)[0].map((b) => b.label), ['0.005 ETH', '0.01 ETH', '0.05 ETH']);
+  });
+});
+
+describe('quick buy amounts, the rules', () => {
+  it('reads a list: spaces or commas, a trailing eth, ".5", duplicates dropped, sorted', () => {
+    assert.deepEqual(buyAmounts.parseBuyAmounts('1, 0.05 .5 0.050 eth'), { ok: true, amounts: ['0.05', '0.5', '1'] });
+  });
+
+  it('refuses none, more than 5, zero, over 100 ETH, more than 6 decimals, or words', () => {
+    const refused = { '': /at least one/, '1 2 3 4 5 6': /at most 5/, '0': /more than 0/, '100.5': /at most 100 ETH/, '0.0000001': /not an amount/, 'lots': /not an amount/ };
+    for (const [body, why] of Object.entries(refused)) {
+      const out = buyAmounts.parseBuyAmounts(body);
+      assert.equal(out.ok, false, body);
+      assert.match(out.message, why, body);
+    }
+  });
+
+  it('a stored value that does not read is the defaults; so is a failed read', async () => {
+    for (const stored of [['0.01', 'x'], ['999'], [], null]) {
+      const db = createFakeSupabase({ accounts: [{ id: 'a', buy_amounts_eth: stored }] });
+      assert.deepEqual(await buyAmounts.readBuyAmounts(db.client, 'a'), [...buyAmounts.DEFAULT_BUY_AMOUNTS], JSON.stringify(stored));
+    }
+    const broken = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'down' } }) }) }) }) };
+    assert.deepEqual(await buyAmounts.readBuyAmounts(broken, 'a', { warn() {} }), [...buyAmounts.DEFAULT_BUY_AMOUNTS]);
+  });
+
+  it('Telegram passes on only well formed buy buttons', () => {
+    for (const ok of [`buy:0.01:${TAG}`, `buy:100:${TAG}`, `buy:edit:${TAG}`]) assert.equal(TelegramBot.isAllowedCallback(ok), true, ok);
+    for (const bad of ['buy:0.01', `buy:0.01:${TAG}x`, `buy:1000:${TAG}`, `buy:-1:${TAG}`, `buy:0.1234567:${TAG}`, `sell:0.01:${TAG}`, `buy:0.01:${TAG}:x`]) {
+      assert.equal(TelegramBot.isAllowedCallback(bad), false, bad);
+    }
   });
 });

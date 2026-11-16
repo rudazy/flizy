@@ -40,6 +40,12 @@
     },
     {
       "kind": "check",
+      "name": "accounts.accounts_buy_amounts_eth_check",
+      "providedBy": "20261116120000_account_buy_amounts.sql",
+      "requiredBy": "check on accounts"
+    },
+    {
+      "kind": "check",
       "name": "accounts.accounts_default_calling_code_check",
       "providedBy": "20261005120000_account_default_calling_code.sql",
       "requiredBy": "check on accounts"
@@ -1092,7 +1098,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js, lib/buyAmounts.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
     },
     {
       "kind": "table",
