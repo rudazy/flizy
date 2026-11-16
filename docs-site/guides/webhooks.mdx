@@ -38,7 +38,7 @@ and these headers:
 | `Content-Type` | `application/json` |
 | `User-Agent` | `Flizy-Webhooks/1` |
 
-`data` says which object changed and its new `state`. `detail` carries what the change produced, such as `tx_hash`, `claim_url` and `expires_at` for a held claim, `error_code` for a failure, or `refund_tx_hash` for a refund. For the full object, read it with `GET /payouts/{id}` or `GET /payments/{id}`.
+`data` says which object changed and its new `state`. `detail` carries what the change produced, such as `tx_hash`, `claim_url` and `expires_at` for a held claim, `error_code` for a failure, or `refund_tx_hash` for a refund. `payout.confirmed` and `payout.claim_pending` also carry `fee`, what your platform paid for that payout (`{ "amount": "0.02", "asset": "tUSD" }`), or null when there was none. For the full object, read it with `GET /payouts/{id}` or `GET /payments/{id}`.
 
 ## Events
 

@@ -10,7 +10,9 @@
  * payout and the fee together and redeems both at once; the worker puts the
  * fee on the plan (so every check counts it), on the payout record, and on
  * both payout kinds, holds the daily limit to the total, and clears it when
- * nothing went out; and the page and the script say and set the mode.
+ * nothing went out, including a revert the reconciler finds; the page and the
+ * script say and set the mode; and (part 2) each payout's API view and its
+ * confirmed and claim_pending webhooks show the fee, as the guides say.
  *
  * Run: node --test test/payoutFee.test.js
  */
@@ -88,13 +90,20 @@ redeem.sendWithPermission = async (args) => {
   return { txHash: HASH, receipt: { status: 1 } };
 };
 
+// The claim a payout made, as lib/claims.js returns it; set per test.
+const claimsMod = require('../lib/claims');
+let claimRow = null;
+claimsMod.getClaimById = async () => claimRow;
+
 const W = require('../lib/api/payoutWorker');
 const AS = require('../lib/api/allowanceSend');
 const PF = require('../lib/api/payoutFee');
 const fees = require('../lib/fees');
 let PT;
+let AP;
 before(async () => {
   PT = await import('../web/lib/payoutFeeText.ts');
+  AP = await import('../web/lib/apiPayouts.ts');
 });
 
 const quiet = { warn() {}, info() {}, error() {} };
@@ -161,12 +170,14 @@ describe('the allowance carries the fee', () => {
 });
 
 describe('the worker', () => {
-  const MOVES = { queued: ['submitted', 'failed'], submitted: ['confirmed', 'claim_pending', 'failed'] };
+  const MOVES = { queued: ['submitted', 'failed'], submitted: ['confirmed', 'claim_pending', 'failed'], claim_pending: ['confirmed', 'expired', 'refund_pending'] };
   function payout(over = {}) {
     return { id: 'po-1', platform_id: PLATFORM, key_id: 'key-1', kind: 'payout', state: 'queued', amount: String(10n ** 16n), asset: 'ETH', recipient_kind: 'username', recipient_ref: 'alice', reference: null, tx_hash: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...over };
   }
   let worker;
+  let details;
   function setup(platformOver = {}, payoutOver = {}) {
+    details = [];
     fake = createFakeSupabase({
       api_platforms: [{ id: PLATFORM, account_id: ACCOUNT, display_name: 'Acme', wallet_address: WALLET, enabled: true, fee_bps: 0, payout_fee_mode: 'tier', claim_expiry_default_days: 30, claim_expiry_max_days: 30, ...platformOver }],
       api_keys: [{ id: 'key-1', revoked_at: null, scopes: ['read', 'payout'] }],
@@ -187,6 +198,7 @@ describe('the worker', () => {
       async rpc(name, args) {
         const r = fake.db.tables.api_transactions.find((x) => x.id === args.p_transaction_id);
         if (!r || !(MOVES[r.state] || []).includes(args.p_to_state)) return { data: null, error: { message: 'bad move' } };
+        details.push([args.p_to_state, args.p_detail]);
         r.state = args.p_to_state;
         return { data: 'evt', error: null };
       },
@@ -226,6 +238,50 @@ describe('the worker', () => {
     assert.equal(row().fee_amount, null);
   });
 
+  it('the confirmed and claim_pending webhooks carry the fee, as the API shows it; none says null', async () => {
+    setup();
+    await worker.processPayout({ ...row() });
+    assert.deepEqual(details.at(-1), ['confirmed', { tx_hash: HASH, fee: { amount: ethers.formatEther(ETH_FEE), asset: 'ETH' } }]);
+    setup({}, { recipient_kind: 'phone', recipient_ref: '+2348012345678' });
+    await worker.processPayout({ ...row() });
+    assert.deepEqual(details.at(-1)[1].fee, { amount: ethers.formatEther(ETH_FEE), asset: 'ETH' });
+    setup({ payout_fee_mode: 'none' });
+    await worker.processPayout({ ...row() });
+    assert.equal(details.at(-1)[1].fee, null);
+  });
+
+  it('the reconciler: a payout found reverted charged nothing, so its fee is cleared; one that landed reports its fee', async () => {
+    const old = new Date(Date.now() - 60 * 60e3).toISOString();
+    setup({}, { state: 'submitted', tx_hash: HASH, fee_amount: '500', updated_at: old });
+    worker = W.makeWorker({ supabase: { from: (t) => fake.client.from(t), rpc: async (n, a) => { details.push([a.p_to_state, a.p_detail]); row().state = a.p_to_state; return { data: 'evt', error: null }; } }, provider: { ...provider, getTransactionReceipt: async () => ({ status: 0 }) }, chain, env, log: quiet });
+    await worker.reconcile();
+    assert.equal(row().fee_amount, null);
+    assert.equal(row().state, 'failed');
+    setup({}, { state: 'submitted', tx_hash: HASH, fee_amount: '500', updated_at: old });
+    worker = W.makeWorker({ supabase: { from: (t) => fake.client.from(t), rpc: async (n, a) => { details.push([a.p_to_state, a.p_detail]); row().state = a.p_to_state; return { data: 'evt', error: null }; } }, provider: { ...provider, getTransactionReceipt: async () => ({ status: 1 }) }, chain, env, log: quiet });
+    await worker.reconcile();
+    assert.deepEqual(details.at(-1), ['confirmed', { tx_hash: HASH, fee: { amount: ethers.formatEther(500n), asset: 'ETH' } }]);
+    assert.equal(row().fee_amount, '500');
+  });
+
+  it('a claim the recipient took: its confirmed webhook carries the fee too', async () => {
+    const old = new Date(Date.now() - 60 * 60e3).toISOString();
+    setup({}, { state: 'claim_pending', claim_id: 'cl-1', fee_amount: '500', recipient_kind: 'phone', updated_at: old });
+    claimRow = { id: 'cl-1', status: 'claimed', api_transaction_id: 'po-1', claim_tx_hash: HASH };
+    try {
+      await worker.watchClaims();
+    } finally {
+      claimRow = null;
+    }
+    assert.deepEqual(details.at(-1), ['confirmed', { claim_tx_hash: HASH, fee: { amount: ethers.formatEther(500n), asset: 'ETH' } }]);
+  });
+
+  it('the reads that report a fee ask for it', () => {
+    const worker = read('lib/api/payoutWorker.js');
+    assert.ok(worker.includes(".select('id, state, tx_hash, recipient_kind, asset, fee_amount')"));
+    assert.ok(worker.includes(".select('id, state, platform_id, claim_id, cancel_requested_at, refund_tx_hash, updated_at, asset, fee_amount')"));
+  });
+
   it('a fee that cannot be worked out: handed back, nothing sent', async () => {
     setup();
     worker = W.makeWorker({ supabase: { from: (t) => fake.client.from(t), rpc: async () => ({ data: 'evt', error: null }) }, provider, chain, env: { ...env, FEE_TREASURY_ADDRESS: '' }, log: quiet });
@@ -253,5 +309,26 @@ describe('what the platform sees and how Flizy sets it', () => {
     assert.match(script, /if \(mode === 'bps'\) patch\.fee_bps = intFlag\('--bps', 0, 1, 1000\);/);
     const sql = read('supabase/migrations/20261116150000_api_payout_fee.sql');
     assert.match(sql, /check \(payout_fee_mode in \('tier', 'bps', 'none'\) and \(payout_fee_mode <> 'bps' or fee_bps > 0\)\)/);
+  });
+});
+
+describe('what the API shows a platform', () => {
+  const base = { id: 'x', state: 'confirmed', amount: '25000000', asset: 'TUSD', recipient_kind: 'username', recipient_ref: 'ada', reference: null, metadata: null, tx_hash: null, error_code: null, claim_url: null, claim_expires_at: null, refund_tx_hash: null, cancel_requested_at: null, created_at: 'a', updated_at: 'a' };
+
+  it('each payout shows its fee in its asset, or null', () => {
+    assert.deepEqual(AP.payoutView({ ...base, fee_amount: '20000' }).fee, { amount: '0.02', asset: 'tUSD' });
+    assert.deepEqual(AP.payoutView({ ...base, asset: 'ETH', amount: '1', fee_amount: String(ETH_FEE) }).fee, { amount: ethers.formatEther(ETH_FEE), asset: 'ETH' });
+    for (const fee_amount of [null, undefined, '', 'x']) assert.equal(AP.payoutView({ ...base, fee_amount }).fee, null, String(fee_amount));
+    assert.match(AP.PAYOUT_COLUMNS, /\bfee_amount\b/);
+  });
+
+  it('the guides say it, at the rate the fee settings default to', () => {
+    const guide = read('docs-site/guides/payouts.mdx');
+    assert.match(guide, /## Fees/);
+    assert.equal(fees.DEFAULTS.FEE_P2P_BASE_USD, '0.02');
+    assert.equal(fees.DEFAULTS.FEE_P2P_STEP_USD, '0.01');
+    assert.equal(fees.DEFAULTS.FEE_P2P_STEP_SIZE_USD, '100');
+    assert.match(guide, /by default it is \$0\.02 per payout up to \$100, plus \$0\.01 for each started \$100 above that\./);
+    assert.match(read('docs-site/guides/webhooks.mdx'), /`payout\.confirmed` and `payout\.claim_pending` also carry `fee`/);
   });
 });

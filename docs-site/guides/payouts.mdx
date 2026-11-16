@@ -10,7 +10,7 @@ A payout moves an amount of one asset from your platform's wallet to one person.
 1. **A key with `payout`.** Flizy grants it per key after review.
 2. **Assets enabled.** Flizy enables each asset for your platform, with the most one payout may move and the most per day.
 3. **A payout allowance.** On the Developers page, sign the allowance with your account's passkey. It lets Flizy's relayer spend up to the daily maximum of each enabled asset from your wallet, for 30 days, and the chain enforces it. Payouts are only ever sent through it. Sign it again before it ends.
-4. **Funds.** Your wallet must hold the amounts plus a small ETH reserve for gas.
+4. **Funds.** Your wallet must hold the amounts, the payout fees and a small ETH reserve for gas.
 
 `GET /me` answers `payouts_enabled: true` once payouts are switched on and the key has `payout`.
 
@@ -27,6 +27,12 @@ A payout moves an amount of one asset from your platform's wallet to one person.
 A **claim** holds the money in Flizy's escrow until the person collects it with the claim link, signing in to Flizy with that phone, email or account. The payout's `claim.url` carries the link once the claim is held: deliver it to the person yourself. If they already have a Flizy account with that phone, email or chat account, Flizy also tells them in their chats.
 
 Every valid request gets the same `202`, whoever the recipient is. Whether a username exists, or a phone or email belongs to a Flizy member, is never revealed by the answer. A username that cannot be paid fails afterwards with `recipient_not_payable`.
+
+## Fees
+
+Your platform pays a small fee on each payout, on top, in the payout's asset. The person always gets the full amount. The Developers page shows your rate; by default it is $0.02 per payout up to $100, plus $0.01 for each started $100 above that.
+
+The fee goes in the same transaction as the payout and counts against your allowance with it. If what is left of the allowance or your balance cannot cover both, the payout fails rather than paying less. Each payout shows its fee in `fee` (`{ "amount": "0.02", "asset": "tUSD" }`, or null when there is none). The fee on a claim is kept if the claim is refunded.
 
 ## States
 

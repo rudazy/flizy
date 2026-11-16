@@ -167,12 +167,14 @@ export type PayoutRow = {
   claim_expires_at: string | null;
   refund_tx_hash: string | null;
   cancel_requested_at: string | null;
+  /** The fee the platform pays on this payout, in base units (lib/api/payoutFee.js); null for none. */
+  fee_amount?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export const PAYOUT_COLUMNS =
-  'id, state, amount, asset, recipient_kind, recipient_ref, reference, metadata, tx_hash, error_code, claim_url, claim_expires_at, refund_tx_hash, cancel_requested_at, created_at, updated_at';
+  'id, state, amount, asset, recipient_kind, recipient_ref, reference, metadata, tx_hash, error_code, claim_url, claim_expires_at, refund_tx_hash, cancel_requested_at, fee_amount, created_at, updated_at';
 
 /** "10.5" for 10.5, "20" for 20.0: formatUnits always keeps a decimal point. */
 export function plainAmount(units: bigint, decimals: number): string {
@@ -212,10 +214,13 @@ export function largePayoutMail(
  * reached its destination (confirmed) or came back (refunded). A claim payout
  * also shows its link, for the platform to deliver to its user, and when it
  * expires; the link appears once the hold is confirmed (claim_pending).
+ * `fee` is what the platform pays on top for this payout, in its asset; the
+ * recipient always gets the full amount. null when there is none.
  */
 export function payoutView(row: PayoutRow) {
   const asset = PAYOUT_ASSETS[row.asset as PayoutSymbol];
   const isClaim = (CLAIM_TYPES as readonly string[]).includes(row.recipient_kind);
+  const feeUnits = row.fee_amount && /^[0-9]+$/.test(row.fee_amount) ? BigInt(row.fee_amount) : null;
   return {
     id: row.id,
     object: 'payout',
@@ -228,6 +233,7 @@ export function payoutView(row: PayoutRow) {
     metadata: row.metadata,
     tx_hash: row.tx_hash,
     error_code: row.error_code,
+    fee: feeUnits !== null && asset ? { amount: plainAmount(feeUnits, asset.decimals), asset: asset.label } : null,
     claim: isClaim
       ? {
           url: row.claim_url,

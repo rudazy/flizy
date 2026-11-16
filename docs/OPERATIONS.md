@@ -377,7 +377,8 @@ when the permission cannot take it. It is never sent on the owner key.
   Flizy with `scripts/api-platform.mjs payout-fee` (`api_platforms.payout_fee_mode`): `tier` (the
   person-to-person tiers, the default), `bps` (`fee_bps` of each payout) or `none`. The fee is
   stored on the payout (`api_transactions.fee_amount`), recorded as kind `api_payout`, and shown
-  on the platform's Developers page. A claim payout's fee is kept if the claim is refunded.
+  on the platform's Developers page, in each payout's API response (`fee`) and in its
+  `payout.confirmed` and `payout.claim_pending` webhooks. A claim payout's fee is kept if the claim is refunded.
   `supabase/migrations/20261116150000_api_payout_fee.sql` must be applied before deploying: the
   schema checks require its constraints.
 - **Business accounts.** An account turns Business on from Account > Business after accepting

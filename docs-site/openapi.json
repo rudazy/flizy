@@ -332,6 +332,14 @@
               "reverted"
             ]
           },
+          "fee": {
+            "type": ["object", "null"],
+            "description": "What your platform pays Flizy for this payout, on top, in the payout's asset. The recipient always gets the full amount. Null when there is none.",
+            "properties": {
+              "amount": { "type": "string", "example": "0.02" },
+              "asset": { "$ref": "#/components/schemas/Asset" }
+            }
+          },
           "claim": {
             "type": ["object", "null"],
             "description": "Claims only (phone, email and platform ids); null for a username or address.",
@@ -357,6 +365,7 @@
           "metadata": null,
           "tx_hash": null,
           "error_code": null,
+          "fee": null,
           "claim": null,
           "created_at": "2026-11-09T12:00:00.000Z",
           "updated_at": "2026-11-09T12:00:00.000Z"
