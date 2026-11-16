@@ -257,7 +257,8 @@ describe('the route and the page', () => {
 
   it('the page asks for the fee at review, shows it with the total, and sends it back', () => {
     const page = read('web/components/PayLanding.tsx');
-    assert.match(page, /fetch\(`\/api\/pay\/fee\?asset=\$\{asset\}&amount=\$\{encodeURIComponent\(amount\)\}`/);
+    // The payee is named: a business payee shows the payer no fee.
+    assert.ok(page.includes('fetch(`/api/pay/fee?ref=${encodeURIComponent(refSlug)}&asset=${asset}&amount=${encodeURIComponent(amount)}`'));
     assert.match(page, /<Row name="Fee" info=/);
     assert.doesNotMatch(page, /<Row name="Flizy fee"/);
     assert.match(page, /<Row name="Total">/);

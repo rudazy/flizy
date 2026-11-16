@@ -15,6 +15,8 @@ export function formatPaymentReceived(p: {
   asset: string;
   /** What it was for, already cleaned by cleanPayNote; flattened again here. */
   note?: string | null;
+  /** For a business: what Flizy kept (web/lib/payFee.ts businessFeeNote). */
+  feeNote?: string | null;
   fromLabel: string;
   walletUrl: string;
 }): string {
@@ -24,6 +26,7 @@ export function formatPaymentReceived(p: {
   const note = p.note ? displaySafeLabel(String(p.note).replace(/[{}]/g, ''), 80) : '';
   return [
     `You received ${p.amount} ${symbolLabel(p.asset)} from ${from}.`,
+    ...(p.feeNote ? [p.feeNote] : []),
     ...(note ? [`For: ${note}`] : []),
     '',
     `It is in your Flizy wallet: ${p.walletUrl}`,

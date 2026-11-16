@@ -26,13 +26,14 @@ const PAIR_ABI = [
 ];
 
 export type FeeQuote = {
-  kind: 'p2p';
+  kind: 'p2p' | 'merchant';
   asset: string;
   decimals: number;
   feeUnits: string;
   feeMicro: string;
-  tierMicro: string;
-  gasEstMicro: string;
+  /** The person-to-person tier and gas estimate; null on a merchant fee. */
+  tierMicro: string | null;
+  gasEstMicro: string | null;
   absorbMicro: string;
   gasOverTier: boolean;
   priceMicro: string;
@@ -143,6 +144,41 @@ export async function quoteP2pFee(p: {
 }
 
 /**
+ * The merchant fee on a payment of amountUnits to a business: FEE_MERCHANT_BPS
+ * of it (1% by default), rounded up, out of what the business receives. null
+ * when it rounds to 0. Same result as lib/feeQuote.js quoteMerchantFee.
+ */
+export async function quoteMerchantFee(p: {
+  provider: ethers.Provider;
+  asset: string;
+  amountUnits: bigint;
+  cfg: fees.FeeConfig;
+  flzPool: { flz: string; pair: string };
+  now?: number;
+}): Promise<FeeQuote | null> {
+  const decimals = feeDecimals(p.asset);
+  const feeUnits = fees.merchantFeeUnits(BigInt(p.amountUnits), p.cfg);
+  if (feeUnits === 0n) return null;
+  const { priceMicro, source } = await priceMicroFor(p.asset, { provider: p.provider, cfg: p.cfg, flzPool: p.flzPool });
+  const feeMicro = fees.unitsToUsdMicro(feeUnits, priceMicro, decimals);
+  return {
+    kind: 'merchant',
+    asset: p.asset,
+    decimals,
+    feeUnits: feeUnits.toString(),
+    feeMicro: feeMicro.toString(),
+    tierMicro: null,
+    gasEstMicro: null,
+    absorbMicro: '0',
+    gasOverTier: false,
+    priceMicro: priceMicro.toString(),
+    priceSource: source,
+    pricedAt: new Date(p.now ?? Date.now()).toISOString(),
+    feeText: fees.centsText(feeMicro),
+  };
+}
+
+/**
  * The gas Flizy paid for a payment the wallet sent: its actualGasCost when the
  * gas top-up funded the UserOp, otherwise 0 (the wallet paid). null when the
  * receipt does not show it.
@@ -195,6 +231,11 @@ export async function openFee(p: { supabase: SupabaseClient; sourceKind: 'transf
   if (error) throw new Error(error.message);
 }
 
+/*
+ * A transfer has one fee, the person-to-person fee or the merchant fee: settle
+ * and waive act on it whatever its kind, as lib/feeQuote.js does.
+ */
+
 /** A pending fee that landed: charged, with its hash and the gas Flizy paid. Returns whether it moved. Throws on a write error. */
 export async function settleFee(p: {
   supabase: SupabaseClient;
@@ -209,7 +250,6 @@ export async function settleFee(p: {
     .select('id, fee_usd_micro')
     .eq('source_kind', p.sourceKind)
     .eq('source_id', p.sourceId)
-    .eq('kind', 'p2p')
     .eq('state', 'pending');
   if (readErr) throw new Error(readErr.message);
   const row = ((rows || []) as Array<{ id: string; fee_usd_micro: string | number }>)[0];
@@ -239,7 +279,6 @@ export async function waiveFee(p: { supabase: SupabaseClient; sourceKind: 'trans
     .update({ state: 'waived', settled_at: new Date().toISOString(), waive_reason: String(p.reason || 'not charged').slice(0, 200) })
     .eq('source_kind', p.sourceKind)
     .eq('source_id', p.sourceId)
-    .eq('kind', 'p2p')
     .eq('state', 'pending')
     .select('id');
   if (error) throw new Error(error.message);

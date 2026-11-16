@@ -253,7 +253,7 @@ export function PayLanding({
     setMsg('');
     setQuoting(true);
     try {
-      const res = await fetch(`/api/pay/fee?asset=${asset}&amount=${encodeURIComponent(amount)}`, { cache: 'no-store' });
+      const res = await fetch(`/api/pay/fee?ref=${encodeURIComponent(refSlug)}&asset=${asset}&amount=${encodeURIComponent(amount)}`, { cache: 'no-store' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setMsg(body.error || 'Could not work out the fee. Try again.');

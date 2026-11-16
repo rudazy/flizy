@@ -292,6 +292,10 @@ describe('what the business is told', () => {
     assert.match(formatReceivedNotice({ amountEth: SF.arrivedAmount(p), asset: 'ETH', fromLabel: '@ada', feeNote: note }), /^You received 0\.0495 ETH from @ada\.\nFlizy kept 0\.0005 ETH as the business fee on 0\.05 ETH\./);
     assert.match(formatRequestPaidNotice({ amountEth: '0.0495', asset: 'ETH', fromLabel: '@ada', feeNote: note }), /0\.0495 ETH from @ada\.\nFlizy kept/);
     assert.match(formatPotContributionNotice({ byLabel: '@ada', amountEth: '0.0495', potName: 'Rent', code: 'P1', feeNote: note }), /into Rent\.\nFlizy kept/);
+    // Whole amounts read as people write them; only a trailing ".0" goes.
+    const whole = { input: { amount: '10' }, fee: { merchant: true, asset: 'TUSD', feeHuman: '0.1', sendHuman: '9.9', totalHuman: '10.0' } };
+    assert.equal(SF.businessFeeNote(whole), 'Flizy kept 0.1 tUSD as the business fee on 10 tUSD.');
+    assert.equal(SF.arrivedAmount({ input: { amount: '10' }, fee: { merchant: true, sendHuman: '10.0' } }), '10');
     // A person-to-person payment: the plan's amount, and no note.
     const plain = plan();
     fake.db.tables.accounts[1].is_business = false;

@@ -376,14 +376,18 @@ when the permission cannot take it. It is never sent on the owner key.
   `supabase/migrations/20261116140000_business_accounts.sql`, applied before deploying: the schema
   checks require its constraint). The terms say Flizy keeps the 1% merchant fee and payers pay
   none.
-- **Merchant fee (chat).** A chat send to a business (a direct payment, a request or a pot)
+- **Merchant fee.** A chat send to a business (a direct payment, a request or a pot), or a
+  payment to one on the site pay page,
   carries the merchant fee (`FEE_MERCHANT_BPS`, 1%) instead of the person-to-person fee. The payer
   pays the price and sees no fee; the business is paid the price less the fee and the fee goes to
   the treasury in the same operation (`lib/engine/sendFee.js`, the executors). Over the passkey
   limit the approval covers the business's part and the fee is collected after. The ledger row is
   kind `merchant`; the business's notices say what arrived and what Flizy kept. Paying your own
-  business is a person-to-person payment. The site pay page does not charge it yet: keep
-  `FEES_ENABLED` off until it does, or a business's site payers would pay the person-to-person fee.
+  business is a person-to-person payment. On the site, `GET /api/pay/fee` shows the payer no fee
+  for a business and `/api/pay/execute` splits the price the same way (`web/lib/payFee.ts`); the
+  payer's record is the price. Paying a token with ETH instead is a swap and carries no merchant fee.
+  The business terms also promise a history showing what Flizy kept on each payment: keep
+  `FEES_ENABLED` off until that view ships.
 - **Site pay page.** The fee is quoted at review (`GET /api/pay/fee`) against what the wallet can
   spend: on top when the balance covers both, otherwise out of the amount (a $5 link paid with
   exactly $5 sends $4.98). The payer sees the fee and the total, or what the payee gets; the payee

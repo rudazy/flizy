@@ -16,6 +16,12 @@
  * than the one the payer saw, or a balance that has moved the fee between on
  * top and out of the amount, is refused with the new figures to review.
  *
+ * A payment to a business (accounts.is_business) carries the merchant fee
+ * instead: 1% of the price, out of what the business receives. The payer pays
+ * the price and is shown no fee, so the page sends none back and nothing is
+ * planned against the balance: the price is the total, as for any payment.
+ * The business is told what arrived and what Flizy kept.
+ *
  * Ledger: pending before the send (nothing is sent without it), charged when
  * the payment lands, waived when it is not sent or reverts, left pending with
  * an unknown outcome for the reconciler, which settles it with the transfer.
@@ -23,7 +29,7 @@
 
 import { ethers } from 'ethers';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { activeFeeConfig, openFee, quoteP2pFee, settleFee, waiveFee, walletGasPaidWei, type FeeQuote } from './feeQuote.ts';
+import { activeFeeConfig, openFee, quoteMerchantFee, quoteP2pFee, settleFee, waiveFee, walletGasPaidWei, type FeeQuote } from './feeQuote.ts';
 import { planAmounts, type FeeConfig } from './fees.ts';
 import { topupConfig } from './gasTopup.ts';
 import { gatorAddresses } from './gatorAccount.ts';
@@ -44,7 +50,17 @@ export type PayFee = {
   treasury: string;
   quote: FeeQuote;
   cfg: FeeConfig;
+  /** A merchant fee: out of the price, paid by the business, never shown to the payer. */
+  merchant: boolean;
 };
+
+/** For the business: what Flizy kept of the price. */
+export function businessFeeNote(fee: PayFee, priceUnits: bigint, asset: string): string {
+  const d = fee.quote.decimals;
+  const label = symbolLabel(asset);
+  const tidy = (units: bigint) => ethers.formatUnits(units, d).replace(/\.0$/, '');
+  return `Flizy kept ${tidy(fee.units)} ${label} as the business fee on ${tidy(priceUnits)} ${label}.`;
+}
 
 /** How a payment and its fee leave the wallet: what the payee gets, and whether the fee came out of the amount. */
 export type PayPlan = { sendUnits: bigint; feeFromAmount: boolean };
@@ -109,6 +125,8 @@ export async function sitePayFee(p: {
   asset: string;
   amountUnits: bigint;
   flzPool: { flz: string; pair: string };
+  /** The payee is a business: the merchant fee, not the person-to-person fee. */
+  payeeIsBusiness?: boolean;
   shownFeeUnits?: unknown;
   env?: Record<string, string | undefined>;
 }): Promise<{ ok: true; fee: PayFee | null } | { ok: false; status: number; error: string; higherFee?: PayFee }> {
@@ -120,6 +138,18 @@ export async function sitePayFee(p: {
     return { ok: false, status: 503, error: PAY_FEE_COPY.settings };
   }
   if (!cfg || !cfg.treasury || !p.viaGator || !FEE_ASSETS.has(p.asset)) return { ok: true, fee: null };
+  if (p.payeeIsBusiness) {
+    let merchantQuote: FeeQuote | null;
+    try {
+      merchantQuote = await quoteMerchantFee({ provider: p.provider, asset: p.asset, amountUnits: p.amountUnits, cfg, flzPool: p.flzPool });
+    } catch (err) {
+      console.warn(`[fees] merchant quote failed: ${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}`);
+      return { ok: false, status: 503, error: PAY_FEE_COPY.unavailable };
+    }
+    // Too small to carry a fee.
+    if (!merchantQuote) return { ok: true, fee: null };
+    return { ok: true, fee: { units: BigInt(merchantQuote.feeUnits), treasury: cfg.treasury, quote: merchantQuote, cfg, merchant: true } };
+  }
   let quote: FeeQuote;
   try {
     quote = await quoteP2pFee({ supabase: p.supabase, provider: p.provider, asset: p.asset, amountUnits: p.amountUnits, cfg, flzPool: p.flzPool });
@@ -127,7 +157,7 @@ export async function sitePayFee(p: {
     console.warn(`[fees] quote failed: ${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}`);
     return { ok: false, status: 503, error: PAY_FEE_COPY.unavailable };
   }
-  const fee: PayFee = { units: BigInt(quote.feeUnits), treasury: cfg.treasury, quote, cfg };
+  const fee: PayFee = { units: BigInt(quote.feeUnits), treasury: cfg.treasury, quote, cfg, merchant: false };
   if (p.shownFeeUnits !== undefined) {
     let shown: bigint | null = null;
     try {

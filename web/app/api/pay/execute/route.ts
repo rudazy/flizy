@@ -31,6 +31,7 @@ import { assertSpendable, resolveReserveAsset } from '../../../../lib/reserveSto
 import { passkeyLimitRefusal } from '../../../../lib/custody/allowanceLeft.ts';
 import {
   PAY_FEE_COPY,
+  businessFeeNote,
   feeCall,
   feeView,
   openPayFee,
@@ -110,7 +111,7 @@ export async function POST(req: Request) {
 
     const { data: dest } = await supabase
       .from('accounts')
-      .select('agent_wallet_address')
+      .select('agent_wallet_address, is_business')
       .eq('id', merchant.accountId)
       .maybeSingle();
     const to = dest?.agent_wallet_address;
@@ -160,6 +161,8 @@ export async function POST(req: Request) {
      */
     let fee: PayFee | null = null;
     let feeShown: ReturnType<typeof feeView> | null = null;
+    /** For a business: what Flizy kept, in its payment notice. */
+    let merchantNote: string | null = null;
     /**
      * The fee planned against what the wallet can spend. sendUnits is what the
      * payee gets. Any refusal is the response to return; nothing is sent.
@@ -171,10 +174,21 @@ export async function POST(req: Request) {
     ): Promise<{ ok: true; fee: PayFee | null; sendUnits: bigint; plan: PayPlan | null } | { ok: false; res: NextResponse }> => {
       const d = getDexAddresses();
       // The page sends the fee it showed; a payment without one is refused once a fee applies.
-      const feed = await sitePayFee({ supabase, provider, viaGator, asset, amountUnits, flzPool: { flz: d.flz, pair: d.pair }, shownFeeUnits: body.feeUnits ?? null });
+      const feed = await sitePayFee({
+        supabase,
+        provider,
+        viaGator,
+        asset,
+        amountUnits,
+        flzPool: { flz: d.flz, pair: d.pair },
+        payeeIsBusiness: Boolean(dest?.is_business),
+        shownFeeUnits: body.feeUnits ?? null,
+      });
       if (!feed.ok && !feed.higherFee) return { ok: false, res: NextResponse.json({ error: feed.error }, { status: feed.status }) };
       const quoted = feed.ok ? feed.fee : (feed.higherFee as PayFee);
       if (!quoted) return { ok: true, fee: null, sendUnits: amountUnits, plan: null };
+      // A business payment: the fee comes out of the price, so the price is the total and the business gets the rest.
+      if (quoted.merchant) return { ok: true, fee: quoted, sendUnits: amountUnits - quoted.units, plan: null };
       const spendable = await spendableUnits(supabase, payerId, asset, holding, gas);
       if (spendable === null) return { ok: false, res: NextResponse.json({ error: 'Could not read Savings. Nothing was sent.' }, { status: 400 }) };
       const planned = planPayFee(quoted, amountUnits, spendable, asset);
@@ -246,13 +260,15 @@ export async function POST(req: Request) {
         if (capped) return NextResponse.json({ error: capped }, { status: 400 });
       }
       amountHuman = ethers.formatEther(amountWei);
+      if (fee?.merchant) merchantNote = businessFeeNote(fee, amountWei + feeWei, asset);
       const { data: logRow } = await supabase
         .from('transfers')
         .insert({
           account_id: payerId,
           phone: 'site',
           to_address: to,
-          amount_eth: amountHuman,
+          // The payer's record is what they paid: for a business, the price.
+          amount_eth: fee?.merchant ? ethers.formatEther(amountWei + feeWei) : amountHuman,
           status: 'pending',
           chain_id: chain.chainId,
           kind: 'transfer',
@@ -389,13 +405,15 @@ export async function POST(req: Request) {
         if (capped) return NextResponse.json({ error: capped }, { status: 400 });
       }
       amountHuman = ethers.formatUnits(amountTok, decimals);
+      if (fee?.merchant) merchantNote = businessFeeNote(fee, amountTok + feeTok, asset);
       const { data: logRow } = await supabase
         .from('transfers')
         .insert({
           account_id: payerId,
           phone: 'site',
           to_address: to,
-          amount_eth: amountHuman,
+          // The payer's record is what they paid: for a business, the price.
+          amount_eth: fee?.merchant ? ethers.formatUnits(amountTok + feeTok, decimals) : amountHuman,
           status: 'pending',
           chain_id: chain.chainId,
           kind: 'transfer',
@@ -496,6 +514,7 @@ export async function POST(req: Request) {
           amount: amountHuman,
           asset,
           note,
+          feeNote: merchantNote,
           fromLabel,
           walletUrl: `${siteOrigin()}/dashboard/wallet`,
         })

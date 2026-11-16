@@ -9,14 +9,17 @@ import { gatorGasReserveWei, pointerIsGator } from '../../../../lib/gatorExecute
 import { predictGatorAddress } from '../../../../lib/gatorAccount.ts';
 import { feeView, planPayFee, sitePayFee, spendableUnits } from '../../../../lib/payFee.ts';
 import { activeFeeConfig } from '../../../../lib/feeQuote.ts';
+import { resolvePayRef } from '../../../../lib/payCode.ts';
 
 const ROUTE = 'GET /api/pay/fee';
 
 /**
  * The fee the pay page shows before the payer confirms (web/lib/payFee.ts),
  * planned against what the wallet can spend: on top, or out of the amount
- * with what the payee gets. { fee: null } when none applies. /api/pay/execute
- * plans again and never charges more, or sends less, than this.
+ * with what the payee gets. { fee: null } when none applies, including a
+ * payment to a business, whose merchant fee the business pays and the payer
+ * never sees. /api/pay/execute plans again and never charges more, or sends
+ * less, than this.
  */
 export async function GET(req: Request) {
   try {
@@ -41,6 +44,13 @@ export async function GET(req: Request) {
     }
     if (!on) return NextResponse.json({ fee: null });
 
+    const supabase = getSupabase();
+    const payee = await resolvePayRef(supabase, url.searchParams.get('ref'));
+    if (!payee?.accountId) return NextResponse.json({ error: 'Pay identity not found.' }, { status: 404 });
+    const { data: payeeRow, error: payeeErr } = await supabase.from('accounts').select('is_business').eq('id', payee.accountId).maybeSingle();
+    if (payeeErr) return NextResponse.json({ error: 'Could not work out the fee right now. Try again shortly.' }, { status: 503 });
+    if (payeeRow?.is_business) return NextResponse.json({ fee: null });
+
     const chain = getWebChain();
     const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.chainId);
     let decimals = 18;
@@ -63,7 +73,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Amount must be greater than zero.' }, { status: 400 });
     }
 
-    const supabase = getSupabase();
     const { data: payer } = await supabase.from('accounts').select('agent_wallet_address').eq('id', payerId).maybeSingle();
     const d = getDexAddresses();
     const feed = await sitePayFee({
