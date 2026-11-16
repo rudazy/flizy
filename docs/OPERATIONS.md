@@ -388,6 +388,12 @@ when the permission cannot take it. It is never sent on the owner key.
   `supabase/migrations/20261115130000_fee_ledger.sql` and
   `supabase/migrations/20261115140000_fee_ledger_state.sql` must be applied before this code is
   deployed: the bots' startup schema check requires both.
+- **Collected once.** The fee of a payment approved with the passkey is collected after it
+  lands, and both the approval worker and the reconciler can reach that step. The run that
+  claims it (`fee_ledger.collecting_at`, from null) sends it; any other stops. A claimed fee
+  that was sent with no answer stays pending for the operator and is never sent again.
+  `supabase/migrations/20261116130000_fee_ledger_collecting.sql` adds the column; until it is
+  applied, such a fee is left pending, not sent.
 
 ### Gas top-up
 

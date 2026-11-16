@@ -7,7 +7,8 @@
  * lands (charged), reverts or is refused before sending (waived), or has no
  * answer (left pending); a send that waits for a passkey approval keeps its
  * fee pending, and after the approved payment the fee is collected through
- * the daily permission, or waived when it cannot be; an approval that is
+ * the daily permission, or waived when it cannot be, and sent at most once
+ * however many runs reach it (claimFee); an approval that is
  * cancelled waives the fee; and the reconciler settles a pending fee with the
  * payment it settles, collecting it for an approved one.
  *
@@ -211,6 +212,69 @@ describe('after a passkey-approved payment', () => {
     const again = await waiting();
     await SF.collectApprovedFee({ supabase: fake.client, provider, transferId: again, accountId: ACCOUNT, gator: GATOR, env: {}, log: quiet });
     assert.deepEqual([rows()[0].state, rows()[0].waive_reason], ['waived', 'fees are off']);
+  });
+
+  it('two runs at once (the approval worker and the reconciler): the fee is sent once', async () => {
+    const transferId = await waiting();
+    const before = permissionCalls.length;
+    let release;
+    const held = new Promise((resolve) => {
+      release = resolve;
+    });
+    // The first send waits, so the second run arrives while it is in flight.
+    permissionAnswer = async () => {
+      await held;
+      return { route: 'permission', txHash: FEE_HASH, receipt: { gasUsed: 100n, gasPrice: 2n } };
+    };
+    const args = { supabase: fake.client, provider, transferId, accountId: ACCOUNT, gator: GATOR, env: ON, log: quiet };
+    const first = SF.collectApprovedFee(args);
+    const second = SF.collectApprovedFee(args);
+    await new Promise((resolve) => setImmediate(resolve));
+    release();
+    await Promise.all([first, second]);
+    assert.equal(permissionCalls.length - before, 1);
+    assert.equal(rows()[0].state, 'charged');
+  });
+
+  it('sent with no answer: left pending and claimed, so a later run does not send it again', async () => {
+    const transferId = await waiting();
+    const before = permissionCalls.length;
+    permissionAnswer = async () => {
+      throw new Error('no answer from the node');
+    };
+    const args = { supabase: fake.client, provider, transferId, accountId: ACCOUNT, gator: GATOR, env: ON, log: quiet };
+    await SF.collectApprovedFee(args);
+    assert.equal(rows()[0].state, 'pending');
+    assert.ok(rows()[0].collecting_at);
+    permissionAnswer = async () => ({ route: 'permission', txHash: FEE_HASH, receipt: { gasUsed: 100n, gasPrice: 2n } });
+    await SF.collectApprovedFee(args);
+    assert.equal(permissionCalls.length - before, 1);
+    assert.equal(rows()[0].state, 'pending');
+  });
+
+  it('a claim that cannot be written sends nothing and leaves the fee pending', async () => {
+    const transferId = await waiting();
+    const before = permissionCalls.length;
+    permissionAnswer = async () => ({ route: 'permission', txHash: FEE_HASH, receipt: { gasUsed: 100n, gasPrice: 2n } });
+    const realFrom = fake.client.from.bind(fake.client);
+    const broken = {
+      ...fake.client,
+      from: (t) => {
+        const q = realFrom(t);
+        if (t === 'fee_ledger') {
+          const realUpdate = q.update.bind(q);
+          // Only the claim (an update of collecting_at) fails, as when the column is not there yet.
+          q.update = (patch) => ('collecting_at' in patch ? { eq: () => broken.chain } : realUpdate(patch));
+        }
+        return q;
+      },
+      chain: null,
+    };
+    const fail = { data: null, error: { message: 'column "collecting_at" does not exist' } };
+    broken.chain = { eq: () => broken.chain, is: () => broken.chain, select: async () => fail };
+    await SF.collectApprovedFee({ supabase: broken, provider, transferId, accountId: ACCOUNT, gator: GATOR, env: ON, log: quiet });
+    assert.equal(permissionCalls.length - before, 0);
+    assert.equal(rows()[0].state, 'pending');
   });
 
   it('an approval cancelled before it was sent waives the fee', async () => {
