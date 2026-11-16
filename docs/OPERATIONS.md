@@ -294,7 +294,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `PENDING_TTL_MS` / `LINK_CODE_TTL_MS` | Plan and link code lifetimes |
 | `SESSION_TTL_MS` / `SESSION_MAX_MS` | Chat unlock: ends after this long without a message (default 30 min), and never later than this after the PIN was entered (default 8 h) |
 | `FEES_ENABLED` / `FEE_TREASURY_ADDRESS` | Payment fees, off unless `FEES_ENABLED=true`; on needs the treasury address: the wallet that receives the swap fees (`feeRouter.treasury`), whose key is never on a server. Same values on the VPS and Vercel. Rules and rates: `lib/fees.js` (mirror `web/lib/fees.ts`). With it on, chat sends charge the fee; see [Payment fees](#payment-fees) for what is covered |
-| `FEE_P2P_BASE_USD` / `FEE_P2P_STEP_USD` / `FEE_P2P_STEP_SIZE_USD` / `FEE_MERCHANT_BPS` / `FEE_GAS_MARGIN_BPS` / `FEE_ABSORB_MAX_MULTIPLE` / `FEE_ABSORB_DAILY_CAP_USD` / `FEE_ETH_USD_RATE` | Fee rates. Defaults: $0.02 up to $100 plus $0.01 per started $100, merchants 1%, gas margin 20%, absorb up to 2x the tier fee within $5 a day, testnet ETH at $3,000. `feeConfig` refuses a malformed value rather than falling back |
+| `FEE_P2P_BASE_USD` / `FEE_P2P_STEP_USD` / `FEE_P2P_STEP_SIZE_USD` / `FEE_MERCHANT_BPS` / `FEE_MERCHANT_MIN_USD` / `FEE_GAS_MARGIN_BPS` / `FEE_ABSORB_MAX_MULTIPLE` / `FEE_ABSORB_DAILY_CAP_USD` / `FEE_ETH_USD_RATE` | Fee rates. Defaults: $0.02 up to $100 plus $0.01 per started $100, merchants 0.5% with at least $0.01 a payment, gas margin 20%, absorb up to 2x the tier fee within $5 a day, testnet ETH at $3,000. `feeConfig` refuses a malformed value rather than falling back |
 | `GAS_TOPUP_ENABLED` / `GAS_TOPUP_PRIVATE_KEY` / `GAS_TOPUP_WALLET_DAILY_CAP_USD` / `GAS_TOPUP_DAILY_CAP_USD` | Gas paid for wallets through their EntryPoint deposit, off unless `GAS_TOPUP_ENABLED=true`; on needs its own key (never `PRIVATE_KEY`), on the VPS and Vercel. $0.50 per wallet and $10 across all wallets per day by default. See [Gas top-up](#gas-top-up) |
 | `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes. Slippage above 500 (5%) is cut to 500 by every quote; an unreadable value is 100 |
 | `CHAIN_GIWA_SEPOLIA_*` | Optional overrides for WETH, routers, FLZ, pair |
@@ -391,11 +391,12 @@ when the permission cannot take it. It is never sent on the owner key.
   the business terms (`web/lib/businessTerms.ts`, versioned; `accounts.is_business`,
   `business_terms_version`, `business_since`, migration
   `supabase/migrations/20261116140000_business_accounts.sql`, applied before deploying: the schema
-  checks require its constraint). The terms say Flizy keeps the 1% merchant fee and payers pay
+  checks require its constraint). The terms say Flizy keeps the merchant fee and payers pay
   none.
 - **Merchant fee.** A chat send to a business (a direct payment, a request or a pot), or a
   payment to one on the site pay page,
-  carries the merchant fee (`FEE_MERCHANT_BPS`, 1%) instead of the person-to-person fee. The payer
+  carries the merchant fee (`FEE_MERCHANT_BPS`, 0.5%, at least `FEE_MERCHANT_MIN_USD`, $0.01; a payment no
+  bigger than that is refused) instead of the person-to-person fee. The payer
   pays the price and sees no fee; the business is paid the price less the fee and the fee goes to
   the treasury in the same operation (`lib/engine/sendFee.js`, the executors). Over the passkey
   limit the approval covers the business's part and the fee is collected after. The ledger row is
@@ -415,7 +416,7 @@ when the permission cannot take it. It is never sent on the owner key.
   `web/lib/gatorExecute.ts`); the ledger row is the transfer's, as in chat. Paying a token with
   ETH instead (`/api/pay/swap`) is a swap and pays the swap fee only.
 
-- **Rules.** `lib/fees.js` (mirror `web/lib/fees.ts`): the person-to-person tiers, merchants 1%,
+- **Rules.** `lib/fees.js` (mirror `web/lib/fees.ts`): the person-to-person tiers, merchants 0.5% (at least $0.01),
   the busy-network rule and its daily absorption cap, rounding. Settings: the `FEE_*` rows above.
 - **Quote.** `lib/feeQuote.js` prices the fee (ETH at `FEE_ETH_USD_RATE`, tUSD at $1, FLZ from the
   Flizy FLZ/WETH pool's reserves), estimates the gas of a payment carrying its fee, and reads what

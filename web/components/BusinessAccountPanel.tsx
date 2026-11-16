@@ -75,7 +75,7 @@ export function BusinessAccountPanel() {
   return (
     <AppSection
       title="Business"
-      helper="For people who sell. Your customers pay no fee; Flizy keeps 1% of what you receive."
+      helper="For people who sell. Your customers pay no fee; Flizy keeps 0.5% of what you receive."
       badge={on ? 'On' : undefined}
       badgeTone="gold"
     >
@@ -102,7 +102,7 @@ export function BusinessAccountPanel() {
           {on ? (
             confirmOff ? (
               <div className="grid gap-3">
-                <p className="m-0 text-sm text-paper">Turn Business off? Payments you receive after this are not charged the 1%.</p>
+                <p className="m-0 text-sm text-paper">Turn Business off? Payments you receive after this are not charged the business fee.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setConfirmOff(false)}>
                     Keep it on

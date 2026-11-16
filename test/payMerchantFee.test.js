@@ -65,11 +65,14 @@ describe('a site payment to a business', () => {
     // The page shows the payer no fee, so it sends none back.
     const out = await ask({ shownFeeUnits: null });
     assert.equal(out.ok, true);
-    assert.deepEqual([out.fee.merchant, out.fee.units, out.fee.quote.kind, out.fee.treasury], [true, 50_000n, 'merchant', TREASURY]);
+    // 0.5% of 5 tUSD.
+    assert.deepEqual([out.fee.merchant, out.fee.units, out.fee.quote.kind, out.fee.treasury], [true, 25_000n, 'merchant', TREASURY]);
   });
 
-  it('none when it rounds to 0, with fees off, or from an older plain wallet; a person-to-person payee is unchanged', async () => {
-    assert.deepEqual(await ask({ amountUnits: 0n }), { ok: true, fee: null });
+  it('no bigger than the minimum fee: refused; none with fees off, or from an older plain wallet; a person-to-person payee is unchanged', async () => {
+    assert.deepEqual(await ask({ amountUnits: 10_000n }), { ok: false, status: 400, error: 'Payments to a business have to be more than $0.01.' });
+    // Just over the minimum: the $0.01 minimum applies.
+    assert.equal((await ask({ amountUnits: 1_000_000n })).fee.units, 10_000n);
     assert.deepEqual(await ask({ env: {} }), { ok: true, fee: null });
     assert.deepEqual(await ask({ viaGator: false }), { ok: true, fee: null });
     const p2p = await ask({ payeeIsBusiness: false, shownFeeUnits: '20000' });
@@ -84,11 +87,11 @@ describe('a site payment to a business', () => {
   it('the business is told what arrived and what Flizy kept', async () => {
     const out = await ask();
     const note = P.businessFeeNote(out.fee, 5_000_000n, 'TUSD');
-    assert.equal(note, 'Flizy kept 0.05 tUSD as the business fee on 5 tUSD.');
+    assert.equal(note, 'Flizy kept 0.025 tUSD as the business fee on 5 tUSD.');
     // Only a trailing ".0" goes: 10 stays 10.
     assert.equal(P.businessFeeNote({ ...out.fee, units: 100_000n }, 10_000_000n, 'TUSD'), 'Flizy kept 0.1 tUSD as the business fee on 10 tUSD.');
-    const text = N.formatPaymentReceived({ amount: '4.95', asset: 'TUSD', fromLabel: '@ada', feeNote: note, walletUrl: 'https://flizy.app/dashboard/wallet' });
-    assert.match(text, /^You received 4\.95 tUSD from @ada\.\nFlizy kept 0\.05 tUSD as the business fee on 5 tUSD\./);
+    const text = N.formatPaymentReceived({ amount: '4.975', asset: 'TUSD', fromLabel: '@ada', feeNote: note, walletUrl: 'https://flizy.app/dashboard/wallet' });
+    assert.match(text, /^You received 4\.975 tUSD from @ada\.\nFlizy kept 0\.025 tUSD as the business fee on 5 tUSD\./);
     assert.doesNotMatch(N.formatPaymentReceived({ amount: '5', asset: 'TUSD', fromLabel: '@ada', walletUrl: 'x' }), /Flizy kept/);
   });
 

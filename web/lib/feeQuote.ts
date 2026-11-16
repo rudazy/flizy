@@ -154,8 +154,9 @@ export async function quoteP2pFee(p: {
 
 /**
  * The merchant fee on a payment of amountUnits to a business: FEE_MERCHANT_BPS
- * of it (1% by default), rounded up, out of what the business receives. null
- * when it rounds to 0. Same result as lib/feeQuote.js quoteMerchantFee.
+ * of it (0.5% by default), rounded up, and at least FEE_MERCHANT_MIN_USD
+ * ($0.01), out of what the business receives. null only when both are 0. Same
+ * result as lib/feeQuote.js quoteMerchantFee.
  */
 export async function quoteMerchantFee(p: {
   provider: ethers.Provider;
@@ -166,9 +167,11 @@ export async function quoteMerchantFee(p: {
   now?: number;
 }): Promise<FeeQuote | null> {
   const decimals = feeDecimals(p.asset);
-  const feeUnits = fees.merchantFeeUnits(BigInt(p.amountUnits), p.cfg);
-  if (feeUnits === 0n) return null;
   const { priceMicro, source } = await priceMicroFor(p.asset, { provider: p.provider, cfg: p.cfg, flzPool: p.flzPool });
+  const byRate = fees.merchantFeeUnits(BigInt(p.amountUnits), p.cfg);
+  const least = p.cfg.merchantMin > 0n ? fees.usdToUnits(p.cfg.merchantMin, priceMicro, decimals) : 0n;
+  const feeUnits = byRate > least ? byRate : least;
+  if (feeUnits === 0n) return null;
   const feeMicro = fees.unitsToUsdMicro(feeUnits, priceMicro, decimals);
   return {
     kind: 'merchant',

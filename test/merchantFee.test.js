@@ -3,7 +3,8 @@
  * lib/feeQuote.js quoteMerchantFee, lib/engine/sendFee.js, the executors,
  * the passkey approval path, the reconciler and the business's notices.
  *
- * Covers: 1% of the price, rounded up, none when it rounds to 0; a send to a
+ * Covers: 0.5% of the price, rounded up, at least $0.01, and a payment no
+ * bigger than that refused; a send to a
  * business carries it instead of the person-to-person fee, and paying your own
  * business does not; the payer's amount, checks, preview and receipt stay the
  * price with no fee; the business is paid the price less the fee and the fee
@@ -97,8 +98,8 @@ const provider = {
   },
 };
 
-/** 1% of 0.05 ETH. */
-const FEE = 5n * 10n ** 14n;
+/** 0.5% of 0.05 ETH ($0.75, above the $0.01 minimum). */
+const FEE = 25n * 10n ** 13n;
 const PRICE = 5n * 10n ** 16n;
 
 const savedEnv = { ...process.env };
@@ -151,12 +152,22 @@ const send = (p) => executeNativeSend({ plan: p, provider, chain, user: { id: US
 const rows = () => fake.db.tables.fee_ledger;
 
 describe('the merchant fee', () => {
-  it('1% of the price, rounded up to the smallest unit; none when it rounds to 0', async () => {
+  it('0.5% of the price, rounded up to the smallest unit, and at least $0.01; none only when both are 0', async () => {
     const cfg = fees.feeConfig(ON);
     const q = await Q.quoteMerchantFee({ provider, asset: 'ETH', amountUnits: PRICE, chainKey: 'giwa_sepolia', cfg });
-    assert.deepEqual([q.kind, q.feeUnits, q.feeMicro, q.feeText, q.tierMicro, q.gasEstMicro], ['merchant', String(FEE), '1500000', '$1.50', null, null]);
-    assert.equal((await Q.quoteMerchantFee({ provider, asset: 'TUSD', amountUnits: 101n, chainKey: 'giwa_sepolia', cfg })).feeUnits, '2');
-    assert.equal(await Q.quoteMerchantFee({ provider, asset: 'TUSD', amountUnits: 0n, chainKey: 'giwa_sepolia', cfg }), null);
+    assert.deepEqual([q.kind, q.feeUnits, q.feeMicro, q.feeText, q.tierMicro, q.gasEstMicro], ['merchant', String(FEE), '750000', '$0.75', null, null]);
+    // 0.5% of 1 tUSD is half a cent: the $0.01 minimum applies. 0.5% of 10 tUSD is 5 cents.
+    assert.equal((await Q.quoteMerchantFee({ provider, asset: 'TUSD', amountUnits: 1_000_000n, chainKey: 'giwa_sepolia', cfg })).feeUnits, '10000');
+    assert.equal((await Q.quoteMerchantFee({ provider, asset: 'TUSD', amountUnits: 10_000_000n, chainKey: 'giwa_sepolia', cfg })).feeUnits, '50000');
+    assert.equal((await Q.quoteMerchantFee({ provider, asset: 'TUSD', amountUnits: 301n, chainKey: 'giwa_sepolia', cfg: fees.feeConfig({ ...ON, FEE_MERCHANT_MIN_USD: '0' }) })).feeUnits, '2');
+    assert.equal(await Q.quoteMerchantFee({ provider, asset: 'TUSD', amountUnits: 0n, chainKey: 'giwa_sepolia', cfg: fees.feeConfig({ ...ON, FEE_MERCHANT_MIN_USD: '0' }) }), null);
+  });
+
+  it('a payment to a business no bigger than the minimum fee is refused before anything is planned', async () => {
+    const p = plan({ asset: 'TUSD', amount: '0.01' });
+    const out = await attach(p);
+    assert.deepEqual(out, { ok: false, message: 'Payments to a business have to be more than $0.01.' });
+    assert.equal(p.fee, undefined);
   });
 });
 
@@ -167,7 +178,7 @@ describe('a chat send to a business', () => {
     assert.equal(p.input.amount, '0.05');
     assert.deepEqual(
       [p.fee.kind, p.fee.merchant, p.fee.feeUnits, p.fee.sendHuman, p.fee.totalHuman, ethers.getAddress(p.fee.treasury)],
-      ['merchant', true, String(FEE), '0.0495', '0.05', TREASURY]
+      ['merchant', true, String(FEE), '0.04975', '0.05', TREASURY]
     );
     assert.equal(SF.planFee(p).merchant, true);
   });
@@ -223,11 +234,11 @@ describe('sending it', () => {
   it('a token: the same split in the token', async () => {
     const p = plan({ asset: 'TUSD' });
     await attach(p);
-    assert.equal(p.fee.feeUnits, '100000');
+    assert.equal(p.fee.feeUnits, '50000');
     const out = await send(p);
     assert.equal(out.ok, true, JSON.stringify(out));
     const decoded = ownerCalls[0].calls.map((c) => [c.target, ...ERC20.decodeFunctionData('transfer', c.data)]);
-    assert.deepEqual(decoded, [[TUSD, SHOP, 9_900_000n], [TUSD, TREASURY, 100_000n]]);
+    assert.deepEqual(decoded, [[TUSD, SHOP, 9_950_000n], [TUSD, TREASURY, 50_000n]]);
   });
 
   it('permission path: the business part and the fee, the total being the price', async () => {
@@ -262,7 +273,7 @@ describe('sending it', () => {
     const H = '0x' + '04'.repeat(32);
     seed({
       transfers: [{ id: '11111111-1111-4111-8111-111111111111', account_id: ACCOUNT, user_id: USER, status: 'submitted', tx_hash: H, kind: 'transfer', amount_eth: '0.05', asset: 'ETH', created_at: new Date(NOW - 10 * 60e3).toISOString() }],
-      fee_ledger: [{ id: 'f1', source_kind: 'transfer', source_id: '11111111-1111-4111-8111-111111111111', kind: 'merchant', state: 'pending', fee_usd_micro: '1500000', asset: 'ETH', fee_units: String(FEE) }],
+      fee_ledger: [{ id: 'f1', source_kind: 'transfer', source_id: '11111111-1111-4111-8111-111111111111', kind: 'merchant', state: 'pending', fee_usd_micro: '750000', asset: 'ETH', fee_units: String(FEE) }],
     });
     const EP = '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
     await runReconcileTick({
@@ -286,12 +297,12 @@ describe('what the business is told', () => {
   it('what arrived, and what Flizy kept of the price', async () => {
     const p = plan();
     await attach(p);
-    assert.equal(SF.arrivedAmount(p), '0.0495');
+    assert.equal(SF.arrivedAmount(p), '0.04975');
     const note = SF.businessFeeNote(p);
-    assert.equal(note, 'Flizy kept 0.0005 ETH as the business fee on 0.05 ETH.');
-    assert.match(formatReceivedNotice({ amountEth: SF.arrivedAmount(p), asset: 'ETH', fromLabel: '@ada', feeNote: note }), /^You received 0\.0495 ETH from @ada\.\nFlizy kept 0\.0005 ETH as the business fee on 0\.05 ETH\./);
-    assert.match(formatRequestPaidNotice({ amountEth: '0.0495', asset: 'ETH', fromLabel: '@ada', feeNote: note }), /0\.0495 ETH from @ada\.\nFlizy kept/);
-    assert.match(formatPotContributionNotice({ byLabel: '@ada', amountEth: '0.0495', potName: 'Rent', code: 'P1', feeNote: note }), /into Rent\.\nFlizy kept/);
+    assert.equal(note, 'Flizy kept 0.00025 ETH as the business fee on 0.05 ETH.');
+    assert.match(formatReceivedNotice({ amountEth: SF.arrivedAmount(p), asset: 'ETH', fromLabel: '@ada', feeNote: note }), /^You received 0\.04975 ETH from @ada\.\nFlizy kept 0\.00025 ETH as the business fee on 0\.05 ETH\./);
+    assert.match(formatRequestPaidNotice({ amountEth: '0.04975', asset: 'ETH', fromLabel: '@ada', feeNote: note }), /0\.04975 ETH from @ada\.\nFlizy kept/);
+    assert.match(formatPotContributionNotice({ byLabel: '@ada', amountEth: '0.04975', potName: 'Rent', code: 'P1', feeNote: note }), /into Rent\.\nFlizy kept/);
     // Whole amounts read as people write them; only a trailing ".0" goes.
     const whole = { input: { amount: '10' }, fee: { merchant: true, asset: 'TUSD', feeHuman: '0.1', sendHuman: '9.9', totalHuman: '10.0' } };
     assert.equal(SF.businessFeeNote(whole), 'Flizy kept 0.1 tUSD as the business fee on 10 tUSD.');

@@ -17,7 +17,8 @@
  * top and out of the amount, is refused with the new figures to review.
  *
  * A payment to a business (accounts.is_business) carries the merchant fee
- * instead: 1% of the price, out of what the business receives. The payer pays
+ * instead: 0.5% of the price, at least $0.01, out of what the business
+ * receives (a payment no bigger than that is refused). The payer pays
  * the price and is shown no fee, so the page sends none back and nothing is
  * planned against the balance: the price is the total, as for any payment.
  * The business is told what arrived and what Flizy kept.
@@ -148,6 +149,10 @@ export async function sitePayFee(p: {
     }
     // Too small to carry a fee.
     if (!merchantQuote) return { ok: true, fee: null };
+    // The minimum fee would leave the business nothing.
+    if (BigInt(merchantQuote.feeUnits) >= p.amountUnits) {
+      return { ok: false, status: 400, error: `Payments to a business have to be more than ${merchantQuote.feeText}.` };
+    }
     return { ok: true, fee: { units: BigInt(merchantQuote.feeUnits), treasury: cfg.treasury, quote: merchantQuote, cfg, merchant: true } };
   }
   let quote: FeeQuote;

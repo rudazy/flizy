@@ -2,7 +2,7 @@
  * Business accounts (Phase 0e, part 2): the terms (web/lib/businessTerms.ts),
  * the switch (/api/account/business), the panel and the migration.
  *
- * Covers: the terms are plain, one point per line, name the 1% that the fee
+ * Covers: the terms are plain, one point per line, name the 0.5% and $0.01 the fee
  * settings charge, and carry a version; turning Business on takes the current
  * terms version and records when, and is refused on stale terms; turning it
  * off is plain; a database without the columns answers "not available yet";
@@ -27,12 +27,12 @@ before(async () => {
 
 describe('the business terms', () => {
   it('a dated version, and the current one is the only one accepted', () => {
-    assert.match(T.BUSINESS_TERMS_VERSION, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(T.BUSINESS_TERMS_VERSION, /^\d{4}-\d{2}-\d{2}(-\d+)?$/);
     assert.equal(T.isCurrentBusinessTerms(T.BUSINESS_TERMS_VERSION), true);
     for (const v of ['2020-01-01', '', null, undefined, 20261116]) assert.equal(T.isCurrentBusinessTerms(v), false, String(v));
   });
 
-  it('plain words: short points, ASCII, no dashes, and the 1% the fee settings charge', () => {
+  it('plain words: short points, ASCII, no dashes, and the 0.5% and $0.01 the fee settings charge', () => {
     assert.ok(T.BUSINESS_TERMS.length >= 4 && T.BUSINESS_TERMS.length <= 8);
     for (const line of T.BUSINESS_TERMS) {
       assert.ok(line.length <= 160, line);
@@ -40,12 +40,13 @@ describe('the business terms', () => {
       assert.match(line, /\.$/, line);
     }
     const all = T.BUSINESS_TERMS.join(' ');
-    assert.match(all, /Flizy keeps 1% of each payment you receive/);
+    assert.match(all, /Flizy keeps 0\.5% of each payment you receive while Business is on, and at least \$0\.01 on a payment\./);
     assert.match(all, /They pay no fee/);
     assert.match(all, /turn Business off at any time/);
     assert.match(all, /test tokens, not real money/);
-    // The 1% in the terms is the default merchant fee; changing it needs new terms.
-    assert.equal(fees.DEFAULTS.FEE_MERCHANT_BPS, '100');
+    // The 0.5% and $0.01 in the terms are the default merchant fee; changing either needs new terms.
+    assert.equal(fees.DEFAULTS.FEE_MERCHANT_BPS, '50');
+    assert.equal(fees.DEFAULTS.FEE_MERCHANT_MIN_USD, '0.01');
   });
 });
 

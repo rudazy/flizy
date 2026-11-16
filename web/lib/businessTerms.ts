@@ -3,16 +3,17 @@
  *
  * Plain words, one point per line. Any change to what they say is a new
  * version: an account accepted the version it saw, and turning business on
- * again takes the current one. The 1% is FEE_MERCHANT_BPS (web/lib/fees.ts,
- * default 100); changing that setting needs a new version of these terms.
+ * again takes the current one. The 0.5% and the $0.01 are FEE_MERCHANT_BPS and
+ * FEE_MERCHANT_MIN_USD (web/lib/fees.ts, defaults 50 and 0.01); changing either
+ * needs a new version of these terms.
  */
 
-export const BUSINESS_TERMS_VERSION = '2026-11-16';
+export const BUSINESS_TERMS_VERSION = '2026-11-16-2';
 
 export const BUSINESS_TERMS: readonly string[] = Object.freeze([
-  'Flizy keeps 1% of each payment you receive while Business is on. You get the other 99%.',
+  'Flizy keeps 0.5% of each payment you receive while Business is on, and at least $0.01 on a payment. You get the rest.',
   'People who pay you pay the price you ask. They pay no fee.',
-  'The 1% applies to payments sent to you in chat, through your pay link, and for your requests and pots. Checkout payments are not charged for now.',
+  'The fee applies to payments sent to you in chat, through your pay link, and for your requests and pots. Checkout payments are not charged for now.',
   'Your history shows each payment, what Flizy kept, and what you received.',
   'You can turn Business off at any time. Payments after that are not charged. Fees already taken are not refunded.',
   'While Flizy runs on a test network, payments and fees are in test tokens, not real money.',

@@ -39,8 +39,8 @@ describe('settings', () => {
     for (const m of sides()) {
       const c = m.feeConfig({});
       assert.deepEqual(
-        [c.p2pBase, c.p2pStep, c.p2pStepSize, c.merchantBps, c.gasMarginBps, c.absorbMaxMultiple, c.absorbDailyCap, c.ethUsd],
-        [20_000n, 10_000n, 100_000_000n, 100, 2000, 2, 5_000_000n, 3_000_000_000n]
+        [c.p2pBase, c.p2pStep, c.p2pStepSize, c.merchantBps, c.merchantMin, c.gasMarginBps, c.absorbMaxMultiple, c.absorbDailyCap, c.ethUsd],
+        [20_000n, 10_000n, 100_000_000n, 50, 10_000n, 2000, 2, 5_000_000n, 3_000_000_000n]
       );
     }
   });
@@ -53,6 +53,7 @@ describe('settings', () => {
         { FEE_P2P_BASE_USD: '1e2' },
         { FEE_MERCHANT_BPS: '1.5' },
         { FEE_MERCHANT_BPS: '1001' },
+        { FEE_MERCHANT_MIN_USD: '-0.01' },
         { FEE_P2P_STEP_SIZE_USD: '0' },
         { FEE_ETH_USD_RATE: '0' },
         { FEE_TREASURY_ADDRESS: 'not-an-address' },
@@ -97,12 +98,12 @@ describe('person to person', () => {
 });
 
 describe('merchant', () => {
-  it('1% of the amount, rounded up to one unit', () => {
+  it('0.5% of the amount, rounded up to one unit (the $0.01 floor is applied where the fee is priced)', () => {
     for (const m of sides()) {
       const c = m.feeConfig({});
-      assert.equal(m.merchantFeeUnits(10_000_000n, c), 100_000n);
+      assert.equal(m.merchantFeeUnits(10_000_000n, c), 50_000n);
       assert.equal(m.merchantFeeUnits(1n, c), 1n);
-      assert.equal(m.merchantFeeUnits(150n, c), 2n);
+      assert.equal(m.merchantFeeUnits(300n, c), 2n);
       assert.equal(m.merchantFeeUnits(0n, c), 0n);
     }
   });
