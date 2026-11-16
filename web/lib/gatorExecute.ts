@@ -147,7 +147,8 @@ export type GatorErrorCode =
   | 'OUTCOME_UNKNOWN'
   | 'HANDLEOPS_REVERTED'
   | 'USEROP_REVERTED'
-  | 'APPROVAL_UNCONFIRMED';
+  | 'APPROVAL_UNCONFIRMED'
+  | 'BAD_BATCH';
 
 /**
  * Every failure from executeGatorCall.
@@ -368,10 +369,10 @@ export async function readAtLeast<T>(
  */
 async function estimateInnerCall(
   provider: ethers.JsonRpcProvider,
-  call: { entryPoint: string; gator: string; target: string; value: bigint; data: string },
+  call: { entryPoint: string; gator: string; target: string; value: bigint; data: string; executeData?: string },
   minBlock: number | undefined
 ): Promise<bigint> {
-  const tx = { from: call.entryPoint, to: call.gator, data: encodeExecuteCall(call.target, call.value, call.data) };
+  const tx = { from: call.entryPoint, to: call.gator, data: call.executeData || encodeExecuteCall(call.target, call.value, call.data) };
   const at = (blockTag: number | 'latest') => (blockTag === 'latest' ? 'latest' : ethers.toQuantity(blockTag));
   const once = () =>
     readAtLeast(provider, minBlock, async (blockTag) => BigInt(await provider.send('eth_estimateGas', [tx, at(blockTag)])));
@@ -511,6 +512,33 @@ function eip712Hash(
   return ethers.keccak256(ethers.concat(['0x1901', domainSeparator, structHash]));
 }
 
+const MODE_EXECUTE_IFACE = new ethers.Interface(['function execute(bytes32 _mode, bytes _executionCalldata) payable']);
+/** ERC-7579 batch call type, default exec type: every call runs, or none does. */
+export const BATCH_MODE = '0x01' + '00'.repeat(31);
+/** More calls than this is not a batch Flizy builds. */
+export const MAX_BATCH_CALLS = 4;
+
+export type BatchCall = { target: string; value: bigint; data?: string };
+
+export function encodeBatchExecuteCall(calls: BatchCall[]): string {
+  const executions = calls.map((c) => [ethers.getAddress(c.target), BigInt(c.value || 0n), c.data && c.data !== '0x' ? c.data : '0x']);
+  const encoded = ethers.AbiCoder.defaultAbiCoder().encode(['tuple(address target, uint256 value, bytes callData)[]'], [executions]);
+  return MODE_EXECUTE_IFACE.encodeFunctionData('execute', [BATCH_MODE, encoded]);
+}
+
+/** The calls of a batch, checked, or null for a single call. Throws on a malformed batch. */
+function batchCalls(calls: BatchCall[] | undefined): Required<BatchCall>[] | null {
+  if (calls == null) return null;
+  if (!Array.isArray(calls) || calls.length < 2 || calls.length > MAX_BATCH_CALLS) {
+    throw new GatorExecError('BAD_BATCH', `A batch is 2 to ${MAX_BATCH_CALLS} calls`);
+  }
+  return calls.map((c) => {
+    const value = BigInt(c.value || 0n);
+    if (value < 0n || !ethers.isAddress(c.target)) throw new GatorExecError('BAD_BATCH', 'A batch call needs a target and a value');
+    return { target: ethers.getAddress(c.target), value, data: c.data || '0x' };
+  });
+}
+
 export function encodeExecuteCall(
   target: string,
   value: bigint | number,
@@ -640,6 +668,8 @@ export async function executeGatorCall(args: {
   target: string;
   value: bigint;
   data?: string;
+  /** A batch run all or nothing in one UserOp (a payment and its fee); target, value and data are then not used. */
+  calls?: BatchCall[];
   onBroadcast?: (txHash: string) => Promise<void> | void;
   /** ETH the account holds in Savings, null when unreadable. The live store by default. */
   savings?: (accountId: string) => Promise<bigint | null>;
@@ -647,8 +677,11 @@ export async function executeGatorCall(args: {
   const { accountId, provider, target, onBroadcast } = args;
   const savings = args.savings ?? savedEthWei;
   const addrs = gatorAddresses();
+  const batch = batchCalls(args.calls);
   const callData = args.data || '0x';
-  const amount = BigInt(args.value || 0n);
+  const amount = batch ? batch.reduce((sum, c) => sum + c.value, 0n) : BigInt(args.value || 0n);
+  const executeData = batch ? encodeBatchExecuteCall(batch) : encodeExecuteCall(target, amount, callData);
+  const label = batch ? batch[0].target : target;
   const gator = await ensureGatorDeployed(accountId, provider);
   const owner = deriveAgentWallet(accountId).connect(provider);
   const ops = opsWallet(provider);
@@ -657,7 +690,7 @@ export async function executeGatorCall(args: {
 
   const estimate = await estimateInnerCall(
     provider,
-    { entryPoint: addrs.entryPointV07, gator, target, value: amount, data: callData },
+    { entryPoint: addrs.entryPointV07, gator, target: label, value: amount, data: batch ? executeData : callData, executeData },
     lastReceiptBlock.get(gator)
   );
   const callGas = callGasFor(estimate);
@@ -712,7 +745,7 @@ export async function executeGatorCall(args: {
       sender: gator,
       nonce,
       initCode: '0x',
-      callData: encodeExecuteCall(target, amount, callData),
+      callData: executeData,
       accountGasLimits: packU128(GATOR_VERIFICATION_GAS, callGas),
       preVerificationGas: GATOR_PREVERIFICATION_GAS,
       gasFees: packU128(maxPrio, maxFee),

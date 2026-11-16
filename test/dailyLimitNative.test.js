@@ -118,7 +118,8 @@ describe('web pay limit', () => {
   it('runs inside the account lock, on the ETH branch, before anything is signed', () => {
     const src = fs.readFileSync(path.join(ROOT, 'web', 'app', 'api', 'pay', 'execute', 'route.ts'), 'utf8');
     const lock = src.indexOf('tryAccountTxLock(supabase, payerId');
-    const check = src.indexOf('checkDailyNativeLimit(supabase, payerId, amountWei)');
+    // The Flizy fee counts toward the daily limit with the payment (web/lib/payFee.ts).
+    const check = src.indexOf('checkDailyNativeLimit(supabase, payerId, amountWei + feeWei)');
     const ethBranch = src.indexOf("if (asset === 'ETH')");
     const flzBranch = src.indexOf('} else {', ethBranch);
     assert.ok(lock > 0 && check > lock, 'the check must come after the lock');

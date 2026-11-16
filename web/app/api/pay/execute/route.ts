@@ -6,7 +6,7 @@ import { requireApproval } from '../../../../lib/stepUp.ts';
 import { ethToWei, sendTier } from '../../../../lib/tiers.ts';
 import { rejectIfCrossOrigin } from '../../../../lib/requestOrigin.ts';
 import { isSavedMerchant, resolvePayRef } from '../../../../lib/payCode.ts';
-import { deriveAgentWallet, getWebChain, explorerTxUrl, resolveToken } from '../../../../lib/dexServer';
+import { deriveAgentWallet, getWebChain, explorerTxUrl, resolveToken, getDexAddresses } from '../../../../lib/dexServer';
 import { maybeMarkFirstTx } from '../../../../lib/invite.ts';
 import { apiErrorBody } from '../../../../lib/apiError';
 import { normalizePayAsset, UNKNOWN_PAY_ASSET, type PayAsset } from '../../../../lib/payAsset.ts';
@@ -29,6 +29,20 @@ import { symbolLabel } from '../../../../lib/listedTokens';
 import { cleanPayNote } from '../../../../lib/payLink.ts';
 import { assertSpendable, resolveReserveAsset } from '../../../../lib/reserveStore';
 import { passkeyLimitRefusal } from '../../../../lib/custody/allowanceLeft.ts';
+import {
+  PAY_FEE_COPY,
+  feeCall,
+  feeView,
+  openPayFee,
+  planPayFee,
+  planStillShown,
+  settlePayFee,
+  sitePayFee,
+  spendableUnits,
+  waivePayFee,
+  type PayFee,
+  type PayPlan,
+} from '../../../../lib/payFee.ts';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -140,6 +154,49 @@ export async function POST(req: Request) {
     let txHash: string;
     /** The transfers row, so the payer can share a receipt for it. */
     let transferId: string | null = null;
+    /**
+     * The Flizy fee (web/lib/payFee.ts), when one applies: in the same asset,
+     * sent with the payment, on top or out of the amount as the page showed.
+     */
+    let fee: PayFee | null = null;
+    let feeShown: ReturnType<typeof feeView> | null = null;
+    /**
+     * The fee planned against what the wallet can spend. sendUnits is what the
+     * payee gets. Any refusal is the response to return; nothing is sent.
+     */
+    const planFee = async (
+      amountUnits: bigint,
+      holding: bigint,
+      gas: bigint
+    ): Promise<{ ok: true; fee: PayFee | null; sendUnits: bigint; plan: PayPlan | null } | { ok: false; res: NextResponse }> => {
+      const d = getDexAddresses();
+      // The page sends the fee it showed; a payment without one is refused once a fee applies.
+      const feed = await sitePayFee({ supabase, provider, viaGator, asset, amountUnits, flzPool: { flz: d.flz, pair: d.pair }, shownFeeUnits: body.feeUnits ?? null });
+      if (!feed.ok && !feed.higherFee) return { ok: false, res: NextResponse.json({ error: feed.error }, { status: feed.status }) };
+      const quoted = feed.ok ? feed.fee : (feed.higherFee as PayFee);
+      if (!quoted) return { ok: true, fee: null, sendUnits: amountUnits, plan: null };
+      const spendable = await spendableUnits(supabase, payerId, asset, holding, gas);
+      if (spendable === null) return { ok: false, res: NextResponse.json({ error: 'Could not read Savings. Nothing was sent.' }, { status: 400 }) };
+      const planned = planPayFee(quoted, amountUnits, spendable, asset);
+      if (!planned.ok) return { ok: false, res: NextResponse.json({ error: planned.error }, { status: 400 }) };
+      if (!feed.ok) return { ok: false, res: NextResponse.json({ error: feed.error, fee: feeView(quoted, planned.plan, asset) }, { status: feed.status }) };
+      const still = planStillShown(quoted, planned.plan, body.feeFromAmount, asset);
+      if (!still.ok) return { ok: false, res: NextResponse.json({ error: still.error, fee: still.fee }, { status: still.status }) };
+      return { ok: true, fee: quoted, sendUnits: planned.plan.sendUnits, plan: planned.plan };
+    };
+    /** The fee on record as pending before the send. False, with the row failed, when it cannot be written. */
+    const recordFee = async (rowId: string | undefined) => {
+      if (!fee) return true;
+      if (!rowId) return false;
+      try {
+        await openPayFee(supabase, fee, rowId, payerId);
+        return true;
+      } catch (feeErr) {
+        console.error(`[${ROUTE}] fee not recorded, nothing sent: ${feeErr instanceof Error ? feeErr.message.slice(0, 120) : 'unknown'}`);
+        await supabase.from('transfers').update({ status: 'failed', error: 'fee not recorded' }).eq('id', rowId);
+        return false;
+      }
+    };
 
     if (asset === 'ETH') {
       let amountWei: bigint;
@@ -151,16 +208,23 @@ export async function POST(req: Request) {
       if (amountWei <= 0n) {
         return NextResponse.json({ error: 'Amount must be greater than zero.' }, { status: 400 });
       }
+      const planned = await planFee(amountWei, ethBal, gasBuf);
+      if (!planned.ok) return planned.res;
+      fee = planned.fee;
+      // From here the amount is what the payee gets: the amount asked for, less the fee when it came out of it.
+      amountWei = planned.sendUnits;
+      const feeWei = fee ? fee.units : 0n;
+      if (fee && planned.plan) feeShown = feeView(fee, planned.plan, asset);
       const ethFence = await assertSpendable(supabase, payerId, {
         asset: 'ETH',
         holding: ethBal,
-        amount: amountWei,
+        amount: amountWei + feeWei,
         gas: gasBuf,
         decimals: 18,
         label: 'ETH',
       });
       if (!ethFence.ok) return NextResponse.json({ error: ethFence.message }, { status: 400 });
-      if (ethBal < amountWei + gasBuf) {
+      if (ethBal < amountWei + feeWei + gasBuf) {
         return NextResponse.json(
           { error: fundingWallText({ kind: 'native', address: walletAddr }) },
           { status: 400 }
@@ -169,14 +233,14 @@ export async function POST(req: Request) {
       // Inside the account lock, which chat confirm also takes, so a chat send
       // and a site pay cannot both pass against the same allowance. A limit that
       // cannot be read throws, and the pay is not made.
-      const daily = await checkDailyNativeLimit(supabase, payerId, amountWei);
+      const daily = await checkDailyNativeLimit(supabase, payerId, amountWei + feeWei);
       if (!daily.ok) {
         return NextResponse.json({ error: daily.message }, { status: 400 });
       }
       if (viaGator) {
         const capped = await passkeyLimitRefusal(supabase, provider, {
           ...passkeyCheck(payerId, walletAddr, asset),
-          amount: amountWei,
+          amount: amountWei + feeWei,
           decimals: 18,
         });
         if (capped) return NextResponse.json({ error: capped }, { status: 400 });
@@ -204,6 +268,7 @@ export async function POST(req: Request) {
       let receipt: ethers.TransactionReceipt | null;
       if (viaGator) {
         const rowId = logRow?.id;
+        if (!(await recordFee(rowId))) return NextResponse.json({ error: PAY_FEE_COPY.record }, { status: 503 });
         const sent = await executeGatorCall({
           // Recorded before broadcast; with no row to record on, nothing is sent.
           onBroadcast: async (hash) => {
@@ -216,10 +281,13 @@ export async function POST(req: Request) {
           target: to,
           value: amountWei,
           data: '0x',
+          // With a fee, the payment and the fee are one all-or-nothing UserOp.
+          ...(fee ? { calls: [{ target: to, value: amountWei, data: '0x' }, feeCall(fee, null)] } : {}),
         }).catch(async (sendErr: unknown) => {
           // Unknown outcome: the row stays 'submitted' for the reconciler.
           if (rowId && !outcomeUnknown(sendErr)) {
             await supabase.from('transfers').update({ status: 'failed', error: 'not sent' }).eq('id', rowId);
+            if (fee) await waivePayFee(supabase, rowId, 'not sent');
           }
           throw sendErr;
         });
@@ -231,6 +299,10 @@ export async function POST(req: Request) {
         receipt = await tx.wait(1);
       }
       const ok = Boolean(receipt && receipt.status === 1);
+      if (fee && logRow?.id) {
+        if (ok) await settlePayFee(supabase, fee, logRow.id, txHash, receipt, walletAddr);
+        else await waivePayFee(supabase, logRow.id, 'reverted');
+      }
 
       if (logRow?.id) {
         await supabase
@@ -285,17 +357,24 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
-      const tokBal = await erc20.balanceOf(walletAddr);
+      const tokBal = BigInt(await erc20.balanceOf(walletAddr));
+      const planned = await planFee(amountTok, tokBal, 0n);
+      if (!planned.ok) return planned.res;
+      fee = planned.fee;
+      // From here the amount is what the payee gets: the amount asked for, less the fee when it came out of it.
+      amountTok = planned.sendUnits;
+      const feeTok = fee ? fee.units : 0n;
+      if (fee && planned.plan) feeShown = feeView(fee, planned.plan, asset);
       const tokenFence = await assertSpendable(supabase, payerId, {
         asset: info.asset,
         holding: tokBal,
-        amount: amountTok,
+        amount: amountTok + feeTok,
         gas: 0n,
         decimals: info.decimals,
         label: info.label,
       });
       if (!tokenFence.ok) return NextResponse.json({ error: tokenFence.message }, { status: 400 });
-      if (tokBal < amountTok) {
+      if (tokBal < amountTok + feeTok) {
         return NextResponse.json(
           { error: fundingWallText({ kind: 'token', asset, address: walletAddr }) },
           { status: 400 }
@@ -304,7 +383,7 @@ export async function POST(req: Request) {
       if (viaGator) {
         const capped = await passkeyLimitRefusal(supabase, provider, {
           ...passkeyCheck(payerId, walletAddr, asset),
-          amount: amountTok,
+          amount: amountTok + feeTok,
           decimals,
         });
         if (capped) return NextResponse.json({ error: capped }, { status: 400 });
@@ -333,6 +412,8 @@ export async function POST(req: Request) {
       let receipt: ethers.TransactionReceipt | null;
       if (viaGator) {
         const rowId = logRow?.id;
+        if (!(await recordFee(rowId))) return NextResponse.json({ error: PAY_FEE_COPY.record }, { status: 503 });
+        const payData = erc20.interface.encodeFunctionData('transfer', [to, amountTok]);
         const sent = await executeGatorCall({
           // Recorded before broadcast; with no row to record on, nothing is sent.
           onBroadcast: async (hash) => {
@@ -344,11 +425,14 @@ export async function POST(req: Request) {
           chainId: chain.chainId,
           target: tokenAddress,
           value: 0n,
-          data: erc20.interface.encodeFunctionData('transfer', [to, amountTok]),
+          data: payData,
+          // With a fee, the payment and the fee are one all-or-nothing UserOp.
+          ...(fee ? { calls: [{ target: tokenAddress, value: 0n, data: payData }, feeCall(fee, tokenAddress)] } : {}),
         }).catch(async (sendErr: unknown) => {
           // Unknown outcome: the row stays 'submitted' for the reconciler.
           if (rowId && !outcomeUnknown(sendErr)) {
             await supabase.from('transfers').update({ status: 'failed', error: 'not sent' }).eq('id', rowId);
+            if (fee) await waivePayFee(supabase, rowId, 'not sent');
           }
           throw sendErr;
         });
@@ -360,6 +444,10 @@ export async function POST(req: Request) {
         receipt = await tx.wait(1);
       }
       const ok = Boolean(receipt && receipt.status === 1);
+      if (fee && logRow?.id) {
+        if (ok) await settlePayFee(supabase, fee, logRow.id, txHash, receipt, walletAddr);
+        else await waivePayFee(supabase, logRow.id, 'reverted');
+      }
 
       if (logRow?.id) {
         await supabase
@@ -440,6 +528,7 @@ export async function POST(req: Request) {
       transferId,
       to: merchant.username ? `@${merchant.username}` : 'account',
       alreadySaved,
+      fee: feeShown,
     });
     } finally {
       await releaseAccountTxLock(supabase, payerId);

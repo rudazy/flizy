@@ -354,8 +354,9 @@ swap; the SDK only quotes and builds the call.
 
 Off unless `FEES_ENABLED=true`. With it on, a chat send of ETH, FLZ or tUSD from a smart-account
 wallet charges the person-to-person fee (`lib/engine/sendFee.js`), including a request or pot
-payment and a claim hold for someone not on Flizy. Not yet: the site, checkouts and API payouts;
-NFTs and older plain wallets never carry one. A send over the daily passkey limit is approved with the passkey for
+payment and a claim hold for someone not on Flizy, and a payment on the site pay page
+(`web/lib/payFee.ts`). Not yet: checkouts and API payouts; NFTs and older plain wallets never
+carry one. A send over the daily passkey limit is approved with the passkey for
 exactly the payment; once it lands, its fee is collected through the daily permission, or waived
 when the permission cannot take it. It is never sent on the owner key.
 
@@ -369,6 +370,14 @@ when the permission cannot take it. It is never sent on the owner key.
 - **Claim holds.** The fee goes in the same transaction as the hold, and the preview says it is
   not refunded: a cancelled or expired claim returns the amount and keeps the fee. Its ledger
   source is the hold attempt (`claim_hold_attempts`), and the reconciler settles it with the hold.
+- **Site pay page.** The fee is quoted at review (`GET /api/pay/fee`) against what the wallet can
+  spend: on top when the balance covers both, otherwise out of the amount (a $5 link paid with
+  exactly $5 sends $4.98). The payer sees the fee and the total, or what the payee gets; the payee
+  is told only what arrived. `/api/pay/execute` plans again and refuses a fee above the one shown,
+  or a balance that has moved the fee between on top and out of the amount, with the new figures.
+  The payment and the fee go in one UserOp (`executeGatorCall` `calls`, mirror
+  `web/lib/gatorExecute.ts`); the ledger row is the transfer's, as in chat. Paying a token with
+  ETH instead (`/api/pay/swap`) is a swap and pays the swap fee only.
 
 - **Rules.** `lib/fees.js` (mirror `web/lib/fees.ts`): the person-to-person tiers, merchants 1%,
   the busy-network rule and its daily absorption cap, rounding. Settings: the `FEE_*` rows above.

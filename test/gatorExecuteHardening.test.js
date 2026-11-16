@@ -298,6 +298,39 @@ for (const [side] of [['bot'], ['web']]) {
     });
   });
 
+  describe(`${side}: a batch (a payment and its fee) is one UserOp`, () => {
+    const TREASURY = '0x' + '7e'.repeat(20);
+    const calls = [
+      { target: TARGET, value: 5n, data: '0x' },
+      { target: TREASURY, value: 1n },
+    ];
+    const opOf = (raw) => EPI.decodeFunctionData('handleOps', ethers.Transaction.from(raw).data).ops[0];
+
+    it('sends both calls in batch mode, and estimates exactly what it sends', async () => {
+      const chain = makeChain({ balance: 10n ** 18n });
+      await run(m(), chain, { calls });
+      const op = opOf(chain.state.broadcasts[0]);
+      assert.equal(op.callData, bot.encodeBatchExecuteCall(calls));
+      assert.equal(m().BATCH_MODE, '0x01' + '00'.repeat(31));
+      assert.equal(chain.state.estimateTxs[0].tx.data, op.callData);
+    });
+
+    it('the wallet must cover the calls\' total value', async () => {
+      const need = (gas) => (1_000_000n + gas + 80_000n) * 2n * GWEI;
+      const short = makeChain({ inner: () => 60_000n, balance: 5n, deposit: need(500_000n) });
+      await assert.rejects(run(m(), short, { calls }), (e) => e.code === 'INSUFFICIENT_GAS_FUNDS');
+      await run(m(), makeChain({ inner: () => 60_000n, balance: 6n, deposit: need(500_000n) }), { calls });
+    });
+
+    it('one call, more than four, or a bad target is refused before anything is read', async () => {
+      for (const bad of [[calls[0]], Array.from({ length: 5 }, () => calls[0]), [{ target: 'nope', value: 1n }, calls[1]]]) {
+        const chain = makeChain();
+        await assert.rejects(run(m(), chain, { calls: bad }), (e) => e.code === 'BAD_BATCH');
+        assert.equal(chain.state.estimateTxs.length, 0);
+      }
+    });
+  });
+
   describe(`${side}: gas the wallet pays itself never comes out of Savings`, () => {
     const need = (gas) => (1_000_000n + gas + 80_000n) * 2n * GWEI;
     const saved = (wei) => async () => wei;

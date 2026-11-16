@@ -100,6 +100,15 @@ export function PayLanding({
   const [showPassword, setShowPassword] = useState(false);
   /** Enter the amount, then review it, then pay. Nothing moves before Confirm. */
   const [stage, setStage] = useState<'edit' | 'review'>('edit');
+  /**
+   * The Flizy fee for this payment (GET /api/pay/fee), shown at review and
+   * sent back with it; null when none applies. On top (a total) when the
+   * balance covers both, otherwise out of the amount (what they get).
+   */
+  const [fee, setFee] = useState<PayFeeView | null>(null);
+  /** The fee as charged, from the payment's answer, for the paid screen. */
+  const [paidFee, setPaidFee] = useState<PayFeeView | null>(null);
+  const [quoting, setQuoting] = useState(false);
   /** The payer's Flizy wallet, for Balance and Max. Null until read, and when it cannot be. */
   const [balances, setBalances] = useState<Record<PayAsset, string> | null>(null);
   const [usdPerEth, setUsdPerEth] = useState<number | null>(null);
@@ -124,7 +133,8 @@ export function PayLanding({
 
   /** Dollars for one unit of the chosen asset, or null when it cannot be priced. tUSD is one dollar. */
   const usdPerUnit = asset === 'TUSD' ? 1 : asset === 'ETH' ? usdPerEth : flzEth != null && usdPerEth != null ? flzEth * usdPerEth : null;
-  const dollars = amountOk && usdPerUnit != null ? Number(amount) * usdPerUnit : null;
+  // Once paid, what they got: the fee may have come out of the amount.
+  const dollars = amountOk && usdPerUnit != null ? Number(paidFee ? paidFee.sendHuman : amount) * usdPerUnit : null;
   const balance = balances ? balances[asset] : null;
   const maxAmount = balance == null ? null : asset === 'ETH' ? Math.max(0, Number(balance) - ETH_GAS_RESERVE) : Number(balance);
 
@@ -233,14 +243,29 @@ export function PayLanding({
     setAmount(asset === 'ETH' ? (Math.floor(maxAmount * 1e6) / 1e6).toString() : balance);
   }
 
-  function onReview(e: React.FormEvent) {
+  async function onReview(e: React.FormEvent) {
     e.preventDefault();
     if (!amountOk) {
       setMsg('Enter an amount above 0.');
       return;
     }
+    if (quoting) return;
     setMsg('');
-    setStage('review');
+    setQuoting(true);
+    try {
+      const res = await fetch(`/api/pay/fee?asset=${asset}&amount=${encodeURIComponent(amount)}`, { cache: 'no-store' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(body.error || 'Could not work out the fee. Try again.');
+        return;
+      }
+      setFee(body.fee ?? null);
+      setStage('review');
+    } catch {
+      setMsg('Could not work out the fee. Try again.');
+    } finally {
+      setQuoting(false);
+    }
   }
 
   async function onPay() {
@@ -258,7 +283,14 @@ export function PayLanding({
         : await fetch('/api/pay/execute', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ref: refSlug, amount, pin: needsPin ? pin : '', asset, note }),
+            body: JSON.stringify({
+              ref: refSlug,
+              amount,
+              pin: needsPin ? pin : '',
+              asset,
+              note,
+              ...(fee ? { feeUnits: fee.feeUnits, feeFromAmount: fee.feeFromAmount } : {}),
+            }),
           });
       const body = await res.json().catch(() => ({}));
       // A wrong PIN is a 401 too; only a missing session (no code) means sign in.
@@ -267,11 +299,14 @@ export function PayLanding({
         return;
       }
       if (body.code === 'PIN_REQUIRED') setPinAsked(true);
+      // The fee moved since review: show the new one; nothing was sent.
+      if (res.status === 409 && body.fee) setFee(body.fee);
       if (!res.ok) {
         setMsg(body.error || 'Could not pay.');
         return;
       }
       setOk(true);
+      setPaidFee(body.fee ?? null);
       setExplorer(body.explorerUrl || '');
       setTxHash(typeof body.txHash === 'string' ? body.txHash : '');
       setTransferId(typeof body.transferId === 'string' ? body.transferId : '');
@@ -292,7 +327,7 @@ export function PayLanding({
     <div className="fade-up mx-auto w-full max-w-[560px]">
       <div className="grid grid-cols-[minmax(0,1fr)] gap-5 rounded-[18px] border border-[#3a3017] px-4 py-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:px-6" style={CARD_BG}>
         {paid ? (
-          <PaidHeader amount={amount} unit={unit} handle={handle} />
+          <PaidHeader amount={paidFee ? paidFee.sendHuman : amount} unit={unit} handle={handle} />
         ) : (
           <div className="flex items-start gap-4">
             <div className="min-w-0 flex-1">
@@ -455,8 +490,8 @@ export function PayLanding({
             </div>
 
             {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
-            <button type="submit" className="btn btn-primary flex w-full items-center justify-center gap-2.5 py-4 font-sans text-[16px] font-semibold" disabled={!amountOk}>
-              Review payment to {handle}
+            <button type="submit" className="btn btn-primary flex w-full items-center justify-center gap-2.5 py-4 font-sans text-[16px] font-semibold" disabled={!amountOk || quoting}>
+              {quoting ? 'Checking the fee...' : <>Review payment to {handle}</>}
               <ArrowRightIcon size={18} />
             </button>
           </form>
@@ -475,6 +510,27 @@ export function PayLanding({
                 <Row name="Amount" copyText={`${amount} ${unit}`}>
                   {amount} {unit}
                 </Row>
+                {fee && !withEth ? (
+                  fee.feeFromAmount ? (
+                    <>
+                      <Row name="Fee" info="Your balance covers the amount but not the fee on top, so the fee comes out of the amount.">
+                        {fee.feeHuman} {fee.label} ({fee.feeText}), from the amount
+                      </Row>
+                      <Row name="They get">
+                        {fee.sendHuman} {fee.label}
+                      </Row>
+                    </>
+                  ) : (
+                    <>
+                      <Row name="Fee" info="Added on top, so they get the full amount. Paid with the payment.">
+                        {fee.feeHuman} {fee.label} ({fee.feeText})
+                      </Row>
+                      <Row name="Total">
+                        {fee.totalHuman} {fee.label}
+                      </Row>
+                    </>
+                  )
+                ) : null}
                 {note ? (
                   <Row name="For">
                     <span className="break-words">{note}</span>
@@ -535,6 +591,7 @@ export function PayLanding({
                   setMsg('');
                   setWithEth(false);
                   setEthQuote(null);
+                  setFee(null);
                   setStage('edit');
                 }}
               >
@@ -546,7 +603,7 @@ export function PayLanding({
                 disabled={busy || (needsPin && !pinReady(pin))}
                 onClick={() => void onPay()}
               >
-                {busy ? 'Paying…' : `Confirm and pay ${amount} ${unit}`}
+                {busy ? 'Paying...' : `Confirm and pay ${fee && !withEth ? fee.totalHuman : amount} ${unit}`}
                 {busy ? null : <ArrowRightIcon size={18} />}
               </button>
             </div>
@@ -560,9 +617,9 @@ export function PayLanding({
                 <Row name="To" copyText={handle}>
                   {handle}
                 </Row>
-                <Row name="Amount" copyText={`${amount} ${unit}`}>
+                <Row name="Amount" copyText={`${paidFee ? paidFee.sendHuman : amount} ${unit}`}>
                   <span className="block">
-                    {amount} {unit}
+                    {paidFee ? paidFee.sendHuman : amount} {unit}
                   </span>
                   {dollars != null ? <span className="block font-mono text-[12px] text-[#8d867c]">≈ {usd(dollars)}</span> : null}
                 </Row>
@@ -682,6 +739,17 @@ export function PayLanding({
 }
 
 /** The success header: a lit check and what was sent. */
+/** The fee as GET /api/pay/fee and /api/pay/execute describe it (web/lib/payFee.ts feeView). */
+type PayFeeView = {
+  feeUnits: string;
+  feeText: string;
+  feeHuman: string;
+  sendHuman: string;
+  totalHuman: string;
+  feeFromAmount: boolean;
+  label: string;
+};
+
 function PaidHeader({ amount, unit, handle }: { amount: string; unit: string; handle: string }) {
   return (
     <div className="grid justify-items-center gap-2 pt-1 text-center">
