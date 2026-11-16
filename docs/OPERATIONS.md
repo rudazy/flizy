@@ -415,6 +415,10 @@ the site and chat keep back for gas is zero for it.
 - **Never a failure.** A top-up that cannot be made (off, over the cap, key out of ETH, lease
   busy, refused, unmined, reverted) only means the wallet pays its own gas as before, or the send
   refuses for want of it. Each one logs `[gas-topup] not topped up: <reason>`.
+- **Never from Savings.** Gas the wallet pays itself comes from ETH outside Savings (Savings is
+  set aside on Flizy's books only, so the chain would take it from there too). When only Savings
+  would cover it, or Savings cannot be read, the send is refused and nothing is sent
+  (`executeGatorCall` in `lib/gatorExecute.js`, mirror `web/lib/gatorExecute.ts`).
 - **Testnet only.** A deposit can be withdrawn by the wallet's owner, so this is replaced with a
   paymaster before ownership moves to users.
 - **Schema.** `supabase/migrations/20261115120000_gas_topups.sql` must be applied before this

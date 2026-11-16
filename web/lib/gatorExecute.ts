@@ -446,18 +446,32 @@ export async function gatorGasReserveWei(
   }
   const shortfall = prefundShortfallWei(maxFee, deposit);
   // Flizy's gas top-up (web/lib/gasTopup.ts) will pay it: the wallet keeps nothing back for gas.
-  if (shortfall > 0n && topupOn() && (await topupWouldCover({ supabase: await topupDb(), wallet: gator, shortfallWei: shortfall }))) {
+  if (shortfall > 0n && topupOn() && (await topupWouldCover({ supabase: await lazyDb(), wallet: gator, shortfallWei: shortfall }))) {
     return 0n;
   }
   return shortfall;
 }
 
 /**
- * The database, loaded only once the top-up is on: ./supabase.ts loads the .env
- * files when it is imported, which nothing on the executor path may do otherwise.
+ * The database, loaded only when needed (a gas top-up, or Savings when the wallet
+ * pays its own gas): ./supabase.ts loads the .env files when it is imported,
+ * which nothing on the executor path may do otherwise.
  */
-async function topupDb() {
+async function lazyDb() {
   return (await import('./supabase.ts')).getSupabase();
+}
+
+/** ETH this account set aside in Savings (web/lib/reserveStore.ts), or null when it cannot be read. */
+async function savedEthWei(accountId: string): Promise<bigint | null> {
+  try {
+    const { loadReserveRows } = await import('./reserveStore.ts');
+    const loaded = await loadReserveRows(await lazyDb(), accountId);
+    if (!loaded.ok) return null;
+    const row = loaded.rows.find((r) => r.asset === 'ETH');
+    return row ? BigInt(row.amount) : 0n;
+  } catch {
+    return null;
+  }
 }
 
 /** The gas top-up switch, read without throwing: a malformed setting means off here. */
@@ -613,7 +627,8 @@ function failedOpReason(err: unknown): string | null {
  * Execute a single call from the account's HybridDeleGator. Same order and
  * rules as lib/gatorExecute.js executeGatorCall: estimate (refuse on revert or
  * no estimate), clamp the call gas, read state no older than this gator's last
- * receipt, check value plus exact prefund, sign, record the hash through
+ * receipt, check value plus exact prefund (the prefund the wallet pays itself
+ * from ETH outside Savings), sign, record the hash through
  * onBroadcast, broadcast, then wait. A node that answers no is
  * BROADCAST_REJECTED (not sent); no answer is OUTCOME_UNKNOWN with
  * submitted: true (classifyBroadcastError).
@@ -626,8 +641,11 @@ export async function executeGatorCall(args: {
   value: bigint;
   data?: string;
   onBroadcast?: (txHash: string) => Promise<void> | void;
+  /** ETH the account holds in Savings, null when unreadable. The live store by default. */
+  savings?: (accountId: string) => Promise<bigint | null>;
 }): Promise<{ txHash: string; receipt: ethers.TransactionReceipt; gator: string; callGasLimit: bigint }> {
   const { accountId, provider, target, onBroadcast } = args;
+  const savings = args.savings ?? savedEthWei;
   const addrs = gatorAddresses();
   const callData = args.data || '0x';
   const amount = BigInt(args.value || 0n);
@@ -670,7 +688,7 @@ export async function executeGatorCall(args: {
     if (shortfall > 0n && !toppedUp && topupOn()) {
       toppedUp = true;
       const topup = await topUpGasDeposit({
-        supabase: await topupDb(),
+        supabase: await lazyDb(),
         provider,
         entryPoint: addrs.entryPointV07,
         wallet: gator,
@@ -679,8 +697,16 @@ export async function executeGatorCall(args: {
       });
       if (topup.ok) deposit = await readAtLeast(provider, topup.blockNumber, (blockTag) => ep.balanceOf(gator, { blockTag }) as Promise<bigint>);
     }
-    if (BigInt(balance) < amount + prefundRequiredWei(callGas, maxFee, deposit)) {
+    const walletPrefund = prefundRequiredWei(callGas, maxFee, deposit);
+    if (BigInt(balance) < amount + walletPrefund) {
       throw new GatorExecError('INSUFFICIENT_GAS_FUNDS', 'Not enough ETH for value plus prefund');
+    }
+    // Gas the wallet pays itself must not come out of ETH set aside in Savings.
+    if (walletPrefund > 0n) {
+      const saved = await savings(accountId);
+      if (saved === null || BigInt(balance) - saved < amount + walletPrefund) {
+        throw new GatorExecError('INSUFFICIENT_GAS_FUNDS', saved === null ? 'Savings could not be read' : 'Prefund would come out of Savings');
+      }
     }
     const userOp: UserOp = {
       sender: gator,

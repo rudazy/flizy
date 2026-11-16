@@ -16,8 +16,15 @@ const { describe, it, before } = require('node:test');
 const assert = require('node:assert/strict');
 const { ethers } = require('ethers');
 const { VECTOR_SECRET } = require('./helpers/derivationVector');
+const { createFakeSupabase, mockSupabaseModule } = require('./helpers/fakeSupabase');
+
+// A caller that does not pass a Savings reader (the bot swap below) reads this
+// empty store, never a live one.
+const store = createFakeSupabase({ account_reserves: [] });
+mockSupabaseModule(store.client);
 
 process.env.WALLET_DERIVATION_SECRET = VECTOR_SECRET;
+const derivation = VECTOR_SECRET;
 // A throwaway submitter key for signing in tests; nothing is ever sent.
 process.env.PRIVATE_KEY = '0x' + '11'.repeat(32);
 
@@ -141,9 +148,12 @@ const sides = () => [
   ['web', web],
 ];
 
+/** Nothing in Savings. Every call here passes a reader, so no test loads a live database client. */
+const NO_SAVINGS = async () => 0n;
+
 async function run(m, chain, extra = {}) {
   m.lastReceiptBlock.clear();
-  return m.executeGatorCall({ accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x', ...extra });
+  return m.executeGatorCall({ accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x', savings: NO_SAVINGS, ...extra });
 }
 
 describe('call gas: estimate + 20%, floor 500,000, ceiling 1,000,000', () => {
@@ -288,6 +298,47 @@ for (const [side] of [['bot'], ['web']]) {
     });
   });
 
+  describe(`${side}: gas the wallet pays itself never comes out of Savings`, () => {
+    const need = (gas) => (1_000_000n + gas + 80_000n) * 2n * GWEI;
+    const saved = (wei) => async () => wei;
+
+    it('refuses when only Savings would cover the prefund, nothing sent', async () => {
+      // On chain there is enough; 1 wei of it is in Savings, so it is not.
+      const chain = makeChain({ inner: () => 510_730n, balance: need(612_876n) });
+      await assert.rejects(run(m(), chain, { savings: saved(1n) }), (e) => e.code === 'INSUFFICIENT_GAS_FUNDS' && e.submitted === false);
+      assert.equal(chain.state.broadcasts.length, 0);
+      const outside = makeChain({ inner: () => 510_730n, balance: need(612_876n) + 1n });
+      await run(m(), outside, { savings: saved(1n) });
+      assert.equal(outside.state.broadcasts.length, 1);
+    });
+
+    it('counts the value sent with the prefund', async () => {
+      const chain = makeChain({ inner: () => 510_730n, balance: need(612_876n) + 10n });
+      await assert.rejects(run(m(), chain, { value: 6n, savings: saved(5n) }), (e) => e.code === 'INSUFFICIENT_GAS_FUNDS');
+      await run(m(), makeChain({ inner: () => 510_730n, balance: need(612_876n) + 11n }), { value: 6n, savings: saved(5n) });
+    });
+
+    it('Savings that cannot be read refuses, when the wallet pays gas itself', async () => {
+      const chain = makeChain({ inner: () => 510_730n, balance: need(612_876n) * 2n });
+      await assert.rejects(run(m(), chain, { savings: saved(null) }), (e) => e.code === 'INSUFFICIENT_GAS_FUNDS' && /Savings could not be read/.test(e.message));
+      assert.equal(chain.state.broadcasts.length, 0);
+    });
+
+    it('a deposit that covers the prefund never reads Savings, and spends nothing of it', async () => {
+      let asked = 0;
+      const chain = makeChain({ inner: () => 60_000n, balance: 6n, deposit: need(500_000n) });
+      await run(m(), chain, {
+        value: 6n,
+        savings: async () => {
+          asked += 1;
+          return 10n ** 18n;
+        },
+      });
+      assert.equal(asked, 0);
+      assert.equal(chain.state.broadcasts.length, 1);
+    });
+  });
+
   describe(`${side}: the hash is recorded before broadcast`, () => {
     it('onBroadcast gets the real hash before the broadcast happens', async () => {
       const chain = makeChain();
@@ -347,7 +398,7 @@ for (const [side] of [['bot'], ['web']]) {
       const chain = makeChain({ receipt: () => null });
       m().lastReceiptBlock.clear();
       await assert.rejects(
-        m().executeApprovalCall({ accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x' }),
+        m().executeApprovalCall({ accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x', savings: NO_SAVINGS }),
         (e) => e.code === 'APPROVAL_UNCONFIRMED' && e.submitted === false
       );
     });
@@ -360,7 +411,7 @@ for (const [side] of [['bot'], ['web']]) {
       assert.equal(m().lastReceiptBlock.get(GATOR), 140);
       chain.state.pinnedTags.length = 0;
       // The next call reaches a node whose head is still 100.
-      await m().executeGatorCall({ accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x' });
+      await m().executeGatorCall({ accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x', savings: NO_SAVINGS });
       assert.ok(chain.state.pinnedTags.length >= 4);
       assert.ok(chain.state.pinnedTags.every((t) => t >= 140), JSON.stringify(chain.state.pinnedTags));
     });
@@ -505,12 +556,12 @@ describe('the receipt-block memory is bounded', () => {
     for (const m of [bot, web]) {
       m.lastReceiptBlock.clear();
       const chain = makeChain({ receipt: (hash) => receiptFor(hash, true, 500) });
-      await m.executeGatorCall({ accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x' });
+      await m.executeGatorCall({ accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x', savings: NO_SAVINGS });
       assert.equal(m.lastReceiptBlock.get(GATOR), 500);
       for (let i = 0; i < 10_000; i += 1) m.lastReceiptBlock.set(`0x${i}`, 1);
       // The next receipt for the gator re-inserts it as newest and evicts the oldest.
       const again = makeChain({ receipt: (hash) => receiptFor(hash, true, 600) });
-      await m.executeGatorCall({ accountId: ACCOUNT, provider: again.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x' });
+      await m.executeGatorCall({ accountId: ACCOUNT, provider: again.provider, chainId: 91342, target: TARGET, value: 0n, data: '0x', savings: NO_SAVINGS });
       assert.ok(m.lastReceiptBlock.size <= 10_000);
       assert.equal(m.lastReceiptBlock.get(GATOR), 600);
       m.lastReceiptBlock.clear();
@@ -675,12 +726,34 @@ describe('approve then sell, with the approval not yet visible at estimate time'
     const router = '0x6427fD0c13577847888B7E2d1A24C887bBEBd9cC';
     await web.executeApprovalCall({
       accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: FLZ, value: 0n,
-      data: ERC20.encodeFunctionData('approve', [router, 10n ** 19n]),
+      data: ERC20.encodeFunctionData('approve', [router, 10n ** 19n]), savings: NO_SAVINGS,
     });
     const res = await web.executeGatorCall({
       accountId: ACCOUNT, provider: chain.provider, chainId: 91342, target: router, value: 0n,
-      data: ROUTER_FN.encodeFunctionData('swapExactTokensForETH', [10n ** 19n, 1n, [FLZ, '0x3a13399f2741122B63c7710B2A85346B97C6BFDf'], GATOR, 2_000_000_000n]),
+      data: ROUTER_FN.encodeFunctionData('swapExactTokensForETH', [10n ** 19n, 1n, [FLZ, '0x3a13399f2741122B63c7710B2A85346B97C6BFDf'], GATOR, 2_000_000_000n]), savings: NO_SAVINGS,
     });
     check(chain, res);
+  });
+});
+
+describe('bot: with no reader passed, Savings is read from the store', () => {
+  const need = (gas) => (1_000_000n + gas + 80_000n) * 2n * GWEI;
+
+  it('ETH in Savings is not spent on gas', async () => {
+    store.db.tables.account_reserves.push({ account_id: ACCOUNT, asset: 'ETH', amount: '1' });
+    try {
+      const chain = makeChain({ inner: () => 510_730n, balance: need(612_876n) });
+      // savings: undefined takes the default reader.
+      await assert.rejects(run(bot, chain, { savings: undefined }), (e) => e.code === 'INSUFFICIENT_GAS_FUNDS');
+      assert.equal(chain.state.broadcasts.length, 0);
+    } finally {
+      store.db.tables.account_reserves.length = 0;
+    }
+  });
+});
+
+describe('this file never loads a live database client', () => {
+  it('the test settings are still the ones set at the top', () => {
+    assert.equal(process.env.WALLET_DERIVATION_SECRET, derivation);
   });
 });
