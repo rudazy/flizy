@@ -37,6 +37,8 @@ type HistoryEntry = {
   received?: boolean;
   /** Who paid, for a received row. Resolved from the sender's account. */
   fromLabel?: string | null;
+  /** On a payment a business received: what arrived and what Flizy kept (lib/history.js). */
+  businessFee?: { kept: string; arrived: string; gross: string; asset: string };
   createdAt: string;
 };
 
@@ -61,6 +63,8 @@ export type ActivityItem = {
   channel?: string | null;
   /** Set on a swap that ran on Ammora; absent for Flizy's own pools. */
   venue?: 'ammora';
+  /** On a payment a business received: what Flizy kept of the price. */
+  businessFee?: { kept: string; gross: string };
 };
 
 function shortAddr(addr: string) {
@@ -71,7 +75,8 @@ function shortAddr(addr: string) {
 function mapTransferRow(
   row: Record<string, unknown>,
   received = false,
-  fromLabel: string | null = null
+  fromLabel: string | null = null,
+  businessFee: HistoryEntry['businessFee'] = undefined
 ): ActivityItem {
   const kind = String(row.kind || 'transfer').toLowerCase();
   // lib/history.js decides this once, from the wallet the payment was sent to.
@@ -79,7 +84,8 @@ function mapTransferRow(
   // belongs to whoever made it.
   const direction = received ? 'in' : 'out';
   const asset = assetSymbol(row.asset);
-  const amount = row.amount_eth as string | number;
+  // A business is shown what arrived: the payer's row is the price.
+  const amount = received && businessFee ? businessFee.arrived : (row.amount_eth as string | number);
   const to = row.to_address ? String(row.to_address) : '';
   const labelExtra = row.counterparty_label ? String(row.counterparty_label) : null;
 
@@ -126,6 +132,7 @@ function mapTransferRow(
     category: historyCategory(type, kind),
     channel: channelLabel(row.phone),
     ...(type === 'swap' && row.venue === 'ammora' ? { venue: 'ammora' as const } : {}),
+    ...(received && businessFee ? { businessFee: { kept: businessFee.kept, gross: businessFee.gross } } : {}),
   };
 }
 
@@ -243,7 +250,7 @@ export async function GET() {
     const items: ActivityItem[] = settled.items.map((entry: HistoryEntry) =>
       entry.source === 'claim'
         ? mapClaimRow(entry.row, accountId)
-        : mapTransferRow(entry.row, Boolean(entry.received), entry.fromLabel ?? null)
+        : mapTransferRow(entry.row, Boolean(entry.received), entry.fromLabel ?? null, entry.businessFee)
     );
 
     // Faucet claims live in their own table, so History would never show the

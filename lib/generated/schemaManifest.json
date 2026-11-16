@@ -1236,7 +1236,7 @@
       "kind": "table",
       "name": "fee_ledger",
       "providedBy": "20261115130000_fee_ledger.sql",
-      "requiredBy": "lib/feeQuote.js"
+      "requiredBy": "lib/feeQuote.js, lib/history.js"
     },
     {
       "kind": "table",

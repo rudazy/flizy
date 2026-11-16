@@ -125,6 +125,8 @@ export type ActivityItem = {
   actor?: string | null;
   /** How a payment travelled ("Flizy pay", "GitHub pay"), never who it went to. Scan only. */
   rail?: string | null;
+  /** On a payment a business received: what Flizy kept of the price (GET /api/history). */
+  businessFee?: { kept: string; gross: string };
 };
 
 export type HoldingsData = {

@@ -280,6 +280,11 @@ function HistoryCard({
             {cat === 'swap' ? <SwapArrowsIcon size={13} className="shrink-0 text-[#8d8d8d]" /> : null}
           </span>
           {row.note ? <span className="truncate font-sans text-[12px] text-[#9a9a9a]">{row.note}</span> : null}
+          {row.businessFee ? (
+            <span className="truncate font-sans text-[12px] text-[#9a9a9a]">
+              Flizy kept {row.businessFee.kept} {row.asset} of {row.businessFee.gross} {row.asset}
+            </span>
+          ) : null}
           <span className="font-sans text-[12px] text-[#8d8d8d]">{relativeTime(row.createdAt)}</span>
         </span>
         {/* Capped so a long amount truncates here instead of squeezing the title or widening the card. */}
@@ -305,6 +310,9 @@ function HistoryCard({
         <div id={detailsId} className="grid gap-[8px] border-t border-[#1f1f22] px-[14px] pb-[14px] pt-[12px] font-sans text-[12px]">
           <Detail label="What" value={row.label} />
           {row.channel ? <Detail label="Channel" value={row.channel} /> : null}
+          {row.businessFee ? (
+            <Detail label="Business fee" value={`${row.businessFee.kept} ${row.asset}, kept by Flizy from ${row.businessFee.gross} ${row.asset} paid`} />
+          ) : null}
           {address ? (
             <Detail
               label="To"

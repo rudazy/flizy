@@ -386,8 +386,9 @@ when the permission cannot take it. It is never sent on the owner key.
   business is a person-to-person payment. On the site, `GET /api/pay/fee` shows the payer no fee
   for a business and `/api/pay/execute` splits the price the same way (`web/lib/payFee.ts`); the
   payer's record is the price. Paying a token with ETH instead is a swap and carries no merchant fee.
-  The business terms also promise a history showing what Flizy kept on each payment: keep
-  `FEES_ENABLED` off until that view ships.
+  A business's history (chat `history` and the site's History, both from `lib/history.js`) shows
+  each payment it received as what arrived, with what Flizy kept of the price, as the business
+  terms promise.
 - **Site pay page.** The fee is quoted at review (`GET /api/pay/fee`) against what the wallet can
   spend: on top when the balance covers both, otherwise out of the amount (a $5 link paid with
   exactly $5 sends $4.98). The payer sees the fee and the total, or what the payee gets; the payee
