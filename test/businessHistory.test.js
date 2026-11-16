@@ -7,7 +7,8 @@
  * kept and the price, in the asset's own decimals; a pending fee counts, a
  * waived one kept nothing; the payer's own row, a person-to-person payment and
  * a payment with no fee are untouched; a failed read leaves the rows as they
- * were; and chat, the site route and the History row use it.
+ * were; chat, the site route and the History row use it; and no root file the
+ * site loads requires a package, which the site build cannot resolve.
  *
  * Run: node --test test/businessHistory.test.js
  */
@@ -18,6 +19,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createFakeSupabase } = require('./helpers/fakeSupabase');
 
+const { builtinModules } = require('node:module');
 const { attachBusinessFees } = require('../lib/history');
 
 const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
@@ -95,5 +97,47 @@ describe('where it shows', () => {
     const ui = read('web/components/ActivityPanels.tsx');
     assert.match(ui, /Flizy kept \{row\.businessFee\.kept\} \{row\.asset\} of \{row\.businessFee\.gross\} \{row\.asset\}/);
     assert.match(ui, /<Detail label="Business fee"/);
+  });
+});
+
+describe('the site build', () => {
+  // Vercel builds web/ alone: packages resolve from web/node_modules, so a root
+  // lib/ file the site requires must load nothing but other lib/ files and Node.
+  it('every root file the site loads requires only relative lib/ files and Node built-ins', () => {
+    const root = path.join(__dirname, '..');
+    const web = [];
+    const walkDir = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.name === 'node_modules' || e.name === '.next') continue;
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walkDir(p);
+        else if (/\.(ts|tsx|js|mjs)$/.test(e.name)) web.push(p);
+      }
+    };
+    walkDir(path.join(root, 'web', 'app'));
+    walkDir(path.join(root, 'web', 'lib'));
+    const libDir = path.join(root, 'lib') + path.sep;
+    const seeds = new Set();
+    for (const file of web) {
+      for (const m of fs.readFileSync(file, 'utf8').matchAll(/require\('([^']+)'\)/g)) {
+        const target = require.resolve(path.resolve(path.dirname(file), m[1]));
+        if (target.startsWith(libDir)) seeds.add(target);
+      }
+    }
+    assert.ok(seeds.has(require.resolve('../lib/history')), 'the history route loads lib/history.js');
+    const builtins = new Set(builtinModules.flatMap((b) => [b, `node:${b}`]));
+    const seen = new Set();
+    const queue = [...seeds];
+    while (queue.length) {
+      const file = queue.pop();
+      if (seen.has(file)) continue;
+      seen.add(file);
+      for (const m of fs.readFileSync(file, 'utf8').matchAll(/require\('([^']+)'\)/g)) {
+        const spec = m[1];
+        if (builtins.has(spec)) continue;
+        assert.ok(spec.startsWith('.'), `${path.relative(root, file)} requires the package "${spec}", which the site build cannot resolve`);
+        queue.push(require.resolve(path.resolve(path.dirname(file), spec)));
+      }
+    }
   });
 });
