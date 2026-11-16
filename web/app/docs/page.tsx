@@ -35,6 +35,11 @@ const CMD_GROUPS: Array<{
         meaning: 'Same thing — name first also works, with send, pay, transfer or give',
       },
       {
+        wa: 'send all flz to john',
+        tg: '/send all flz to john',
+        meaning: 'Everything you can spend of one asset (ETH if none is named). Savings stay put, and any fee comes out of the amount',
+      },
+      {
         wa: 'pay 0.01 to @ludarep',
         tg: '/pay 0.01 to @ludarep',
         meaning: 'Pay a Flizy account by @username (same as scanning their QR)',
