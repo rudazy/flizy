@@ -4,7 +4,7 @@
  *
  * Mirror of lib/feeQuote.js (web/ cannot import root lib/), which documents
  * the inputs: ETH at FEE_ETH_USD_RATE, tUSD at $1, FLZ from the Flizy FLZ/WETH
- * pool at that rate; FEE_PAYMENT_GAS at the current max fee per gas; what
+ * pool at that rate, and any other listed token from its own ETH pool; FEE_PAYMENT_GAS at the current max fee per gas; what
  * Flizy absorbed since 00:00 UTC. The rules are web/lib/fees.ts.
  *
  * The pool addresses come from the caller (dexServer getDexAddresses), so this
@@ -50,15 +50,26 @@ export function activeFeeConfig(env: Record<string, string | undefined> = proces
   return fees.feeConfig(env);
 }
 
-/** Decimals of the assets a fee can be charged in. */
+/** Decimals of the assets a fee can be charged in: ETH, FLZ and the listed tokens. */
 export function feeDecimals(asset: string): number {
   if (asset === 'ETH' || asset === 'FLZ') return 18;
-  if (asset === 'TUSD') {
-    const t = listedBySymbol('TUSD');
-    if (!t) throw new Error('tUSD is not listed');
-    return Number(t.decimals);
-  }
+  const listed = listedBySymbol(asset);
+  if (listed) return Number(listed.decimals);
   throw new Error(`no fee is defined for ${asset}`);
+}
+
+/** micro-USD per whole token from its ETH pool's reserves, at the configured ETH rate. */
+async function poolPriceMicro(provider: ethers.Provider, token: string, pairAddress: string, decimals: number, ethUsd: bigint, symbol: string): Promise<bigint> {
+  const pair = new ethers.Contract(pairAddress, PAIR_ABI, provider);
+  const [[r0, r1], t0] = await Promise.all([pair.getReserves() as Promise<[bigint, bigint, number]>, pair.token0() as Promise<string>]);
+  const tokenIs0 = ethers.getAddress(t0) === ethers.getAddress(token);
+  const reserveToken = BigInt(tokenIs0 ? r0 : r1);
+  const reserveWeth = BigInt(tokenIs0 ? r1 : r0);
+  if (reserveToken === 0n || reserveWeth === 0n) throw new Error(`the ${symbol} pool is empty`);
+  // USD per whole token = (WETH per token, decimals evened out) x USD per ETH.
+  const priceMicro = (reserveWeth * ethUsd * 10n ** BigInt(decimals)) / (reserveToken * 10n ** 18n);
+  if (priceMicro <= 0n) throw new Error(`the ${symbol} price rounds to zero`);
+  return priceMicro;
 }
 
 /** The USD price of one whole token, in micro-USD, and its source. Throws when it cannot be read. */
@@ -69,16 +80,14 @@ export async function priceMicroFor(
   if (asset === 'ETH') return { priceMicro: p.cfg.ethUsd, source: 'FEE_ETH_USD_RATE' };
   if (asset === 'TUSD') return { priceMicro: fees.MICRO, source: 'tUSD at $1' };
   if (asset === 'FLZ') {
-    const pair = new ethers.Contract(p.flzPool.pair, PAIR_ABI, p.provider);
-    const [[r0, r1], t0] = await Promise.all([pair.getReserves() as Promise<[bigint, bigint, number]>, pair.token0() as Promise<string>]);
-    const flzIs0 = ethers.getAddress(t0) === ethers.getAddress(p.flzPool.flz);
-    const reserveFlz = BigInt(flzIs0 ? r0 : r1);
-    const reserveWeth = BigInt(flzIs0 ? r1 : r0);
-    if (reserveFlz === 0n || reserveWeth === 0n) throw new Error('the FLZ pool is empty');
-    // Both 18 decimals: USD per FLZ = (WETH per FLZ) x USD per ETH.
-    const priceMicro = (reserveWeth * p.cfg.ethUsd) / reserveFlz;
-    if (priceMicro <= 0n) throw new Error('the FLZ price rounds to zero');
-    return { priceMicro, source: 'Flizy FLZ/WETH pool' };
+    return { priceMicro: await poolPriceMicro(p.provider, p.flzPool.flz, p.flzPool.pair, 18, p.cfg.ethUsd, 'FLZ'), source: 'Flizy FLZ/WETH pool' };
+  }
+  const listed = listedBySymbol(asset);
+  if (listed && listed.pair) {
+    return {
+      priceMicro: await poolPriceMicro(p.provider, listed.address, listed.pair, Number(listed.decimals), p.cfg.ethUsd, listed.symbol),
+      source: `Flizy ${listed.symbol}/WETH pool`,
+    };
   }
   throw new Error(`no fee price for ${asset}`);
 }

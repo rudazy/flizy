@@ -1962,7 +1962,7 @@
       "kind": "table",
       "name": "fee_ledger",
       "providedBy": "20261115130000_fee_ledger.sql",
-      "requiredBy": "web/lib/feeQuote.ts"
+      "requiredBy": "web/lib/feeQuote.ts, web/lib/swapFee.ts"
     },
     {
       "kind": "table",

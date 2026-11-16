@@ -370,6 +370,12 @@ when the permission cannot take it. It is never sent on the owner key.
 - **Claim holds.** The fee goes in the same transaction as the hold, and the preview says it is
   not refunded: a cancelled or expired claim returns the amount and keeps the fee. Its ledger
   source is the hold attempt (`claim_hold_attempts`), and the reconciler settles it with the hold.
+- **Swap fees.** The fee router keeps taking its swap fee (`SWAP_FEE_BPS`) on chain. Once a swap
+  made with a Flizy wallet lands, in chat, on the site or settled later by the reconciler, its
+  `FeeTaken` event is recorded in the ledger as kind `swap`, charged, against the swap's transfers
+  row (`lib/swapFee.js`, mirror `web/lib/swapFee.ts`), priced like any fee (a listed token from its
+  own ETH pool). A fee in a token Flizy does not list is left out: its price comes from a pool its
+  creator controls. Ammora swaps and swaps from an outside wallet are not recorded.
 - **API payouts.** The platform pays the fee on each payout, on top, in the payout's asset, in the
   same redeem as the payout through its allowance (`lib/api/payoutFee.js`,
   `lib/api/allowanceSend.js`); the recipient always gets the full amount, so a payout whose

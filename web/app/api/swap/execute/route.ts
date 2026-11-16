@@ -29,6 +29,7 @@ import { UNVERIFIED_REFUSAL, bindAmountOutMin, isUnverifiedSwap, parseSlippageBp
 import { ammoraEnabled } from '../../../../lib/ammora/venue.ts';
 import { ammoraSiteExecute } from '../../../../lib/ammora/siteSwap.ts';
 import { ClientError, apiErrorBodyAllowingClientError } from '../../../../lib/apiError';
+import { recordSwapFee } from '../../../../lib/swapFee.ts';
 
 const ROUTE = 'POST /api/swap/execute';
 
@@ -286,6 +287,17 @@ export async function POST(req: Request) {
           .update({ status: 'confirmed', tx_hash: result.txHash })
           .eq('id', logRow.id);
       }
+      // The router's fee, in the fee ledger (web/lib/swapFee.ts). Never throws.
+      await recordSwapFee({
+        supabase,
+        provider,
+        receipt: result.receipt,
+        transferId: logRow?.id,
+        accountId,
+        payer: walletAddr,
+        gator: viaGator ? walletAddr : null,
+        dex,
+      });
 
       try {
         const kind = side === 'buy' || side === 'sell' ? side : 'swap';
