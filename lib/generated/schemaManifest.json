@@ -40,6 +40,12 @@
     },
     {
       "kind": "check",
+      "name": "accounts.accounts_business_terms_check",
+      "providedBy": "20261116140000_business_accounts.sql",
+      "requiredBy": "check on accounts"
+    },
+    {
+      "kind": "check",
       "name": "accounts.accounts_buy_amounts_eth_check",
       "providedBy": "20261116120000_account_buy_amounts.sql",
       "requiredBy": "check on accounts"
