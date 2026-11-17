@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import type { TractionResult, WeekMetrics } from '../lib/traction.ts';
+import { usdText } from '../lib/usdText.ts';
 
 /**
  * The private traction dashboard (web/app/dashboard/admin/traction). Both
@@ -12,18 +13,24 @@ import type { TractionResult, WeekMetrics } from '../lib/traction.ts';
  * Each table pages five weeks at a time (View all shows every week), sorts by
  * any column, keeps the week column in place while it scrolls sideways, marks
  * the change from the week before under each count, and closes with a summary
- * row: the latest figure for running totals, the sum for weekly counts.
+ * row: the latest figure for running totals, the sum for weekly counts and
+ * amounts.
+ *
+ * The cards, tables and icons are shared with the rewards dashboard
+ * (RewardsDashboard.tsx), so both read the same way.
  */
 
 type Mode = 'without' | 'everyone';
-type Kind = 'count' | 'total' | 'rate' | 'ratio';
-type Col = { key: keyof WeekMetrics; label: string; hint: string; kind: Kind };
-type Section = { id: string; title: string; icon: ReactNode; cols: Col[] };
+type Kind = 'count' | 'total' | 'rate' | 'ratio' | 'usd';
+/** A weekly row: one week, and whether it is still running. */
+type WeekRow = { week_start: string; partial: boolean };
+type Col<R extends WeekRow> = { key: keyof R & string; label: string; hint: string; kind: Kind };
+export type Section<R extends WeekRow> = { id: string; title: string; icon: ReactNode; cols: Col<R>[] };
 
 const GOLD = '#f7d047';
 const PAGE = 5;
 
-const SECTIONS: Section[] = [
+const SECTIONS: Section<WeekMetrics>[] = [
   {
     id: 'users',
     title: 'Users',
@@ -184,7 +191,7 @@ export function TractionDashboard({
   );
 }
 
-function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+export function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
@@ -201,7 +208,7 @@ function ModeButton({ active, onClick, children }: { active: boolean; onClick: (
   );
 }
 
-function StatCard({
+export function StatCard({
   icon,
   label,
   value,
@@ -211,7 +218,8 @@ function StatCard({
 }: {
   icon: ReactNode;
   label: string;
-  value: number;
+  /** A count, or an amount already written out. */
+  value: number | string;
   change: { text: string; up: boolean; zero: boolean } | null;
   note: string;
   series: number[];
@@ -223,7 +231,7 @@ function StatCard({
         <div className="min-w-0">
           <p className="m-0 font-sans text-[13px] text-[#cfc8bd] sm:text-[14px]">{label}</p>
           <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-            <span className="font-sans text-[30px] font-bold leading-none text-[#f5f5f5] sm:text-[34px]">{value.toLocaleString('en-US')}</span>
+            <span className="font-sans text-[30px] font-bold leading-none text-[#f5f5f5] sm:text-[34px]">{typeof value === 'number' ? value.toLocaleString('en-US') : value}</span>
             {change && !change.zero ? (
               <span className={`inline-flex items-center gap-1 font-sans text-[13px] font-semibold ${change.up ? 'text-[#5fd38d]' : 'text-[#e0806a]'}`}>
                 <ArrowIcon up={change.up} />
@@ -262,16 +270,16 @@ function Sparkline({ values, className }: { values: number[]; className?: string
   );
 }
 
-type Sort = { key: keyof WeekMetrics; dir: 'asc' | 'desc' };
+type Sort<R extends WeekRow> = { key: keyof R & string; dir: 'asc' | 'desc' };
 
-function TableCard({ section, weeks }: { section: Section; weeks: WeekMetrics[] }) {
-  const [sort, setSort] = useState<Sort>({ key: 'week_start', dir: 'desc' });
+export function TableCard<R extends WeekRow>({ section, weeks }: { section: Section<R>; weeks: R[] }) {
+  const [sort, setSort] = useState<Sort<R>>({ key: 'week_start', dir: 'desc' });
   const [page, setPage] = useState(0);
   const [all, setAll] = useState(false);
 
   // The week before each week, for the change shown under a count.
   const previous = useMemo(() => {
-    const m = new Map<string, WeekMetrics>();
+    const m = new Map<string, R>();
     weeks.forEach((w, i) => {
       if (i > 0) m.set(w.week_start, weeks[i - 1]);
     });
@@ -297,14 +305,15 @@ function TableCard({ section, weeks }: { section: Section; weeks: WeekMetrics[] 
   const shown = all ? sorted : sorted.slice(current * PAGE, current * PAGE + PAGE);
   const newest = weeks[weeks.length - 1];
 
-  function toggleSort(key: keyof WeekMetrics) {
+  function toggleSort(key: keyof R & string) {
     setPage(0);
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }));
   }
 
-  function summary(col: Col): string {
+  function summary(col: Col<R>): string {
     if (col.kind === 'total') return newest ? fmt(newest[col.key] as number, col.kind) : '-';
     if (col.kind === 'count') return String(weeks.reduce((n, w) => n + ((w[col.key] as number) || 0), 0));
+    if (col.kind === 'usd') return fmt(weeks.reduce((n, w) => n + ((w[col.key] as number) || 0), 0), col.kind);
     return '-';
   }
 
@@ -423,7 +432,7 @@ function Th({
   );
 }
 
-function Cell({ col, value, prev }: { col: Col; value: number | null; prev: number | null }) {
+function Cell<R extends WeekRow>({ col, value, prev }: { col: Col<R>; value: number | null; prev: number | null }) {
   const delta = (col.kind === 'count' || col.kind === 'total') && value != null && prev != null ? value - prev : 0;
   return (
     <td className="whitespace-nowrap px-2 py-3 align-top font-sans text-[13px] font-semibold text-[#f5f5f5] sm:px-3 sm:text-[13.5px]">
@@ -446,6 +455,7 @@ function Cell({ col, value, prev }: { col: Col; value: number | null; prev: numb
 function fmt(value: number | null, kind: Kind): string {
   if (value == null) return '-';
   if (kind === 'rate') return `${Math.round(value * 1000) / 10}%`;
+  if (kind === 'usd') return usdText(value);
   return value.toLocaleString('en-US');
 }
 
@@ -508,7 +518,7 @@ function CountriesCard({ countries, names }: { countries: TractionResult['countr
   );
 }
 
-function Svg({ children, size = 22 }: { children: ReactNode; size?: number }) {
+export function Svg({ children, size = 22 }: { children: ReactNode; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       {children}
@@ -516,7 +526,7 @@ function Svg({ children, size = 22 }: { children: ReactNode; size?: number }) {
   );
 }
 
-function UsersIcon() {
+export function UsersIcon() {
   return (
     <Svg>
       <circle cx="9" cy="8" r="3.5" />
@@ -534,7 +544,7 @@ function BoltIcon() {
   );
 }
 
-function WalletIcon() {
+export function WalletIcon() {
   return (
     <Svg>
       <rect x="3" y="5.5" width="18" height="14" rx="2.5" />
@@ -552,7 +562,7 @@ function ShieldIcon() {
   );
 }
 
-function SparkIcon() {
+export function SparkIcon() {
   return (
     <Svg>
       <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5" />

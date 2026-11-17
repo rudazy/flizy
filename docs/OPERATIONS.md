@@ -463,6 +463,10 @@ when the permission cannot take it. It is never sent on the owner key.
   payment", "Referral reward: @name", "Business reward"), never with a share (`lib/rewardsView.js`,
   the same reader for both). One point is one cent of reward. The balance is `reward_balance`
   (migration `20261117130000_reward_balance.sql`), summed in the database.
+- **Admin view.** `/dashboard/admin/rewards` is private like the traction dashboard (admins
+  only, a 404 for anyone else, never indexed) and laid out the same way: fees charged and rewards
+  recorded by week, what Flizy kept, the accounts that earned, and the top earners by username,
+  with or without the test and team accounts. `/api/admin/rewards` gives the weeks as CSV.
 - **Testnet.** Rewards are points: nothing is paid out.
 
 ### Gas top-up

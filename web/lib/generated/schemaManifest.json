@@ -1246,6 +1246,18 @@
     },
     {
       "kind": "check",
+      "name": "reward_entries.reward_entries_fee_check",
+      "providedBy": "20261117120000_rewards.sql",
+      "requiredBy": "check on reward_entries"
+    },
+    {
+      "kind": "check",
+      "name": "reward_entries.reward_entries_kind_check",
+      "providedBy": "20261117120000_rewards.sql",
+      "requiredBy": "check on reward_entries"
+    },
+    {
+      "kind": "check",
       "name": "sessions.sessions_channel_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on sessions"
@@ -1794,7 +1806,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "web/app/api/account/business/route.ts, web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/outside-pay/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/google/callback/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/auth/signup/verify/route.ts, web/app/api/checkout/[id]/pay/route.ts, web/app/api/custody/passkey/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/external/route.ts, web/app/api/pay/fee/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pay/swap/route.ts, web/app/api/payments/received/route.ts, web/app/api/pin/route.ts, web/app/api/reserves/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/app/pay/[code]/page.tsx, web/app/pay/c/[code]/page.tsx, web/lib/accountReset.ts, web/lib/accountTokens.ts, web/lib/admin.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/custody/liveDeps.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/followStore.ts, web/lib/invite.ts, web/lib/merchant.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/pinGate.ts, web/lib/profileShare.ts, web/lib/receipts.ts, web/lib/saleNotice.ts, web/lib/securityNotice.ts, web/lib/siteSearch.ts, web/lib/starterPack.ts, web/lib/tasks.ts, web/lib/tiers.ts, web/lib/tokenSocial.ts, web/lib/tractionData.ts, web/lib/walletMarket.ts, web/lib/walletScanRecord.ts"
+      "requiredBy": "web/app/api/account/business/route.ts, web/app/api/account/calling-code/route.ts, web/app/api/account/closure/route.ts, web/app/api/account/emails/route.ts, web/app/api/account/invite-attach/route.ts, web/app/api/account/locale/route.ts, web/app/api/account/outside-pay/route.ts, web/app/api/account/password/route.ts, web/app/api/account/profile/route.ts, web/app/api/account/scan-visibility/route.ts, web/app/api/account/username/check/route.ts, web/app/api/account/username/route.ts, web/app/api/auth/email/send-code/route.ts, web/app/api/auth/email/verify/route.ts, web/app/api/auth/google/callback/route.ts, web/app/api/auth/login/route.ts, web/app/api/auth/signup/route.ts, web/app/api/auth/signup/verify/route.ts, web/app/api/checkout/[id]/pay/route.ts, web/app/api/custody/passkey/route.ts, web/app/api/dashboard/route.ts, web/app/api/history/route.ts, web/app/api/holdings/route.ts, web/app/api/limits/route.ts, web/app/api/market/[action]/route.ts, web/app/api/nfts/offers/decline/route.ts, web/app/api/pay/execute/route.ts, web/app/api/pay/external/route.ts, web/app/api/pay/fee/route.ts, web/app/api/pay/preview/route.ts, web/app/api/pay/save/route.ts, web/app/api/pay/swap/route.ts, web/app/api/payments/received/route.ts, web/app/api/pin/route.ts, web/app/api/reserves/route.ts, web/app/api/scan/route.ts, web/app/api/swap/execute/route.ts, web/app/api/swap/liquidity/route.ts, web/app/pay/[code]/page.tsx, web/app/pay/c/[code]/page.tsx, web/lib/accountReset.ts, web/lib/accountTokens.ts, web/lib/admin.ts, web/lib/claimPayout.ts, web/lib/cookies.ts, web/lib/copySetup.ts, web/lib/custody/liveDeps.ts, web/lib/dailyLimits.ts, web/lib/emailVerify.ts, web/lib/faucet.ts, web/lib/followStore.ts, web/lib/invite.ts, web/lib/merchant.ts, web/lib/mintDrops.ts, web/lib/nftApi.ts, web/lib/offerBook.ts, web/lib/passwordGate.ts, web/lib/payCode.ts, web/lib/pendingClaims.ts, web/lib/pinGate.ts, web/lib/profileShare.ts, web/lib/receipts.ts, web/lib/rewardsAdminData.ts, web/lib/saleNotice.ts, web/lib/securityNotice.ts, web/lib/siteSearch.ts, web/lib/starterPack.ts, web/lib/tasks.ts, web/lib/tiers.ts, web/lib/tokenSocial.ts, web/lib/tractionData.ts, web/lib/walletMarket.ts, web/lib/walletScanRecord.ts"
     },
     {
       "kind": "table",
@@ -1962,7 +1974,7 @@
       "kind": "table",
       "name": "fee_ledger",
       "providedBy": "20261115130000_fee_ledger.sql",
-      "requiredBy": "web/lib/feeQuote.ts, web/lib/swapFee.ts"
+      "requiredBy": "web/lib/feeQuote.ts, web/lib/rewardsAdminData.ts, web/lib/swapFee.ts"
     },
     {
       "kind": "table",
@@ -2040,7 +2052,7 @@
       "kind": "table",
       "name": "metrics_excluded_accounts",
       "providedBy": "20261111120000_traction_metrics.sql",
-      "requiredBy": "web/lib/tractionData.ts"
+      "requiredBy": "web/lib/rewardsAdminData.ts, web/lib/tractionData.ts"
     },
     {
       "kind": "table",
@@ -2119,6 +2131,12 @@
       "name": "reserved_usernames",
       "providedBy": "20260811000000_reserved_usernames.sql",
       "requiredBy": "web/lib/username.ts"
+    },
+    {
+      "kind": "table",
+      "name": "reward_entries",
+      "providedBy": "20261117120000_rewards.sql",
+      "requiredBy": "web/lib/rewardsAdminData.ts"
     },
     {
       "kind": "table",
