@@ -41,6 +41,7 @@ describe('every state-changing route checks the request Origin', () => {
     'internal/security-mail': 'server to server: no cookie, a bearer secret instead (checked below)',
     'internal/payment-notice': 'server to server: no cookie, a bearer secret instead (checked below)',
     'internal/api-key-notices': 'server to server: no cookie, a bearer secret instead (checked below)',
+    'internal/claim-notice': 'server to server: no cookie, a bearer secret instead (checked below)',
     'v1/payouts': 'Flizy Pay API: no cookie, an API key with the payout permission instead (test/apiPayouts.test.js)',
     'v1/payouts/[id]/cancel': 'Flizy Pay API: no cookie, an API key with the payout permission instead (test/apiClaims.test.js)',
     'v1/payments': 'Flizy Pay API: no cookie, an API key with the collect permission instead (test/apiPayments.test.js)',

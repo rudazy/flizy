@@ -495,6 +495,22 @@ rows and show the status the claims table gives them.
   recipient's own channel is tried first through `lib/claimNotify.js`: no channel can reach a
   non-user yet (email arrives with its sender and `CLAIM_NOTIFY_EMAIL`; WhatsApp waits for the
   Business API; Telegram, Discord, GitHub and X never can).
+- **Email to a recipient not on Flizy.** With `CLAIM_NOTIFY_EMAIL=true` on the bots, a claim to
+  an email that is on no Flizy account is emailed once, right after the hold lands, and reminded
+  once if still unclaimed after `CLAIM_EMAIL_REMINDER_HOURS` (72; the WhatsApp process runs the
+  reminders). The bots name only the claim to `/api/internal/claim-notice` (`SECURITY_MAIL_SECRET`);
+  the site reads the address from the claim and applies every rule (`web/lib/claimEmail.ts`,
+  migration `20261117150000_claim_email_notices.sql`): never to an address on a Flizy account
+  or one that stopped these emails, at most `CLAIM_EMAIL_PER_SENDER_DAY` (10) new addresses per
+  sender and `CLAIM_EMAIL_PER_ADDRESS_DAY` (3) emails per address a day, and over
+  `CLAIM_EMAIL_MIN_USD` when set. The address is kept only as a SHA-256 hash. `notified` is
+  recorded only when the mail provider accepted it. When an email is not sent the claim is still
+  held, and chat tells the sender to share the link. The email opens the claim page only: no
+  code, no password. "Stop these emails" (`/email/stop`, a button, so a mail scanner opening the
+  link stops nothing) adds the hash to `email_suppressions`; payments to the address still work.
+  On the claim page, a signed-in visitor can add and verify the email there, then claim.
+  Setup before turning it on: a sending domain and From address on flizy.app (`EMAIL_FROM`),
+  with the provider's SPF, DKIM and DMARC records.
 - **The claim page.** Signed out, `/claim/<token>` shows who sent it, the amount, that it is
   testnet and any expiry, with sign-up and sign-in: nothing about who it was sent to. Signed
   in: the sender sees the share card, the recipient can receive it (a phone claim in chat), and

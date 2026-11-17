@@ -21,7 +21,7 @@ export default function robots(): MetadataRoute.Robots {
         // URL from the header/footer/homepage links without ever seeing the page.
         // /api/, /claim/ and /a/ stay blocked: claim and approval URLs carry
         // one-time tokens.
-        disallow: ['/api/', '/claim/', '/a/'],
+        disallow: ['/api/', '/claim/', '/email/', '/a/'],
       },
     ],
     sitemap: `${base}/sitemap.xml`,

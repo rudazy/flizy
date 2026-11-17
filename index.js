@@ -39,6 +39,7 @@ const { startApprovalWatcher } = require('./lib/chatApprovals');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const { startReconciler } = require('./lib/reconcile');
 const { startRewardsWorker } = require('./lib/rewards');
+const { registerClaimEmailSender, startClaimReminderWorker } = require('./lib/claimEmailNotice');
 const { startApprovalWorker } = require('./lib/custody/approvals');
 const { startApiKeyNoticePump } = require('./lib/apiKeyNotices');
 const { startApiPayoutWorker } = require('./lib/api/payoutWorker');
@@ -471,6 +472,11 @@ async function main() {
   // Rewards from charged fees, recorded once per fee, from this process only
   // (lib/rewards.js). Nothing runs while REWARDS_ENABLED is off.
   startRewardsWorker({ supabase });
+  // A claim sent to an email not on Flizy is emailed through the site, and
+  // reminded once, from this process only (lib/claimEmailNotice.js). Nothing
+  // is emailed while CLAIM_NOTIFY_EMAIL is off.
+  registerClaimEmailSender();
+  startClaimReminderWorker({ supabase });
   // Payments over a secured account's daily cap that its passkey approved are
   // sent from here, where the relayer key lives; late ones expire
   // (lib/custody/approvals.js). Each approval is claimed before it is sent.

@@ -370,6 +370,24 @@
     },
     {
       "kind": "check",
+      "name": "claim_email_notices.claim_email_notices_hash_check",
+      "providedBy": "20261117150000_claim_email_notices.sql",
+      "requiredBy": "check on claim_email_notices"
+    },
+    {
+      "kind": "check",
+      "name": "claim_email_notices.claim_email_notices_kind_check",
+      "providedBy": "20261117150000_claim_email_notices.sql",
+      "requiredBy": "check on claim_email_notices"
+    },
+    {
+      "kind": "check",
+      "name": "claim_email_notices.claim_email_notices_state_check",
+      "providedBy": "20261117150000_claim_email_notices.sql",
+      "requiredBy": "check on claim_email_notices"
+    },
+    {
+      "kind": "check",
       "name": "claim_events.claim_events_channel_check",
       "providedBy": "20261117140000_claim_events.sql",
       "requiredBy": "check on claim_events"
@@ -1252,6 +1270,12 @@
     },
     {
       "kind": "table",
+      "name": "claim_email_notices",
+      "providedBy": "20261117150000_claim_email_notices.sql",
+      "requiredBy": "lib/claimEmailNotice.js"
+    },
+    {
+      "kind": "table",
       "name": "claim_events",
       "providedBy": "20261117140000_claim_events.sql",
       "requiredBy": "lib/claimEvents.js"
@@ -1266,7 +1290,7 @@
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "lib/api/payoutWorker.js, lib/claims.js, lib/escrowWallet.js, lib/handlers/claims.js, lib/history.js, lib/reconcile.js"
+      "requiredBy": "lib/api/payoutWorker.js, lib/claimEmailNotice.js, lib/claims.js, lib/escrowWallet.js, lib/handlers/claims.js, lib/history.js, lib/reconcile.js"
     },
     {
       "kind": "table",

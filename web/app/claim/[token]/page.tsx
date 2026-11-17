@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { track } from '../../../lib/analytics';
 import { formatClaimAmount } from '../../../lib/claimAmount.ts';
 import { ShareClaimCard } from '../../../components/ShareClaimCard';
+import { ClaimEmailVerify } from '../../../components/ClaimEmailVerify';
 import type { ClaimShare } from '../../../lib/claimShareView.ts';
 
 type ClaimView = {
@@ -33,7 +34,6 @@ function when(iso: string): string {
 
 /** Where on Account an identity of this kind is added and verified. */
 const VERIFY_PLACE: Record<string, { href: string; label: string }> = {
-  email: { href: '/dashboard/account', label: 'Add and verify the email on Account' },
   platform: { href: '/dashboard/account?s=platforms', label: 'Link it on Account, Platforms' },
   phone: { href: '/dashboard/account?s=chat', label: 'Link WhatsApp or Telegram with that number' },
 };
@@ -139,7 +139,9 @@ export default function ClaimPage() {
               <p className="m-0 text-paper">
                 This payment was sent to {data.sent_to || 'another identity'}. Add and verify it on your account to claim, then open this link again.
               </p>
-              {data.recipient_kind && VERIFY_PLACE[data.recipient_kind] ? (
+              {data.recipient_kind === 'email' ? (
+                <ClaimEmailVerify onVerified={() => void load()} />
+              ) : data.recipient_kind && VERIFY_PLACE[data.recipient_kind] ? (
                 <Link href={VERIFY_PLACE[data.recipient_kind].href} className="btn btn-ghost no-underline">
                   {VERIFY_PLACE[data.recipient_kind].label}
                 </Link>

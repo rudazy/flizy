@@ -30,6 +30,7 @@ const {
 const { config } = require('./lib/config');
 const { TelegramBot } = require('./lib/telegram/bot');
 const { startAmmora } = require('./lib/ammora/boot');
+const { registerClaimEmailSender } = require('./lib/claimEmailNotice');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -52,6 +53,9 @@ async function main() {
   // Ammora venue, only with AMMORA_ENABLED (lib/ammora/boot.js). The pool
   // inventory runs from the WhatsApp process, not here.
   void startAmmora({ supabase, provider });
+  // Claims made here to an email not on Flizy are emailed through the site too.
+  // Reminders run from the WhatsApp process only.
+  registerClaimEmailSender();
   await bot.start();
 }
 
