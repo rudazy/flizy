@@ -150,9 +150,10 @@ describe('secondary emails', () => {
     assert.ok(MIGRATION.indexOf('create unique index') < MIGRATION.indexOf('drop index'));
   });
 
-  it('verifying an address another account verified says so', () => {
+  it('verifying an address another account verified is refused without saying that account exists', () => {
     const src = read('web/lib/emailVerify.ts');
-    assert.match(src, /if \(sErr\?\.code === '23505'\) \{\s*return \{\s*ok: false,\s*error: 'That email is already verified on another Flizy account\.'/);
+    assert.match(src, /if \(sErr\?\.code === '23505'\) \{\s*return \{\s*ok: false,\s*error: 'That email could not be verified on this account\.'/);
+    assert.doesNotMatch(src, /another Flizy account/);
   });
 
   it('adding one twice is about this account, not somebody else', () => {

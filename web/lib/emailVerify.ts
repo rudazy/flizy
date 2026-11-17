@@ -328,10 +328,11 @@ export async function consumeEmailVerificationCode(p: {
     // Verified addresses are unique across accounts
     // (account_emails_verified_email_unique), so this inbox is already
     // verified on another account. An unverified row never blocks anyone.
+    // The answer does not say so: it must not confirm that account exists.
     if (sErr?.code === '23505') {
       return {
         ok: false,
-        error: 'That email is already verified on another Flizy account.',
+        error: 'That email could not be verified on this account.',
         status: 409,
       };
     }

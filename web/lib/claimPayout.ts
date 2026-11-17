@@ -1,8 +1,9 @@
 /**
  * Web claim payout (Stage 1.4).
  *
- * Mirrors lib/engine/executeClaim.js executeClaimPayout for Vercel:
- * no root lib/ on deploy. Match rules stay the same as the bot:
+ * Mirrors lib/engine/executeClaim.js executeClaimPayout for Vercel, which
+ * builds web/ alone: a root lib/ file is loaded here only if it requires no
+ * package (lib/claimEvents.js). Match rules stay the same as the bot:
  *   phone     → account must hold phone_e164 on some channel_identities row
  *   platform  → account must hold (channel, external_id)
  * Race: status pending → processing → claimed (or back to pending if pre-chain fail).
@@ -32,6 +33,8 @@ import {
 import { parseEmail } from './email.ts';
 import { isNativeClaim, claimAssetSymbol, nftTokenIdOf } from './claimAmount.ts';
 import { withRelayerLock } from './relayerLock.ts';
+import { recordClaimEvent } from '../../lib/claimEvents.js';
+import { formatClaimAmount } from './claimAmount.ts';
 
 const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',
@@ -251,6 +254,129 @@ async function ensureAgentAddress(accountId: string): Promise<string> {
   return address;
 }
 
+type EscrowSend =
+  | { ok: true; tx: ethers.TransactionResponse }
+  | { ok: false; error: string; status: number };
+
+/**
+ * Send a held claim's asset from escrow to toAddress: ETH, a listed token or
+ * one NFT, each under the escrow's lease (./relayerLock.ts) until the node has
+ * it. Checks the network and what escrow holds first. ok: false means nothing
+ * was sent, and the caller hands the claim back.
+ *
+ * Used by the payout (to the recipient) and the cancel (back to the sender).
+ */
+async function sendFromEscrow(
+  held: ClaimRow,
+  toAddress: string,
+  unavailable: string
+): Promise<EscrowSend> {
+  const supabase = getSupabase();
+  const chain = getWebChain();
+  const provider = new ethers.JsonRpcProvider(chain.rpcUrl);
+  const escrow = getEscrowWallet(chain, provider);
+  const gasBuffer = gasBufferWei();
+  const escEth = await provider.getBalance(escrow.address);
+  const tokenAddr = held.token_address && ethers.isAddress(String(held.token_address))
+    ? ethers.getAddress(String(held.token_address))
+    : null;
+  const nftId = nftTokenIdOf(held);
+  const isNft = nftId != null;
+  const native = !isNft && isNativeClaim(held) && !tokenAddr;
+
+  const network = await provider.getNetwork();
+  if (Number(network.chainId) !== chain.chainId) {
+    return { ok: false, error: 'Network mismatch. Try again shortly.', status: 503 };
+  }
+
+  let tx: ethers.TransactionResponse;
+  if (isNft) {
+    if (!tokenAddr) {
+      return {
+        ok: false,
+        error: `This ${claimAssetSymbol(held)} claim has no collection on record.`,
+        status: 400,
+      };
+    }
+    if (escEth < gasBuffer) {
+      return {
+        ok: false,
+        error: unavailable,
+        status: 503,
+      };
+    }
+    const nft = new ethers.Contract(tokenAddr, ERC721_ABI, escrow);
+    try {
+      const owner = await nft.ownerOf(nftId);
+      if (ethers.getAddress(String(owner)) !== ethers.getAddress(escrow.address)) {
+        return {
+          ok: false,
+          error: unavailable,
+          status: 503,
+        };
+      }
+    } catch {
+      return {
+        ok: false,
+        error: unavailable,
+        status: 503,
+      };
+    }
+    // Under the escrow's lease (./relayerLock.ts) until the node has it, so a
+    // send from a bot at the same moment never takes the same nonce.
+    tx = await withRelayerLock({ supabase, relayer: escrow.address }, () => nft.transferFrom(escrow.address, toAddress, nftId));
+  } else if (native) {
+    const amountWei = ethers.parseEther(String(held.amount_eth));
+    if (amountWei <= 0n) {
+      return { ok: false, error: 'Invalid claim amount.', status: 400 };
+    }
+    if (escEth < amountWei + gasBuffer) {
+      return {
+        ok: false,
+        error: unavailable,
+        status: 503,
+      };
+    }
+    tx = await withRelayerLock({ supabase, relayer: escrow.address }, () =>
+      escrow.sendTransaction({
+        to: toAddress,
+        value: amountWei,
+      })
+    );
+  } else {
+    if (!tokenAddr) {
+      return {
+        ok: false,
+        error: `This ${claimAssetSymbol(held)} claim has no token on record.`,
+        status: 400,
+      };
+    }
+    if (escEth < gasBuffer) {
+      return {
+        ok: false,
+        error: unavailable,
+        status: 503,
+      };
+    }
+    const erc20 = new ethers.Contract(tokenAddr, ERC20_ABI, escrow);
+    const decimals = Number(await erc20.decimals());
+    const amountTok = ethers.parseUnits(String(held.amount_eth), decimals);
+    if (amountTok <= 0n) {
+      return { ok: false, error: 'Invalid claim amount.', status: 400 };
+    }
+    const tokBal = await erc20.balanceOf(escrow.address);
+    if (tokBal < amountTok) {
+      return {
+        ok: false,
+        error: unavailable,
+        status: 503,
+      };
+    }
+    tx = await withRelayerLock({ supabase, relayer: escrow.address }, () => erc20.transfer(toAddress, amountTok));
+  }
+  return { ok: true, tx };
+}
+
 /**
  * Pay out one pending claim to this logged-in account when identity matches.
  */
@@ -305,131 +431,25 @@ export async function executeWebClaimPayout(p: {
     return { ok: false, error: 'That claim is already being processed.', status: 409 };
   }
 
-  const chain = getWebChain();
-  const provider = new ethers.JsonRpcProvider(chain.rpcUrl);
   let submitted = false;
+  const release = () => supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
 
   try {
     const toAddress = await ensureAgentAddress(accountId);
     // Touch derivation so secret is validated even if we only send TO the address
     void deriveAgentPrivateKey(accountId);
 
-    const escrow = getEscrowWallet(chain, provider);
-    const gasBuffer = gasBufferWei();
-    const escEth = await provider.getBalance(escrow.address);
-    const tokenAddr = held.token_address && ethers.isAddress(String(held.token_address))
-      ? ethers.getAddress(String(held.token_address))
-      : null;
-    const nftId = nftTokenIdOf(held as ClaimRow);
-    const isNft = nftId != null;
-    const native = !isNft && isNativeClaim(held as ClaimRow) && !tokenAddr;
-
-    const network = await provider.getNetwork();
-    if (Number(network.chainId) !== chain.chainId) {
-      await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-      return { ok: false, error: 'Network mismatch. Try again shortly.', status: 503 };
+    const sent = await sendFromEscrow(held as ClaimRow, toAddress, 'Payout temporarily unavailable. Try again later.');
+    if (!sent.ok) {
+      await release();
+      return { ok: false, error: sent.error, status: sent.status };
     }
-
-    let tx: ethers.TransactionResponse;
-    if (isNft) {
-      if (!tokenAddr) {
-        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-        return {
-          ok: false,
-          error: `This ${claimAssetSymbol(held as ClaimRow)} claim has no collection on record.`,
-          status: 400,
-        };
-      }
-      if (escEth < gasBuffer) {
-        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-        return {
-          ok: false,
-          error: 'Payout temporarily unavailable. Try again later.',
-          status: 503,
-        };
-      }
-      const nft = new ethers.Contract(tokenAddr, ERC721_ABI, escrow);
-      try {
-        const owner = await nft.ownerOf(nftId);
-        if (ethers.getAddress(String(owner)) !== ethers.getAddress(escrow.address)) {
-          await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-          return {
-            ok: false,
-            error: 'Payout temporarily unavailable. Try again later.',
-            status: 503,
-          };
-        }
-      } catch {
-        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-        return {
-          ok: false,
-          error: 'Payout temporarily unavailable. Try again later.',
-          status: 503,
-        };
-      }
-      // Under the escrow's lease (./relayerLock.ts) until the node has it, so a
-      // send from a bot at the same moment never takes the same nonce.
-      tx = await withRelayerLock({ supabase, relayer: escrow.address }, () => nft.transferFrom(escrow.address, toAddress, nftId));
-    } else if (native) {
-      const amountWei = ethers.parseEther(String(held.amount_eth));
-      if (amountWei <= 0n) {
-        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-        return { ok: false, error: 'Invalid claim amount.', status: 400 };
-      }
-      if (escEth < amountWei + gasBuffer) {
-        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-        return {
-          ok: false,
-          error: 'Payout temporarily unavailable. Try again later.',
-          status: 503,
-        };
-      }
-      tx = await withRelayerLock({ supabase, relayer: escrow.address }, () =>
-        escrow.sendTransaction({
-          to: toAddress,
-          value: amountWei,
-        })
-      );
-    } else {
-      if (!tokenAddr) {
-        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-        return {
-          ok: false,
-          error: `This ${claimAssetSymbol(held as ClaimRow)} claim has no token on record.`,
-          status: 400,
-        };
-      }
-      if (escEth < gasBuffer) {
-        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-        return {
-          ok: false,
-          error: 'Payout temporarily unavailable. Try again later.',
-          status: 503,
-        };
-      }
-      const erc20 = new ethers.Contract(tokenAddr, ERC20_ABI, escrow);
-      const decimals = Number(await erc20.decimals());
-      const amountTok = ethers.parseUnits(String(held.amount_eth), decimals);
-      if (amountTok <= 0n) {
-        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-        return { ok: false, error: 'Invalid claim amount.', status: 400 };
-      }
-      const tokBal = await erc20.balanceOf(escrow.address);
-      if (tokBal < amountTok) {
-        await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
-        return {
-          ok: false,
-          error: 'Payout temporarily unavailable. Try again later.',
-          status: 503,
-        };
-      }
-      tx = await withRelayerLock({ supabase, relayer: escrow.address }, () => erc20.transfer(toAddress, amountTok));
-    }
+    const tx = sent.tx;
     submitted = true;
 
     const receipt = await tx.wait(1);
     if (!receipt || receipt.status !== 1) {
-      await supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+      await release();
       return { ok: false, error: 'Payout transaction failed.', status: 502 };
     }
 
@@ -447,6 +467,7 @@ export async function executeWebClaimPayout(p: {
       .select('*')
       .single();
     if (uErr) throw new Error(uErr.message);
+    await recordClaimEvent(supabase, claimId, 'claimed');
 
     try {
       const { maybeMarkFirstTx } = await import('./invite.ts');
@@ -464,7 +485,7 @@ export async function executeWebClaimPayout(p: {
       );
     }
 
-    const explorerUrl = `${chain.explorerBaseUrl}/tx/${tx.hash}`;
+    const explorerUrl = `${getWebChain().explorerBaseUrl}/tx/${tx.hash}`;
     const byLabel = await claimerLabel(accountId);
     const viaLine = claimViaLine(updated as ClaimRow);
     if (updated.from_account_id) {
@@ -519,6 +540,98 @@ export async function executeWebClaimPayout(p: {
       error: 'Payout may be in flight. Check your balance before retrying.',
       status: 500,
     };
+  }
+}
+
+export type RefundResult =
+  | { ok: true; refundTxHash: string; explorerUrl: string }
+  | { ok: false; error: string; status: number };
+
+/**
+ * Cancel a pending claim from the site and send its money back to the sender,
+ * as chat's cancel does (lib/engine/executeClaim.js executeClaimRefund): only
+ * the account that sent it, only while it is pending, locked first so the
+ * recipient cannot claim it at the same moment.
+ */
+export async function executeWebClaimRefund(p: { claimId: string; accountId: string }): Promise<RefundResult> {
+  const { claimId, accountId } = p;
+  if (!claimId || !accountId) return { ok: false, error: 'Missing claim or account.', status: 400 };
+
+  const supabase = getSupabase();
+  const { data: claim, error: cErr } = await supabase.from('claims').select('*').eq('id', claimId).maybeSingle();
+  if (cErr) throw new Error(cErr.message);
+  // Someone else's claim reads the same as no claim.
+  if (!claim || claim.from_account_id !== accountId) return { ok: false, error: 'Claim not found.', status: 404 };
+  if (String(claim.status) !== 'pending') {
+    return { ok: false, error: `Claim is already ${claim.status}.`, status: 409 };
+  }
+
+  const { data: held, error: hErr } = await supabase
+    .from('claims')
+    .update({ status: 'processing' })
+    .eq('id', claimId)
+    .eq('status', 'pending')
+    .select('*')
+    .maybeSingle();
+  if (hErr) throw new Error(hErr.message);
+  if (!held) return { ok: false, error: 'That claim is already being processed.', status: 409 };
+
+  const release = () => supabase.from('claims').update({ status: 'pending' }).eq('id', claimId).eq('status', 'processing');
+  let submitted = false;
+  try {
+    const toAddress = await ensureAgentAddress(accountId);
+    const sent = await sendFromEscrow(held as ClaimRow, toAddress, 'Escrow cannot refund right now. Try again later.');
+    if (!sent.ok) {
+      await release();
+      return { ok: false, error: sent.error, status: sent.status };
+    }
+    const tx = sent.tx;
+    submitted = true;
+
+    const receipt = await tx.wait(1);
+    if (!receipt || receipt.status !== 1) {
+      await release();
+      return { ok: false, error: 'Refund transaction failed.', status: 502 };
+    }
+
+    const { data: updated, error: uErr } = await supabase
+      .from('claims')
+      .update({ status: 'cancelled', refund_tx_hash: tx.hash, tx_hash: tx.hash })
+      .eq('id', claimId)
+      .eq('status', 'processing')
+      .select('*')
+      .single();
+    if (uErr) throw new Error(uErr.message);
+
+    // Same events as a cancel in chat (lib/claims.js cancelClaim).
+    const expired = Boolean(updated.expires_at) && Date.parse(String(updated.expires_at)) <= Date.now();
+    await recordClaimEvent(supabase, claimId, expired ? 'expired' : 'cancelled');
+    await recordClaimEvent(supabase, claimId, 'refunded');
+
+    const explorerUrl = `${getWebChain().explorerBaseUrl}/tx/${tx.hash}`;
+    // Cancelled on the site, so the chats hear it too.
+    await notifyAllChannels(
+      accountId,
+      [
+        'Claim cancelled on the site.',
+        `${formatClaimAmount({ amount_eth: updated.amount_eth, asset: updated.asset, nft_token_id: updated.nft_token_id })} is back in your Flizy wallet.`,
+        explorerUrl,
+      ].join('\n')
+    );
+    return { ok: true, refundTxHash: tx.hash, explorerUrl };
+  } catch (err) {
+    console.error('[claimRefund]', err instanceof Error ? err.message : err);
+    if (!submitted) {
+      try {
+        await release();
+      } catch {
+        /* preserve processing if release fails */
+      }
+      return { ok: false, error: 'Refund failed. Try again shortly.', status: 500 };
+    }
+    // Sent and not confirmed: the claim stays locked, so it cannot also be paid out.
+    console.error(`[claimRefund] ${claimId} left in processing after a submitted refund. Check escrow on-chain before releasing it.`);
+    return { ok: false, error: 'Refund was sent but could not be confirmed. Check your balance before retrying.', status: 500 };
   }
 }
 

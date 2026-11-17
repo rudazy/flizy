@@ -469,6 +469,26 @@ when the permission cannot take it. It is never sent on the owner key.
   with or without the test and team accounts. `/api/admin/rewards` gives the weeks as CSV.
 - **Testnet.** Rewards are points: nothing is paid out.
 
+### Claim tracking
+
+A claim's sender can see what happened to it. Every change is a row in `claim_events`
+(`lib/claimEvents.js`, migration `20261117140000_claim_events.sql`), appended and never edited:
+`created` when the hold lands, `notified` when a recipient already on Flizy is told, `link_opened`
+the first time someone other than the sender opens the claim link (no IP, browser or account is
+kept), `claimed`, `cancelled` or `expired`, and `refunded`. Claims from before the table have no
+rows and show the status the claims table gives them.
+
+- **Chat.** `claims`, `pending` or `outgoing claims` lists the sender's open claims with their
+  status, age, expiry and steps so far, and offers the cancel as before.
+- **Site.** History shows each claim the reader sent with that status and timeline, its expiry,
+  and Cancel claim while it is pending (`POST /api/claim/cancel`: the sender only, locked first,
+  the money back through the same escrow send as a payout, `web/lib/claimPayout.ts`). A
+  recipient sees only their own payment, never the sender's timeline.
+- **Notices.** The sender hears in chat when a claim is claimed, when they cancel it on the site,
+  and, for a Flizy Pay API claim, when it expired and was refunded.
+- **Sender names.** Anything a recipient reads names the sender by @username or display name,
+  never by phone.
+
 ### Gas top-up
 
 Off unless `GAS_TOPUP_ENABLED=true`. With it on, a wallet's UserOp gas is paid by Flizy: just

@@ -370,6 +370,24 @@
     },
     {
       "kind": "check",
+      "name": "claim_events.claim_events_channel_check",
+      "providedBy": "20261117140000_claim_events.sql",
+      "requiredBy": "check on claim_events"
+    },
+    {
+      "kind": "check",
+      "name": "claim_events.claim_events_event_check",
+      "providedBy": "20261117140000_claim_events.sql",
+      "requiredBy": "check on claim_events"
+    },
+    {
+      "kind": "check",
+      "name": "claim_events.claim_events_meta_check",
+      "providedBy": "20261117140000_claim_events.sql",
+      "requiredBy": "check on claim_events"
+    },
+    {
+      "kind": "check",
       "name": "claim_hold_attempts.claim_hold_attempts_amount_check",
       "providedBy": "20261016130000_executor_reconcile.sql",
       "requiredBy": "check on claim_hold_attempts"
@@ -1140,7 +1158,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js, lib/buyAmounts.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/engine/sendFee.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/rewards.js, lib/rewardsView.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js, lib/buyAmounts.js, lib/claims.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/engine/sendFee.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/rewards.js, lib/rewardsView.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
     },
     {
       "kind": "table",
@@ -1231,6 +1249,12 @@
       "name": "chat_approvals",
       "providedBy": "20261017100000_chat_approvals.sql",
       "requiredBy": "lib/chatApprovals.js"
+    },
+    {
+      "kind": "table",
+      "name": "claim_events",
+      "providedBy": "20261117140000_claim_events.sql",
+      "requiredBy": "lib/claimEvents.js"
     },
     {
       "kind": "table",

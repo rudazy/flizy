@@ -127,6 +127,20 @@ export type ActivityItem = {
   rail?: string | null;
   /** On a payment a business received: what Flizy kept of the price (GET /api/history). */
   businessFee?: { kept: string; gross: string };
+  /**
+   * On a claim the reader sent, and only then: its status, what has happened
+   * to it, its expiry, and whether it can still be cancelled.
+   */
+  claim?: ClaimTrack;
+};
+
+/** What the sender of a claim sees of it (lib/claimEvents.js). */
+export type ClaimTrack = {
+  id: string;
+  statusLabel: string;
+  timeline: Array<{ label: string; at: string }>;
+  expiresAt: string | null;
+  canCancel: boolean;
 };
 
 export type HoldingsData = {

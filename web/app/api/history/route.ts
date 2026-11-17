@@ -22,6 +22,11 @@ const {
 // two implementations of "what happened on this account" disagreed.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { loadSettledHistory } = require('../../../../lib/history');
+// What happened to a claim, worded the same way as the chat claims list.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { loadClaimEvents, claimTimeline, claimStatusLabel } = require('../../../../lib/claimEvents');
+
+type ClaimEvent = { event: string; channel: string | null; at: string };
 
 const ROUTE = 'GET /api/history';
 
@@ -166,7 +171,7 @@ function mapFaucetRow(row: Record<string, unknown>): ActivityItem | null {
   };
 }
 
-function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityItem {
+function mapClaimRow(row: Record<string, unknown>, accountId: string, events: ClaimEvent[] | null): ActivityItem {
   const status = String(row.status || 'pending');
   const amount = row.amount_eth as string | number;
   const isSender = row.from_account_id === accountId;
@@ -221,6 +226,18 @@ function mapClaimRow(row: Record<string, unknown>, accountId: string): ActivityI
     label,
     // A payout that reached the reader is money received; everything else about a claim stays under Claim.
     category: !isSender && status === 'claimed' ? 'receive' : 'claim',
+    // Only the sender sees what happened to the claim.
+    ...(isSender
+      ? {
+          claim: {
+            id: String(row.id),
+            statusLabel: claimStatusLabel(row, events || []),
+            timeline: claimTimeline(row, events || []),
+            expiresAt: row.expires_at ? String(row.expires_at) : null,
+            canCancel: status === 'pending',
+          },
+        }
+      : {}),
   };
 }
 
@@ -247,9 +264,21 @@ export async function GET() {
       walletAddress: me?.agent_wallet_address || null,
     });
 
+    // The events of the claims this reader sent. Without them a claim still
+    // shows, with the status the claims table gives it.
+    const sentClaimIds = settled.items
+      .filter((e: HistoryEntry) => e.source === 'claim' && e.row.from_account_id === accountId)
+      .map((e: HistoryEntry) => String(e.row.id));
+    let claimEvents: Map<string, ClaimEvent[]> = new Map();
+    try {
+      claimEvents = await loadClaimEvents(supabase, sentClaimIds);
+    } catch {
+      // Statuses still come from the claims rows.
+    }
+
     const items: ActivityItem[] = settled.items.map((entry: HistoryEntry) =>
       entry.source === 'claim'
-        ? mapClaimRow(entry.row, accountId)
+        ? mapClaimRow(entry.row, accountId, claimEvents.get(String(entry.row.id)) || null)
         : mapTransferRow(entry.row, Boolean(entry.received), entry.fromLabel ?? null, entry.businessFee)
     );
 

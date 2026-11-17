@@ -298,10 +298,9 @@ describe('the recipient is notified the moment the claim is held', () => {
   });
 
   /**
-   * from_wa_sender is rendered back to the recipient as "+<number>". Writing a
-   * transfer key there would put "telegram:5566778899" through the phone
-   * normalizer and store 5566778899, telling the recipient the money came from
-   * a number that is not the sender's and may belong to someone else entirely.
+   * from_wa_sender is a phone column. Writing a transfer key there would put
+   * "telegram:5566778899" through the phone normalizer and store 5566778899, a
+   * number that is not the sender's and may belong to someone else entirely.
    */
   it('never records a chat user id as the sender phone', async () => {
     seed({ recipientOnFlizy: true });

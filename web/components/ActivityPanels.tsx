@@ -14,7 +14,7 @@ import {
   NftsIcon,
   SwapArrowsIcon,
 } from './ExploreIcons';
-import type { ActivityItem } from '../lib/dashboardTypes';
+import type { ActivityItem, ClaimTrack } from '../lib/dashboardTypes';
 import { shortAddr } from '../lib/dashboardTypes';
 import { formatAmount } from '../lib/amountDisplay';
 import {
@@ -44,6 +44,8 @@ import {
  * Activity: filters (All, Send, Receive, Swap, Claim, NFT), Today / Yesterday /
  * Earlier, one card per move with who, which channel, the amount and its USD
  * value, and a status pill. Tapping a card opens its details and explorer link.
+ * A claim the reader sent shows its own status, what has happened to it, its
+ * expiry, and a cancel while it is still waiting.
  */
 
 /** The card title, from lib/historyView.ts so both surfaces word it the same. */
@@ -247,7 +249,7 @@ function HistoryCard({
   open: boolean;
   onToggle: () => void;
 }) {
-  const pill = statusPill(row.status);
+  const pill = row.claim ? claimPill(row.claim) : statusPill(row.status);
   const cat = categoryOf(row);
   const hasAmount = Number(row.amount) > 0;
   const usd = usdLine(row.amount, row.asset, usdPerEth);
@@ -326,6 +328,7 @@ function HistoryCard({
           ) : null}
           <Detail label="Status" value={pill.label} />
           <Detail label="When" value={new Date(row.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} />
+          {row.claim ? <ClaimDetails claim={row.claim} /> : null}
           {row.txHash && explorerBase ? (
             <a
               href={`${explorerBase}/tx/${row.txHash}`}
@@ -340,6 +343,83 @@ function HistoryCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+/** A sent claim's chip: done is good, ended without a payout is neutral, the rest is still waiting. */
+function claimPill(claim: ClaimTrack): { label: string; tone: Tone } {
+  if (claim.statusLabel === 'Claimed') return { label: 'Claimed', tone: 'good' };
+  if (claim.statusLabel === 'Cancelled' || claim.statusLabel === 'Expired') return { label: claim.statusLabel, tone: 'neutral' };
+  return { label: claim.statusLabel, tone: 'pending' };
+}
+
+/** What happened to a claim the reader sent, its expiry, and the cancel while it waits. */
+function ClaimDetails({ claim }: { claim: ClaimTrack }) {
+  const { refreshAll } = useDashboard();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  async function cancel() {
+    setBusy(true);
+    setMsg('');
+    try {
+      const res = await fetch('/api/claim/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId: claim.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(body.error || 'Could not cancel. Try again.');
+        return;
+      }
+      setConfirming(false);
+      await refreshAll();
+    } catch {
+      setMsg('Could not cancel. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      {claim.expiresAt ? (
+        <Detail label="Expires" value={new Date(claim.expiresAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} />
+      ) : null}
+      <div className="flex items-start justify-between gap-[12px]">
+        <span className="shrink-0 text-[#8d8d8d]">Timeline</span>
+        <ol className="m-0 grid list-none gap-[4px] p-0 text-right text-[#e6e6e6]">
+          {claim.timeline.map((step, i) => (
+            <li key={`${step.label}-${i}`}>
+              {step.label}
+              <span className="ml-[6px] text-[#8d8d8d]">{new Date(step.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      {claim.canCancel ? (
+        confirming ? (
+          <div className="grid gap-[8px]">
+            <p className="m-0 text-[#e6e6e6]">Cancel this claim? The money comes back to your Flizy wallet.</p>
+            <div className="flex gap-[8px]">
+              <button type="button" className="btn btn-ghost text-sm" disabled={busy} onClick={() => setConfirming(false)}>
+                Keep it
+              </button>
+              <button type="button" className="btn btn-primary text-sm" disabled={busy} onClick={() => void cancel()}>
+                {busy ? 'Cancelling...' : 'Cancel claim'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className="justify-self-start text-left text-sun" onClick={() => setConfirming(true)}>
+            Cancel claim
+          </button>
+        )
+      ) : null}
+      {msg ? <p className="m-0 text-[#f05252]">{msg}</p> : null}
+    </>
   );
 }
 

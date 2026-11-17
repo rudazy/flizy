@@ -4,6 +4,9 @@ import { publicClaimAccess, publicRecipientLabel } from '../../../../lib/claimRe
 import { apiErrorBody } from '../../../../lib/apiError';
 import { INVITE_SOURCE_CLAIM, isInviteCodeFormat, normalizeInviteCode } from '../../../../lib/invite.ts';
 import { attachInviteCookie } from '../../../../lib/inviteCookie.ts';
+import { getAccountIdFromCookie } from '../../../../lib/cookies';
+import { getSupabase } from '../../../../lib/supabase';
+import { recordClaimEvent } from '../../../../../lib/claimEvents.js';
 
 const ROUTE = 'GET /api/claim/[token]';
 
@@ -11,6 +14,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ token: string 
   try {
     const claim = await getClaimByToken((await ctx.params).token);
     if (!claim) return NextResponse.json({ error: 'Claim not found' }, { status: 404 });
+    // The sender's timeline shows the first open by anyone but the sender.
+    // Nothing about who opened it is kept: no IP, no browser, no account.
+    if (claim.status === 'pending' && (await getAccountIdFromCookie()) !== claim.from_account_id) {
+      await recordClaimEvent(getSupabase(), String(claim.id), 'link_opened');
+    }
     const access = publicClaimAccess(claim);
     const stored = normalizeInviteCode(claim.invite_code);
     const carriesInvite = isInviteCodeFormat(stored);
