@@ -260,13 +260,14 @@ describe('wiring', () => {
 
   it('a link open is recorded for anyone but the sender, and nothing about who opened it', () => {
     const route = read('web/app/api/claim/[token]/route.ts');
-    assert.match(route, /if \(claim\.status === 'pending' && \(await getAccountIdFromCookie\(\)\) !== claim\.from_account_id\) \{\s+await recordClaimEvent\(getSupabase\(\), String\(claim\.id\), 'link_opened'\);/);
+    assert.match(route, /const isSender = Boolean\(viewerId\) && viewerId === claim\.from_account_id;/);
+    assert.match(route, /if \(claim\.status === 'pending' && !isSender\) \{\s+await recordClaimEvent\(db, String\(claim\.id\), 'link_opened'\);/);
     assert.doesNotMatch(route, /x-forwarded-for|user-agent|headers\.get/i);
   });
 
   it('notified is recorded wherever a recipient on Flizy is told', () => {
     assert.match(read('lib/router.js'), /if \(notified && result\.claim\?\.id\) await recordClaimEvent\(supabase, result\.claim\.id, 'notified', \{ channel: 'chat' \}\);/);
-    assert.match(read('lib/reconcile.js'), /if \(await d\.notifyClaimRecipient\(a, claim\)\) await recordClaimEvent\(d\.supabase, claim\.id, 'notified', \{ channel: 'chat' \}\);/);
+    assert.match(read('lib/reconcile.js'), /const told = await d\.notifyClaimRecipient\(a, claim\);\s+if \(told\) await recordClaimEvent\(d\.supabase, claim\.id, 'notified', \{ channel: 'chat' \}\);/);
     assert.match(read('lib/api/payoutWorker.js'), /if \(res && res\.delivered \+ res\.queued > 0\) await recordClaimEvent\(supabase, claimId, 'notified', \{ channel: 'chat' \}\);/);
   });
 

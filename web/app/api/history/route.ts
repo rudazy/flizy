@@ -5,6 +5,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { apiErrorBody } from '../../../lib/apiError';
 import { listPendingClaimSummaries } from '../../../lib/pendingClaims';
 import { ethUsd } from '../../../lib/ethUsd.ts';
+import { claimShareFor } from '../../../lib/claimShareView.ts';
 import {
   assetSymbol,
   channelLabel,
@@ -235,6 +236,7 @@ function mapClaimRow(row: Record<string, unknown>, accountId: string, events: Cl
             timeline: claimTimeline(row, events || []),
             expiresAt: row.expires_at ? String(row.expires_at) : null,
             canCancel: status === 'pending',
+            share: status === 'pending' ? claimShareFor(row) : null,
           },
         }
       : {}),

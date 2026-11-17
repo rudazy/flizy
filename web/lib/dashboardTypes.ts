@@ -141,6 +141,8 @@ export type ClaimTrack = {
   timeline: Array<{ label: string; at: string }>;
   expiresAt: string | null;
   canCancel: boolean;
+  /** The link to forward, while it is pending (web/lib/claimShareView.ts). */
+  share: { url: string; text: string; telegramUrl: string | null } | null;
 };
 
 export type HoldingsData = {

@@ -1,5 +1,6 @@
 /**
- * Claim share path and Telegram href.
+ * Claim share path and Telegram href. The message itself is lib/claimShare.js
+ * (test/claimShareLink.test.js).
  *
  * Run: node --test test/claimShare.test.js
  */
@@ -27,16 +28,5 @@ describe('claim share', () => {
     const q = new URL(href).searchParams;
     assert.equal(q.get('url'), 'https://flizy.app/claim/tok_1/ludarep');
     assert.equal(q.get('text'), 'Claim funds');
-  });
-
-  it('share text names the asset', () => {
-    assert.match(
-      web.claimShareText('https://flizy.app/claim/t', '10', 'FLZ'),
-      /10 FLZ waiting/
-    );
-    assert.match(
-      web.claimShareText('https://flizy.app/claim/t', '0.01'),
-      /0\.01 ETH waiting/
-    );
   });
 });

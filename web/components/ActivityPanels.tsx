@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AppSection } from './AppSection';
 import { useDashboard } from './DashboardProvider';
 import { ShareReceiptButton } from './ShareReceiptButton';
+import { ShareClaimCard } from './ShareClaimCard';
 import {
   ArrowDownIcon,
   ChevronRightIcon,
@@ -399,6 +400,7 @@ function ClaimDetails({ claim }: { claim: ClaimTrack }) {
           ))}
         </ol>
       </div>
+      {claim.share ? <ShareClaimCard claimId={claim.id} share={claim.share} /> : null}
       {claim.canCancel ? (
         confirming ? (
           <div className="grid gap-[8px]">

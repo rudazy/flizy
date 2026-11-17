@@ -19,21 +19,3 @@ export function telegramShareHref(url: string, text: string): string {
   if (body) q.set('text', body);
   return `https://t.me/share/url?${q.toString()}`;
 }
-
-export function claimShareText(
-  url: string,
-  amountEth?: string | null,
-  asset?: string | null,
-  nftTokenId?: string | null
-): string {
-  const link = String(url || '').trim();
-  const id = nftTokenId != null && String(nftTokenId).trim() !== '' ? String(nftTokenId).trim() : '';
-  if (id) {
-    const ticker = String(asset || 'nft').trim().toLowerCase() || 'nft';
-    return `You have ${ticker} #${id} waiting on Flizy. Claim: ${link}`;
-  }
-  const amt = String(amountEth || '').trim();
-  const sym = String(asset || 'ETH').trim().toUpperCase() || 'ETH';
-  if (amt) return `You have ${amt} ${sym} waiting on Flizy. Claim: ${link}`;
-  return `You have funds waiting on Flizy. Claim: ${link}`;
-}

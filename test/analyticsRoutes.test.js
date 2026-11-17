@@ -114,7 +114,7 @@ describe('private paths are refused', () => {
 
 describe('a credential in the query of an allowed page', () => {
   it('refuses the claim flow that sends a signed-out visitor to login', () => {
-    // claim/[token]/page.tsx does exactly this, in five places.
+    // claim/[token]/page.tsx does exactly this: its sign-up and sign-in links.
     const token = '9f3a1c2b4d5e';
     const search = `next=${encodeURIComponent(`/claim/${token}`)}`;
     assert.equal(routes.analyticsAllowedPath('/login'), true, 'the path alone is allowed');

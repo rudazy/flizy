@@ -1,83 +1,67 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { track } from '../../../lib/analytics';
-import { CopyButton } from '../../../components/CopyButton';
-import { claimSharePath, claimShareText, telegramShareHref } from '../../../lib/claimShare.ts';
 import { formatClaimAmount } from '../../../lib/claimAmount.ts';
+import { ShareClaimCard } from '../../../components/ShareClaimCard';
+import type { ClaimShare } from '../../../lib/claimShareView.ts';
 
 type ClaimView = {
+  error?: string;
   amount_eth?: string;
   asset?: string;
   nft_token_id?: string | null;
   status?: string;
-  error?: string;
-  recipient?: string;
-  recipient_kind?: string;
+  sender?: string;
+  testnet?: boolean;
+  expires_at?: string | null;
+  /** Only for a signed-in viewer. */
+  viewer?: 'sender' | 'recipient' | 'other';
+  claim_id?: string;
+  share?: ClaimShare | null;
   can_claim_on_web?: boolean;
-  to_wa_hint?: string;
-  carries_invite?: boolean;
+  recipient_kind?: 'phone' | 'email' | 'platform';
+  sent_to?: string | null;
 };
 
+function when(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/** Where on Account an identity of this kind is added and verified. */
+const VERIFY_PLACE: Record<string, { href: string; label: string }> = {
+  email: { href: '/dashboard/account', label: 'Add and verify the email on Account' },
+  platform: { href: '/dashboard/account?s=platforms', label: 'Link it on Account, Platforms' },
+  phone: { href: '/dashboard/account?s=chat', label: 'Link WhatsApp or Telegram with that number' },
+};
+
+/**
+ * A payment held for someone, opened from its link. Signed out, it shows who
+ * sent what, that it is testnet, and its expiry, with sign-up and sign-in:
+ * nothing about who it was sent to. Signed in, the sender can share it, the
+ * recipient can claim it, and anyone else is told which identity it was sent
+ * to so they can add and verify it. The link never moves money on its own.
+ */
 export default function ClaimPage() {
   const params = useParams();
   const token = String(params.token || '');
-  const inviteRef = String(params.ref || '');
-  const [origin, setOrigin] = useState('');
   const [data, setData] = useState<ClaimView | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
-  const [payerHandle, setPayerHandle] = useState('');
 
   const load = useCallback(async () => {
     if (!token) return;
-    const res = await fetch(`/api/claim/${token}`);
+    const res = await fetch(`/api/claim/${token}`, { cache: 'no-store' });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setData({ error: json.error || 'Claim not found' });
-      return;
-    }
-    setData(json);
+    setData(res.ok ? json : { error: json.error || 'Claim not found' });
   }, [token]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
-
-  const shareUrl = useMemo(() => {
-    const path = claimSharePath(token, inviteRef);
-    if (!path || !origin) return '';
-    return `${origin}${path}`;
-  }, [origin, token, inviteRef]);
-
-  const tgShare = shareUrl
-    ? telegramShareHref(
-        shareUrl,
-        claimShareText(shareUrl, data?.amount_eth, data?.asset, data?.nft_token_id)
-      )
-    : '';
-
-  useEffect(() => {
-    fetch('/api/dashboard', { cache: 'no-store' })
-      .then(async (r) => {
-        if (!r.ok) {
-          setLoggedIn(false);
-          return;
-        }
-        const body = await r.json().catch(() => ({}));
-        const mine = String(body?.account?.username || '').toLowerCase();
-        if (mine) setPayerHandle(`@${mine}`);
-        setLoggedIn(true);
-      })
-      .catch(() => setLoggedIn(false));
-  }, []);
 
   async function onClaim() {
     setBusy(true);
@@ -89,17 +73,12 @@ export default function ClaimPage() {
         body: JSON.stringify({ token }),
       });
       const json = await res.json().catch(() => ({}));
-      if (res.status === 401) {
-        setMsg('Log in first, then claim.');
-        window.location.href = `/login?next=${encodeURIComponent(`/claim/${token}`)}`;
-        return;
-      }
       if (!res.ok) {
         setMsg(json.error || 'Could not claim.');
         return;
       }
       track('claim_completed');
-      setMsg('Claim received. Funds are in your Flizy wallet.');
+      setMsg('Received. The funds are in your Flizy wallet.');
       await load();
     } catch {
       setMsg('Could not claim. Try again.');
@@ -108,185 +87,67 @@ export default function ClaimPage() {
     }
   }
 
-  const pending = data && !data.error && data.status === 'pending';
-  const claimed = data?.status === 'claimed';
-  const isPhone = data?.recipient_kind === 'phone';
-  const isEmail = data?.recipient_kind === 'email';
-  // The status word as a person reads it, not the database's.
-  const statusLabel =
-    data?.status === 'pending' ? 'Waiting to be claimed' : data?.status === 'claimed' ? 'Claimed' : data?.status === 'cancelled' ? 'Cancelled' : data?.status;
-  const canWeb = Boolean(data?.can_claim_on_web);
+  const next = encodeURIComponent(`/claim/${token}`);
+  const amount = data && !data.error ? formatClaimAmount({ amount_eth: data.amount_eth, asset: data.asset, nft_token_id: data.nft_token_id }) : '';
+  const pending = data?.status === 'pending';
 
   return (
     <div className="mx-auto max-w-md space-y-6">
-      <h1 className="font-sans text-3xl tracking-wide text-paper">Claim funds</h1>
-      <p className="text-sm text-muted">
-        Money held for a phone, email, or platform. Phone holds are claimed in WhatsApp or Telegram
-        after that number is proven on that chat. Email and platform holds can be claimed here after
-        you log in (and link, for platforms).
-      </p>
-      {loggedIn === null ? <p className="text-sm text-muted">Checking your account…</p> : null}
-      {loggedIn ? (
-        <p className="text-sm text-muted">
-          {payerHandle
-            ? `Signed in as ${payerHandle}.`
-            : 'Signed in. This claim pays out to your Flizy wallet.'}
-        </p>
-      ) : null}
+      <h1 className="font-sans text-3xl tracking-wide text-paper">A payment for you</h1>
 
-      {!data ? <p className="text-muted">Loading…</p> : null}
+      {!data ? <p className="text-muted">Loading...</p> : null}
       {data?.error ? <p className="text-gold">{data.error}</p> : null}
 
       {data && !data.error ? (
         <div className="card space-y-4 p-6 text-sm">
-          <p>
-            Amount:{' '}
-            <span className="font-sans text-lg text-lime">
-              {formatClaimAmount({
-                amount_eth: data.amount_eth,
-                asset: data.asset,
-                nft_token_id: data.nft_token_id,
-              })}
-            </span>
+          <p className="m-0 text-paper">
+            {data.viewer === 'sender' ? 'You sent' : `${data.sender} sent you`}{' '}
+            <span className="font-sans text-lg text-lime">{amount}</span> on Flizy.
           </p>
-          <p className="text-muted">
-            Status: <span className="text-paper">{statusLabel}</span>
-          </p>
-          {data.recipient ? (
-            <p className="text-muted">
-              Held for: <span className="text-paper">{data.recipient}</span>
-              {isPhone ? (
-                <span className="mt-1 block text-xs">
-                  (A phone hold is claimed in WhatsApp or Telegram)
-                </span>
-              ) : null}
+          <p className="m-0 text-xs text-muted">Testnet: these are test funds, not real money.</p>
+          {data.expires_at ? <p className="m-0 text-xs text-muted">Can be claimed until {when(data.expires_at)}.</p> : null}
+
+          {!pending ? (
+            <p className="m-0 text-muted">
+              {data.status === 'claimed' ? 'This payment has been received.' : 'This payment is no longer waiting to be claimed.'}
             </p>
-          ) : null}
-
-          {pending && shareUrl ? (
-            <div className="space-y-2 border-t border-border pt-4">
-              <p className="break-all font-mono text-xs text-paper">{shareUrl}</p>
-              <div className="flex flex-wrap gap-2">
-                <CopyButton value={shareUrl} label="Copy link" />
-                {tgShare ? (
-                  <a
-                    href={tgShare}
-                    className="btn btn-ghost text-sm no-underline"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Share on Telegram
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {data.carries_invite && pending ? (
-            <p className="text-xs text-muted">
-              The sender invited you. Create an account from this page to be attributed. It
-              counts for them after you finish setup, bind a verified phone, and complete a
-              transfer (claiming this hold counts).
-            </p>
-          ) : null}
-
-          {msg ? (
-            <div
-              className={`alert text-sm ${
-                claimed || msg.includes('received') ? 'alert-ok' : 'alert-error'
-              }`}
-            >
-              {msg}
-            </div>
-          ) : null}
-
-          {pending && isPhone ? (
-            <>
-              <ol className="list-decimal space-y-2 pl-4 text-muted">
-                {loggedIn ? null : <li>Create or log in to your Flizy account</li>}
-                <li>Link WhatsApp or Telegram from the dashboard (with this number proven)</li>
-                <li>
-                  In that chat send <span className="font-mono text-paper">flizy claim</span>
-                </li>
-              </ol>
-              <div className="flex flex-col gap-2">
-                {loggedIn === false ? (
-                  <>
-                    <Link
-                      href={`/signup?next=${encodeURIComponent(`/claim/${token}`)}`}
-                      className="btn btn-primary no-underline"
-                    >
-                      Create account
-                    </Link>
-                    <Link
-                      href={`/login?next=${encodeURIComponent(`/claim/${token}`)}`}
-                      className="btn btn-ghost no-underline"
-                    >
-                      Log in
-                    </Link>
-                  </>
-                ) : null}
-                {loggedIn ? (
-                  <Link href="/dashboard/account?s=chat" className="btn btn-primary no-underline">
-                    Open chat link options
-                  </Link>
-                ) : null}
-              </div>
-              <p className="text-xs text-muted">
-                Phone holds are not paid out on the web on purpose: the number is proven only in chat.
-              </p>
-            </>
-          ) : null}
-
-          {pending && canWeb ? (
-            <>
-              <ol className="list-decimal space-y-2 pl-4 text-muted">
-                {loggedIn ? null : <li>Create or log in to your Flizy account</li>}
-                <li>{isEmail ? 'Verify that email on your Flizy account' : 'Link the matching platform (Account, Platforms)'}</li>
-                <li>Claim below, or in chat: flizy claim</li>
-              </ol>
-
-              {loggedIn ? (
-                <button
-                  type="button"
-                  className="btn btn-primary w-full py-3 font-semibold"
-                  disabled={busy}
-                  onClick={() => void onClaim()}
-                >
-                  {busy ? 'Claiming…' : 'Claim to my wallet'}
-                </button>
-              ) : null}
-              {loggedIn === false ? (
-                <div className="flex flex-col gap-2">
-                  <Link
-                    href={`/signup?next=${encodeURIComponent(`/claim/${token}`)}`}
-                    className="btn btn-primary no-underline"
-                  >
-                    Create account
-                  </Link>
-                  <Link
-                    href={`/login?next=${encodeURIComponent(`/claim/${token}`)}`}
-                    className="btn btn-ghost no-underline"
-                  >
-                    Log in
-                  </Link>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-
-          {claimed ? (
-            <div className="space-y-2">
-              <p className="text-lime">This claim has been paid out.</p>
-              <Link href="/dashboard?s=recent" className="btn btn-ghost no-underline">
-                Open dashboard
+          ) : !data.viewer ? (
+            <div className="flex flex-col gap-2">
+              <Link href={`/signup?next=${next}`} className="btn btn-primary no-underline">
+                Create a Flizy account
+              </Link>
+              <Link href={`/login?next=${next}`} className="btn btn-ghost no-underline">
+                Sign in
               </Link>
             </div>
-          ) : null}
+          ) : data.viewer === 'sender' ? (
+            data.share && data.claim_id ? (
+              <ShareClaimCard claimId={data.claim_id} share={data.share} />
+            ) : null
+          ) : data.viewer === 'recipient' ? (
+            data.can_claim_on_web ? (
+              <button type="button" className="btn btn-primary w-full py-3 font-semibold" disabled={busy} onClick={() => void onClaim()}>
+                {busy ? 'Receiving...' : 'Receive it in my Flizy wallet'}
+              </button>
+            ) : (
+              <p className="m-0 text-muted">
+                This was sent to your phone, so you receive it in WhatsApp or Telegram: send <span className="font-mono text-paper">flizy claim</span>.
+              </p>
+            )
+          ) : (
+            <div className="space-y-3">
+              <p className="m-0 text-paper">
+                This payment was sent to {data.sent_to || 'another identity'}. Add and verify it on your account to claim, then open this link again.
+              </p>
+              {data.recipient_kind && VERIFY_PLACE[data.recipient_kind] ? (
+                <Link href={VERIFY_PLACE[data.recipient_kind].href} className="btn btn-ghost no-underline">
+                  {VERIFY_PLACE[data.recipient_kind].label}
+                </Link>
+              ) : null}
+            </div>
+          )}
 
-          {data.status && data.status !== 'pending' && data.status !== 'claimed' ? (
-            <p className="text-muted">This claim is {data.status}.</p>
-          ) : null}
+          {msg ? <div className={`alert text-sm ${msg.startsWith('Received') ? 'alert-ok' : 'alert-error'}`}>{msg}</div> : null}
         </div>
       ) : null}
     </div>

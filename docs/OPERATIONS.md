@@ -486,6 +486,25 @@ rows and show the status the claims table gives them.
   recipient sees only their own payment, never the sender's timeline.
 - **Notices.** The sender hears in chat when a claim is claimed, when they cancel it on the site,
   and, for a Flizy Pay API claim, when it expired and was refunded.
+- **Telling a recipient not on Flizy.** After the hold, chat sends the sender one message to
+  forward as is: "I sent you 0.01 ETH on Flizy (testnet). Claim it here: <link>", and for a
+  Telegram claim a link that opens the bot on it (`/start claim_<token>`, `lib/claimShare.js`).
+  The reconciler sends the same message when it confirms a hold late. History and the claim
+  page give the sender a Share claim link card (copy, WhatsApp, Telegram, the device share
+  sheet); each use is a `link_shared` event (`POST /api/claim/shared`, at most 20 a claim). A
+  recipient's own channel is tried first through `lib/claimNotify.js`: no channel can reach a
+  non-user yet (email arrives with its sender and `CLAIM_NOTIFY_EMAIL`; WhatsApp waits for the
+  Business API; Telegram, Discord, GitHub and X never can).
+- **The claim page.** Signed out, `/claim/<token>` shows who sent it, the amount, that it is
+  testnet and any expiry, with sign-up and sign-in: nothing about who it was sent to. Signed
+  in: the sender sees the share card, the recipient can receive it (a phone claim in chat), and
+  anyone else is told which identity it was sent to, masked, to add and verify. The link never
+  moves money on its own.
+- **Private Telegram usernames.** A Telegram user the bot cannot resolve is held by @username
+  (`tguser:`). The sender is warned that whoever holds that name when they claim can receive it,
+  and the hold is capped at `CLAIM_TGUSER_MAX_USD` ($20; NFTs and unpriced amounts refused). The
+  first person to open its Telegram link while holding that @username pins it to their numeric
+  id, once (`recipient_pinned`); from then on only that id can claim it.
 - **Sender names.** Anything a recipient reads names the sender by @username or display name,
   never by phone.
 

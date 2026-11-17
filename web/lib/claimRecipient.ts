@@ -1,5 +1,7 @@
 /**
- * How a claim names its recipient, for the public claim page.
+ * How a claim names its recipient, masked: on the claim page for a signed-in
+ * viewer it was not sent to, and in a recipient's own pending list. A
+ * signed-out visitor is never shown it.
  *
  * Mirrors the display half of lib/claimRecipient.js. Only the public label
  * lives here: the matching rules decide who gets paid and stay on the server

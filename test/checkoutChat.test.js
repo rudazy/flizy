@@ -44,7 +44,8 @@ describe('chat reads a checkout link', () => {
 
   it('the router maps /start co_... to checkout before the link-code fallback', () => {
     const src = read('lib/router.js');
-    assert.match(src, /const checkoutId = checkoutFromStartPayload\(start\[1\]\);\s*if \(checkoutId\) return \{ text: `checkout \$\{checkoutId\}`, hadPrefix: true \};\s*return \{ text: start\[1\] \? `link \$\{start\[1\]\}`/);
+    // A claim's start link (claim_...) is the other payload read before the fallback.
+    assert.match(src, /const checkoutId = checkoutFromStartPayload\(start\[1\]\);\s*if \(checkoutId\) return \{ text: `checkout \$\{checkoutId\}`, hadPrefix: true \};\s*const claimToken = tokenFromStartPayload\(start\[1\]\);\s*if \(claimToken\) return \{ text: `claim start \$\{claimToken\}`, hadPrefix: true \};\s*return \{ text: start\[1\] \? `link \$\{start\[1\]\}`/);
     assert.match(src, /const checkoutCmd = parseCheckoutCommand\(text\);\s*if \(checkoutCmd\) \{\s*await handleCheckout\(ctx, user, account, checkoutCmd\.id\);/);
   });
 });
