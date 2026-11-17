@@ -1030,6 +1030,12 @@
     },
     {
       "kind": "function",
+      "name": "record_fee_rewards",
+      "providedBy": "20261117120000_rewards.sql",
+      "requiredBy": "lib/rewards.js"
+    },
+    {
+      "kind": "function",
       "name": "record_known_recipient",
       "providedBy": "20261018100000_known_recipients.sql",
       "requiredBy": "executed by trigger transfers_record_known_recipient"
@@ -1116,7 +1122,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js, lib/buyAmounts.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/engine/sendFee.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js, lib/buyAmounts.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/engine/sendFee.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/rewards.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
     },
     {
       "kind": "table",
@@ -1248,7 +1254,7 @@
       "kind": "table",
       "name": "fee_ledger",
       "providedBy": "20261115130000_fee_ledger.sql",
-      "requiredBy": "lib/feeQuote.js, lib/history.js"
+      "requiredBy": "lib/feeQuote.js, lib/history.js, lib/rewards.js"
     },
     {
       "kind": "table",
@@ -1272,7 +1278,7 @@
       "kind": "table",
       "name": "invite_attributions",
       "providedBy": "20260813000000_invite_attribution.sql",
-      "requiredBy": "lib/invite.js"
+      "requiredBy": "lib/invite.js, lib/rewards.js"
     },
     {
       "kind": "table",
@@ -1356,7 +1362,7 @@
       "kind": "table",
       "name": "transfers",
       "providedBy": "20260721010000_multi_user_friendly.sql",
-      "requiredBy": "lib/api/paymentWatcher.js, lib/custody/approvals.js, lib/custody/ownerKeySpend.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/receipts.js, lib/reconcile.js, lib/transferLog.js"
+      "requiredBy": "lib/api/paymentWatcher.js, lib/custody/approvals.js, lib/custody/ownerKeySpend.js, lib/history.js, lib/payCode.js, lib/pots.js, lib/receipts.js, lib/reconcile.js, lib/rewards.js, lib/transferLog.js"
     },
     {
       "kind": "table",

@@ -38,6 +38,7 @@ const { registerChannelSender, startOutboxDrain, notifyAccount } = require('./li
 const { startApprovalWatcher } = require('./lib/chatApprovals');
 const { startLimitOrderWatcher } = require('./lib/limitOrders');
 const { startReconciler } = require('./lib/reconcile');
+const { startRewardsWorker } = require('./lib/rewards');
 const { startApprovalWorker } = require('./lib/custody/approvals');
 const { startApiKeyNoticePump } = require('./lib/apiKeyNotices');
 const { startApiPayoutWorker } = require('./lib/api/payoutWorker');
@@ -467,6 +468,9 @@ async function main() {
   // Sends whose outcome was unknown (broadcast, no receipt) are settled from
   // their receipt here, also from this process only (lib/reconcile.js).
   startReconciler({ supabase, provider });
+  // Rewards from charged fees, recorded once per fee, from this process only
+  // (lib/rewards.js). Nothing runs while REWARDS_ENABLED is off.
+  startRewardsWorker({ supabase });
   // Payments over a secured account's daily cap that its passkey approved are
   // sent from here, where the relayer key lives; late ones expire
   // (lib/custody/approvals.js). Each approval is claimed before it is sent.

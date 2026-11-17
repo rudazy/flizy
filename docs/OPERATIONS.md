@@ -295,6 +295,7 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `SESSION_TTL_MS` / `SESSION_MAX_MS` | Chat unlock: ends after this long without a message (default 30 min), and never later than this after the PIN was entered (default 8 h) |
 | `FEES_ENABLED` / `FEE_TREASURY_ADDRESS` | Payment fees, off unless `FEES_ENABLED=true`; on needs the treasury address: the wallet that receives the swap fees (`feeRouter.treasury`), whose key is never on a server. Same values on the VPS and Vercel. Rules and rates: `lib/fees.js` (mirror `web/lib/fees.ts`). With it on, chat sends charge the fee; see [Payment fees](#payment-fees) for what is covered |
 | `FEE_P2P_BASE_USD` / `FEE_P2P_STEP_USD` / `FEE_P2P_STEP_SIZE_USD` / `FEE_MERCHANT_BPS` / `FEE_MERCHANT_MIN_USD` / `FEE_GAS_MARGIN_BPS` / `FEE_ABSORB_MAX_MULTIPLE` / `FEE_ABSORB_DAILY_CAP_USD` / `FEE_ETH_USD_RATE` | Fee rates. Defaults: $0.02 up to $100 plus $0.01 per started $100, merchants 0.5% with at least $0.01 a payment, gas margin 20%, absorb up to 2x the tier fee within $5 a day, testnet ETH at $3,000. `feeConfig` refuses a malformed value rather than falling back |
+| `REWARDS_ENABLED` / `REWARDS_START_AT` / `REWARDS_CASHBACK_BPS` / `REWARDS_REFERRAL_BPS` / `REWARDS_MERCHANT_BPS` | Rewards from charged fees, WhatsApp bot (VPS) only. Off unless `REWARDS_ENABLED=true`; on needs the start time and every share (basis points of the fee net of gas). The shares have no defaults in code and are never shown to users. `rewardsConfig` refuses a malformed value, or shares that add up to more than the fee |
 | `GAS_TOPUP_ENABLED` / `GAS_TOPUP_PRIVATE_KEY` / `GAS_TOPUP_WALLET_DAILY_CAP_USD` / `GAS_TOPUP_DAILY_CAP_USD` | Gas paid for wallets through their EntryPoint deposit, off unless `GAS_TOPUP_ENABLED=true`; on needs its own key (never `PRIVATE_KEY`), on the VPS and Vercel. $0.50 per wallet and $10 across all wallets per day by default. See [Gas top-up](#gas-top-up) |
 | `SWAP_FEE_BPS` / `SWAP_SLIPPAGE_BPS` | Defaults for display and quotes. Slippage above 500 (5%) is cut to 500 by every quote; an unreadable value is 100 |
 | `CHAIN_GIWA_SEPOLIA_*` | Optional overrides for WETH, routers, FLZ, pair |
@@ -440,6 +441,24 @@ when the permission cannot take it. It is never sent on the owner key.
   that was sent with no answer stays pending for the operator and is never sent again.
   `supabase/migrations/20261116130000_fee_ledger_collecting.sql` adds the column; until it is
   applied, such a fee is left pending, not sent.
+
+### Rewards
+
+- **What earns.** Each charged fee settled from `REWARDS_START_AT` earns once (`lib/rewards.js`,
+  migration `20261117120000_rewards.sql`): a person-to-person or swap fee gives cashback to the
+  account that paid it; a merchant fee gives a business reward to the account the payment went to
+  (never the payer, who pays no fee); and either gives a referral reward to the account that
+  invited the earner, only for fees settled after that invite was counted. API payout fees earn
+  nothing. Each reward is a share of the fee net of the gas Flizy paid, or of the gross fee when
+  that gas is not known.
+- **Once per fee.** The bot's rewards worker reads due fees every minute, oldest first, and
+  records each with `record_fee_rewards`, which marks the fee (`fee_ledger.rewards_at`) and writes
+  its `reward_entries` in one statement. A second run records nothing. If a lookup fails, the
+  batch stops and records nothing, so no fee loses its referral or its business; a fee whose
+  record fails is retried next minute.
+- **Corrections.** Entries are never edited. A correction is a row of kind `adjustment`, written
+  by hand.
+- **Testnet.** Rewards are points: nothing is paid out.
 
 ### Gas top-up
 
