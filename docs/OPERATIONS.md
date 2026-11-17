@@ -458,6 +458,11 @@ when the permission cannot take it. It is never sent on the owner key.
   record fails is retried next minute.
 - **Corrections.** Entries are never edited. A correction is a row of kind `adjustment`, written
   by hand.
+- **What people see.** The chat command `rewards` (also `reward`, `points`) and Account >
+  Rewards show the account's points and its latest entries, named in words ("Cashback on a
+  payment", "Referral reward: @name", "Business reward"), never with a share (`lib/rewardsView.js`,
+  the same reader for both). One point is one cent of reward. The balance is `reward_balance`
+  (migration `20261117130000_reward_balance.sql`), summed in the database.
 - **Testnet.** Rewards are points: nothing is paid out.
 
 ### Gas top-up

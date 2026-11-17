@@ -19,6 +19,7 @@ import { useFeatures } from '../../../components/FeaturesProvider';
 import { LinkedAccounts } from '../../../components/LinkedAccounts';
 import { PayIdentity } from '../../../components/PayIdentity';
 import { BusinessAccountPanel } from '../../../components/BusinessAccountPanel';
+import { RewardsPanel } from '../../../components/RewardsPanel';
 import { OwnWalletPanel } from '../../../components/OwnWalletPanel';
 import { SecureWalletPanel } from '../../../components/SecureWalletPanel';
 import { CountryPanel, LanguagePanel } from '../../../components/AccountPrefs';
@@ -40,6 +41,7 @@ const SLIDES = [
   'projects',
   'pay',
   'business',
+  'rewards',
   'language',
   'country',
   'chat',
@@ -571,6 +573,7 @@ export default function AccountPage() {
           ...(projectsOn ? [{ id: 'projects', label: 'Projects' }] : []),
           { id: 'pay', label: 'Pay me', badge: data.pay?.username ? `@${data.pay.username}` : undefined },
           { id: 'business', label: 'Business' },
+          { id: 'rewards', label: 'Rewards' },
           { id: 'language', label: t('account.language') },
           {
             id: 'country',
@@ -946,6 +949,8 @@ export default function AccountPage() {
       ) : null}
 
       {slide === 'business' ? <BusinessAccountPanel /> : null}
+
+      {slide === 'rewards' ? <RewardsPanel /> : null}
 
       {slide === 'country' ? (
         <CountryPanel

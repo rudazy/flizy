@@ -856,6 +856,18 @@
     },
     {
       "kind": "check",
+      "name": "reward_entries.reward_entries_fee_check",
+      "providedBy": "20261117120000_rewards.sql",
+      "requiredBy": "check on reward_entries"
+    },
+    {
+      "kind": "check",
+      "name": "reward_entries.reward_entries_kind_check",
+      "providedBy": "20261117120000_rewards.sql",
+      "requiredBy": "check on reward_entries"
+    },
+    {
+      "kind": "check",
       "name": "sessions.sessions_channel_check_v2",
       "providedBy": "20261002150000_schema_guard_checks.sql",
       "requiredBy": "check on sessions"
@@ -1054,6 +1066,12 @@
     },
     {
       "kind": "function",
+      "name": "reward_balance",
+      "providedBy": "20261117130000_reward_balance.sql",
+      "requiredBy": "lib/rewardsView.js"
+    },
+    {
+      "kind": "function",
       "name": "schema_guard_objects",
       "providedBy": "20261015140000_lock_public_exposure.sql",
       "requiredBy": "lib/schemaGuard.js"
@@ -1122,7 +1140,7 @@
       "kind": "table",
       "name": "accounts",
       "providedBy": "20260721100000_accounts_and_link_codes.sql",
-      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js, lib/buyAmounts.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/engine/sendFee.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/rewards.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
+      "requiredBy": "lib/accountEmails.js, lib/agentWallet.js, lib/api/paymentWatcher.js, lib/api/payoutWorker.js, lib/buyAmounts.js, lib/commands/account.js, lib/commands/chat.js, lib/dailyLimits.js, lib/engine/executeTransfer.js, lib/engine/sendFee.js, lib/history.js, lib/identity.js, lib/invite.js, lib/payCode.js, lib/pots.js, lib/rewards.js, lib/rewardsView.js, lib/router.js, lib/saleNotice.js, lib/session.js, lib/tiers.js"
     },
     {
       "kind": "table",
@@ -1254,7 +1272,7 @@
       "kind": "table",
       "name": "fee_ledger",
       "providedBy": "20261115130000_fee_ledger.sql",
-      "requiredBy": "lib/feeQuote.js, lib/history.js, lib/rewards.js"
+      "requiredBy": "lib/feeQuote.js, lib/history.js, lib/rewards.js, lib/rewardsView.js"
     },
     {
       "kind": "table",
@@ -1351,6 +1369,12 @@
       "name": "reserved_usernames",
       "providedBy": "20260811000000_reserved_usernames.sql",
       "requiredBy": "lib/username.js"
+    },
+    {
+      "kind": "table",
+      "name": "reward_entries",
+      "providedBy": "20261117120000_rewards.sql",
+      "requiredBy": "lib/rewardsView.js"
     },
     {
       "kind": "table",
