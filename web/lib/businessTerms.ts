@@ -19,6 +19,23 @@ export const BUSINESS_TERMS: readonly string[] = Object.freeze([
   'While Flizy runs on a test network, payments and fees are in test tokens, not real money.',
 ]);
 
+/**
+ * A short heading for each line above, in the same order, for Account >
+ * Business. A heading only names its line: what is agreed is the line itself,
+ * so a heading can change without a new version.
+ */
+export const BUSINESS_TERM_HEADINGS: readonly string[] = Object.freeze([
+  'Our fee',
+  'No fees for your customers',
+  'Where it applies',
+  'Transparent history',
+  'Turn it off anytime',
+  'Test network',
+]);
+
+/** The fee and its minimum, as the first line states them, for the summary at the top of the panel. */
+export const BUSINESS_FEE_SUMMARY = Object.freeze({ fee: '0.5%', minimum: '$0.01' });
+
 /** Whether a version the browser sent is the current one. */
 export function isCurrentBusinessTerms(version: unknown): boolean {
   return typeof version === 'string' && version === BUSINESS_TERMS_VERSION;

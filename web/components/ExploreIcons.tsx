@@ -832,3 +832,51 @@ export function BookmarkIcon({ size, strokeWidth = 1.8, className, filled = fals
     </Svg>
   );
 }
+
+export function PercentIcon({ size, strokeWidth = 1.9, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M18.5 5.5l-13 13" />
+        <circle cx="7.2" cy="7.2" r="2.4" />
+        <circle cx="16.8" cy="16.8" r="2.4" />
+      </g>
+    </Svg>
+  );
+}
+
+export function LayersIcon({ size, strokeWidth = 1.7, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M12 3.5l8.5 4.6L12 12.7 3.5 8.1z" />
+        <path d="M3.5 12.1l8.5 4.6 8.5-4.6" />
+        <path d="M3.5 16l8.5 4.6 8.5-4.6" />
+      </g>
+    </Svg>
+  );
+}
+
+export function PowerIcon({ size, strokeWidth = 1.9, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M12 3.5v8" />
+        <path d="M7.2 6.6a7.6 7.6 0 1 0 9.6 0" />
+      </g>
+    </Svg>
+  );
+}
+
+/** A shop front with an awning. */
+export function StoreIcon({ size, strokeWidth = 1.8, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g strokeWidth={strokeWidth}>
+        <path d="M4.5 4.5h15l1.5 4.8a2.6 2.6 0 0 1-5 .9 2.6 2.6 0 0 1-4 0 2.6 2.6 0 0 1-4 0 2.6 2.6 0 0 1-5-.9z" />
+        <path d="M5.2 11.8v7.7h13.6v-7.7" />
+        <path d="M9.4 4.5L8.6 9.6M14.6 4.5l.8 5.1" />
+      </g>
+    </Svg>
+  );
+}
