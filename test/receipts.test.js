@@ -101,6 +101,17 @@ describe('what a receipt shows', () => {
     );
   });
 
+  it('names the asset by its symbol, not its contract address (FLZ is not a listed token)', async () => {
+    seed({ amount_eth: '10', asset: 'FLZ', token_address: '0x308be8f71DA695f18E70D2243a446e1fD1566BA6' });
+    let r = await R.loadReceipt(await R.shareReceipt(SENDER, TX, c()), 'GIWA Sepolia', c());
+    assert.equal(r.unit, 'FLZ');
+    // A row with only an address still gets a short name, never the full address.
+    seed({ asset: null, token_address: '0x' + '9a'.repeat(20) });
+    r = await R.loadReceipt(await R.shareReceipt(SENDER, TX, c()), 'GIWA Sepolia', c());
+    assert.equal(r.unit, '0x9a9a…9a9a');
+    assert.match(fs.readFileSync(path.join(__dirname, '..', 'web/lib/merchant.ts'), 'utf8'), /unit: assetSymbol\(r\.asset \|\| r\.token_address \|\| 'ETH'\)/);
+  });
+
   it('masks a hidden username to five characters whatever its length', () => {
     assert.equal(R.maskUsername('ludarep'), 'l***p');
     assert.equal(R.maskUsername('sunnysmith'), 's***h');

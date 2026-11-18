@@ -111,7 +111,7 @@ export async function loadReceived(
       id: String(r.id),
       at: String(r.created_at),
       amount: String(r.amount_eth),
-      unit: assetSymbol(r.token_address || r.asset || 'ETH'),
+      unit: assetSymbol(r.asset || r.token_address || 'ETH'),
       asset: payAssetOf(r),
       from,
       note: r.note ? displaySafeLabel(r.note, 80) || null : null,

@@ -154,7 +154,9 @@ export async function loadReceipt(token: string, network: string, client?: Db): 
 
   return {
     amount: String(t.amount_eth ?? ''),
-    unit: assetSymbol(t.token_address || t.asset || 'ETH'),
+    // The stored symbol first: a token's address is only the fallback, and an
+    // unlisted one (FLZ among them) would otherwise print as 0x308b...6ba6.
+    unit: assetSymbol(t.asset || t.token_address || 'ETH'),
     from: partyLabel(sender, null),
     to: partyLabel(payee, t.to_address),
     fromKind: sender ? 'flizy' : 'wallet',
