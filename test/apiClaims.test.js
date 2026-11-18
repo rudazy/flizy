@@ -198,11 +198,13 @@ describe('an API claim hold', () => {
     assert.equal(calls.owner, 0);
   });
 
-  it('a chat hold is unchanged: the owner path, and no expiry or payout on the claim', async () => {
+  it('a chat hold is unchanged: the owner path, no payout, and the chat deadline rather than an API one', async () => {
     const out = await executeClaimHold({ fromAccountId: ACCOUNT, recipient: phoneTo, amountEth: '5', asset: 'TUSD', tokenAddress: C.ASSETS.TUSD.token, provider, chain, escrowWallet: escrow });
     assert.equal(out.ok, true, out.error);
     assert.equal(calls.owner, 1);
-    assert.equal(fake.db.tables.claims[0].expires_at, undefined);
+    // A chat claim now comes back after CLAIM_EXPIRY_DAYS (lib/claimExpiry.js), counted from now.
+    const days = (Date.parse(fake.db.tables.claims[0].expires_at) - Date.now()) / 86400000;
+    assert.ok(days > 89.9 && days <= 90, String(days));
     assert.equal(fake.db.tables.claims[0].api_transaction_id, undefined);
   });
 });

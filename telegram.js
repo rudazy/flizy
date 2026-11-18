@@ -31,6 +31,7 @@ const { config } = require('./lib/config');
 const { TelegramBot } = require('./lib/telegram/bot');
 const { startAmmora } = require('./lib/ammora/boot');
 const { registerClaimEmailSender } = require('./lib/claimEmailNotice');
+const { claimExpiryDays } = require('./lib/claimExpiry');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -56,6 +57,9 @@ async function main() {
   // Claims made here to an email not on Flizy are emailed through the site too.
   // Reminders run from the WhatsApp process only.
   registerClaimEmailSender();
+  // Claims made here get their deadline from CLAIM_EXPIRY_DAYS: a malformed one
+  // stops the bot now, not after a hold has already moved the money.
+  claimExpiryDays();
   await bot.start();
 }
 

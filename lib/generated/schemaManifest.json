@@ -1290,7 +1290,7 @@
       "kind": "table",
       "name": "claims",
       "providedBy": "20260721120000_phase_full_features.sql",
-      "requiredBy": "lib/api/payoutWorker.js, lib/claimEmailNotice.js, lib/claims.js, lib/escrowWallet.js, lib/handlers/claims.js, lib/history.js, lib/reconcile.js"
+      "requiredBy": "lib/api/payoutWorker.js, lib/claimEmailNotice.js, lib/claimExpiry.js, lib/claims.js, lib/escrowWallet.js, lib/handlers/claims.js, lib/history.js, lib/reconcile.js"
     },
     {
       "kind": "table",

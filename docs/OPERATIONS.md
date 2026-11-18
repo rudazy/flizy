@@ -489,7 +489,17 @@ rows and show the status the claims table gives them.
   the money back through the same escrow send as a payout, `web/lib/claimPayout.ts`). A
   recipient sees only their own payment, never the sender's timeline.
 - **Notices.** The sender hears in chat when a claim is claimed, when they cancel it on the site,
-  and, for a Flizy Pay API claim, when it expired and was refunded.
+  and when it expired and was refunded.
+- **Expiry.** A chat claim can be received for `CLAIM_EXPIRY_DAYS` (90) after it was sent; the
+  deadline is set when it is created and shown in chat ("Not received by ... ? It comes back to
+  you by itself."), the email, the claim page and History. A claim from before deadlines gets one
+  counted from when it was sent. Past it, the claim cannot be received (a `claim_refused` event,
+  reason `expired`), and the WhatsApp process (`lib/claimExpiry.js`, every 10 minutes) locks
+  it, refunds it to the sender's wallet through the escrow, records `expired` then `refunded`,
+  and tells the sender in chat. The refund's hash is stored on the claim before the broadcast, so
+  a crash is settled from the receipt, never sent twice; when nothing reached the chain the lock
+  is released and the next pass tries again. Flizy Pay API claims keep their own expiry
+  (`lib/api/payoutWorker.js`).
 - **Telling a recipient not on Flizy.** After the hold, chat sends the sender one message to
   forward as is: "I sent you 0.01 ETH on Flizy (testnet). Claim it here: <link>", and for a
   Telegram claim a link that opens the bot on it (`/start claim_<token>`, `lib/claimShare.js`).

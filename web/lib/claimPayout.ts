@@ -403,6 +403,11 @@ export async function executeWebClaimPayout(p: {
     await refused('not_pending');
     return { ok: false, error: `Claim is already ${claim.status}.`, status: 409 };
   }
+  // Past its deadline the money is the sender's again, even before the refund runs.
+  if (claim.expires_at && Date.parse(String(claim.expires_at)) <= Date.now()) {
+    await refused('expired');
+    return { ok: false, error: 'This payment expired and is going back to the sender.', status: 410 };
+  }
 
   // Phone claims: ownership is proven only in WhatsApp/Telegram (contact share /
   // channel metadata). Web may show the hold, but payout stays chat-only.
