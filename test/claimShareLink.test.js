@@ -260,7 +260,8 @@ describe('chat and the site', () => {
     for (const key of ['amount_eth', 'asset', 'nft_token_id', 'status', 'sender', 'testnet: true', 'expires_at']) assert.ok(base.includes(key), key);
     assert.doesNotMatch(base, /recipient|sent_to|to_wa_hint|to_email|carries_invite|can_claim/);
     const page = read('web/app/claim/[token]/page.tsx');
-    assert.match(page, /Testnet: these are test funds, not real money\./);
+    // The page no longer says it (Ludarep's design); the email and the share message still do.
+    assert.doesNotMatch(page, /Testnet: these are test funds/);
     assert.match(page, /Create a Flizy account/);
     assert.match(page, /This payment was sent to \{data\.sent_to \|\| 'another identity'\}\. Add and verify it on your account to claim/);
   });

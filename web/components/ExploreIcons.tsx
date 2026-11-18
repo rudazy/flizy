@@ -880,3 +880,40 @@ export function StoreIcon({ size, strokeWidth = 1.8, className }: IconProps) {
     </Svg>
   );
 }
+
+/** Telegram's paper plane, for the footer and share buttons. */
+export function TelegramGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+      <path d="M21.5 3.5L2.8 10.8c-.8.3-.8 1.4 0 1.7l4.6 1.6 1.8 5.6c.2.7 1.1.9 1.6.4l2.6-2.4 4.7 3.5c.6.4 1.4.1 1.6-.6L22.9 4.9c.2-.9-.6-1.7-1.4-1.4z" />
+      <path d="M7.4 14.1l11.1-7.4-8.4 9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** WhatsApp's speech bubble, for the footer and share buttons. */
+export function WhatsAppGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+      <path d="M3.5 20.5l1.3-4.6A8.6 8.6 0 1112 20.6a8.5 8.5 0 01-4-1z" />
+      <path
+        d="M9 8.3c.2-.4.5-.4.8-.4h.4c.2 0 .3.1.4.3l.7 1.6c.1.2 0 .4-.1.5l-.5.6c-.1.1-.1.3 0 .5.6 1.1 1.5 1.9 2.6 2.4.2.1.4 0 .5-.1l.6-.7c.1-.2.3-.2.5-.1l1.6.7c.2.1.3.3.3.5v.4c0 .3-.1.6-.4.8-.6.5-1.4.6-2.2.4-2.4-.7-4.4-2.6-5.2-5-.2-.8 0-1.7.4-2.4z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
+  );
+}
+
+/** Three dots in a row: more ways to share. */
+export function MoreHorizontalIcon({ size, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <g fill="currentColor" stroke="none">
+        <circle cx="5.5" cy="12" r="1.7" />
+        <circle cx="12" cy="12" r="1.7" />
+        <circle cx="18.5" cy="12" r="1.7" />
+      </g>
+    </Svg>
+  );
+}

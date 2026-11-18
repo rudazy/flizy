@@ -24,6 +24,8 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [needsCode, setNeedsCode] = useState(false);
+  /** Google confirmed the account; only the emailed code is left (/api/auth/google/verify). */
+  const [googleCode, setGoogleCode] = useState(false);
   const [devCode, setDevCode] = useState('');
   const [error, setError] = useState('');
   /** Said after a resend, because the new code silently replaces the old one. */
@@ -41,6 +43,13 @@ export function LoginForm() {
     const account = params.get('account');
     if (account === 'deleted' || account === 'deactivated') {
       setAccountNote('This account is paused. Enter the same email and the account password to bring it back.');
+    }
+    if (params.get('google') === 'code') {
+      setGoogleCode(true);
+      setNeedsCode(true);
+      // Only ever present on a development build, which has no mail transport.
+      setDevCode(String(params.get('dev') || '').replace(/\D/g, '').slice(0, 6));
+      return;
     }
     const google = googleLoginError(params.get('google'));
     if (google) setError(google);
@@ -94,6 +103,26 @@ export function LoginForm() {
     // Once the page is on its way to the dashboard the button stays busy, so it
     // never flips back to "Log in" and looks like the attempt failed.
     let leaving = false;
+    if (googleCode) {
+      try {
+        const res = await fetch('/api/auth/google/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Could not sign in');
+        track('login_completed');
+        clearAppearanceCache();
+        leaving = true;
+        router.push(safeNext(data.next));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not sign in');
+      } finally {
+        if (!leaving) setLoading(false);
+      }
+      return;
+    }
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -140,16 +169,16 @@ export function LoginForm() {
     setError('');
     setNotice('');
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(googleCode ? '/api/auth/google/verify' : '/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(googleCode ? { resend: true } : { email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not send code');
       setCode('');
       setDevCode(typeof data.devCode === 'string' ? data.devCode : '');
-      setNotice(`New code sent to ${email}. Earlier codes no longer work.`);
+      setNotice(googleCode ? 'New code sent to your Flizy email. Earlier codes no longer work.' : `New code sent to ${email}. Earlier codes no longer work.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send code');
     } finally {
@@ -216,6 +245,8 @@ export function LoginForm() {
                 onChange={(code: LocaleCode) => setLocale(code)}
               />
             </div>
+            {googleCode ? null : (
+            <>
             <div>
               <label className={fieldLabel} htmlFor="desk-email">
                 {t('auth.login.email')}
@@ -243,10 +274,14 @@ export function LoginForm() {
               autoComplete="current-password"
               iconToggle
             />
+            </>
+            )}
             {needsCode ? (
               <div>
                 <div className="alert mb-3 text-sm" role="status">
-                  One more step. Enter the code below to finish signing in.
+                  {googleCode
+                    ? 'Google confirmed your account. One more step: enter the code we emailed to your Flizy address.'
+                    : 'One more step. Enter the code below to finish signing in.'}
                 </div>
                 <label className={fieldLabel} htmlFor="desk-login-code">
                   Login code

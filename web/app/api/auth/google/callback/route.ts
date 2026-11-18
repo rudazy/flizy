@@ -4,6 +4,11 @@
  * Order: rate limit, the cookie we set, the signed state, then the code
  * exchange. The email comes from Google's profile, never from the query.
  * A verified Flizy account on that email gets a session. Nothing else does.
+ *
+ * Google replaces the password, not the emailed code: on a browser Flizy does
+ * not remember, the code is sent and the login form asks for it
+ * (/api/auth/google/verify). A paused account is brought back only once the
+ * sign-in is complete.
  */
 
 import { NextResponse } from 'next/server';
@@ -11,14 +16,19 @@ import { cookies } from 'next/headers';
 import { verifyOAuthState, oauthStateConfigured } from '../../../../../lib/oauthState';
 import { clientIpKey } from '../../../../../lib/clientIp.ts';
 import { exchangeGoogleCode, googleAuthOrigin, googleOAuthConfigured } from '../../../../../lib/googleOAuth';
-import { createSession, revokeAllSessions } from '../../../../../lib/cookies';
+import { createSession, hasTrustedLoginDevice } from '../../../../../lib/cookies';
 import { getSupabase } from '../../../../../lib/supabase';
 import { isMissingClosureColumn } from '../../../../../lib/accountClosure.ts';
 import { logApiError } from '../../../../../lib/apiError';
+import { restoreAccount } from '../../../../../lib/accountRestore';
+import { issueEmailVerificationCode } from '../../../../../lib/emailVerify.ts';
 import {
   GOOGLE_LOGIN_COOKIE,
+  GOOGLE_PENDING_COOKIE,
+  GOOGLE_PENDING_TTL_MS,
   allowGoogleAttempt,
   decideGoogleAccount,
+  packGooglePending,
   unpackGoogleTicket,
   type GoogleAccountRow,
   type GoogleTicket,
@@ -52,25 +62,23 @@ function formAgain(ticket: GoogleTicket | null, code: string, clear: boolean) {
   return send(`${url.pathname}${url.search}`, clear);
 }
 
-async function restoreAccount(accountId: string): Promise<boolean> {
-  try {
-    await revokeAllSessions(accountId);
-  } catch (err) {
-    logApiError(ROUTE, err);
-    return false;
-  }
-  const { data, error } = await getSupabase()
-    .from('accounts')
-    .update({ deactivated_at: null, deleted_at: null })
-    .eq('id', accountId)
-    .select('id')
-    .maybeSingle();
-  if (error && isMissingClosureColumn(error)) return true;
-  if (error) {
-    logApiError(ROUTE, error);
-    return false;
-  }
-  return Boolean(data?.id);
+/**
+ * A browser Flizy does not remember: the emailed code is sent, the signed note
+ * is left, and the login form opens on its code step. Development has no mail
+ * transport, so its code rides along in the address (never in production).
+ */
+async function askForCode(ticket: GoogleTicket, accountId: string, email: string, restore: boolean) {
+  const issued = await issueEmailVerificationCode({ accountId, email, purpose: 'login' });
+  if (!issued.ok) return formAgain(ticket, 'failed', true);
+  const note = packGooglePending({ accountId, email, restore, next: ticket.next, issuedAt: Date.now() }, process.env.OAUTH_STATE_SECRET || '');
+  if (!note) return formAgain(ticket, 'unavailable', true);
+  const url = new URL('/login', googleAuthOrigin());
+  url.searchParams.set('google', 'code');
+  if (ticket.next !== '/dashboard') url.searchParams.set('next', ticket.next);
+  if (issued.devCode) url.searchParams.set('dev', issued.devCode);
+  const res = send(`${url.pathname}${url.search}`, true);
+  res.cookies.set(GOOGLE_PENDING_COOKIE, note, { ...cookieBase(), maxAge: Math.floor(GOOGLE_PENDING_TTL_MS / 1000) });
+  return res;
 }
 
 async function findAccount(
@@ -125,7 +133,10 @@ export async function GET(req: Request) {
     if (!found.ok) return formAgain(ticket, 'failed', true);
     const decision = decideGoogleAccount(found.row);
     if (decision.action === 'reject') return formAgain(ticket, decision.reason, true);
-    if (decision.restore && !(await restoreAccount(decision.accountId))) {
+    if (!(await hasTrustedLoginDevice(decision.accountId))) {
+      return askForCode(ticket, decision.accountId, profile.email, decision.restore);
+    }
+    if (decision.restore && !(await restoreAccount(decision.accountId, ROUTE))) {
       return formAgain(ticket, 'failed', true);
     }
 

@@ -52,6 +52,14 @@ function routesReturningDevCode() {
     );
 }
 
+/**
+ * Routes that hand the code on by a redirect rather than a fetch, and the page
+ * they send it to, which must read it from the address and show it.
+ */
+const REDIRECTED = {
+  'auth/google/callback': 'web/app/login/LoginForm.tsx',
+};
+
 describe('every dev code reaches the screen', () => {
   const routes = routesReturningDevCode();
 
@@ -63,6 +71,15 @@ describe('every dev code reaches the screen', () => {
   });
 
   for (const route of routesReturningDevCode()) {
+    if (REDIRECTED[route]) {
+      it(`/api/${route} redirects with it, and ${REDIRECTED[route]} shows it`, () => {
+        const page = fs.readFileSync(path.join(__dirname, '..', REDIRECTED[route]), 'utf8');
+        assert.match(page, /params\.get\('dev'\)/);
+        assert.match(page, /setDevCode\(/);
+        assert.match(page, /Your code is \{devCode\}/);
+      });
+      continue;
+    }
     it(`every client of /api/${route} surfaces it`, () => {
       const clients = walk(path.join(WEB, 'app'))
         .concat(walk(path.join(WEB, 'components')))
