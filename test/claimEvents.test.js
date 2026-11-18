@@ -92,8 +92,9 @@ describe('recording', () => {
 
   it('the events and channels match the migration', () => {
     const sql = read('supabase/migrations/20261117140000_claim_events.sql');
-    const list = (name) => sql.match(new RegExp(`${name} in \\(([^)]*)\\)`))[1].match(/'([a-z_]+)'/g).map((s) => s.slice(1, -1));
-    assert.deepEqual(list('event'), [...E.EVENTS]);
+    const list = (name, text = sql) => text.match(new RegExp(`${name} in \\(([^)]*)\\)`))[1].match(/'([a-z_]+)'/g).map((s) => s.slice(1, -1));
+    // The event list was widened by a later migration (claim_refused); that one is current.
+    assert.deepEqual(list('event', read('supabase/migrations/20261118120000_claim_refused_and_skipped.sql')), [...E.EVENTS]);
     assert.deepEqual(list('channel'), [...E.CHANNELS]);
     assert.match(sql, /create unique index if not exists claim_events_link_opened_once\s+on public\.claim_events \(claim_id\)\s+where event = 'link_opened';/);
     assert.match(sql, /alter table public\.claim_events enable row level security;\nrevoke all on table public\.claim_events from public, anon, authenticated;/);
@@ -131,8 +132,10 @@ describe('what the sender sees', () => {
     assert.equal(s('pending', ['created', 'notified', 'link_opened']), 'Link opened');
     assert.equal(s('processing', ['link_opened']), 'Processing');
     assert.equal(s('claimed', []), 'Claimed');
-    assert.equal(s('cancelled', ['cancelled', 'refunded']), 'Cancelled');
-    assert.equal(s('cancelled', ['expired', 'refunded']), 'Expired');
+    assert.equal(s('cancelled', ['cancelled']), 'Cancelled');
+    assert.equal(s('cancelled', ['expired']), 'Expired');
+    assert.equal(s('cancelled', ['cancelled', 'refunded']), 'Refunded');
+    assert.equal(s('cancelled', ['expired', 'refunded']), 'Refunded');
     assert.equal(E.claimAge('2026-11-17T10:00:00.000Z', Date.parse('2026-11-19T11:00:00.000Z')), '2d');
     assert.equal(E.claimAge('2026-11-17T10:00:00.000Z', Date.parse('2026-11-17T13:30:00.000Z')), '3h');
   });

@@ -24,7 +24,13 @@ import { recordClaimEvent } from '../../lib/claimEvents.js';
  * the smallest claim worth an email (off by default).
  *
  * The email only opens the claim page. It carries no code, no password field
- * and nothing that asks for credentials.
+ * and nothing that asks for credentials. Its link carries the address after
+ * the # (never sent to a server), so signing up from the claim page starts
+ * with it filled in.
+ *
+ * Every decision about a claim's email is written down: sent or failed, or
+ * skipped when a rule held it back. A skipped one is final, and counts toward
+ * no limit.
  */
 
 export type ClaimEmailKind = 'first' | 'reminder';
@@ -69,7 +75,12 @@ export function emailHash(raw: unknown): string {
   return createHash('sha256').update(parseEmail(raw)).digest('hex');
 }
 
-/** The email itself. Plain words, ASCII, one link to the claim page, and the stop link. */
+/**
+ * The email itself: a payment notification with the amount, the three steps to
+ * receive it and one button to the claim page, then when it was sent, until
+ * when it can be claimed, its reference, that it is test money, the warning
+ * about links, and the stop link. ASCII only.
+ */
 export function formatClaimEmail(p: {
   sender: string;
   amount: string;
@@ -83,28 +94,72 @@ export function formatClaimEmail(p: {
 }): { subject: string; text: string; html: string } {
   const day = (iso: string) => new Date(iso).toUTCString().replace(/ GMT$/, ' UTC');
   const subject = `${p.reminder ? 'Reminder: ' : ''}${p.sender} sent you ${p.amount} on Flizy (testnet)`;
-  const lines = [
-    `${p.sender} sent you ${p.amount} on Flizy.`,
-    '',
+  const heading = p.reminder ? 'Your payment is still waiting for you.' : 'Someone sent you money!';
+  const steps = [
+    'Create a Flizy account using this email address, or sign in to your existing account.',
+    'If you already have a Flizy account with another email, add and verify this email in your account.',
+    'Return to this payment and claim your funds.',
+  ];
+  const details = [
     `Sent: ${day(p.sentAt)}`,
     ...(p.expiresAt ? [`Can be claimed until: ${day(p.expiresAt)}`] : []),
-    'These are test funds on a test network (testnet), not real money.',
-    '',
-    `Open the payment: ${p.claimUrl}`,
     `Payment reference: ${p.reference}`,
+  ];
+  const testnet = 'These are test funds on a test network (testnet), not real money.';
+  const warning = `Flizy will never ask for your password or a code by email. Only open links that start with ${p.origin}.`;
+
+  const lines = [
+    heading,
+    `${p.sender} sent you a payment through Flizy.`,
     '',
-    `Flizy will never ask for your password or a code by email. Only open links that start with ${p.origin}.`,
+    'YOU HAVE RECEIVED',
+    p.amount,
+    'Waiting for you to claim',
+    '',
+    'How to receive your money',
+    ...steps.map((s, i) => `${i + 1}. ${s}`),
+    '',
+    `Claim your payment: ${p.claimUrl}`,
+    '',
+    ...details,
+    testnet,
+    '',
+    warning,
     '',
     `Don't want emails like this? Stop these emails: ${p.stopUrl}`,
   ];
+
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const font = "font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
+  const small = 'margin:0;font-size:13px;line-height:1.6;color:#52525b';
   const html = [
-    `<p>${esc(p.sender)} sent you <strong>${esc(p.amount)}</strong> on Flizy.</p>`,
-    `<p>Sent: ${esc(day(p.sentAt))}${p.expiresAt ? `<br>Can be claimed until: ${esc(day(p.expiresAt))}` : ''}<br>These are test funds on a test network (testnet), not real money.</p>`,
-    `<p><a href="${esc(p.claimUrl)}" style="display:inline-block;padding:10px 16px;background:#f7d047;color:#1a1405;text-decoration:none;border-radius:4px;font-weight:600">Open the payment</a></p>`,
-    `<p>Payment reference: ${esc(p.reference)}</p>`,
-    `<p style="color:#666">Flizy will never ask for your password or a code by email. Only open links that start with ${esc(p.origin)}.</p>`,
-    `<p style="color:#666">Don't want emails like this? <a href="${esc(p.stopUrl)}">Stop these emails</a>.</p>`,
+    '<!doctype html>',
+    `<html><body style="margin:0;padding:0;background:#f4f4f5;${font}">`,
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 12px"><tr><td align="center">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;color:#18181b">',
+    '<tr><td style="padding:20px 24px;border-bottom:1px solid #e4e4e7">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>',
+    '<td style="font-size:24px;font-weight:700">Flizy</td>',
+    '<td align="right"><span style="display:inline-block;padding:4px 12px;border-radius:999px;background:#dcf5e3;color:#137a3c;font-size:13px">Payment notification</span></td>',
+    '</tr></table>',
+    '</td></tr>',
+    '<tr><td style="padding:24px">',
+    `<p style="margin:0 0 12px;font-size:18px">${esc(heading)}</p>`,
+    `<p style="margin:0 0 16px;font-size:16px">${esc(p.sender)} sent you a payment through Flizy.</p>`,
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;border-radius:12px"><tr><td style="padding:16px 18px">',
+    '<p style="margin:0;font-size:12px;letter-spacing:0.04em;color:#52525b">YOU HAVE RECEIVED</p>',
+    `<p style="margin:6px 0;font-size:30px;font-weight:700;color:#137a3c">${esc(p.amount)}</p>`,
+    '<p style="margin:0;font-size:13px;color:#52525b">Waiting for you to claim</p>',
+    '</td></tr></table>',
+    '<p style="margin:20px 0 8px;font-size:16px">How to receive your money</p>',
+    `<ol style="margin:0 0 20px;padding-left:22px;font-size:15px;line-height:1.5">${steps.map((s) => `<li style="margin-bottom:4px">${esc(s)}</li>`).join('')}</ol>`,
+    `<a href="${esc(p.claimUrl)}" style="display:block;text-align:center;background:#f2b705;color:#1a1405;font-weight:600;font-size:16px;padding:14px 16px;border-radius:10px;text-decoration:none">Claim your payment</a>`,
+    `<p style="${small};margin-top:20px">${details.map(esc).join('<br>')}<br>${esc(testnet)}</p>`,
+    `<p style="${small};margin-top:12px">${esc(warning)}</p>`,
+    `<p style="${small};margin-top:12px">Don't want emails like this? <a href="${esc(p.stopUrl)}" style="color:#52525b">Stop these emails</a>.</p>`,
+    '</td></tr></table>',
+    '</td></tr></table>',
+    '</body></html>',
   ].join('\n');
   return { subject, text: lines.join('\n'), html };
 }
@@ -120,7 +175,7 @@ async function onFlizy(db: SupabaseClient, email: string): Promise<boolean> {
   return (extra || []).length > 0;
 }
 
-/** How many notices since `since`, not counting ones that failed. */
+/** How many notices since `since`, not counting ones that failed or were skipped. */
 async function recentCount(db: SupabaseClient, column: 'sender_account_id' | 'recipient_hash', value: string, since: string, kind?: ClaimEmailKind) {
   let q = db.from('claim_email_notices').select('id', { count: 'exact', head: true }).eq(column, value).gte('created_at', since).in('state', ['sending', 'sent']);
   if (kind) q = q.eq('kind', kind);
@@ -169,12 +224,19 @@ export async function sendClaimEmail(p: {
   if (claim.status !== 'pending' || !claim.hold_tx_hash) return 'not_pending';
   const email = parseEmail(claim.to_email);
   if (!email) return 'not_email';
-  if (await onFlizy(db, email)) return 'on_flizy';
-
   const hash = emailHash(email);
+  const skip = async (result: ClaimEmailResult): Promise<ClaimEmailResult> => {
+    const { error: skipErr } = await db
+      .from('claim_email_notices')
+      .insert({ claim_id: claimId, kind, sender_account_id: claim.from_account_id || null, recipient_hash: hash, state: 'skipped' });
+    if (skipErr && skipErr.code !== '23505') throw new Error(skipErr.message);
+    return result;
+  };
+  if (await onFlizy(db, email)) return skip('on_flizy');
+
   const { data: stopped, error: sErr } = await db.from('email_suppressions').select('email_hash').eq('email_hash', hash).maybeSingle();
   if (sErr) throw new Error(sErr.message);
-  if (stopped) return 'suppressed';
+  if (stopped) return skip('suppressed');
 
   if (kind === 'reminder') {
     if (Date.parse(String(claim.created_at)) > now - cfg.reminderHours * 3600 * 1000) return 'too_early';
@@ -184,13 +246,13 @@ export async function sendClaimEmail(p: {
   }
 
   const since = new Date(now - DAY_MS).toISOString();
-  if (kind === 'first' && claim.from_account_id && (await recentCount(db, 'sender_account_id', String(claim.from_account_id), since, 'first')) >= cfg.perSenderDay) return 'limited';
-  if ((await recentCount(db, 'recipient_hash', hash, since)) >= cfg.perAddressDay) return 'limited';
+  if (kind === 'first' && claim.from_account_id && (await recentCount(db, 'sender_account_id', String(claim.from_account_id), since, 'first')) >= cfg.perSenderDay) return skip('limited');
+  if ((await recentCount(db, 'recipient_hash', hash, since)) >= cfg.perAddressDay) return skip('limited');
 
   const asset = String(claim.asset || 'ETH').toUpperCase();
   if (cfg.minMicro != null) {
     const usd = claim.nft_token_id ? null : claimUsdMicro(claim.amount_eth, asset);
-    if (usd == null || usd < cfg.minMicro) return 'below_minimum';
+    if (usd == null || usd < cfg.minMicro) return skip('below_minimum');
   }
 
   // Taken first, so a retry or a second caller finds it and sends nothing.
@@ -210,7 +272,7 @@ export async function sendClaimEmail(p: {
     amount: formatClaimAmount({ amount_eth: claim.amount_eth, asset, nft_token_id: claim.nft_token_id }),
     sentAt: String(claim.created_at),
     expiresAt: claim.expires_at ? String(claim.expires_at) : null,
-    claimUrl: `${origin}/claim/${claim.claim_token}`,
+    claimUrl: `${origin}/claim/${claim.claim_token}#to=${encodeURIComponent(email)}`,
     stopUrl: `${origin}/email/stop?c=${claim.claim_token}`,
     reference: `FLZ-${String(claim.id).slice(0, 8).toUpperCase()}`,
     origin,

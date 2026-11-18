@@ -9,8 +9,8 @@ import { useState } from 'react';
  * /api/auth/email/verify), so an address on another account is refused there
  * with the same neutral answer.
  */
-export function ClaimEmailVerify({ onVerified }: { onVerified: () => void }) {
-  const [email, setEmail] = useState('');
+export function ClaimEmailVerify({ initialEmail = '', onVerified }: { initialEmail?: string; onVerified: () => void }) {
+  const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [busy, setBusy] = useState(false);

@@ -497,22 +497,32 @@ rows and show the status the claims table gives them.
   page give the sender a Share claim link card (copy, WhatsApp, Telegram, the device share
   sheet); each use is a `link_shared` event (`POST /api/claim/shared`, at most 20 a claim). A
   recipient's own channel is tried first through `lib/claimNotify.js`: no channel can reach a
-  non-user yet (email arrives with its sender and `CLAIM_NOTIFY_EMAIL`; WhatsApp waits for the
-  Business API; Telegram, Discord, GitHub and X never can).
-- **Email to a recipient not on Flizy.** With `CLAIM_NOTIFY_EMAIL=true` on the bots, a claim to
-  an email that is on no Flizy account is emailed once, right after the hold lands, and reminded
-  once if still unclaimed after `CLAIM_EMAIL_REMINDER_HOURS` (72; the WhatsApp process runs the
-  reminders). The bots name only the claim to `/api/internal/claim-notice` (`SECURITY_MAIL_SECRET`);
+  non-user by email (below); WhatsApp waits for the Business API; Telegram, Discord, GitHub and
+  X never can.
+- **Email to a recipient not on Flizy.** On unless `CLAIM_NOTIFY_EMAIL=false` on the bots (each
+  bot warns at startup when `SECURITY_MAIL_SECRET` or an https `SITE_URL` is missing). A claim
+  to an email that is on no Flizy account is emailed once, right after the hold lands, and
+  reminded once if still unclaimed after `CLAIM_EMAIL_REMINDER_HOURS` (72). The WhatsApp process
+  also catches up, every 15 minutes, the first email for a held claim from the last 7 days that
+  the bot never asked about (a restart, the site down). The bots name only the claim to `/api/internal/claim-notice` (`SECURITY_MAIL_SECRET`);
   the site reads the address from the claim and applies every rule (`web/lib/claimEmail.ts`,
   migration `20261117150000_claim_email_notices.sql`): never to an address on a Flizy account
   or one that stopped these emails, at most `CLAIM_EMAIL_PER_SENDER_DAY` (10) new addresses per
   sender and `CLAIM_EMAIL_PER_ADDRESS_DAY` (3) emails per address a day, and over
-  `CLAIM_EMAIL_MIN_USD` when set. The address is kept only as a SHA-256 hash. `notified` is
-  recorded only when the mail provider accepted it. When an email is not sent the claim is still
-  held, and chat tells the sender to share the link. The email opens the claim page only: no
-  code, no password. "Stop these emails" (`/email/stop`, a button, so a mail scanner opening the
+  `CLAIM_EMAIL_MIN_USD` when set. Each decision is a `claim_email_notices` row: sent, failed, or
+  skipped when a rule held it back (final; counts toward no limit; migration
+  `20261118120000_claim_refused_and_skipped.sql`). The address is kept only as a SHA-256 hash.
+  `notified` is recorded only when the mail provider accepted it. When an email is not sent the
+  claim is still held, and chat tells the sender to share the link. The email is a payment
+  notification: the amount, the three steps to receive it, and one "Claim your payment" button
+  to the claim page; no code, no password. The button's link carries the address after the
+  `#` (`#to=`, never sent to a server), so sign-up, sign-in and the add-email form on the claim
+  page start with it filled in (`web/lib/emailHint.ts`). "Stop these emails" (`/email/stop`, a button, so a mail scanner opening the
   link stops nothing) adds the hash to `email_suppressions`; payments to the address still work.
-  On the claim page, a signed-in visitor can add and verify the email there, then claim.
+  On the claim page, a signed-in visitor can add and verify the email there, then claim. A
+  refused claim attempt (not the recipient, no longer pending, already being claimed) is a
+  `claim_refused` event with a reason code only, kept for the record and not shown to the
+  sender. A cancelled claim whose money came back shows as Refunded.
   These go from the payments sender (`PAYMENTS_EMAIL_FROM`, see [Environment](#environment)).
   Setup before turning it on: that sender on flizy.app, with the domain's SPF, DKIM and DMARC
   records.

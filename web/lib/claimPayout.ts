@@ -397,7 +397,10 @@ export async function executeWebClaimPayout(p: {
     .maybeSingle();
   if (cErr) throw new Error(cErr.message);
   if (!claim) return { ok: false, error: 'Claim not found.', status: 404 };
+  // Every refused attempt is recorded, with a reason code only, never who tried.
+  const refused = (reason: string) => recordClaimEvent(supabase, claimId, 'claim_refused', { meta: { reason } });
   if (String(claim.status) !== 'pending') {
+    await refused('not_pending');
     return { ok: false, error: `Claim is already ${claim.status}.`, status: 409 };
   }
 
@@ -405,6 +408,7 @@ export async function executeWebClaimPayout(p: {
   // channel metadata). Web may show the hold, but payout stays chat-only.
   const isPhoneClaim = !claim.to_channel && Boolean(claim.to_wa_hint);
   if (isPhoneClaim) {
+    await refused('phone_on_web');
     return {
       ok: false,
       error:
@@ -415,6 +419,7 @@ export async function executeWebClaimPayout(p: {
 
   const keys = await claimKeysForAccount(accountId);
   if (!claimMatchesAccountKeys(claim as ClaimRow, keys)) {
+    await refused('not_recipient');
     return { ok: false, error: matchErrorForClaim(claim as ClaimRow, keys), status: 403 };
   }
 
@@ -428,6 +433,7 @@ export async function executeWebClaimPayout(p: {
     .maybeSingle();
   if (hErr) throw new Error(hErr.message);
   if (!held) {
+    await refused('in_progress');
     return { ok: false, error: 'That claim is already being processed.', status: 409 };
   }
 

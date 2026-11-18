@@ -110,7 +110,7 @@ describe('the notification adapters', () => {
     N.registerNoticeSender('email', async () => results.shift());
     const claim = { id: 'c1' };
     const email = { kind: 'email', email: 'a@b.co' };
-    assert.equal(await N.noticeNonUser({ supabase: db.client, claim, recipient: email, env: {}, log: quiet }), null, 'setting off');
+    assert.equal(await N.noticeNonUser({ supabase: db.client, claim, recipient: email, env: { CLAIM_NOTIFY_EMAIL: 'false' }, log: quiet }), null, 'setting off');
     assert.equal(await N.noticeNonUser({ supabase: db.client, claim, recipient: email, env: { CLAIM_NOTIFY_EMAIL: 'true' }, log: quiet }), 'email');
     assert.equal(await N.noticeNonUser({ supabase: db.client, claim, recipient: email, env: { CLAIM_NOTIFY_EMAIL: 'true' }, log: quiet }), null, 'not accepted');
     N.registerNoticeSender('email', async () => {

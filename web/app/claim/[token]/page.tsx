@@ -8,6 +8,7 @@ import { formatClaimAmount } from '../../../lib/claimAmount.ts';
 import { ShareClaimCard } from '../../../components/ShareClaimCard';
 import { ClaimEmailVerify } from '../../../components/ClaimEmailVerify';
 import type { ClaimShare } from '../../../lib/claimShareView.ts';
+import { emailFromHash, emailHashSuffix } from '../../../lib/emailHint.ts';
 
 type ClaimView = {
   error?: string;
@@ -44,6 +45,10 @@ const VERIFY_PLACE: Record<string, { href: string; label: string }> = {
  * nothing about who it was sent to. Signed in, the sender can share it, the
  * recipient can claim it, and anyone else is told which identity it was sent
  * to so they can add and verify it. The link never moves money on its own.
+ *
+ * The claim email's link carries the address after the # (#to=). It is read
+ * once, taken out of the address bar, and only fills in the email on sign-up,
+ * sign-in and the add-email form.
  */
 export default function ClaimPage() {
   const params = useParams();
@@ -51,6 +56,14 @@ export default function ClaimPage() {
   const [data, setData] = useState<ClaimView | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [toHint, setToHint] = useState('');
+
+  useEffect(() => {
+    const hint = emailFromHash(window.location.hash, 'to');
+    if (!window.location.hash) return;
+    setToHint(hint);
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }, []);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -113,10 +126,10 @@ export default function ClaimPage() {
             </p>
           ) : !data.viewer ? (
             <div className="flex flex-col gap-2">
-              <Link href={`/signup?next=${next}`} className="btn btn-primary no-underline">
+              <Link href={`/signup?next=${next}${emailHashSuffix(toHint)}`} className="btn btn-primary no-underline">
                 Create a Flizy account
               </Link>
-              <Link href={`/login?next=${next}`} className="btn btn-ghost no-underline">
+              <Link href={`/login?next=${next}${emailHashSuffix(toHint)}`} className="btn btn-ghost no-underline">
                 Sign in
               </Link>
             </div>
@@ -140,7 +153,7 @@ export default function ClaimPage() {
                 This payment was sent to {data.sent_to || 'another identity'}. Add and verify it on your account to claim, then open this link again.
               </p>
               {data.recipient_kind === 'email' ? (
-                <ClaimEmailVerify onVerified={() => void load()} />
+                <ClaimEmailVerify initialEmail={toHint} onVerified={() => void load()} />
               ) : data.recipient_kind && VERIFY_PLACE[data.recipient_kind] ? (
                 <Link href={VERIFY_PLACE[data.recipient_kind].href} className="btn btn-ghost no-underline">
                   {VERIFY_PLACE[data.recipient_kind].label}

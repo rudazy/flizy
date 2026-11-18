@@ -1,7 +1,8 @@
 /**
  * Emailing a claim's recipient who is not on Flizy (Slice 3): the site side
  * (web/lib/claimEmail.ts, /api/internal/claim-notice, the stop link), the bot
- * side (lib/claimEmailNotice.js), and migration 20261117150000.
+ * side (lib/claimEmailNotice.js), and migrations 20261117150000 and
+ * 20261118120000.
  *
  * Covers: only after the hold, only a pending claim to an email; never to an
  * address on a Flizy account or a suppressed one; once, and one reminder after
@@ -9,7 +10,11 @@
  * recorded only when the provider accepted it; no code, password or other
  * request for credentials in the email; suppression blocks emails, not
  * payments; the bot names only the claim; a blocked email still leaves the
- * claim held and tells the sender to share the link.
+ * claim held and tells the sender to share the link. Email is on unless turned
+ * off; a first email the bot never asked for is caught up; a rule that holds
+ * one back leaves a final skipped row; the email as designed, with the address
+ * after the # of its button so sign-up starts filled in; every refused claim
+ * attempt is recorded.
  *
  * Run: node --test test/claimEmail.test.js
  */
@@ -99,9 +104,9 @@ describe('the email', () => {
       reminder: false,
     });
     assert.equal(m.subject, '@kemi sent you 5 tUSD on Flizy (testnet)');
-    assert.match(m.text, /^@kemi sent you 5 tUSD on Flizy\.\n\nSent: Fri, 20 Nov 2026 11:00:00 UTC\nCan be claimed until: Tue, 01 Dec 2026 00:00:00 UTC\nThese are test funds on a test network \(testnet\), not real money\./);
-    assert.match(m.text, /Open the payment: https:\/\/flizy\.app\/claim\/abab/);
-    assert.match(m.text, /Payment reference: FLZ-33333333/);
+    assert.match(m.text, /^Someone sent you money!\n@kemi sent you a payment through Flizy\.\n\nYOU HAVE RECEIVED\n5 tUSD\nWaiting for you to claim\n/);
+    assert.match(m.text, /Claim your payment: https:\/\/flizy\.app\/claim\/abab/);
+    assert.match(m.text, /Sent: Fri, 20 Nov 2026 11:00:00 UTC\nCan be claimed until: Tue, 01 Dec 2026 00:00:00 UTC\nPayment reference: FLZ-33333333\nThese are test funds on a test network \(testnet\), not real money\./);
     assert.match(m.text, /Flizy will never ask for your password or a code by email\. Only open links that start with https:\/\/flizy\.app\./);
     assert.match(m.text, /Don't want emails like this\? Stop these emails: https:\/\/flizy\.app\/email\/stop\?c=abab/);
     for (const t of [m.subject, m.text, m.html]) {
@@ -262,7 +267,7 @@ describe('the bot', () => {
     const sent = await E.sendDueReminders({ supabase: fake.client, env: {}, now: NOW, request: async (id, kind) => (asked.push([id, kind]), 'sent') });
     assert.deepEqual(asked, [['due', 'reminder']]);
     assert.equal(sent, 1);
-    assert.equal(E.startClaimReminderWorker({ supabase: fake.client, env: {} }), null, 'nothing runs while email is off');
+    assert.equal(E.startClaimReminderWorker({ supabase: fake.client, env: { CLAIM_NOTIFY_EMAIL: 'false' } }), null, 'nothing runs while email is off');
   });
 
   it('both bots register the email sender; reminders run from the WhatsApp process only', () => {
@@ -274,7 +279,7 @@ describe('the bot', () => {
 
   it('a blocked email leaves the claim held and tells the sender to share the link', () => {
     const router = read('lib/router.js');
-    assert.match(router, /!notified && !toldOn && isEmailClaim && canReach\('email'\) \? "We couldn't email them this time\. Share the claim link instead\." : null,/);
+    assert.match(router, /!notified && !toldOn && isEmailClaim \? "We couldn't email them this time\. Share the claim link instead\." : null,/);
   });
 });
 
@@ -304,9 +309,165 @@ describe('the routes and the migration', () => {
 
   it('the claim page lets a signed-in visitor add and verify the email there', () => {
     const page = read('web/app/claim/[token]/page.tsx');
-    assert.match(page, /\{data\.recipient_kind === 'email' \? \(\s+<ClaimEmailVerify onVerified=\{\(\) => void load\(\)\} \/>/);
+    assert.match(page, /\{data\.recipient_kind === 'email' \? \(\s+<ClaimEmailVerify initialEmail=\{toHint\} onVerified=\{\(\) => void load\(\)\} \/>/);
     const c = read('web/components/ClaimEmailVerify.tsx');
     assert.match(c, /post\('\/api\/account\/emails', \{ email \}\)/);
     assert.match(c, /post\('\/api\/auth\/email\/verify', \{ purpose: 'secondary', email, code \}\)/);
+  });
+});
+
+describe('delivery that does not depend on a setting being remembered', () => {
+  const N = require('../lib/claimNotify');
+  const E = require('../lib/claimEmailNotice');
+
+  it('email is on unless CLAIM_NOTIFY_EMAIL=false; WhatsApp stays off until set', () => {
+    assert.equal(N.channelOn('email', {}), true);
+    assert.equal(N.channelOn('email', { CLAIM_NOTIFY_EMAIL: ' ' }), true);
+    assert.equal(N.channelOn('email', { CLAIM_NOTIFY_EMAIL: 'true' }), true);
+    assert.equal(N.channelOn('email', { CLAIM_NOTIFY_EMAIL: 'false' }), false);
+    assert.equal(N.channelOn('email', { CLAIM_NOTIFY_EMAIL: 'no' }), false);
+    assert.equal(N.channelOn('whatsapp', {}), false);
+    assert.equal(N.channelOn('telegram', {}), false);
+  });
+
+  it('a bot with email on but no secret or https site says so at startup', () => {
+    const warned = [];
+    const orig = console.warn;
+    console.warn = (m) => warned.push(String(m));
+    try {
+      E.registerClaimEmailSender({ env: {}, secret: '', siteUrl: 'https://flizy.app' });
+      E.registerClaimEmailSender({ env: {}, secret: 's', siteUrl: 'http://flizy.app' });
+      E.registerClaimEmailSender({ env: {}, secret: 's', siteUrl: 'https://flizy.app' });
+      E.registerClaimEmailSender({ env: { CLAIM_NOTIFY_EMAIL: 'false' }, secret: '', siteUrl: '' });
+    } finally {
+      console.warn = orig;
+    }
+    assert.equal(warned.length, 2);
+    assert.match(warned[0], /claim emails are on, but SECURITY_MAIL_SECRET or an https SITE_URL is missing/);
+  });
+
+  it('the catch-up asks for the first email only for recent held chat claims nobody asked about yet', async () => {
+    const now = Date.parse('2026-11-20T12:00:00.000Z');
+    const ago = (min) => new Date(now - min * 60000).toISOString();
+    const held = '0x' + 'cd'.repeat(32);
+    const fake = createFakeSupabase({
+      claims: [
+        { id: 'missed', status: 'pending', to_email: 'a@x.co', hold_tx_hash: held, api_transaction_id: null, created_at: ago(60) },
+        { id: 'api', status: 'pending', to_email: 'h@x.co', hold_tx_hash: held, api_transaction_id: 'tx-1', created_at: ago(60) },
+        { id: 'fresh', status: 'pending', to_email: 'b@x.co', hold_tx_hash: held, created_at: ago(5) },
+        { id: 'stale', status: 'pending', to_email: 'c@x.co', hold_tx_hash: held, created_at: ago(8 * 24 * 60) },
+        { id: 'unheld', status: 'pending', to_email: 'd@x.co', hold_tx_hash: null, created_at: ago(60) },
+        { id: 'skipped', status: 'pending', to_email: 'e@x.co', hold_tx_hash: held, created_at: ago(60) },
+        { id: 'failed', status: 'pending', to_email: 'f@x.co', hold_tx_hash: held, created_at: ago(60) },
+        { id: 'claimed', status: 'claimed', to_email: 'g@x.co', hold_tx_hash: held, created_at: ago(60) },
+        { id: 'phone', status: 'pending', to_email: null, hold_tx_hash: held, created_at: ago(60) },
+      ],
+      claim_email_notices: [
+        { claim_id: 'skipped', kind: 'first', state: 'skipped' },
+        { claim_id: 'failed', kind: 'first', state: 'failed' },
+      ],
+    });
+    const asked = [];
+    const sent = await E.sendMissedFirstEmails({ supabase: fake.client, now, request: async (id, kind) => (asked.push([id, kind]), 'sent') });
+    assert.deepEqual(asked, [['missed', 'first']]);
+    assert.equal(sent, 1);
+    assert.match(read('lib/claimEmailNotice.js'), /const caught = await sendMissedFirstEmails\(\{ supabase \}\);/);
+  });
+
+  it('a rule that holds an email back writes a final skipped row, which counts toward no limit', async () => {
+    let w = world();
+    await M.suppressClaimAddress(w.db, TOKEN);
+    assert.equal(await go(w), 'suppressed');
+    assert.deepEqual(w.fake.db.tables.claim_email_notices.map((n) => [n.kind, n.state, n.recipient_hash]), [['first', 'skipped', sha('ada@example.com')]]);
+    w.fake.db.tables.email_suppressions.length = 0;
+    assert.equal(await go(w), 'already', 'a skipped first email is never sent later');
+
+    w = world({ accounts: [{ id: SENDER, username: 'kemi' }, { id: 'a2', email: 'ada@example.com' }] });
+    assert.equal(await go(w), 'on_flizy');
+    assert.equal(w.fake.db.tables.claim_email_notices[0].state, 'skipped');
+
+    const skipped = Array.from({ length: 10 }, (_, i) => ({ id: `s${i}`, claim_id: `c${i}`, kind: 'first', sender_account_id: SENDER, recipient_hash: sha('ada@example.com'), state: 'skipped', created_at: '2026-11-20T06:00:00.000Z' }));
+    w = world({ claim_email_notices: skipped });
+    assert.equal(await go(w), 'sent');
+  });
+
+  it('the button carries the address after the #, so sign-up starts with it; the stop link does not', async () => {
+    const w = world();
+    assert.equal(await go(w), 'sent');
+    const m = w.mails[0];
+    assert.equal(m.sender, 'payments');
+    assert.match(m.text, /Claim your payment: https?:\/\/\S+\/claim\/abab[0-9a-f]*#to=ada%40example\.com\n/);
+    assert.match(m.text, /Stop these emails: https?:\/\/\S+\/email\/stop\?c=abab[0-9a-f]*$/);
+    assert.match(m.html, /href="https?:\/\/[^"]+\/claim\/abab[0-9a-f]*#to=ada%40example\.com"/);
+  });
+
+  it('the email as designed: the notification, the amount box, three steps, one button', () => {
+    const m = M.formatClaimEmail({ sender: 'Ludarep', amount: '50 tUSD', sentAt: NOW, expiresAt: null, claimUrl: 'https://flizy.app/claim/t#to=a%40b.co', stopUrl: 'https://flizy.app/email/stop?c=t', reference: 'FLZ-1', origin: 'https://flizy.app', reminder: false });
+    for (const part of ['Payment notification', 'Someone sent you money!', 'Ludarep sent you a payment through Flizy.', 'YOU HAVE RECEIVED', '50 tUSD', 'Waiting for you to claim', 'How to receive your money', 'Claim your payment']) {
+      assert.ok(m.html.includes(part), part);
+    }
+    assert.equal((m.html.match(/<li /g) || []).length, 3);
+    assert.equal((m.html.match(/<a href="https:\/\/flizy\.app\/claim\//g) || []).length, 1);
+    assert.match(m.text, /How to receive your money\n1\. Create a Flizy account using this email address, or sign in to your existing account\.\n2\. If you already have a Flizy account with another email, add and verify this email in your account\.\n3\. Return to this payment and claim your funds\./);
+    assert.match(M.formatClaimEmail({ sender: 'x', amount: '1 ETH', sentAt: NOW, expiresAt: null, claimUrl: 'u', stopUrl: 's', reference: 'r', origin: 'o', reminder: true }).text, /^Your payment is still waiting for you\./);
+  });
+});
+
+describe('the address from the email fills in sign-up, never more', () => {
+  let H;
+  before(async () => {
+    H = await import('../web/lib/emailHint.ts');
+  });
+
+  it('reads a well-formed address after the #, and nothing else', () => {
+    assert.equal(H.emailFromHash('#to=Ada%40Example.com', 'to'), 'ada@example.com');
+    assert.equal(H.emailFromHash('#email=ada%40example.com', 'email'), 'ada@example.com');
+    assert.equal(H.emailFromHash('#to=ada%40example.com', 'email'), '');
+    for (const bad of ['', '#', '#to=', '#to=not-an-email', '#to=%3Cscript%3E%40x.co', '#to=a%40b']) assert.equal(H.emailFromHash(bad, 'to'), '', bad);
+    assert.equal(H.emailHashSuffix('Ada@Example.com'), '#email=ada%40example.com');
+    assert.equal(H.emailHashSuffix('nope'), '');
+  });
+
+  it('the claim page takes it out of the address bar and hands it on; sign-up and sign-in fill it in', () => {
+    const page = read('web/app/claim/[token]/page.tsx');
+    assert.match(page, /emailFromHash\(window\.location\.hash, 'to'\)/);
+    assert.match(page, /window\.history\.replaceState\(null, '', window\.location\.pathname \+ window\.location\.search\)/);
+    assert.match(page, /href=\{`\/signup\?next=\$\{next\}\$\{emailHashSuffix\(toHint\)\}`\}/);
+    assert.match(page, /href=\{`\/login\?next=\$\{next\}\$\{emailHashSuffix\(toHint\)\}`\}/);
+    for (const form of ['web/app/signup/SignupForm.tsx', 'web/app/login/LoginForm.tsx']) {
+      assert.match(read(form), /const fromClaim = emailFromHash\(window\.location\.hash, 'email'\);\s+if \(fromClaim\) setEmail\(fromClaim\);/, form);
+    }
+  });
+});
+
+describe('every refused claim attempt is recorded', () => {
+  const Ev = require('../lib/claimEvents');
+
+  it('claim_refused is an event, with a reason code only, and the sender never sees it', async () => {
+    assert.ok(Ev.EVENTS.includes('claim_refused'));
+    const db = createFakeSupabase({ claim_events: [] });
+    assert.equal(await Ev.recordClaimEvent(db.client, 'c1', 'claim_refused', { meta: { reason: 'not_recipient' } }), 'recorded');
+    assert.deepEqual(Ev.claimTimeline({ created_at: NOW }, [{ event: 'created', at: '1' }, { event: 'claim_refused', at: '2' }]).map((e) => e.label), ['Sent']);
+  });
+
+  it('the site records each refusal before it answers', () => {
+    const src = read('web/lib/claimPayout.ts');
+    for (const reason of ['not_pending', 'phone_on_web', 'not_recipient', 'in_progress']) {
+      assert.match(src, new RegExp(`await refused\\('${reason}'\\);\\s+return \\{`), reason);
+    }
+    assert.match(src, /recordClaimEvent\(supabase, claimId, 'claim_refused', \{ meta: \{ reason \} \}\)/);
+  });
+
+  it('chat records a refused Telegram claim link', () => {
+    const src = read('lib/handlers/claims.js');
+    assert.match(src, /'claim_refused', \{ channel: 'telegram', meta: \{ reason: 'not_recipient' \} \}\);\s+await reply\(ctx, \[head, '', 'This payment cannot be received with this Telegram account\.'\]/);
+    assert.match(src, /'claim_refused', \{ channel: ctx\.channel === 'telegram' \? 'telegram' : 'whatsapp', meta: \{ reason: 'not_pending' \} \}\);\s+await reply\(ctx, 'This payment is no longer waiting to be claimed\.'\);/);
+  });
+
+  it('the migration widens both lists and checks it did', () => {
+    const sql = read('supabase/migrations/20261118120000_claim_refused_and_skipped.sql');
+    assert.match(sql, /check \(state in \('sending', 'sent', 'failed', 'skipped'\)\)/);
+    assert.match(sql, /raise exception 'claim_events_event_check_v2 does not allow claim_refused'/);
+    assert.match(sql, /raise exception 'claim_email_notices_state_check_v2 does not allow skipped'/);
   });
 });

@@ -13,6 +13,7 @@ import { passwordChecklist, validatePassword } from '../../lib/passwordPolicy';
 import type { LocaleCode } from '../../lib/locale';
 import { googleLoginError } from '../../lib/googleLoginCopy.ts';
 import { safeNext } from '../../lib/safeNext.ts';
+import { emailFromHash } from '../../lib/emailHint.ts';
 import { HONEYPOT_FIELD } from '../../lib/honeypot.ts';
 import { SITE_PHONE_COUNTRIES } from '../../lib/phoneFormat';
 
@@ -43,6 +44,9 @@ export function SignupForm() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     setNext(safeNext(q.get('next'), '/dashboard?welcome=1'));
+    // From a claim email, by way of the claim page (web/lib/emailHint.ts).
+    const fromClaim = emailFromHash(window.location.hash, 'email');
+    if (fromClaim) setEmail(fromClaim);
     const google = googleLoginError(q.get('google'));
     if (google) setError(google);
     const fromQuery = (q.get('invite') || q.get('i') || '').replace(/^@/, '');

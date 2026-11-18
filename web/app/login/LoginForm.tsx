@@ -12,6 +12,7 @@ import { clearAppearanceCache } from '../../lib/appearanceCache';
 import type { LocaleCode } from '../../lib/locale';
 import { googleLoginError } from '../../lib/googleLoginCopy.ts';
 import { safeNext } from '../../lib/safeNext.ts';
+import { emailFromHash } from '../../lib/emailHint.ts';
 import { useWalletDoor } from '../../components/WalletModeBits';
 
 export function LoginForm() {
@@ -34,6 +35,9 @@ export function LoginForm() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setNext(safeNext(params.get('next')));
+    // From a claim email, by way of the claim page (web/lib/emailHint.ts).
+    const fromClaim = emailFromHash(window.location.hash, 'email');
+    if (fromClaim) setEmail(fromClaim);
     const account = params.get('account');
     if (account === 'deleted' || account === 'deactivated') {
       setAccountNote('This account is paused. Enter the same email and the account password to bring it back.');

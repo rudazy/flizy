@@ -382,8 +382,8 @@
     },
     {
       "kind": "check",
-      "name": "claim_email_notices.claim_email_notices_state_check",
-      "providedBy": "20261117150000_claim_email_notices.sql",
+      "name": "claim_email_notices.claim_email_notices_state_check_v2",
+      "providedBy": "20261118120000_claim_refused_and_skipped.sql",
       "requiredBy": "check on claim_email_notices"
     },
     {
@@ -394,8 +394,8 @@
     },
     {
       "kind": "check",
-      "name": "claim_events.claim_events_event_check",
-      "providedBy": "20261117140000_claim_events.sql",
+      "name": "claim_events.claim_events_event_check_v2",
+      "providedBy": "20261118120000_claim_refused_and_skipped.sql",
       "requiredBy": "check on claim_events"
     },
     {
