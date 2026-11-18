@@ -308,6 +308,10 @@ Copy `.env.example` to `.env` and fill it. Never commit a real `.env`.
 | `CUSTODY_RELAYER_KEY` | VPS only. The relayer that sends chat payments through a secured account's signed permissions. Unset: chat payments use the owner key as before. See [Custody relayer](#custody-relayer) |
 | `CUSTODY_PILOT_ACCOUNTS` | Vercel only. Account ids that may secure their wallet with a passkey. Empty: the section is hidden and the routes refuse |
 | `CUSTODY_DELEGATE_ADDRESS` | Vercel only. The relayer's address, written into every permission a passkey signs. Must be the address of `CUSTODY_RELAYER_KEY` |
+| `EMAIL_FROM` | Vercel only. The default sender, e.g. `Flizy <noreply@flizy.app>`: login and verification codes, security notices, API key notices. Unset in production: no email is sent and the site logs an error. Never a gmail.com or resend.dev address |
+| `PAYMENTS_EMAIL_FROM` | Vercel only. The sender for email about money moving, e.g. `Flizy Pay <payments@flizy.app>`: claim emails and reminders, payment received, large API payouts, all with Reply-To `payments@flizy.app`. Unset: `EMAIL_FROM` |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | Vercel only. Gmail SMTP, the first transport: the Workspace mailbox it signs in as and its app password. Every From must be a "Send mail as" address of that mailbox. `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` point it at another server instead |
+| `RESEND_API_KEY` | Vercel only, optional. Resend, used when SMTP is not configured or fails. Its domain must be verified for the From addresses above |
 | `NODIT_WEBHOOK_SIGNING_KEY` | Vercel only, optional. The signing key of the Nodit webhook for the Explore charts. Server only, never `NEXT_PUBLIC_`. Unset: the webhook route refuses every call and the charts rely on their poller |
 
 Treat `PRIVATE_KEY`, escrow keys and Supabase service keys as production secrets. Rotate
@@ -509,8 +513,9 @@ rows and show the status the claims table gives them.
   code, no password. "Stop these emails" (`/email/stop`, a button, so a mail scanner opening the
   link stops nothing) adds the hash to `email_suppressions`; payments to the address still work.
   On the claim page, a signed-in visitor can add and verify the email there, then claim.
-  Setup before turning it on: a sending domain and From address on flizy.app (`EMAIL_FROM`),
-  with the provider's SPF, DKIM and DMARC records.
+  These go from the payments sender (`PAYMENTS_EMAIL_FROM`, see [Environment](#environment)).
+  Setup before turning it on: that sender on flizy.app, with the domain's SPF, DKIM and DMARC
+  records.
 - **The claim page.** Signed out, `/claim/<token>` shows who sent it, the amount, that it is
   testnet and any expiry, with sign-up and sign-in: nothing about who it was sent to. Signed
   in: the sender sees the share card, the recipient can receive it (a phone claim in chat), and

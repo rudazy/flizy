@@ -185,14 +185,16 @@ export function plainAmount(units: bigint, decimals: number): string {
 /**
  * The email to a platform's owner when a payout at or above its notice amount
  * (api_platform_limits.notice_at) is accepted: early enough to revoke the key
- * if it was not theirs. Names the payout, never a key or secret.
+ * if it was not theirs. Names the payout, never a key or secret. Money moved,
+ * so it goes from the payments sender.
  */
 export function largePayoutMail(
   view: ReturnType<typeof payoutView>,
   platformName: string,
   siteUrl: string
-): { subject: string; text: string } {
+): { subject: string; text: string; sender: 'payments' } {
   return {
+    sender: 'payments',
     subject: `Flizy API payout of ${view.amount} ${view.asset} accepted`,
     text: [
       `A payout of ${view.amount} ${view.asset} from ${platformName} was accepted through the Flizy Pay API.`,

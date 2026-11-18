@@ -217,7 +217,7 @@ export async function sendClaimEmail(p: {
     reminder: kind === 'reminder',
   });
 
-  const sent = await (p.send || sendMail)({ to: email, subject: mail.subject, text: mail.text, html: mail.html });
+  const sent = await (p.send || sendMail)({ to: email, subject: mail.subject, text: mail.text, html: mail.html, sender: 'payments' });
   const mark = (state: 'sent' | 'failed') =>
     db.from('claim_email_notices').update({ state, sent_at: state === 'sent' ? new Date(now).toISOString() : null }).eq('claim_id', claimId).eq('kind', kind);
   if (!sent.ok) {

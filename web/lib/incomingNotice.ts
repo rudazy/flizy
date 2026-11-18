@@ -165,7 +165,7 @@ async function unmailedRecent(supabase: SupabaseClient, accountId: string, dedup
 }
 
 async function deliver(supabase: SupabaseClient, built: BuiltIncoming, id: string): Promise<boolean> {
-  const sent = await mailOwner(supabase, built.accountId, { subject: built.subject, text: built.text });
+  const sent = await mailOwner(supabase, built.accountId, { subject: built.subject, text: built.text, sender: 'payments' });
   if (!sent) return false;
   await stampMailed(supabase, built.accountId, id);
   return true;

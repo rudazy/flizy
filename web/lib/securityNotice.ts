@@ -17,11 +17,12 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 // Explicit extensions: this module is also loaded straight by node --test.
-import { sendMail } from './sendMail.ts';
+import { sendMail, type MailSender } from './sendMail.ts';
 
 export type LinkedChat = { channel: string; label: string; linkedAt: string | null };
 
-type MailBody = { subject: string; text: string };
+/** sender: which From it goes out under (web/lib/sendMail.ts); unset is the default. */
+type MailBody = { subject: string; text: string; sender?: MailSender };
 
 const CHAT_CHANNELS = ['whatsapp', 'telegram'];
 
@@ -302,7 +303,7 @@ export async function mailOwner(
     const { data } = await supabase.from('accounts').select('email').eq('id', accountId).maybeSingle();
     const to = String(data?.email || '').trim();
     if (!to) return false;
-    const sent = await send({ to, subject: mail.subject, text: mail.text });
+    const sent = await send({ to, subject: mail.subject, text: mail.text, ...(mail.sender ? { sender: mail.sender } : {}) });
     if (!sent.ok) console.warn(`[security-notice] not sent: ${sent.code || 'error'}`);
     return sent.ok;
   } catch (err) {

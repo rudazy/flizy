@@ -39,6 +39,12 @@ export const PUBLIC_MAIL = [
 
 export type PublicMailId = (typeof PUBLIC_MAIL)[number]['id'];
 
+/**
+ * Where replies to an email about money moving go (web/lib/sendMail.ts). A
+ * mailbox of its own, so it is not on the published list above.
+ */
+export const PAYMENTS_REPLY_TO = 'payments@flizy.app';
+
 export function publicMail(id: PublicMailId) {
   const box = PUBLIC_MAIL.find((item) => item.id === id);
   if (!box) throw new Error('Unknown public mailbox');
