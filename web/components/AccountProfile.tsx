@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { AccountBackground } from './AccountBackground';
+import { useFeatures } from './FeaturesProvider';
 import { useEffect, useId, useState } from 'react';
 import {
   ChartLineIcon,
@@ -494,6 +495,8 @@ export function AccountProfile({
   const social = socialState.social;
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
+  // "Find people" opens the people directory, which is paused with follows (web/lib/features.ts).
+  const { follows: followsOn } = useFeatures();
   const silkId = useId().replace(/:/g, '');
   const handle = username ? `@${username}` : 'Set a username';
   const short = address && address.length >= 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
@@ -666,21 +669,28 @@ export function AccountProfile({
         </div>
       </section>
 
-      <section className="grid grid-cols-4 divide-x divide-[#2a2b30] rounded-[14px] border border-[#2a2b30] bg-[#101012] px-1 py-2.5">
+      <section
+        className={`grid ${followsOn ? 'grid-cols-4' : 'grid-cols-2'} divide-x divide-[#2a2b30] rounded-[14px] border border-[#2a2b30] bg-[#101012] px-1 py-2.5`}
+      >
         <Stat icon={<ChartLineIcon size={14} />} value={stats ? volumeText(stats.volumeEth) : '-'} label="Total volume" />
         <Stat icon={<SwapGlyph />} value={stats ? String(stats.swaps) : '-'} label="Swaps" />
-        <Stat
-          icon={<PeopleIcon size={14} />}
-          value={social ? String(social.followers) : '-'}
-          label="Followers"
-          href={username ? `/u/${username}?list=followers` : undefined}
-        />
-        <Stat
-          icon={<PersonIcon size={14} />}
-          value={social ? String(social.following) : '-'}
-          label="Following"
-          href={username ? `/u/${username}?list=following` : undefined}
-        />
+        {/* Follow counts show only while follows is on (web/lib/features.ts). */}
+        {followsOn ? (
+          <>
+            <Stat
+              icon={<PeopleIcon size={14} />}
+              value={social ? String(social.followers) : '-'}
+              label="Followers"
+              href={username ? `/u/${username}?list=followers` : undefined}
+            />
+            <Stat
+              icon={<PersonIcon size={14} />}
+              value={social ? String(social.following) : '-'}
+              label="Following"
+              href={username ? `/u/${username}?list=following` : undefined}
+            />
+          </>
+        ) : null}
       </section>
 
       <Card
@@ -747,30 +757,42 @@ export function AccountProfile({
         {ownWallet}
       </Card>
 
-      <Card dropdown icon={<BarsGlyph />} title="Stats & Social" hint="Your activity, followers and community.">
-        <div className="grid grid-cols-4 gap-1.5 border-t border-[#26262a] px-3 py-3">
+      <Card
+        dropdown
+        icon={<BarsGlyph />}
+        title="Stats & Social"
+        hint={followsOn ? 'Your activity, followers and community.' : 'Your invites and credits.'}
+      >
+        {/* Followers and Following, like Find people below, show only while follows is on. */}
+        <div className={`grid ${followsOn ? 'grid-cols-4' : 'grid-cols-2'} gap-1.5 border-t border-[#26262a] px-3 py-3`}>
           <Mini icon={<UserPlusIcon size={14} />} value={String(invites)} label="Invites" />
           <Mini icon={<CoinsGlyph />} value={String(credits)} label="Credits" />
-          <Mini
-            icon={<PeopleIcon size={14} />}
-            value={social ? String(social.followers) : '-'}
-            label="Followers"
-            href={username ? `/u/${username}?list=followers` : undefined}
-          />
-          <Mini
-            icon={<PersonIcon size={14} />}
-            value={social ? String(social.following) : '-'}
-            label="Following"
-            href={username ? `/u/${username}?list=following` : undefined}
-          />
+          {followsOn ? (
+            <>
+              <Mini
+                icon={<PeopleIcon size={14} />}
+                value={social ? String(social.followers) : '-'}
+                label="Followers"
+                href={username ? `/u/${username}?list=followers` : undefined}
+              />
+              <Mini
+                icon={<PersonIcon size={14} />}
+                value={social ? String(social.following) : '-'}
+                label="Following"
+                href={username ? `/u/${username}?list=following` : undefined}
+              />
+            </>
+          ) : null}
         </div>
-        <Link href="/people" className="flex min-h-[44px] items-center gap-3 border-t border-[#26262a] px-3.5 py-2 no-underline">
-          <span className="text-[#c8c2b8]">
-            <PeopleIcon size={16} />
-          </span>
-          <span className="min-w-0 flex-1 font-sans text-[13px] text-[#f3f1ec]">Find people</span>
-          <ChevronRightIcon size={16} className="shrink-0 text-[#6f6a62]" />
-        </Link>
+        {followsOn ? (
+          <Link href="/people" className="flex min-h-[44px] items-center gap-3 border-t border-[#26262a] px-3.5 py-2 no-underline">
+            <span className="text-[#c8c2b8]">
+              <PeopleIcon size={16} />
+            </span>
+            <span className="min-w-0 flex-1 font-sans text-[13px] text-[#f3f1ec]">Find people</span>
+            <ChevronRightIcon size={16} className="shrink-0 text-[#6f6a62]" />
+          </Link>
+        ) : null}
       </Card>
 
       <Card dropdown icon={<EyeIcon size={16} />} title="Privacy & Visibility" hint="Control what others can see of your profile.">

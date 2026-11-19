@@ -158,6 +158,18 @@ describe('hidden stays hidden', () => {
     assert.match(read('web/app/people/page.tsx'), /if \(!featureOn\('follows'\)\) notFound\(\);/);
   });
 
+  it('Account profile shows follow counts and "Find people" only while follows is on', () => {
+    const account = read('web/components/AccountProfile.tsx');
+    assert.match(account, /const \{ follows: followsOn \} = useFeatures\(\);/);
+    assert.match(account, /\{followsOn \? \(\s*<Link href="\/people"/);
+    assert.equal((account.match(/href="\/people"/g) || []).length, 1);
+    // Both places that show the counts: the stats strip (Stat) and the Stats & Social card (Mini).
+    assert.match(account, /\{followsOn \? \(\s*<>\s*<Stat\s+icon=\{<PeopleIcon size=\{14\} \/>\}\s+value=\{social \? String\(social\.followers\) : '-'\}/);
+    assert.match(account, /\{followsOn \? \(\s*<>\s*<Mini\s+icon=\{<PeopleIcon size=\{14\} \/>\}\s+value=\{social \? String\(social\.followers\) : '-'\}/);
+    assert.equal((account.match(/label="Followers"/g) || []).length, 2);
+    assert.equal((account.match(/label="Following"/g) || []).length, 2);
+  });
+
   it('search offers paused places only while their feature is on, and My NFTs always', async () => {
     const I = await import('../web/lib/searchIndex.ts');
     const hrefs = (q, flags) => I.matchPlaces(q, 20, flags).map((r) => r.href);
