@@ -160,6 +160,17 @@ describe('who can be paid from an outside wallet', () => {
     assert.match(toggle, /rejectIfCrossOrigin\(req\)/);
     assert.match(toggle, /typeof body\?\.enabled !== 'boolean'/);
   });
+
+  it('a signed-out payer sees the amount asked and its note, with or without outside wallets', () => {
+    const page = read('web/components/PayLanding.tsx');
+    // Gated only on being signed out and the link carrying an amount, never on outsidePay.
+    assert.match(page, /\{loggedIn === false && preset\?\.amount \? \(\s*<div className="min-w-0 rounded-\[14px\]/);
+    assert.match(page, />Amount requested</);
+    assert.match(page, /\{preset\.amount\} \{symbolLabel\(preset\.asset\)\}/);
+    assert.match(page, /\{note \? <p className="[^"]*break-words[^"]*">For: \{note\}<\/p> : null\}/);
+    // Shown above the sign-in buttons, so it is read first.
+    assert.ok(page.indexOf('>Amount requested<') < page.indexOf('Log in to pay'));
+  });
 });
 
 describe('the receiver address', () => {

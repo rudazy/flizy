@@ -368,6 +368,17 @@ export function PayLanding({
 
         {self ? <p className="m-0 font-sans text-[13px] text-[#9a958c]">This is your pay page. Share the QR or @username.</p> : null}
 
+        {/* A link with an amount says what it asks for before anyone signs in, whether or not other wallets can pay it. */}
+        {loggedIn === false && preset?.amount ? (
+          <div className="min-w-0 rounded-[14px] border border-[#3a3017] bg-[#14110a] px-4 py-3.5">
+            <p className="m-0 font-mono text-[11px] uppercase tracking-[0.22em] text-sun">Amount requested</p>
+            <p className="m-0 mt-1.5 break-words font-sans text-[26px] font-bold leading-tight text-white">
+              {preset.amount} {symbolLabel(preset.asset)}
+            </p>
+            {note ? <p className="m-0 mt-1.5 break-words font-sans text-[14px] text-[#b7b1a8]">For: {note}</p> : null}
+          </div>
+        ) : null}
+
         {loggedIn === false ? (
           <div className="grid gap-2">
             <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn btn-primary py-3 font-sans no-underline">
