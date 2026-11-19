@@ -821,18 +821,25 @@ These are enforced in code review and by tests:
 | Area | State |
 |------|--------|
 | Site identity, dashboard, link codes | Live |
-| WhatsApp client and agent sends | Live (GIWA Sepolia) |
-| Telegram client on the same engine | Built and tested |
-| Channel-agnostic identity (both chat apps on one account) | Built and tested |
+| WhatsApp and Telegram clients on one engine | Live (GIWA Sepolia) |
+| Channel-agnostic identity (both chat apps on one account) | Live |
+| Smart-account wallets (HybridDeleGator, UserOps) | Live; Flizy's key is still the owner |
+| Passkey spending limits | Pilot |
 | Approved destinations and daily limits (policy layer) | Live |
-| Phone claims, escrow, cancel | Live |
-| Payment requests | Live |
+| Claims to phone, email and platform ids, escrow, cancel, 90-day refund | Live |
+| Claim emails, Found by email | Live |
+| Payment requests, pay links, receipts, outside-wallet payments | Live |
+| Payment fees, Business accounts, Rewards (points) | Live when `FEES_ENABLED=true` |
+| Gas top-up | Live when `GAS_TOPUP_ENABLED=true` (testnet only) |
+| Flizy Pay API checkouts and webhooks | Live |
+| Flizy Pay API payouts | Built; on with `API_PAYOUTS_ENABLED=true` and per approved platform |
 | Phone join key for LID-only WhatsApp sessions | Live |
-| DEX, FLZ, IZY, MAKI, fee router | Live and verified on GIWA Sepolia |
-| Site swap and liquidity add/remove (FLZ, IZY, MAKI, DCAT) | Live |
+| DEX, FLZ, IZY, MAKI, tUSD, fee router | Live on GIWA Sepolia; the tUSD / WETH pair is verified only through its twin |
+| Site swap and liquidity add/remove (FLZ, IZY, MAKI, tUSD, DCAT) | Live |
 | Chat buy / sell / swap / price | Live |
-| Smart wallet deploy | Contracts in repo, not required for current agent EOAs |
-| Listed tokens | IZY and MAKI (verified) and DCAT, from `lib/listedTokens.js` |
+| Ammora venue | Live when `AMMORA_ENABLED=true` |
+| Listed tokens | FLZ, IZY, MAKI and tUSD (verified) and DCAT, from `lib/listedTokens.js` |
+| NFT marketplace, mints and collections, tasks, projects, token social, follows | Built, paused (`FEATURE_*`, off unless `on`) |
 | More EVM chains | Chain registry ready |
 
 ---

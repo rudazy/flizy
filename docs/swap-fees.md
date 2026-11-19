@@ -11,11 +11,14 @@
 
 **All-in trading cost (excluding gas): about 0.60%.** Always disclose the all-in figure, not only the protocol fee.
 
-The same fees apply on every Flizy pool: FLZ, IZY, MAKI and DCAT, each against ETH.
+The same fees apply on every Flizy pool: FLZ, IZY, MAKI, tUSD and DCAT, each against ETH.
+
+An Ammora trade goes through Ammora's own venue and pays no Flizy protocol fee; only Ammora's
+pool fee and gas apply.
 
 ## Where the fee is shown
 
-- WhatsApp: every swap plan lists protocol fee, pool fee, and all-in ~0.60% before `confirm`.
+- WhatsApp and Telegram: every swap plan lists protocol fee, pool fee, and all-in ~0.60% before `confirm`.
 - Site Swap screen: protocol fee, pool fee, and all-in on the quote before you confirm.
 - This document.
 
@@ -28,11 +31,11 @@ The same fees apply on every Flizy pool: FLZ, IZY, MAKI and DCAT, each against E
 ## Liquidity
 
 - Adding and removing liquidity is **site only** (Swap → + Liquidity, pick the pool → Add / Remove),
-  for FLZ, IZY, MAKI or DCAT against ETH.
+  for FLZ, IZY, MAKI, tUSD or DCAT against ETH.
 - No protocol fee on add or remove; you still pay gas.
 - Remove burns that pool's LP from your agent wallet and returns proportional ETH and the token.
 
 ## Addresses
 
 See `deployments/giwa-sepolia.json` for factory, V2 router, fee router, WETH, FLZ, and pair,
-and under `listings` for IZY, MAKI, DCAT and their pairs.
+and under `listings` for IZY, MAKI, tUSD, DCAT and their pairs.

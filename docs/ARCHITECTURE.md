@@ -11,6 +11,14 @@ in the public tree.
 (`lib/agentWallet.js`, `accounts.agent_wallet_address`). Every user-facing string — chat,
 site, README — calls it **your Flizy wallet**. One address, two names, split by audience.
 
+**Paused features:** the NFT marketplace, NFT mints and collections (with Copy Mint), tasks,
+projects and XP, token social and follows are built but switched off by `FEATURE_*`
+(`web/lib/features.ts`, mirror `lib/features.js`; off unless set to `on`). A paused feature is
+hidden in the app and its routes refuse new activity with `403 feature_paused`; every exit
+(cancel a listing or offer, withdraw credits, send an owned NFT from chat, end a follow) stays
+open. Sections below that describe those features describe code that is in place and paused.
+`test/features.test.js` fails if a switch is added to any payment, swap or Pay API path.
+
 ---
 
 ## Component map
@@ -121,6 +129,19 @@ Two rules do the heavy lifting:
 - A phone is only accepted from a channel-verified source: WhatsApp contact metadata, or a
   Telegram contact share where `contact.user_id` equals the sender. A typed number is never
   a claim key.
+
+Claims can also be addressed to an email or a platform identity (`lib/claimRecipient.js`).
+An email claim pays out only to an account where that address is verified: the registration
+email with `email_verified_at`, or a secondary in `account_emails` with `verified_at`
+(`lib/accountEmails.js`). A platform claim binds to the platform's immutable numeric user id,
+never the handle. A chat claim that is not received within `CLAIM_EXPIRY_DAYS` (90) is
+refunded to the sender automatically (`lib/claimExpiry.js`).
+
+An account can let people who know one of its verified emails find it
+(`accounts.findable_by_email`, off by default). Only then does a chat send to that email name
+the @username and offer a direct transfer, paid to the account's wallet by account id
+(`findOptedInAccountByEmail`). For every other address the send is a claim, and no reply,
+before or after the hold, differs between an address on Flizy and one that is not.
 
 ### Storage detail
 
@@ -372,7 +393,9 @@ wired into the engine.
 ### Connected wallets (wallet mode)
 
 There are two ways into the site. A Flizy account uses its agent wallet as
-above. A visitor can instead connect a wallet of their own
+above. (While the NFT marketplace is paused, the NFT trade plans below refuse
+new trades, including accepting an offer; reading owned NFTs and offers, and
+cancelling a listing or an offer, stay available.) A visitor can instead connect a wallet of their own
 (`web/components/ExternalWalletProvider.tsx`: Privy when
 `NEXT_PUBLIC_PRIVY_APP_ID` is set, otherwise the browser's injected wallet)
 and use Explore, token pages, NFT collections and Swap with no account
@@ -452,9 +475,11 @@ Representative surfaces:
 | Auth | signup, login, GitHub OAuth start/callback |
 | Session / PIN | pin, dashboard cookie session |
 | Identity | `/api/identity`, link code create |
-| Money | claim token, withdraw, swap quote/execute, trusted |
-| Read | dashboard, history, holdings, limits |
-| Webhooks | `/api/webhooks/nodit` (signed by Nodit, a hint only; see Explore charts) |
+| Money | pay (fee quote, execute, pay with ETH), claim token, checkout pay, swap quote/execute, trusted |
+| Read | dashboard, history, holdings, limits, payments received |
+| Account settings | outside-pay, email-findable, scan-visibility, business, rewards (each its own route, boolean or versioned input only) |
+| Flizy Pay API | `/api/v1/me`, `/api/v1/payments`, `/api/v1/payouts` (see below) |
+| Webhooks in | `/api/webhooks/nodit` (signed by Nodit, a hint only; see Explore charts) |
 
 Errors: prefer `web/lib/apiError.ts` patterns — no secret leakage, fail closed.
 
@@ -470,28 +495,49 @@ a page-level animation.
 
 ---
 
-## Future authenticated Engine API
+## Flizy Pay API
 
-Not shipped as a public product yet (roadmap Stage 6). Target:
+For approved platforms that collect from or pay out to their users. Another adapter on the
+same engine: AI and third parties are clients of this API, never second engines, and no
+server action may move money around Policy.
 
-- Auth’d, scoped keys call the same Intent → Policy → Plan → Execute → Receipt pipeline
-- Delegated caps (e.g. trade under limit; withdraw denied by default)
-- Webhooks for plan / receipt
-- AI and third parties are adapters on this API, never second engines
+- **Keys.** Bearer keys with scopes `read`, `collect` and `payout` (`web/lib/apiKeys.ts`);
+  only the SHA-256 of a key is stored. The site grants `read` and `collect`; `payout` is
+  granted by the operator. Each authenticated call is logged in `api_requests`, which is also
+  the per-key rate counter (`web/lib/apiAuth.ts`).
+- **Idempotency.** Every POST carries an `Idempotency-Key`. The first request is recorded
+  before work starts; a repeat returns the first answer, a different request under the same
+  key is refused, and the database's primary key decides a race (`web/lib/apiIdempotency.ts`).
+- **Checkouts** (`collect`). `POST /api/v1/payments` returns a `/checkout/<id>` link. The
+  customer pays from any wallet through FlizyPaymentReceiver, from their Flizy wallet signed
+  in (with every check of a Flizy payment), or in chat (`lib/api/checkoutPay.js`). The money
+  goes straight to the platform's wallet; Flizy never holds it.
+- **Payouts** (`payout`). The route only validates and records a payout as `accepted`. The
+  WhatsApp process (`lib/api/payoutWorker.js`) runs it through the same engine steps as a chat
+  send, from the platform's own wallet, inside a daily allowance the platform signed with its
+  passkey and redeemed by a dedicated relayer key, never the owner key. A payout to a phone,
+  email or platform id is a claim with its own expiry and refund. The transaction hash is
+  stored before broadcast, so a payout with a hash is settled from its receipt and never taken again.
+- **Webhooks out.** Up to five https endpoints per platform. Every payout state change is
+  signed (`Flizy-Signature`, HMAC-SHA256 over the timestamp and raw body,
+  `lib/api/webhookSign.js`, site copy `web/lib/apiWebhookSign.ts`) and delivered by
+  `lib/api/webhookWorker.js` only to a public
+  address on port 443, with retries for 24 hours.
 
-Until then, do not grow ad-hoc server actions that bypass Policy.
+Switches and setup are in [OPERATIONS.md](OPERATIONS.md#flizy-pay-api-payouts).
 
 ---
 
 ## Security (technical)
 
 - Trusted destinations mutated only with password on web; chat cannot expand allowlist
-- Every route that moves value (pay, pay with ETH, limit orders, marketplace, mints) runs the step-up check (web/lib/stepUp.ts). It asks for the PIN only while the transaction PIN is on (`txPin` in web/lib/txPin.ts and lib/tiers.js); on testnet it is off and the session is the gate, with the chat unlock still taking the PIN. Password on every route that widens authority (trusted, pin, limits, identity, linking)
+- Every route that moves value (pay, pay with ETH, checkout, limit orders, and the paused marketplace and mints) runs the step-up check (web/lib/stepUp.ts). It asks for the PIN only while the transaction PIN is on (`txPin` in web/lib/txPin.ts and lib/tiers.js); on testnet it is off and the session is the gate, with the chat unlock still taking the PIN. Password on every route that widens authority (trusted, pin, limits, identity, linking)
 - Swap needs none: output is fixed to the caller's own wallet and slippage is server-set, so the route cannot re-target funds — rate-capped per account instead
 - Session lock per `(account, channel, external_id)`; PIN ladder / lockout tables
 - Daily and per-tx limits in Policy
 - Channel and external id normalization fail closed; phones never forged from chat ids
-- Claim match keys: verified phone or platform id — not display handles
+- Claim match keys: verified phone, verified email or platform id, never display handles
+- A send to an email reveals that the address is on Flizy only when its account opted in (`findable_by_email`)
 - Separated agent / ops / escrow keys
 - Link codes and OAuth binds: attempt limiting / lockout ladders where secrets are guessable
 - No secrets in client error bodies or logs
@@ -572,4 +618,9 @@ transfer log as a chat send.
 | Get paid | Confirmed payments into the wallet over 30, 90 or 365 days, totals in each asset's smallest unit, a CSV with formula cells neutralised, and refunds back through the pay page | `web/lib/merchant.ts` |
 | Savings | ETH set aside from Available (`account_reserves`, ETH only; a token saved before that rule can still be moved out). Available is the chain balance minus Savings, read each time. Every spend path refuses a spend that would reach into Savings (`assertSpendable`), and a passkey-approved payment is checked again just before it is sent. The wallet shows only a small + until the owner opens Savings, and a public portfolio value shows Available | `lib/reserves.js`, `web/lib/reserveStore.ts`, `web/lib/spendable.ts`, `web/components/SavingsButton.tsx`, `lib/custody/approvals.js` |
 | Metrics | Weekly and monthly active payers, repeat payer pairs, outside-wallet payments. Aggregates only | `lib/paymentMetrics.js`, `scripts/payment-metrics.js` |
+| Fees | Person to person: a flat tier fee on top, in the asset sent, quoted with the plan and paid in the same UserOp as the payment; on a busy network the fee covers gas and Flizy absorbs the difference up to a daily cap. One `fee_ledger` row per fee, unique per source. Rates are server settings (`FEE_*`), on only with `FEES_ENABLED` | `lib/fees.js` (mirror `web/lib/fees.ts`), `lib/feeQuote.js`, `lib/engine/sendFee.js`, `web/lib/payFee.ts` |
+| Business | An account accepts the versioned business terms. A payment to it carries the merchant fee instead: the payer pays the price, the business receives the price less the fee, and its history shows both | `web/lib/businessTerms.ts`, `lib/history.js` |
+| Rewards | Points earned once per charged fee, written by a worker as append-only entries; a correction is a new entry. Users see only their own points | `lib/rewards.js`, `lib/rewardsView.js` |
+| Claim notices | A claim to an email not on Flizy is emailed once after the hold and reminded once, within per-sender and per-address daily limits; the address is kept only as a SHA-256 hash, and a stop link suppresses it | `web/lib/claimEmail.ts`, `lib/claimEmailNotice.js` |
+| Gas top-up | A wallet short of gas for a payment is topped up from a dedicated key, within a per-wallet and a global daily cap, never from Savings | `lib/gasTopup.js` |
 

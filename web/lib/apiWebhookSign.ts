@@ -10,7 +10,8 @@ import { createHmac, timingSafeEqual } from 'crypto';
  * unique id (api_webhook_events.id); receivers dedupe by it, since a retry
  * delivers the same event again.
  *
- * Phase 1 builds and tests the signing; delivery to real endpoints comes later.
+ * Deliveries are signed by lib/api/webhookSign.js, the bot-side copy of this
+ * scheme, and sent by lib/api/webhookWorker.js.
  * Imports only crypto, so node --test loads this file directly.
  */
 
