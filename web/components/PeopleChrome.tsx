@@ -22,7 +22,7 @@ export function PeopleChrome({ children, signedIn }: { children: ReactNode; sign
       <div id="flizy-app-bg" className="app-bg" aria-hidden="true" />
       <div className="app-shell app-shell-tabbed">
         <div className="fade-up mx-auto flex w-full max-w-lg flex-1 flex-col px-4 sm:max-w-[1200px] sm:px-6 md:py-8">
-          <header className="sticky top-0 z-40 -mx-4 mb-4 bg-[#0b0a09]/90 px-4 pb-3 pt-[max(0.7rem,env(safe-area-inset-top))] backdrop-blur-md sm:-mx-6 sm:px-0">
+          <header className="sticky top-0 z-40 -mx-4 mb-4 bg-[#0b0a09]/90 px-4 pb-3 pt-[max(0.7rem,env(safe-area-inset-top))] backdrop-blur-md sm:-mx-6 sm:px-6 xl:px-0">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <Link

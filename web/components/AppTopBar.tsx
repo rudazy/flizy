@@ -37,7 +37,14 @@ export function AppTopBar({
 
   return (
     <>
-      <header className="sticky top-0 z-40 -mx-4 mb-5 bg-ink/90 px-4 pb-3 pt-[max(0.7rem,env(safe-area-inset-top))] backdrop-blur-md sm:-mx-6 sm:px-0">
+      {/*
+        The bar runs edge to edge (-mx cancels the page padding) and puts the
+        padding back so its content lines up with the page. Between sm and xl the
+        page is as wide as the screen, so px-0 there put the F tile and the bell on
+        the screen edge and the bell's 44px tap area scrolled the page sideways.
+        From xl the centred page leaves a margin, and the bar keeps its wider span.
+      */}
+      <header className="sticky top-0 z-40 -mx-4 mb-5 bg-ink/90 px-4 pb-3 pt-[max(0.7rem,env(safe-area-inset-top))] backdrop-blur-md sm:-mx-6 sm:px-6 xl:px-0">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <Link

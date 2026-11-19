@@ -42,3 +42,18 @@ describe('people button', () => {
     assert.doesNotMatch(EXPLORE, /Find people/);
   });
 });
+
+describe('tablet width', () => {
+  // Between sm and xl the page is as wide as the screen. A sticky bar that cancels the page
+  // padding (sm:-mx-6) must put it back (sm:px-6), or its edge buttons sit on the screen edge
+  // and their 44px tap areas (hit-44) scroll the page sideways.
+  const BARS = ['web/components/AppTopBar.tsx', 'web/components/PeopleChrome.tsx', 'web/app/dashboard/explore/new/page.tsx'];
+
+  for (const rel of BARS) {
+    it(`${rel} keeps a gutter until xl`, () => {
+      const src = fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
+      assert.match(src, /sm:-mx-6 sm:px-6 xl:px-0/);
+      assert.doesNotMatch(src, /sm:-mx-6 sm:px-0/);
+    });
+  }
+});

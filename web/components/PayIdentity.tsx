@@ -114,7 +114,7 @@ export function PayIdentity({
         />
       </div>
 
-      <div className="relative grid gap-4 px-4 pb-5 sm:px-5">
+      <div className="relative grid grid-cols-[minmax(0,1fr)] gap-4 px-4 pb-5 sm:px-5">
         <LowerGlow />
 
         <div className="relative mx-auto w-full max-w-[300px] print:max-w-[260px]">
@@ -216,8 +216,10 @@ function AskBuilder({ url }: { url: string }) {
   const noteId = useId();
   const ask = Number(amount) > 0 ? buildPayLink(url, { amount, asset, note }) : null;
 
+  // minmax(0,1fr), here and on the parent: a plain grid column grows to fit the
+  // long ask link, which pushed the card (and its copy button) off a phone screen.
   return (
-    <div className="relative grid gap-4 overflow-hidden rounded-[16px] border border-[#3a3220] bg-[linear-gradient(160deg,#151410_0%,#0d0d0d_55%)] px-4 pb-5 pt-5 shadow-[0_0_0_1px_rgba(247,208,71,0.03)] print:hidden">
+    <div className="relative grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 overflow-hidden rounded-[16px] border border-[#3a3220] bg-[linear-gradient(160deg,#151410_0%,#0d0d0d_55%)] px-4 pb-5 pt-5 shadow-[0_0_0_1px_rgba(247,208,71,0.03)] print:hidden">
       <CornerSweep />
       <div className="relative">
         <p className="m-0 font-sans text-[18px] font-bold text-white">Amount</p>
@@ -260,11 +262,21 @@ function AskBuilder({ url }: { url: string }) {
           className="input h-[52px] !rounded-[10px] !border-[#2e2e32] !bg-[#0b0b0b] !px-5 font-sans !text-[17px]"
         />
       </label>
-      {ask ? (
-        <div className="relative">
-          <Field label="Link for this ask" value={ask.replace(/^https?:\/\//, '')} copyValue={ask} copyLabel="Copy link for this ask" muted />
-        </div>
-      ) : null}
+      {/*
+        Always shown, so nothing moves while the amount and note are typed: only the
+        link text changes, cut to fit, and the copy button stays where it is. Until
+        there is an amount the button is off and the row says what to do.
+      */}
+      <div className="relative min-w-0">
+        <Field
+          label="Link for this ask"
+          value={ask ? ask.replace(/^https?:\/\//, '') : 'Enter an amount to get your link'}
+          copyValue={ask ?? ''}
+          copyLabel="Copy link for this ask"
+          muted
+          disabled={!ask}
+        />
+      </div>
     </div>
   );
 }
@@ -391,44 +403,79 @@ function Field({
   copyValue,
   copyLabel,
   muted = false,
+  disabled = false,
 }: {
   label: string;
   value: string;
   copyValue?: string;
   copyLabel: string;
   muted?: boolean;
+  /** Nothing to copy yet: the value is a hint, shown dimmer, and the button is off. */
+  disabled?: boolean;
 }) {
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-[14px] border border-[#2a2a2e] bg-[#0f0f10] px-4 py-3.5">
       <div className="min-w-0 flex-1">
         <p className="m-0 font-mono text-[10px] font-medium uppercase tracking-[0.24em] text-[#9a958c]">{label}</p>
-        <p className={`m-0 mt-1 truncate font-sans text-[16px] font-medium ${muted ? 'text-[#d9d4ca]' : 'text-white'}`} title={value}>
+        <p
+          className={`m-0 mt-1 truncate font-sans text-[16px] font-medium ${disabled ? 'text-[#8a857d]' : muted ? 'text-[#d9d4ca]' : 'text-white'}`}
+          title={value}
+        >
           {value}
         </p>
       </div>
-      <CopyTile value={copyValue ?? value} label={copyLabel} />
+      <CopyTile value={copyValue ?? value} label={copyLabel} disabled={disabled} />
     </div>
   );
 }
 
-function CopyTile({ value, label }: { value: string; label: string }) {
+/**
+ * Copy for browsers without the async clipboard, or that refuse it, as many in-app
+ * browsers (a link opened from WhatsApp or Telegram) do. A hidden, read-only
+ * textarea is selected and copied the old way.
+ */
+function copyFallback(text: string): boolean {
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.top = '0';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  area.setSelectionRange(0, text.length);
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(area);
+  return ok;
+}
+
+function CopyTile({ value, label, disabled = false }: { value: string; label: string; disabled?: boolean }) {
   const [done, setDone] = useState(false);
   async function copy() {
+    if (disabled || !value) return;
+    let ok = false;
     try {
       await navigator.clipboard.writeText(value);
-      setDone(true);
-      setTimeout(() => setDone(false), 1600);
+      ok = true;
     } catch {
-      setDone(false);
+      ok = copyFallback(value);
     }
+    setDone(ok);
+    if (ok) setTimeout(() => setDone(false), 1600);
   }
   return (
     <button
       type="button"
       onClick={() => void copy()}
+      disabled={disabled}
       aria-label={done ? 'Copied' : label}
       title={done ? 'Copied' : label}
-      className={`hit-44 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] border transition-colors print:hidden ${
+      className={`hit-44 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] border transition-colors disabled:cursor-not-allowed disabled:opacity-40 print:hidden ${
         done ? 'border-sun/70 text-sun' : 'border-[#3a3a3e] bg-[#151517] text-[#d9d4ca] hover:text-white'
       }`}
     >

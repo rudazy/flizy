@@ -763,7 +763,7 @@ function formatDeadline(value: string): string {
 /** The page's own bar: back, title, help. The search and bell are not here. */
 function TaskHeader({ subtitle, onHelp }: { subtitle: string; onHelp: () => void }) {
   return (
-    <header className="sticky top-0 z-40 -mx-4 bg-ink/90 px-4 pb-[4px] pt-[max(0.55rem,env(safe-area-inset-top))] backdrop-blur-md sm:-mx-6 sm:px-0">
+    <header className="sticky top-0 z-40 -mx-4 bg-ink/90 px-4 pb-[4px] pt-[max(0.55rem,env(safe-area-inset-top))] backdrop-blur-md sm:-mx-6 sm:px-6 xl:px-0">
       <div className="flex items-center gap-[15px] px-[2.5px] sm:px-0">
         <Link
           href="/dashboard/explore"

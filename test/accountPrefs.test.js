@@ -26,6 +26,25 @@ describe('Pay me', () => {
     assert.match(PAY, /QR\.toCanvas\(canvas, qrUrl,/);
     assert.match(PAGE, /<PayIdentity url=\{data\.pay\.url\} qrUrl=\{data\.pay\.qrUrl\} code=\{data\.pay\.code\} username=\{data\.pay\.username\} \/>/);
   });
+
+  it('a long ask link truncates instead of pushing the card and its copy button off a phone screen', () => {
+    // A plain grid column grows to its longest line; minmax(0,1fr) holds it to the card.
+    assert.match(PAY, /<div className="relative grid grid-cols-\[minmax\(0,1fr\)\] gap-4 px-4 pb-5 sm:px-5">/);
+    assert.match(PAY, /<div className="relative grid min-w-0 grid-cols-\[minmax\(0,1fr\)\] gap-4 overflow-hidden rounded-\[16px\]/);
+    // The link text itself truncates inside its row.
+    assert.match(PAY, /className=\{`m-0 mt-1 truncate font-sans/);
+  });
+
+  it('the ask link row is always there, so typing never moves the copy button', () => {
+    // Rendered whatever is typed: no {ask ? ... : null} around it.
+    assert.doesNotMatch(PAY, /\{ask \? \(\s*<div className="relative min-w-0">/);
+    assert.match(PAY, /<div className="relative min-w-0">\s*<Field\s+label="Link for this ask"\s+value=\{ask \? ask\.replace\(\/\^https\?:\\\/\\\/\/, ''\) : 'Enter an amount to get your link'\}/);
+    assert.match(PAY, /copyValue=\{ask \?\? ''\}/);
+    assert.match(PAY, /disabled=\{!ask\}/);
+    // Off until there is a link, and it copies in in-app browsers that refuse the async clipboard.
+    assert.match(PAY, /if \(disabled \|\| !value\) return;/);
+    assert.match(PAY, /ok = copyFallback\(value\);/);
+  });
 });
 
 describe('Language', () => {
