@@ -161,15 +161,22 @@ export function PayIdentity({
           <Field label="Pay link" value={link} copyValue={url} copyLabel="Copy pay link" muted />
         </div>
 
+        <div className="relative mt-3 print:hidden">
+          <h3 className="m-0 font-sans text-[22px] font-bold leading-tight tracking-[0.01em] text-white">Request payment</h3>
+          <p className="m-0 mt-1.5 font-sans text-[14px] text-[#b7b1a8]">Create a payment link or QR for any amount.</p>
+        </div>
+
         <AskBuilder url={url} />
 
         <OutsidePayToggle />
 
         <a
           href="/dashboard/received"
-          className="relative flex h-[46px] items-center justify-center rounded-[12px] border border-[#3a3a3e] font-sans text-[14px] text-[#f5f5f5] no-underline transition-colors hover:border-[#5a5a60] print:hidden"
+          className="group relative flex min-h-[54px] items-center gap-3 rounded-[14px] border border-[#2a2a2e] bg-[#0d0d0e] px-4 font-sans text-[14.5px] font-medium text-[#f5f5f5] no-underline transition-colors hover:border-[#4a4a50] print:hidden"
         >
-          Payments received, totals and CSV
+          <BarsGlyph />
+          <span className="min-w-0 flex-1">Payments received, totals and CSV</span>
+          <ChevronGlyph />
         </a>
 
         <div className="relative grid grid-cols-2 gap-3 print:hidden">
@@ -177,7 +184,7 @@ export function PayIdentity({
             type="button"
             onClick={onDownload}
             disabled={!qrReady}
-            className="flex h-[50px] items-center justify-center gap-2.5 rounded-[12px] border border-[#3a3a3e] bg-[#0f0f10] font-sans text-[14.5px] font-medium text-white transition-colors hover:border-[#5a5a60] disabled:opacity-50"
+            className="flex h-[52px] items-center justify-center gap-2.5 rounded-[12px] border border-[#6b5822] bg-[#0d0d0e] font-sans text-[15px] font-semibold text-white transition-colors hover:border-[#9a7f2c] disabled:opacity-50"
           >
             <DownloadGlyph />
             Download QR
@@ -185,7 +192,7 @@ export function PayIdentity({
           <button
             type="button"
             onClick={onPrint}
-            className="btn-sun flex h-[50px] items-center justify-center gap-2.5 rounded-[12px] font-sans text-[14.5px] font-semibold"
+            className="btn-sun flex h-[52px] items-center justify-center gap-2.5 rounded-[12px] font-sans text-[15px] font-semibold shadow-[0_0_28px_-6px_rgba(247,208,71,0.55)]"
           >
             <PrintGlyph />
             Print QR
@@ -210,52 +217,83 @@ function AskBuilder({ url }: { url: string }) {
   const ask = Number(amount) > 0 ? buildPayLink(url, { amount, asset, note }) : null;
 
   return (
-    <div className="relative grid gap-3 rounded-[14px] border border-[#2a2a2e] bg-[#0f0f10] px-4 py-4 print:hidden">
-      <p className="m-0 font-mono text-[10px] font-medium uppercase tracking-[0.24em] text-[#9a958c]">Ask for an amount</p>
-      <div className="flex gap-2" role="group" aria-label="Asset">
+    <div className="relative grid gap-4 overflow-hidden rounded-[16px] border border-[#3a3220] bg-[linear-gradient(160deg,#151410_0%,#0d0d0d_55%)] px-4 pb-5 pt-5 shadow-[0_0_0_1px_rgba(247,208,71,0.03)] print:hidden">
+      <CornerSweep />
+      <div className="relative">
+        <p className="m-0 font-sans text-[18px] font-bold text-white">Amount</p>
+        <p className="m-0 mt-1 max-w-[86%] font-sans text-[13px] leading-snug text-[#b7b1a8]">Choose a currency and enter the amount you want to receive.</p>
+      </div>
+      <div className="relative flex gap-3" role="group" aria-label="Asset">
         {PAY_ASSETS.map((opt) => (
           <button
             key={opt}
             type="button"
             onClick={() => setAsset(opt)}
-            className={`hit-y-44 h-9 flex-1 rounded-[8px] border font-sans text-[13px] transition-colors ${
-              asset === opt ? 'border-sun/70 text-sun' : 'border-[#3a3a3e] text-[#d9d4ca] hover:text-white'
+            aria-pressed={asset === opt}
+            className={`h-[46px] flex-1 rounded-[10px] font-sans text-[15px] transition-colors ${
+              asset === opt ? 'btn-sun' : 'border border-[#3a3a3e] bg-[#0b0b0b] text-[#e8e4dc] hover:border-[#5a5a60] hover:text-white'
             }`}
           >
             {symbolLabel(opt)}
           </button>
         ))}
       </div>
-      <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
-        <label htmlFor={amountId} className="grid gap-1">
-          <span className="font-sans text-[12px] text-[#9a958c]">Amount</span>
-          <input
-            id={amountId}
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value.trim())}
-            placeholder={asset === 'TUSD' ? '50' : asset === 'FLZ' ? '10' : '0.01'}
-            className="input"
-          />
-        </label>
-        <label htmlFor={noteId} className="grid gap-1">
-          <span className="font-sans text-[12px] text-[#9a958c]">For (optional)</span>
-          <input
-            id={noteId}
-            value={note}
-            maxLength={PAY_NOTE_MAX}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Design work"
-            className="input"
-          />
-        </label>
-      </div>
+      <label htmlFor={amountId} className="relative grid gap-2">
+        <span className="font-sans text-[13px] text-[#9a958c]">Amount</span>
+        <input
+          id={amountId}
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value.trim())}
+          placeholder={asset === 'TUSD' ? '50' : asset === 'FLZ' ? '10' : '0.01'}
+          className="input h-[52px] !rounded-[10px] !border-[#2e2e32] !bg-[#0b0b0b] !px-5 font-sans !text-[17px] font-medium"
+        />
+      </label>
+      <label htmlFor={noteId} className="relative grid gap-2">
+        <span className="font-sans text-[13px] text-[#9a958c]">Note (optional)</span>
+        <input
+          id={noteId}
+          value={note}
+          maxLength={PAY_NOTE_MAX}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Design work"
+          className="input h-[52px] !rounded-[10px] !border-[#2e2e32] !bg-[#0b0b0b] !px-5 font-sans !text-[17px]"
+        />
+      </label>
       {ask ? (
-        <Field label="Link for this ask" value={ask.replace(/^https?:\/\//, '')} copyValue={ask} copyLabel="Copy link for this ask" muted />
-      ) : (
-        <p className="m-0 font-sans text-[12.5px] text-[#9a958c]">Enter an amount to get a link that opens with it filled in.</p>
-      )}
+        <div className="relative">
+          <Field label="Link for this ask" value={ask.replace(/^https?:\/\//, '')} copyValue={ask} copyLabel="Copy link for this ask" muted />
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/** One gold line curving down the amount card's top right corner. */
+function CornerSweep() {
+  const id = useId().replace(/:/g, '');
+  return (
+    <svg aria-hidden viewBox="0 0 200 120" preserveAspectRatio="none" className="pointer-events-none absolute right-0 top-0 h-[64px] w-[120px]">
+      <defs>
+        <linearGradient id={`${id}-c`} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#f7d047" stopOpacity="0" />
+          <stop offset="0.7" stopColor="#f7d047" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#f7d047" stopOpacity="0.6" />
+        </linearGradient>
+        <radialGradient id={`${id}-r`} cx="1" cy="0" r="1">
+          <stop offset="0" stopColor="#f7d047" stopOpacity="0.16" />
+          <stop offset="1" stopColor="#f7d047" stopOpacity="0" />
+        </radialGradient>
+        <filter id={`${id}-b`} x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2.5" />
+        </filter>
+      </defs>
+      <rect width="200" height="120" fill={`url(#${id}-r)`} />
+      <g fill="none" stroke={`url(#${id}-c)`} strokeLinecap="round">
+        <path d="M40 120 C 110 105, 140 20, 200 4" strokeWidth="5" opacity="0.4" filter={`url(#${id}-b)`} />
+        <path d="M40 120 C 110 105, 140 20, 200 4" strokeWidth="1.3" />
+      </g>
+    </svg>
   );
 }
 
@@ -268,7 +306,8 @@ function OutsidePayToggle() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const id = useId();
+  const titleId = useId();
+  const textId = useId();
 
   useEffect(() => {
     let live = true;
@@ -304,24 +343,39 @@ function OutsidePayToggle() {
   }
 
   return (
-    <div className="relative grid gap-2 rounded-[14px] border border-[#2a2a2e] bg-[#0f0f10] px-4 py-4 print:hidden">
-      <label htmlFor={id} className="flex cursor-pointer items-start gap-3">
-        <input
-          id={id}
-          type="checkbox"
-          className="mt-1"
-          checked={enabled === true}
-          disabled={enabled === null || busy}
-          onChange={(e) => void toggle(e.target.checked)}
-        />
-        <span className="grid gap-1">
-          <span className="font-sans text-[14.5px] text-white">Accept payments from other wallets</span>
-          <span className="font-sans text-[12.5px] leading-relaxed text-[#9a958c]">
-            People without Flizy can pay your link from their own wallet. Anyone with the link can then see your
-            wallet address and its activity on the chain.
-          </span>
+    <div className="relative grid gap-2 rounded-[14px] border border-[#2e2a1e] bg-[#0d0d0e] px-4 py-4 print:hidden">
+      <div className="flex items-start gap-3">
+        <span className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[9px] bg-[#2a2414] text-sun" aria-hidden>
+          <LayersGlyph />
         </span>
-      </label>
+        <div className="min-w-0 flex-1">
+          <p id={titleId} className="m-0 font-sans text-[14.5px] font-semibold leading-snug text-white">
+            Accept payments from other wallets
+          </p>
+          <p id={textId} className="m-0 mt-1 font-sans text-[12.5px] leading-relaxed text-[#b7b1a8]">
+            Let people without a Flizy account pay with their own wallet. Anyone with your link can also view your
+            wallet address and onchain activity.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled === true}
+          aria-labelledby={titleId}
+          aria-describedby={textId}
+          disabled={enabled === null || busy}
+          onClick={() => void toggle(enabled !== true)}
+          className={`hit-44 relative mt-0.5 h-[28px] w-[50px] shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+            enabled === true ? 'bg-[linear-gradient(180deg,#f9d95d,#f7d043)] shadow-[0_0_14px_-2px_rgba(247,208,71,0.6)]' : 'bg-[#3a3a40]'
+          }`}
+        >
+          <span
+            className={`absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow transition-[left] ${
+              enabled === true ? 'left-[25px]' : 'left-[3px]'
+            }`}
+          />
+        </button>
+      </div>
       {error ? (
         <p className="m-0 font-sans text-[12.5px] text-[#e0b070]" role="alert">
           {error}
@@ -459,6 +513,31 @@ function TickGlyph() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
       <path d="M5 12.5l4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function LayersGlyph() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+      <path d="M12 4l8 4.5-8 4.5-8-4.5L12 4z" strokeLinejoin="round" />
+      <path d="M4 12.5l8 4.5 8-4.5M4 16.5l8 4.5 8-4.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function BarsGlyph() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="shrink-0 text-[#d9d4ca]" aria-hidden>
+      <path d="M3.5 20.5h17M6 20.5V12m4 8.5V6m4 14.5V9.5m4 11V4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ChevronGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[#d9d4ca] transition-transform group-hover:translate-x-0.5" aria-hidden>
+      <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

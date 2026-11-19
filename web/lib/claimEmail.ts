@@ -5,7 +5,7 @@ import { parseEmail } from './email.ts';
 import { siteOrigin } from './siteOrigin.ts';
 import { displaySafeLabel } from './sanitize.ts';
 import { formatUsernameLabel } from './username.ts';
-import { formatClaimAmount } from './claimAmount.ts';
+import { formatClaimAmount, isNftClaim } from './claimAmount.ts';
 import * as fees from './fees.ts';
 import { recordClaimEvent } from '../../lib/claimEvents.js';
 
@@ -76,14 +76,38 @@ export function emailHash(raw: unknown): string {
 }
 
 /**
- * The email itself: a payment notification with the amount, the three steps to
- * receive it and one button to the claim page, then when it was sent, until
- * when it can be claimed, its reference, that it is test money, the warning
- * about links, and the stop link. ASCII only.
+ * Gold coin art beside the amount, by asset (web/public/mail). ETH, USDT, USDC,
+ * tUSD and FLZ get their own mark; any other token gets a plain coin, and an
+ * NFT gets none, since a coin would misdescribe it.
+ */
+const COIN_ART: Record<string, string> = {
+  ETH: 'coin-eth.png',
+  USDT: 'coin-usdt.png',
+  USDC: 'coin-usdc.png',
+  TUSD: 'coin-tusd.png',
+  FLZ: 'coin-flz.png',
+};
+
+export function claimCoinArt(asset: string | null | undefined, nft: boolean): string | null {
+  if (nft) return null;
+  return COIN_ART[String(asset || 'ETH').trim().toUpperCase()] || 'coin-coin.png';
+}
+
+/**
+ * The email itself: a dark header, the amount with the asset's coin, the three
+ * steps to receive it and one button to the claim page, then when it was sent,
+ * when it expires, its reference, that it is test money, the warning about
+ * links, the footer and the stop link. Built from tables and inline styles, so
+ * it holds together in Gmail and Outlook, plus one media query in the head that
+ * narrows it on phones (a client that drops it still gets the full layout).
+ * ASCII only.
  */
 export function formatClaimEmail(p: {
   sender: string;
   amount: string;
+  /** The claim's asset symbol, for the coin art. Absent means ETH. */
+  asset?: string | null;
+  nft?: boolean;
   sentAt: string;
   expiresAt: string | null;
   claimUrl: string;
@@ -94,7 +118,7 @@ export function formatClaimEmail(p: {
 }): { subject: string; text: string; html: string } {
   const day = (iso: string) => new Date(iso).toUTCString().replace(/ GMT$/, ' UTC');
   const subject = `${p.reminder ? 'Reminder: ' : ''}${p.sender} sent you ${p.amount} on Flizy (testnet)`;
-  const heading = p.reminder ? 'Your payment is still waiting for you.' : 'Someone sent you money!';
+  const heading = p.reminder ? 'Your payment is still waiting for you' : 'You received a payment on Flizy';
   const steps = [
     'Create a Flizy account using this email address, or sign in to your existing account.',
     'If you already have a Flizy account with another email, add and verify this email in your account.',
@@ -131,33 +155,124 @@ export function formatClaimEmail(p: {
 
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const font = "font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
-  const small = 'margin:0;font-size:13px;line-height:1.6;color:#52525b';
+  const T = 'role="presentation" cellpadding="0" cellspacing="0" border="0"';
+  const img = (file: string) => `${esc(p.origin)}/mail/${file}`;
+  const coin = claimCoinArt(p.asset, p.nft === true);
+  // "Wed, 18 Nov 2026 20:16:22 UTC" split into the date and the time, one per line.
+  const stamp = (iso: string) => {
+    const [d, t] = day(iso).split(/ (?=\d\d:\d\d:\d\d)/);
+    return `${esc(d)}<br>${esc(t || '')}`;
+  };
+  const tile = (size: number, text: number) =>
+    `<td width="${size}" height="${size}" align="center" valign="middle" bgcolor="#0d0d0d" style="width:${size}px;height:${size}px;background:#0d0d0d;border:1px solid #6b5822;border-radius:${Math.round(size / 4.5)}px;color:#f7d047;font-size:${text}px;font-weight:800;line-height:1">F.</td>`;
+  const meta = [
+    ['Sent', stamp(p.sentAt)],
+    ...(p.expiresAt ? [['Expires', stamp(p.expiresAt)]] : []),
+    ['Payment reference', esc(p.reference)],
+  ];
+  const stepRows = steps
+    .map((s, i) => {
+      const line = i < steps.length - 1 ? '<tr><td align="center" style="padding:0"><div style="width:2px;height:16px;background:#f3dc8f;line-height:16px;font-size:0">&nbsp;</div></td><td></td></tr>' : '';
+      return [
+        '<tr>',
+        `<td width="44" align="center" valign="top" style="width:44px;padding:0"><div style="width:32px;height:32px;border-radius:16px;background:#fbefc6;color:#1a1405;font-size:15px;font-weight:700;line-height:32px;text-align:center">${i + 1}</div></td>`,
+        `<td valign="middle" style="padding:5px 0 0 12px;font-size:15px;line-height:1.45;color:#27272a">${esc(s)}</td>`,
+        '</tr>',
+        line,
+      ].join('');
+    })
+    .join('');
+
   const html = [
     '<!doctype html>',
-    `<html><body style="margin:0;padding:0;background:#f4f4f5;${font}">`,
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 12px"><tr><td align="center">',
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e4e4e7;border-radius:12px;color:#18181b">',
-    '<tr><td style="padding:20px 24px;border-bottom:1px solid #e4e4e7">',
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>',
-    '<td style="font-size:24px;font-weight:700">Flizy</td>',
-    '<td align="right"><span style="display:inline-block;padding:4px 12px;border-radius:999px;background:#dcf5e3;color:#137a3c;font-size:13px">Payment notification</span></td>',
+    '<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">',
+    '<style>',
+    '@media (max-width:520px){',
+    '.fz-pad{padding-left:20px!important;padding-right:20px!important}',
+    '.fz-h1{font-size:26px!important}',
+    '.fz-amt{font-size:30px!important}',
+    '.fz-coin{width:96px!important;height:auto!important}',
+    '.fz-coincell{width:96px!important}',
+    '.fz-col{display:block!important;width:100%!important;border-left:0!important;padding:10px 0!important}',
+    '.fz-col+.fz-col{border-top:1px solid #e4e4e7!important}',
+    '.fz-foot{display:block!important;width:100%!important;text-align:left!important;padding-top:12px!important}',
+    '}',
+    '</style></head>',
+    `<body style="margin:0;padding:0;background:#f4f4f5;${font}">`,
+    `<table ${T} width="100%" bgcolor="#f4f4f5" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 10px">`,
+    `<table ${T} width="100%" style="max-width:560px;background:#ffffff;border-radius:18px;overflow:hidden;color:#18181b">`,
+    // Header: dark, the logo tile, the gold arc behind "Payment Notification".
+    `<tr><td bgcolor="#0d0d0d" background="${img('header-arc.png')}" style="background:#0d0d0d url('${img('header-arc.png')}') right top / auto 100% no-repeat;padding:22px 28px 38px" class="fz-pad">`,
+    `<table ${T} width="100%"><tr>`,
+    `<td width="40" style="width:40px"><table ${T}><tr>${tile(38, 18)}</tr></table></td>`,
+    '<td style="padding-left:12px;color:#ffffff;font-size:24px;font-weight:700">Flizy</td>',
+    '<td align="right" style="color:#d4d4d8;font-size:13px">Payment Notification</td>',
     '</tr></table>',
     '</td></tr>',
-    '<tr><td style="padding:24px">',
-    `<p style="margin:0 0 12px;font-size:18px">${esc(heading)}</p>`,
-    `<p style="margin:0 0 16px;font-size:16px">${esc(p.sender)} sent you a payment through Flizy.</p>`,
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;border-radius:12px"><tr><td style="padding:16px 18px">',
-    '<p style="margin:0;font-size:12px;letter-spacing:0.04em;color:#52525b">YOU HAVE RECEIVED</p>',
-    `<p style="margin:6px 0;font-size:30px;font-weight:700;color:#137a3c">${esc(p.amount)}</p>`,
-    '<p style="margin:0;font-size:13px;color:#52525b">Waiting for you to claim</p>',
+    // White body, rounded at the top so it sits over the header like a sheet.
+    `<tr><td bgcolor="#0d0d0d" style="background:#0d0d0d;padding:0"><table ${T} width="100%"><tr><td bgcolor="#ffffff" style="background:#ffffff;border-radius:18px 18px 0 0;height:18px;line-height:18px;font-size:0">&nbsp;</td></tr></table></td></tr>`,
+    '<tr><td class="fz-pad" style="padding:6px 28px 8px">',
+    `<h1 class="fz-h1" style="margin:0;font-size:32px;line-height:1.15;font-weight:800;color:#0a0a0a">${esc(heading)}</h1>`,
+    `<p style="margin:10px 0 22px;font-size:16px;line-height:1.5;color:#52525b">${esc(p.sender)} sent you a payment through Flizy.</p>`,
+    // Amount box.
+    `<table ${T} width="100%" bgcolor="#fdf3d6" style="background:#fdf3d6;background-image:linear-gradient(110deg,#fffaf0 0%,#fdf0cc 100%);border:1px solid #f3e2ab;border-radius:16px"><tr>`,
+    '<td valign="middle" style="padding:22px 8px 22px 22px">',
+    '<p style="margin:0;font-size:15px;color:#52525b">You have received</p>',
+    `<p class="fz-amt" style="margin:4px 0 12px;font-size:38px;line-height:1.1;font-weight:800;color:#0a0a0a;word-break:break-word">${esc(p.amount)}</p>`,
+    '<span style="display:inline-block;padding:7px 14px;border-radius:999px;background:#f8e4a4;color:#1a1405;font-size:14px;font-weight:600">Waiting for you to claim</span>',
+    '</td>',
+    coin
+      ? `<td class="fz-coincell" width="150" align="right" valign="middle" style="width:150px;padding:10px 12px 10px 0"><img class="fz-coin" src="${img(coin)}" width="150" height="130" alt="" style="display:block;width:150px;height:130px;border:0"></td>`
+      : '',
+    '</tr></table>',
+    // Steps.
+    '<h2 style="margin:28px 0 16px;font-size:22px;line-height:1.25;font-weight:800;color:#0a0a0a">How to receive your money</h2>',
+    `<table ${T} width="100%">${stepRows}</table>`,
+    // The one button.
+    `<table ${T} width="100%" style="margin-top:24px"><tr><td align="center" bgcolor="#f7d047" style="background:#f7d047;background-image:linear-gradient(180deg,#fadc63 0%,#f2c230 100%);border:1px solid #e3b62a;border-radius:10px">`,
+    `<a href="${esc(p.claimUrl)}" style="display:block;padding:15px 16px;color:#1a1405;font-size:18px;font-weight:700;text-decoration:none">Claim your payment</a>`,
     '</td></tr></table>',
-    '<p style="margin:20px 0 8px;font-size:16px">How to receive your money</p>',
-    `<ol style="margin:0 0 20px;padding-left:22px;font-size:15px;line-height:1.5">${steps.map((s) => `<li style="margin-bottom:4px">${esc(s)}</li>`).join('')}</ol>`,
-    `<a href="${esc(p.claimUrl)}" style="display:block;text-align:center;background:#f2b705;color:#1a1405;font-weight:600;font-size:16px;padding:14px 16px;border-radius:10px;text-decoration:none">Claim your payment</a>`,
-    `<p style="${small};margin-top:20px">${details.map(esc).join('<br>')}<br>${esc(testnet)}</p>`,
-    `<p style="${small};margin-top:12px">${esc(warning)}</p>`,
-    `<p style="${small};margin-top:12px">Don't want emails like this? <a href="${esc(p.stopUrl)}" style="color:#52525b">Stop these emails</a>.</p>`,
+    // Sent, expires, reference.
+    `<table ${T} width="100%" bgcolor="#f4f4f5" style="margin-top:22px;background:#f4f4f5;border-radius:12px"><tr><td style="padding:14px 18px">`,
+    `<table ${T} width="100%"><tr>`,
+    meta
+      .map(
+        ([label, value], i) =>
+          `<td class="fz-col" valign="top" style="padding:2px ${i === meta.length - 1 ? 0 : 14}px 2px ${i === 0 ? 0 : 16}px;${i === 0 ? '' : 'border-left:1px solid #d4d4d8;'}"><p style="margin:0;font-size:13px;color:#71717a">${label}</p><p style="margin:4px 0 0;font-size:15px;line-height:1.4;font-weight:700;color:#18181b">${value}</p></td>`
+      )
+      .join(''),
+    '</tr></table>',
     '</td></tr></table>',
+    // Testnet.
+    `<table ${T} width="100%" bgcolor="#fdf6e3" style="margin-top:12px;background:#fdf6e3;border-radius:10px"><tr>`,
+    '<td width="22" valign="middle" style="width:22px;padding:11px 0 11px 16px"><div style="width:16px;height:16px;border:1.5px solid #52525b;border-radius:9px;color:#52525b;font-size:11px;font-weight:700;line-height:16px;text-align:center">i</div></td>',
+    `<td valign="middle" style="padding:11px 16px 11px 12px;font-size:14px;line-height:1.45;color:#3f3f46">${esc(testnet)}</td>`,
+    '</tr></table>',
+    // Stay secure.
+    `<table ${T} width="100%" style="margin-top:20px"><tr>`,
+    `<td width="64" align="center" valign="middle" style="width:64px;border-right:1px solid #d4d4d8"><img src="${img('shield.png')}" width="34" height="34" alt="" style="display:block;width:34px;height:34px;border:0"></td>`,
+    '<td valign="middle" style="padding:2px 0 2px 24px">',
+    '<p style="margin:0;font-size:18px;font-weight:700;color:#0a0a0a">Stay secure</p>',
+    `<p style="margin:4px 0 0;font-size:14px;line-height:1.5;color:#52525b">Flizy will never ask for your password or a code by email. Only open links that start with <a href="${esc(p.origin)}" style="color:#a87b12;font-weight:600;text-decoration:underline">${esc(p.origin)}</a>.</p>`,
+    '</td>',
+    '</tr></table>',
+    '</td></tr>',
+    // Footer.
+    '<tr><td class="fz-pad" style="padding:0 28px 26px">',
+    `<table ${T} width="100%" style="margin-top:18px;border-top:1px solid #e4e4e7"><tr>`,
+    '<td class="fz-foot" valign="top" style="padding-top:20px">',
+    `<table ${T}><tr>${tile(32, 15)}<td style="padding-left:12px;font-size:20px;font-weight:700;color:#0a0a0a">Flizy</td></tr></table>`,
+    '<p style="margin:10px 0 0;font-size:13px;line-height:1.55;color:#52525b">Chat wallet for WhatsApp and Telegram.<br>Trusted sends. Built for GIWA and EVM.</p>',
+    '</td>',
+    '<td class="fz-foot" align="right" valign="bottom" style="padding-top:20px;white-space:nowrap">',
+    `<a href="${esc(p.origin)}" style="color:#18181b;font-size:14px;text-decoration:underline">Open Flizy</a>`,
+    '<span style="display:inline-block;width:1px;height:14px;background:#d4d4d8;margin:0 14px;vertical-align:middle"></span>',
+    `<a href="${esc(p.origin)}/how-it-works" style="color:#18181b;font-size:14px;text-decoration:underline">Help Center</a>`,
+    '</td>',
+    '</tr></table>',
+    `<p style="margin:18px 0 0;font-size:12px;line-height:1.5;color:#71717a">Don't want emails like this? <a href="${esc(p.stopUrl)}" style="color:#71717a;text-decoration:underline">Stop these emails</a>.</p>`,
+    '</td></tr>',
+    '</table>',
     '</td></tr></table>',
     '</body></html>',
   ].join('\n');
@@ -270,6 +385,8 @@ export async function sendClaimEmail(p: {
   const mail = formatClaimEmail({
     sender,
     amount: formatClaimAmount({ amount_eth: claim.amount_eth, asset, nft_token_id: claim.nft_token_id }),
+    asset,
+    nft: isNftClaim({ nft_token_id: claim.nft_token_id }),
     sentAt: String(claim.created_at),
     expiresAt: claim.expires_at ? String(claim.expires_at) : null,
     claimUrl: `${origin}/claim/${claim.claim_token}#to=${encodeURIComponent(email)}`,

@@ -104,7 +104,7 @@ describe('the email', () => {
       reminder: false,
     });
     assert.equal(m.subject, '@kemi sent you 5 tUSD on Flizy (testnet)');
-    assert.match(m.text, /^Someone sent you money!\n@kemi sent you a payment through Flizy\.\n\nYOU HAVE RECEIVED\n5 tUSD\nWaiting for you to claim\n/);
+    assert.match(m.text, /^You received a payment on Flizy\n@kemi sent you a payment through Flizy\.\n\nYOU HAVE RECEIVED\n5 tUSD\nWaiting for you to claim\n/);
     assert.match(m.text, /Claim your payment: https:\/\/flizy\.app\/claim\/abab/);
     assert.match(m.text, /Sent: Fri, 20 Nov 2026 11:00:00 UTC\nCan be claimed until: Tue, 01 Dec 2026 00:00:00 UTC\nPayment reference: FLZ-33333333\nThese are test funds on a test network \(testnet\), not real money\./);
     assert.match(m.text, /Flizy will never ask for your password or a code by email\. Only open links that start with https:\/\/flizy\.app\./);
@@ -403,13 +403,32 @@ describe('delivery that does not depend on a setting being remembered', () => {
 
   it('the email as designed: the notification, the amount box, three steps, one button', () => {
     const m = M.formatClaimEmail({ sender: 'Ludarep', amount: '50 tUSD', sentAt: NOW, expiresAt: null, claimUrl: 'https://flizy.app/claim/t#to=a%40b.co', stopUrl: 'https://flizy.app/email/stop?c=t', reference: 'FLZ-1', origin: 'https://flizy.app', reminder: false });
-    for (const part of ['Payment notification', 'Someone sent you money!', 'Ludarep sent you a payment through Flizy.', 'YOU HAVE RECEIVED', '50 tUSD', 'Waiting for you to claim', 'How to receive your money', 'Claim your payment']) {
+    for (const part of ['Payment Notification', 'You received a payment on Flizy', 'Ludarep sent you a payment through Flizy.', 'You have received', '50 tUSD', 'Waiting for you to claim', 'How to receive your money', 'Claim your payment']) {
       assert.ok(m.html.includes(part), part);
     }
-    assert.equal((m.html.match(/<li /g) || []).length, 3);
+    for (const step of ['Create a Flizy account using this email address', 'add and verify this email in your account', 'Return to this payment and claim your funds.']) {
+      assert.equal(m.html.split(step).length - 1, 1, step);
+    }
     assert.equal((m.html.match(/<a href="https:\/\/flizy\.app\/claim\//g) || []).length, 1);
     assert.match(m.text, /How to receive your money\n1\. Create a Flizy account using this email address, or sign in to your existing account\.\n2\. If you already have a Flizy account with another email, add and verify this email in your account\.\n3\. Return to this payment and claim your funds\./);
-    assert.match(M.formatClaimEmail({ sender: 'x', amount: '1 ETH', sentAt: NOW, expiresAt: null, claimUrl: 'u', stopUrl: 's', reference: 'r', origin: 'o', reminder: true }).text, /^Your payment is still waiting for you\./);
+    assert.match(M.formatClaimEmail({ sender: 'x', amount: '1 ETH', sentAt: NOW, expiresAt: null, claimUrl: 'u', stopUrl: 's', reference: 'r', origin: 'o', reminder: true }).text, /^Your payment is still waiting for you\n/);
+  });
+
+  it('the coin beside the amount follows the asset; an NFT gets none', () => {
+    assert.equal(M.claimCoinArt('ETH', false), 'coin-eth.png');
+    assert.equal(M.claimCoinArt(null, false), 'coin-eth.png');
+    assert.equal(M.claimCoinArt('usdc', false), 'coin-usdc.png');
+    assert.equal(M.claimCoinArt('USDT', false), 'coin-usdt.png');
+    assert.equal(M.claimCoinArt('TUSD', false), 'coin-tusd.png');
+    assert.equal(M.claimCoinArt('FLZ', false), 'coin-flz.png');
+    assert.equal(M.claimCoinArt('DCAT', false), 'coin-coin.png');
+    assert.equal(M.claimCoinArt('ETH', true), null);
+    for (const f of ['coin-eth.png', 'coin-usdc.png', 'coin-usdt.png', 'coin-tusd.png', 'coin-flz.png', 'coin-coin.png', 'shield.png', 'header-arc.png']) {
+      assert.ok(fs.existsSync(path.join(__dirname, '..', 'web', 'public', 'mail', f)), f);
+    }
+    const base = { sender: 'x', sentAt: NOW, expiresAt: null, claimUrl: 'https://flizy.app/claim/t', stopUrl: 's', reference: 'r', origin: 'https://flizy.app', reminder: false };
+    assert.match(M.formatClaimEmail({ ...base, amount: '10 USDC', asset: 'USDC' }).html, /src="https:\/\/flizy\.app\/mail\/coin-usdc\.png"/);
+    assert.doesNotMatch(M.formatClaimEmail({ ...base, amount: 'nft #1', asset: 'NFT', nft: true }).html, /mail\/coin-/);
   });
 });
 
