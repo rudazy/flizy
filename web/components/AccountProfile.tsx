@@ -218,6 +218,90 @@ function ScanUsernameToggle({
   );
 }
 
+/**
+ * "People who know my email can find me" (/api/account/email-findable). Off,
+ * a chat send to your email is held as a claim and nobody can tell you are on
+ * Flizy. On, a sender to one of your verified emails sees your @username and
+ * can pay you directly.
+ */
+function EmailFindableToggle() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let live = true;
+    // An unread setting stays unknown (and the switch disabled): showing "Off" could misstate who can find this account.
+    fetch('/api/account/email-findable', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('read'))))
+      .then((body) => live && setOn(body?.enabled === true))
+      .catch(() => live && setError('Could not load this setting. Try again shortly.'));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function flip() {
+    if (on === null) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/account/email-findable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !on }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof body.error === 'string' ? body.error : 'Could not save that.');
+        return;
+      }
+      setOn(body.enabled === true);
+    } catch {
+      setError('Could not save that.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on === true}
+        disabled={busy || on == null}
+        onClick={() => void flip()}
+        className="hit-y-44 flex min-h-[44px] w-full items-center gap-3 border-t border-[#26262a] px-3.5 py-2 text-left disabled:opacity-60"
+      >
+        <span className="text-[#c8c2b8]">
+          <MailGlyph />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-sans text-[13px] text-[#f3f1ec]">People who know my email can find me</span>
+          <span className="block font-sans text-[11.5px] leading-[16px] text-[#8f8a82]">
+            {on === null
+              ? error
+                ? 'Unavailable right now.'
+                : 'Loading...'
+              : on
+                ? 'On: people sending to your verified email see your @username and can pay you directly.'
+                : 'Off: sends to your email are held as claims, and no one can tell you are on Flizy.'}
+          </span>
+        </span>
+        <span className={`relative h-[22px] w-[40px] shrink-0 rounded-full ${on ? 'bg-[#f7d047]' : 'bg-[#3a3a3e]'}`} aria-hidden>
+          <span className={`absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white ${on ? 'left-[20px]' : 'left-[2px]'}`} />
+        </span>
+      </button>
+      {error ? (
+        <p className="m-0 px-3.5 pb-2 font-sans text-[11.5px] text-[#e0b070]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function CopyGlyph() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
@@ -700,6 +784,7 @@ export function AccountProfile({
           disabled={socialState.busy || !social}
           onClick={() => void socialState.setFlag({ showUsername: !(social && social.showUsername) })}
         />
+        <EmailFindableToggle />
         <FlagSwitch
           on={social ? social.showStats : null}
           disabled={socialState.busy || !social}

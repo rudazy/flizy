@@ -536,6 +536,14 @@ rows and show the status the claims table gives them.
   These go from the payments sender (`PAYMENTS_EMAIL_FROM`, see [Environment](#environment)).
   Setup before turning it on: that sender on flizy.app, with the domain's SPF, DKIM and DMARC
   records.
+- **Found by email.** Account > Profile > Privacy & Visibility, "People who know my email can
+  find me" (`accounts.findable_by_email`, off by default, migration
+  `20261119120000_findable_by_email.sql`, `/api/account/email-findable`). On, a chat send to one
+  of that account's verified emails names its @username and asks: send now (a normal transfer
+  to that account's wallet, read by account id) or hold as a claim. Off, not verified, or not
+  on Flizy, the send is a claim hold with nothing in the replies that differs between the three,
+  including after the hold lands, so sends cannot be used to learn who has an account
+  (`findOptedInAccountByEmail` in `lib/accountEmails.js`).
 - **The claim page.** Signed out, `/claim/<token>` shows who sent it, the amount, that it is
   testnet and any expiry, with sign-up and sign-in: nothing about who it was sent to. Signed
   in: the sender sees the share card, the recipient can receive it (a phone claim in chat), and

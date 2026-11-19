@@ -249,7 +249,8 @@ describe('chat and the site', () => {
   it('after a hold for someone not on Flizy, chat tries their channel, then sends the link to forward', () => {
     const router = read('lib/router.js');
     assert.match(router, /!notified && result\.claim\s+\? await noticeNonUser\(\{ supabase, claim: result\.claim, recipient: recipient \|\| \{ kind: 'phone', phone: toWaHint \} \}\)/);
-    assert.match(router, /if \(!notified && result\.claim\) \{\s+await reply\(\s+ctx,\s+claimShareMessage\(/);
+    // toldSender is notified, except for an email claim whose recipient did not opt in to being found: that sender gets the link too.
+    assert.match(router, /if \(!toldSender && result\.claim\) \{\s+await reply\(\s+ctx,\s+claimShareMessage\(/);
     assert.match(router, /await recordClaimEvent\(supabase, result\.claim\.id, 'link_shared', \{ channel: 'share_link' \}\);/);
     assert.match(read('lib/reconcile.js'), /if \(!told && claimUrl\) \{/);
   });
