@@ -379,9 +379,27 @@ export function PayLanding({
           </div>
         ) : null}
 
+        {/*
+          On an ask link, paying from the visitor's own wallet comes first, right under
+          the amount: one tap connects the wallet, then they sign. No account needed.
+          Only where the owner turned it on (accept_outside_pay); otherwise say so,
+          rather than leave a payer looking for a button that is not there.
+        */}
+        {loggedIn === false && outsidePay && preset?.amount ? (
+          <ExternalPay refSlug={refSlug} presetAmount={preset.amount} presetAsset={preset.asset} note={note} handle={handle} prominent />
+        ) : null}
+        {loggedIn === false && !outsidePay && preset?.amount ? (
+          <p className="m-0 font-sans text-[13px] leading-relaxed text-[#9a958c]">
+            {handle} does not take payments from other wallets. Log in to pay with Flizy.
+          </p>
+        ) : null}
+
         {loggedIn === false ? (
           <div className="grid gap-2">
-            <Link href={`/login?next=${encodeURIComponent(next)}`} className="btn btn-primary py-3 font-sans no-underline">
+            <Link
+              href={`/login?next=${encodeURIComponent(next)}`}
+              className={`btn ${outsidePay && preset?.amount ? 'btn-ghost' : 'btn-primary'} py-3 font-sans no-underline`}
+            >
               Log in to pay
             </Link>
             <Link href={`/signup?next=${encodeURIComponent(next)}`} className="btn btn-ghost py-3 font-sans no-underline">
@@ -390,8 +408,9 @@ export function PayLanding({
           </div>
         ) : null}
 
-        {loggedIn === false && outsidePay ? (
-          <ExternalPay refSlug={refSlug} presetAmount={preset?.amount ?? null} presetAsset={preset?.asset ?? 'ETH'} note={note} handle={handle} />
+        {/* A plain pay link (no amount): the payer types it, below the sign-in buttons. */}
+        {loggedIn === false && outsidePay && !preset?.amount ? (
+          <ExternalPay refSlug={refSlug} presetAmount={null} presetAsset={preset?.asset ?? 'ETH'} note={note} handle={handle} />
         ) : null}
 
         {loggedIn && !self && !ok && stage === 'edit' ? (

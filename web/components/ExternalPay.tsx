@@ -36,6 +36,7 @@ export function ExternalPay({
   presetAsset,
   note,
   handle,
+  prominent = false,
 }: {
   refSlug: string;
   /** From the link. With one, the amount is fixed; without, the payer types it. */
@@ -43,6 +44,11 @@ export function ExternalPay({
   presetAsset: PayAsset;
   note: string | null;
   handle: string;
+  /**
+   * On an ask link (an amount set): the first action under the amount, a gold
+   * button, no card around it. Otherwise the secondary "No Flizy account?" card.
+   */
+  prominent?: boolean;
 }) {
   const [amount, setAmount] = useState(presetAmount ?? '');
   const [asset, setAsset] = useState<PayAsset>(presetAsset);
@@ -154,17 +160,17 @@ export function ExternalPay({
 
   const busy = step === 'connecting' || step === 'approving' || step === 'paying' || step === 'checking';
   const label = {
-    idle: `Pay ${amount || ''} ${unit} from another wallet`,
+    idle: prominent ? `Pay ${amount || ''} ${unit} with your wallet` : `Pay ${amount || ''} ${unit} from another wallet`,
     connecting: 'Connecting your wallet',
     approving: `Approve ${unit} in your wallet`,
     paying: 'Confirm in your wallet',
     checking: 'Checking the payment',
-    error: `Pay ${amount || ''} ${unit} from another wallet`,
+    error: prominent ? `Pay ${amount || ''} ${unit} with your wallet` : `Pay ${amount || ''} ${unit} from another wallet`,
   }[step];
 
   return (
-    <div className="card space-y-3 p-6">
-      <p className="m-0 text-xs uppercase tracking-[0.18em] text-muted">No Flizy account?</p>
+    <div className={prominent ? 'grid gap-2' : 'card space-y-3 p-6'}>
+      {prominent ? null : <p className="m-0 text-xs uppercase tracking-[0.18em] text-muted">No Flizy account?</p>}
       {canPay && !presetAmount ? (
         <div className="grid gap-2">
           <div className="flex gap-2" role="group" aria-label="Asset">
@@ -193,7 +199,12 @@ export function ExternalPay({
       ) : null}
       {canPay ? (
         <>
-          <button type="button" className="btn btn-ghost w-full py-3" disabled={busy || !(Number(amount) > 0)} onClick={() => void pay()}>
+          <button
+            type="button"
+            className={prominent ? 'btn-sun min-h-[52px] w-full rounded-[10px] py-3 font-sans text-[16px] font-semibold disabled:opacity-50' : 'btn btn-ghost w-full py-3'}
+            disabled={busy || !(Number(amount) > 0)}
+            onClick={() => void pay()}
+          >
             {label}
           </button>
           <p className="m-0 text-xs text-muted">

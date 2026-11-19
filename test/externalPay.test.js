@@ -155,7 +155,12 @@ describe('who can be paid from an outside wallet', () => {
     for (const rel of ['web/app/pay/[code]/page.tsx', 'web/app/pay/c/[code]/page.tsx']) {
       assert.match(read(rel), /outsidePay = data\?\.accept_outside_pay === true;/, rel);
     }
-    assert.match(read('web/components/PayLanding.tsx'), /loggedIn === false && outsidePay \? \(\s*<ExternalPay/);
+    // Every place the page offers outside-wallet pay is gated on outsidePay.
+    const landing = read('web/components/PayLanding.tsx');
+    const offers = landing.match(/<ExternalPay /g) || [];
+    const gated = landing.match(/\{loggedIn === false && outsidePay && (?:preset\?\.amount|!preset\?\.amount) \? \(\s*<ExternalPay /g) || [];
+    assert.equal(offers.length, 2);
+    assert.equal(gated.length, offers.length);
     const toggle = read('web/app/api/account/outside-pay/route.ts');
     assert.match(toggle, /rejectIfCrossOrigin\(req\)/);
     assert.match(toggle, /typeof body\?\.enabled !== 'boolean'/);
@@ -170,6 +175,22 @@ describe('who can be paid from an outside wallet', () => {
     assert.match(page, /\{note \? <p className="[^"]*break-words[^"]*">For: \{note\}<\/p> : null\}/);
     // Shown above the sign-in buttons, so it is read first.
     assert.ok(page.indexOf('>Amount requested<') < page.indexOf('Log in to pay'));
+  });
+
+  it('on an ask link, paying from your own wallet sits right under the amount, before sign-in', () => {
+    const page = read('web/components/PayLanding.tsx');
+    const amountAt = page.indexOf('>Amount requested<');
+    const walletAt = page.indexOf('<ExternalPay refSlug={refSlug} presetAmount={preset.amount} presetAsset={preset.asset} note={note} handle={handle} prominent />');
+    const loginAt = page.indexOf('Log in to pay');
+    assert.ok(amountAt > 0 && walletAt > amountAt && loginAt > walletAt, 'amount, then wallet pay, then log in');
+    // Sign-in steps back to secondary while wallet pay is the first action.
+    assert.match(page, /className=\{`btn \$\{outsidePay && preset\?\.amount \? 'btn-ghost' : 'btn-primary'\} py-3 font-sans no-underline`\}/);
+    // Off for this account: said plainly instead of a missing button.
+    assert.match(page, /\{loggedIn === false && !outsidePay && preset\?\.amount \? \(\s*<p[^>]*>\s*\{handle\} does not take payments from other wallets\. Log in to pay with Flizy\./);
+    // Prominent: a gold button, one tap to connect and sign.
+    const pay = read('web/components/ExternalPay.tsx');
+    assert.match(pay, /className=\{prominent \? 'btn-sun min-h-\[52px\] w-full/);
+    assert.match(pay, /idle: prominent \? `Pay \$\{amount \|\| ''\} \$\{unit\} with your wallet`/);
   });
 });
 
