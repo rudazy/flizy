@@ -16,7 +16,7 @@ export const metadata: Metadata = pageMetadata({
   path: '/privacy',
 });
 
-const UPDATED = '4 November 2026';
+const UPDATED = '20 November 2026';
 
 export default function PrivacyPage() {
   const origin = siteOrigin();
@@ -92,8 +92,13 @@ export default function PrivacyPage() {
             </li>
             <li>
               <span className="text-paper">Session cookies.</span> A logged-in session cookie
-              on the site. While that sign-in lasts we keep a short name for the device,
-              and the city when the host provides one. We do not keep the network address.
+              on the site. While that sign-in lasts we keep a short name for the browser,
+              whether it is a phone, tablet or computer, the phone model when the browser
+              shares it, the city and country, and when the sign-in was last used. The place
+              comes from the host, or from your device&apos;s time zone when the two disagree,
+              in which case we keep both. The login and signup pages set a cookie holding only
+              that time zone, such as Africa/Lagos, for 30 days. We do not keep the network
+              address.
               Continue with Google also sets a cookie for ten minutes. It
               carries the sign-in check and the page to open afterwards. It does not hold
               your email or a Google token. If you open an invite or a claim that carries

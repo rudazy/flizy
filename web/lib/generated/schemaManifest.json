@@ -1545,6 +1545,12 @@
       "requiredBy": "check on trusted_addresses"
     },
     {
+      "kind": "check",
+      "name": "web_sessions.web_sessions_client_kind_check",
+      "providedBy": "20261120120000_session_device_and_last_seen.sql",
+      "requiredBy": "check on web_sessions"
+    },
+    {
       "kind": "function",
       "name": "account_follows_before_insert",
       "providedBy": "20261027120000_account_follows.sql",

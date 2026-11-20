@@ -76,7 +76,13 @@ const nextConfig = {
     return [
       {
         source: '/:path*',
-        headers: securityHeaders,
+        headers: [
+          ...securityHeaders,
+          // Asks Chromium to send the handset model on later requests to this
+          // site, so the sessions list can say which phone signed in. Same-origin
+          // only; no third party receives it.
+          { key: 'Accept-CH', value: 'Sec-CH-UA-Model' },
+        ],
       },
     ];
   },

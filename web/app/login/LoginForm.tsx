@@ -13,6 +13,7 @@ import type { LocaleCode } from '../../lib/locale';
 import { googleLoginError } from '../../lib/googleLoginCopy.ts';
 import { safeNext } from '../../lib/safeNext.ts';
 import { emailFromHash } from '../../lib/emailHint.ts';
+import { rememberTimeZone } from '../../lib/timeZoneCookie.ts';
 import { useWalletDoor } from '../../components/WalletModeBits';
 
 export function LoginForm() {
@@ -35,6 +36,7 @@ export function LoginForm() {
   const [showSoon, soonNote] = useComingSoon();
 
   useEffect(() => {
+    rememberTimeZone();
     const params = new URLSearchParams(window.location.search);
     setNext(safeNext(params.get('next')));
     // From a claim email, by way of the claim page (web/lib/emailHint.ts).

@@ -427,7 +427,7 @@ describe('follow screens', () => {
     assert.match(read('web/public/llms.txt'), /\/u\/:username/);
     // The people directory is part of following, a paused feature, so llms.txt no longer lists it.
     assert.doesNotMatch(read('web/public/llms.txt'), /flizy\.app\/people/);
-    assert.match(read('web/app/privacy/page.tsx'), /4 November 2026/);
+    assert.match(read('web/app/privacy/page.tsx'), /20 November 2026/);
     assert.match(read('web/app/privacy/page.tsx'), /Show wallet address/);
     assert.match(read('web/app/privacy/page.tsx'), /Show portfolio value shows that wallet's available ETH balance; ETH\s+you moved to Savings is not included\./);
     assert.match(read('web/app/privacy/page.tsx'), /Following does not send a payment/);

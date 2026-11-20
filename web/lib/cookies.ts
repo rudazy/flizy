@@ -15,6 +15,7 @@ import { cookies, headers } from 'next/headers';
 import { createHash, randomBytes } from 'crypto';
 import { getSupabase } from './supabase';
 import { isMissingSessionColumn, sessionClientFrom } from './sessionClient';
+import { TIME_ZONE_COOKIE } from './timeZoneCookie.ts';
 import {
   LOGIN_DEVICE_COOKIE,
   LOGIN_DEVICE_TTL_MS,
@@ -81,9 +82,14 @@ export async function createSession(accountId: string, sink?: SessionCookieSink)
     expires_at: expiresAt.toISOString(),
   };
   try {
-    const seen = sessionClientFrom(await headers());
+    const timeZone = (await cookies()).get(TIME_ZONE_COOKIE)?.value || null;
+    const seen = sessionClientFrom(await headers(), timeZone);
     if (seen.label) row.client_label = seen.label;
+    if (seen.kind) row.client_kind = seen.kind;
+    if (seen.model) row.client_model = seen.model;
     if (seen.place) row.client_place = seen.place;
+    if (seen.networkPlace) row.client_network_place = seen.networkPlace;
+    row.last_seen_at = new Date().toISOString();
   } catch {
     // No request headers, for example a script. The session still opens.
   }
@@ -124,6 +130,61 @@ export async function hasTrustedLoginDevice(accountId: string): Promise<boolean>
   return loginDeviceMatches((await cookies()).get(LOGIN_DEVICE_COOKIE)?.value || '', accountId);
 }
 
+type SessionLookup = { account_id: string; expires_at: string; last_seen_at?: string | null };
+
+/** Set once a database without last_seen_at has answered, so it is not asked again. */
+let lastSeenMissing = false;
+
+async function readSession(tokenHash: string): Promise<SessionLookup | null> {
+  const supabase = getSupabase();
+  if (!lastSeenMissing) {
+    const { data, error } = await supabase
+      .from('web_sessions')
+      .select('account_id, expires_at, last_seen_at')
+      .eq('token_hash', tokenHash)
+      .maybeSingle();
+    if (!error) return (data as SessionLookup | null) || null;
+    if (!isMissingSessionColumn(error)) return null;
+    lastSeenMissing = true;
+  }
+  const { data, error } = await supabase
+    .from('web_sessions')
+    .select('account_id, expires_at')
+    .eq('token_hash', tokenHash)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as SessionLookup;
+}
+
+/** "Active" on the sessions list is this fresh. One write per window, not per request. */
+const LAST_SEEN_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Move last_seen_at forward when it is older than the window. A failed write
+ * costs only the freshness of that label, so it never fails the request.
+ */
+async function touchSession(tokenHash: string, lastSeenAt: string | null | undefined): Promise<void> {
+  if (lastSeenMissing) return;
+  const seen = lastSeenAt ? new Date(lastSeenAt).getTime() : 0;
+  if (Number.isFinite(seen) && Date.now() - seen < LAST_SEEN_WINDOW_MS) return;
+  try {
+    const { error } = await getSupabase()
+      .from('web_sessions')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('token_hash', tokenHash);
+    if (error) warnTouchFailedOnce(error.code || 'unknown');
+  } catch {
+    warnTouchFailedOnce('threw');
+  }
+}
+
+let warnedTouchFailed = false;
+function warnTouchFailedOnce(code: string): void {
+  if (warnedTouchFailed) return;
+  warnedTouchFailed = true;
+  console.warn(`[session] last_seen_at write failed (${code})`);
+}
+
 /**
  * Account id for the current request, or null when there is no live session.
  * Absolute expiry is enforced server side; the cookie maxAge is only a hint.
@@ -133,13 +194,9 @@ export async function getAccountIdFromCookie(): Promise<string | null> {
   if (!token) return null;
 
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('web_sessions')
-    .select('account_id, expires_at')
-    .eq('token_hash', hashToken(token))
-    .maybeSingle();
-
-  if (error || !data) return null;
+  const tokenHash = hashToken(token);
+  const data = await readSession(tokenHash);
+  if (!data) return null;
   if (new Date(data.expires_at).getTime() < Date.now()) return null;
 
   const { data: account, error: accountError } = await supabase
@@ -150,6 +207,7 @@ export async function getAccountIdFromCookie(): Promise<string | null> {
   if (accountError) {
     if (isMissingClosureColumn(accountError)) {
       warnMissingClosureOnce();
+      await touchSession(tokenHash, data.last_seen_at);
       return data.account_id;
     }
     return null;
@@ -160,6 +218,8 @@ export async function getAccountIdFromCookie(): Promise<string | null> {
   if (!account) return null;
   const state = closureOf(account);
   if (state === 'deleted' || state === 'deactivated') return null;
+  // Only a session that is let through counts as activity.
+  await touchSession(tokenHash, data.last_seen_at);
   return data.account_id;
 }
 

@@ -95,6 +95,44 @@ describe('POST /api/account/sessions', () => {
   });
 });
 
+describe('DELETE /api/account/sessions', () => {
+  const SRC = read('app/api/account/sessions/route.ts');
+  const HANDLER = SRC.slice(SRC.indexOf('export async function DELETE'));
+
+  it('checks origin, then the session, then the id, before deleting anything', () => {
+    const order = ['rejectIfCrossOrigin(req)', 'getAccountIdFromCookie()', 'SESSION_ID.test(id)', '.delete()'];
+    let at = -1;
+    for (const step of order) {
+      const i = HANDLER.indexOf(step);
+      assert.ok(i > at, `${step} out of order`);
+      at = i;
+    }
+  });
+
+  it('deletes one row of this account, never this browser', () => {
+    assert.match(HANDLER, /\.eq\('id', id\)\s*\.eq\('account_id', accountId\)\s*\.neq\('token_hash', hash\)/);
+    assert.match(HANDLER, /if \(!accountId \|\| !hash\)/);
+    assert.match(HANDLER, /status: 404/);
+  });
+});
+
+describe('Active sessions list', () => {
+  it('signs out one device by id and keeps the list honest', () => {
+    assert.match(SEC, /method: 'DELETE'/);
+    assert.match(SEC, /body: JSON\.stringify\(\{ id \}\)/);
+    assert.match(SEC, /row\.current \? null : \(/);
+    assert.match(SEC, /Network shows \{row\.networkPlace\}/);
+  });
+
+  it('asks for the phone model and remembers the time zone at sign-in', () => {
+    assert.match(read('next.config.mjs'), /key: 'Accept-CH', value: 'Sec-CH-UA-Model'/);
+    for (const form of ['app/login/LoginForm.tsx', 'app/signup/SignupForm.tsx']) {
+      assert.match(read(form), /rememberTimeZone\(\);/, form);
+    }
+    assert.match(read('lib/cookies.ts'), /sessionClientFrom\(await headers\(\), timeZone\)/);
+  });
+});
+
 describe('POST /api/account/password', () => {
   const ROUTE_SRC = read('app/api/account/password/route.ts');
 

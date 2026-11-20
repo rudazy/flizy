@@ -497,7 +497,7 @@ export function SecurityPanel({
         art={<HeroArt src="/account/security-hero.webp" />}
       />
 
-      <div className="grid gap-2.5 px-4 pb-5 pt-2">
+      <div className="grid grid-cols-1 gap-2.5 px-4 pb-5 pt-2">
         <Fold icon={<PersonGlyph />} title="Signed in as" text={email || 'No email on this account'}>
           {email ? (
             <span
@@ -698,9 +698,19 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 type SessionRow = {
   id: string;
   label: string | null;
+  kind: 'phone' | 'tablet' | 'computer' | null;
+  model: string | null;
   place: string | null;
+  networkPlace: string | null;
   createdAt: string;
+  lastSeenAt: string | null;
   current: boolean;
+};
+
+const KIND_NAME: Record<NonNullable<SessionRow['kind']>, string> = {
+  phone: 'Phone',
+  tablet: 'Tablet',
+  computer: 'Laptop or desktop',
 };
 
 function signedInOn(iso: string): string {
@@ -709,21 +719,48 @@ function signedInOn(iso: string): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+/** The server moves last_seen_at at most every 15 minutes, so inside that is "now". */
+function activeAgo(iso: string | null, now: number): string {
+  if (!iso) return '';
+  const at = new Date(iso).getTime();
+  if (Number.isNaN(at)) return '';
+  const minutes = Math.max(0, Math.floor((now - at) / 60000));
+  if (minutes < 16) return 'Active now';
+  if (minutes < 60) return `Active ${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Active ${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'Active 1 day ago' : `Active ${days} days ago`;
+}
+
+/** "Phone, Samsung SM-A155F", "Laptop or desktop", or the older label alone. */
+function deviceTitle(row: SessionRow): string {
+  const kind = row.kind ? KIND_NAME[row.kind] : '';
+  if (kind && row.model) return `${kind}, ${row.model}`;
+  return kind || row.label || (row.current ? 'This browser' : 'Another device');
+}
+
 /**
- * Every live sign-in for this account. Disconnecting others leaves this browser
- * signed in. The list is the device name and, when the host sent one, the city.
+ * Every live sign-in for this account. Each other device can be signed out on
+ * its own, or all of them at once; this browser stays signed in either way.
+ * A row names the kind of device, the model when the browser shared it, the
+ * browser, the place, and when it was last used.
  */
 function ActiveSessions() {
   const [sessions, setSessions] = useState<SessionRow[] | null>(null);
   const [problem, setProblem] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  /** The row whose own Sign out is running. */
+  const [ending, setEnding] = useState('');
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     let gone = false;
     (async () => {
       try {
         const res = await fetch('/api/account/sessions', { cache: 'no-store' });
+        if (!gone) setNow(Date.now());
         const body = await res.json().catch(() => null);
         if (!res.ok || !body || !Array.isArray(body.sessions)) {
           if (!gone) setProblem('Sessions could not be loaded.');
@@ -742,8 +779,34 @@ function ActiveSessions() {
   const others = sessions ? sessions.filter((row) => !row.current).length : 0;
   const onlyHere = sessions !== null && others === 0;
 
+  async function signOutOne(id: string) {
+    if (busy || ending) return;
+    setEnding(id);
+    setProblem('');
+    setNote('');
+    try {
+      const res = await fetch('/api/account/sessions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const body = await res.json().catch(() => null);
+      // 404 means it was already gone, which is the outcome asked for.
+      if (res.status !== 404 && (!res.ok || !body || body.ok !== true)) {
+        setProblem('Could not sign out that device.');
+        return;
+      }
+      setSessions((rows) => (rows || []).filter((row) => row.id !== id));
+      setNote('That device was signed out.');
+    } catch {
+      setProblem('Could not sign out that device.');
+    } finally {
+      setEnding('');
+    }
+  }
+
   async function disconnect() {
-    if (busy || onlyHere) return;
+    if (busy || ending || onlyHere) return;
     setBusy(true);
     setProblem('');
     setNote('');
@@ -790,20 +853,38 @@ function ActiveSessions() {
           <ul className="m-0 grid list-none gap-2 p-0">
             {sessions.map((row) => {
               const when = signedInOn(row.createdAt);
+              const active = row.current ? 'Active now' : activeAgo(row.lastSeenAt, now);
+              const title = deviceTitle(row);
+              const times = [when ? `Signed in ${when}` : '', active].filter(Boolean).join(' · ');
               return (
                 <li key={row.id} className="rounded-[12px] border border-[#26262a] bg-[#141416] px-3 py-2.5">
                   <span className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 font-sans text-[14px] font-medium text-white">
-                      {row.label || (row.current ? 'This browser' : 'Another device')}
-                    </span>
+                    <span className="min-w-0 break-words font-sans text-[14px] font-medium text-white">{title}</span>
                     {row.current ? (
                       <span className="shrink-0 rounded-full border border-[#5a4a1f] px-2 py-0.5 font-sans text-[11px] text-sun">
                         This device
                       </span>
                     ) : null}
                   </span>
+                  {row.label && row.label !== title ? (
+                    <span className="mt-0.5 block font-sans text-[13px] text-[#d9d4ca]">{row.label}</span>
+                  ) : null}
                   {row.place ? <span className="mt-0.5 block font-sans text-[13px] text-[#d9d4ca]">{row.place}</span> : null}
-                  {when ? <span className="mt-0.5 block font-sans text-[12px] text-[#9a958c]">Signed in {when}</span> : null}
+                  {row.networkPlace ? (
+                    <span className="mt-0.5 block font-sans text-[12px] text-[#9a958c]">Network shows {row.networkPlace}</span>
+                  ) : null}
+                  {times ? <span className="mt-0.5 block font-sans text-[12px] text-[#9a958c]">{times}</span> : null}
+                  {row.current ? null : (
+                    <button
+                      type="button"
+                      onClick={() => void signOutOne(row.id)}
+                      disabled={busy || Boolean(ending)}
+                      aria-label={`Sign out ${title}`}
+                      className="mt-2 inline-flex h-[44px] items-center justify-center rounded-[10px] border border-[#2e2e33] px-4 font-sans text-[13px] font-medium text-[#d9d4ca] hover:border-[#5a4a1f] hover:text-sun disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {ending === row.id ? 'Signing out...' : 'Sign out'}
+                    </button>
+                  )}
                 </li>
               );
             })}
@@ -814,7 +895,7 @@ function ActiveSessions() {
         <button
           type="button"
           onClick={() => void disconnect()}
-          disabled={busy || sessions === null || onlyHere}
+          disabled={busy || Boolean(ending) || sessions === null || onlyHere}
           className="inline-flex h-[44px] w-full items-center justify-center rounded-[10px] border border-[#5a4a1f] px-4 font-sans text-[14px] font-medium text-sun hover:border-sun/70 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? 'Signing out...' : 'Disconnect all other sessions'}
