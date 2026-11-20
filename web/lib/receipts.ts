@@ -43,10 +43,12 @@ type TransferRow = {
   created_at: string;
   note: string | null;
   receipt_token: string | null;
+  /** The channel key. Read only to tell External pay apart; never put on a receipt. */
+  phone: string | null;
 };
 
 const TRANSFER_COLUMNS =
-  'id, account_id, to_address, status, kind, amount_eth, asset, token_address, tx_hash, created_at, note, receipt_token';
+  'id, account_id, to_address, status, kind, amount_eth, asset, token_address, tx_hash, created_at, note, receipt_token, phone';
 
 function sameAddress(a: unknown, b: unknown): boolean {
   return Boolean(a) && Boolean(b) && String(a).toLowerCase() === String(b).toLowerCase();
@@ -114,7 +116,8 @@ export type Receipt = {
   txHash: string | null;
 };
 
-export type PartyKind = 'flizy' | 'wallet';
+/** A Flizy account; a wallet that paid in through External pay; or any other wallet outside Flizy. */
+export type PartyKind = 'flizy' | 'external' | 'wallet';
 
 type Party = { username: string | null; scan_show_username: boolean | null };
 
@@ -159,7 +162,8 @@ export async function loadReceipt(token: string, network: string, client?: Db): 
     unit: assetSymbol(t.asset || t.token_address || 'ETH'),
     from: partyLabel(sender, null),
     to: partyLabel(payee, t.to_address),
-    fromKind: sender ? 'flizy' : 'wallet',
+    // External pay rows carry the channel key 'external' (web/lib/externalPay.ts).
+    fromKind: sender ? 'flizy' : t.phone === 'external' ? 'external' : 'wallet',
     toKind: payee ? 'flizy' : 'wallet',
     note: t.note ? displaySafeLabel(t.note, 80) || null : null,
     at: t.created_at,

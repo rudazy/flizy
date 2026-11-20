@@ -142,6 +142,14 @@ describe('what a receipt shows', () => {
     const r = await R.loadReceipt('abcdefghijklmnopqrstuv', 'GIWA Sepolia', c());
     assert.deepEqual({ from: r.from, fromKind: r.fromKind }, { from: 'A wallet', fromKind: 'wallet' });
   });
+
+  it('names an External pay payer as External pay, and keeps the channel key off the receipt', async () => {
+    seed({ account_id: null, phone: 'external', receipt_token: 'externalpayreceipt0001' });
+    const r = await R.loadReceipt('externalpayreceipt0001', 'GIWA Sepolia', c());
+    assert.equal(r.fromKind, 'external');
+    assert.equal(r.from, 'A wallet');
+    assert.ok(!('phone' in r));
+  });
 });
 
 describe('the receipt link in chat', () => {

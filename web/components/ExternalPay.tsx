@@ -201,13 +201,18 @@ export function ExternalPay({
         <>
           <button
             type="button"
-            className={prominent ? 'btn-sun min-h-[52px] w-full rounded-[10px] py-3 font-sans text-[16px] font-semibold disabled:opacity-50' : 'btn btn-ghost w-full py-3'}
+            className={
+              prominent
+                ? 'btn-sun min-h-[56px] w-full gap-3 rounded-[12px] py-3 font-sans text-[15.5px] font-semibold min-[400px]:text-[16.5px] shadow-[0_0_30px_-8px_rgba(247,208,71,0.6)] disabled:opacity-50'
+                : 'btn btn-ghost w-full py-3'
+            }
             disabled={busy || !(Number(amount) > 0)}
             onClick={() => void pay()}
           >
+            {prominent ? <WalletGlyph /> : null}
             {label}
           </button>
-          <p className="m-0 text-xs text-muted">
+          <p className={prominent ? 'm-0 text-center font-sans text-[13px] leading-relaxed text-[#9a958c]' : 'm-0 text-xs text-muted'}>
             Pays on {PAYMENT_RECEIVER_CHAIN.name} straight to {handle}. Your wallet shows the exact amount before you sign.
             {asset !== 'ETH' ? ` A token payment asks you to approve ${amount || 'the amount'} ${unit} first.` : ''}
           </p>
@@ -223,5 +228,15 @@ export function ExternalPay({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function WalletGlyph() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden>
+      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" />
+      <rect x="3.5" y="7.5" width="17" height="12" rx="2.5" />
+      <path d="M15.5 13.5h2" />
+    </svg>
   );
 }

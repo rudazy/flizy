@@ -40,5 +40,8 @@ describe('receipt figures', () => {
     assert.equal(v.partyNote('flizy', 'from'), 'Flizy wallet');
     assert.equal(v.partyNote('flizy', 'to'), 'Flizy user');
     assert.equal(v.partyNote('wallet', 'to'), 'Outside wallet');
+    // Paying in through External pay says so; any other wallet stays an outside wallet.
+    assert.equal(v.partyNote('external', 'from'), 'External pay');
+    assert.equal(v.partyNote('wallet', 'from'), 'Outside wallet');
   });
 });

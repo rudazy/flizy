@@ -43,8 +43,8 @@ export function channelLabel(key: unknown): string | null {
   const k = typeof key === 'string' ? key.trim().toLowerCase() : '';
   if (!k) return null;
   if (k === 'site') return 'Flizy app';
-  // Paid from a wallet outside Flizy, through FlizyPaymentReceiver.
-  if (k === 'external') return 'Outside wallet';
+  // External pay: paid from a wallet outside Flizy, through FlizyPaymentReceiver.
+  if (k === 'external') return 'External pay';
   // Signed by a connected wallet on the site, recorded for Scan (web/lib/walletScanRecord.ts).
   if (k === 'wallet') return 'Guest';
   const prefix = k.match(/^([a-z]+):/);

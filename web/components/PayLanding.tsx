@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { PinField, pinReady } from './PinField';
 import { txPin } from '../lib/txPin';
@@ -322,18 +322,28 @@ export function PayLanding({
 
   const fromLabel = payerHandle ? `${payerHandle}, Flizy wallet` : 'Your Flizy wallet';
   const paid = loggedIn && !self && ok;
+  /** A signed-out visitor on a link that asks for an amount: the payment request layout. */
+  const askView = loggedIn === false && Boolean(preset?.amount);
 
   return (
     <div className="fade-up mx-auto w-full max-w-[560px]">
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 rounded-[18px] border border-[#3a3017] px-4 py-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:px-6" style={CARD_BG}>
+      <div
+        className="relative grid grid-cols-[minmax(0,1fr)] gap-5 overflow-hidden rounded-[18px] border border-[#3a3017] px-4 py-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:px-6"
+        style={CARD_BG}
+      >
+        {askView ? <CardArc /> : null}
         {paid ? (
           <PaidHeader amount={paidFee ? paidFee.sendHuman : amount} unit={unit} handle={handle} />
         ) : (
-          <div className="flex items-start gap-4">
+          <div className="relative flex items-start gap-4">
             <div className="min-w-0 flex-1">
-              <p className="m-0 font-mono text-[12px] uppercase tracking-[0.22em] text-sun">Send payment to</p>
+              <p className="m-0 font-mono text-[12px] uppercase tracking-[0.22em] text-sun">{askView ? 'Payment request' : 'Send payment to'}</p>
               <div className="mt-4 flex items-start gap-3.5">
-                <span className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full border border-[#5a4718] bg-[#14110a] font-sans text-[28px] font-bold text-sun">
+                <span
+                  className={`flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full border bg-[#14110a] font-sans text-[28px] font-bold ${
+                    askView ? 'border-[1.5px] border-sun text-white shadow-[0_0_18px_-6px_rgba(247,208,71,0.6)]' : 'border-[#5a4718] text-sun'
+                  }`}
+                >
                   @
                 </span>
                 <div className="min-w-0">
@@ -357,25 +367,36 @@ export function PayLanding({
                 </div>
               </div>
             </div>
-            <div className="hidden shrink-0 flex-col items-center gap-2 rounded-[14px] border border-[#3a3017] bg-[#14110a] px-4 pb-3 pt-4 min-[400px]:flex">
-              <span className="flex h-[58px] w-[58px] items-center justify-center rounded-[10px] border border-[#5a4718] text-sun">
-                <QrGlyph />
-              </span>
-              <span className="font-mono text-[11.5px] text-sun">Flizy Pay</span>
-            </div>
+            {askView ? null : (
+              <div className="hidden shrink-0 flex-col items-center gap-2 rounded-[14px] border border-[#3a3017] bg-[#14110a] px-4 pb-3 pt-4 min-[400px]:flex">
+                <span className="flex h-[58px] w-[58px] items-center justify-center rounded-[10px] border border-[#5a4718] text-sun">
+                  <QrGlyph />
+                </span>
+                <span className="font-mono text-[11.5px] text-sun">Flizy Pay</span>
+              </div>
+            )}
           </div>
         )}
 
         {self ? <p className="m-0 font-sans text-[13px] text-[#9a958c]">This is your pay page. Share the QR or @username.</p> : null}
 
-        {/* A link with an amount says what it asks for before anyone signs in, whether or not other wallets can pay it. */}
-        {loggedIn === false && preset?.amount ? (
-          <div className="min-w-0 rounded-[14px] border border-[#3a3017] bg-[#14110a] px-4 py-3.5">
-            <p className="m-0 font-mono text-[11px] uppercase tracking-[0.22em] text-sun">Amount requested</p>
-            <p className="m-0 mt-1.5 break-words font-sans text-[26px] font-bold leading-tight text-white">
-              {preset.amount} {symbolLabel(preset.asset)}
-            </p>
-            {note ? <p className="m-0 mt-1.5 break-words font-sans text-[14px] text-[#b7b1a8]">For: {note}</p> : null}
+        {/*
+          A link with an amount says what it asks for before anyone signs in, whether or
+          not other wallets can pay it. The QR is this same link, for paying from a phone.
+        */}
+        {askView && preset?.amount ? (
+          <div className="relative grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-[14px] border border-[#3a3017] bg-[#100f0d]/90 px-4 py-4 sm:px-5">
+            <div className="min-w-0">
+              <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[#b7b1a8] min-[400px]:text-[11px] min-[400px]:tracking-[0.22em]">Amount requested</p>
+              <p className="m-0 mt-2 break-words font-sans text-[28px] font-bold leading-[1.1] min-[400px]:text-[32px]">
+                <span className="text-white">{preset.amount}</span> <span className="text-sun">{symbolLabel(preset.asset)}</span>
+              </p>
+              {note ? <p className="m-0 mt-2 break-words font-sans text-[14px] text-[#b7b1a8]">For: {note}</p> : null}
+            </div>
+            <div className="flex flex-col items-center gap-2 border-l border-[#2e2a1e] pl-3 min-[400px]:pl-4">
+              <AskQr />
+              <span className="font-sans text-[12px] text-[#9a958c]">Scan to pay</span>
+            </div>
           </div>
         ) : null}
 
@@ -395,14 +416,19 @@ export function PayLanding({
         ) : null}
 
         {loggedIn === false ? (
-          <div className="grid gap-2">
+          <div className={askView ? 'grid grid-cols-2 gap-3' : 'grid gap-2'}>
             <Link
               href={`/login?next=${encodeURIComponent(next)}`}
-              className={`btn ${outsidePay && preset?.amount ? 'btn-ghost' : 'btn-primary'} py-3 font-sans no-underline`}
+              className={`btn ${outsidePay && preset?.amount ? 'btn-ghost' : 'btn-primary'} inline-flex items-center justify-center gap-2 whitespace-nowrap !px-2 py-3 font-sans text-[14.5px] no-underline`}
             >
+              {askView ? <LoginGlyph /> : null}
               Log in to pay
             </Link>
-            <Link href={`/signup?next=${encodeURIComponent(next)}`} className="btn btn-ghost py-3 font-sans no-underline">
+            <Link
+              href={`/signup?next=${encodeURIComponent(next)}`}
+              className="btn btn-ghost inline-flex items-center justify-center gap-2 whitespace-nowrap !px-2 py-3 font-sans text-[14.5px] no-underline"
+            >
+              {askView ? <UserPlusGlyph /> : null}
               Create account
             </Link>
           </div>
@@ -764,6 +790,7 @@ export function PayLanding({
           </div>
         ) : null}
       </div>
+      {askView && outsidePay ? <AskPoints /> : null}
     </div>
   );
 }
@@ -915,6 +942,126 @@ function LockGlyph() {
       <rect x="5" y="10.5" width="14" height="10" rx="2" />
       <path d="M8 10.5V7.5a4 4 0 018 0v3" />
       <circle cx="12" cy="15.5" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** One gold line sweeping down the card's top right, behind the content. Drawn, so it stays sharp. */
+function CardArc() {
+  return (
+    <svg aria-hidden viewBox="0 0 240 260" preserveAspectRatio="none" className="pointer-events-none absolute right-0 top-0 h-[260px] w-[46%]">
+      <defs>
+        <linearGradient id="pay-arc" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#f7d047" stopOpacity="0" />
+          <stop offset="0.6" stopColor="#f7d047" stopOpacity="0.85" />
+          <stop offset="1" stopColor="#f7d047" stopOpacity="0.5" />
+        </linearGradient>
+        <radialGradient id="pay-glow" cx="1" cy="0" r="1">
+          <stop offset="0" stopColor="#f7d047" stopOpacity="0.14" />
+          <stop offset="1" stopColor="#f7d047" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect width="240" height="260" fill="url(#pay-glow)" />
+      <path d="M40 260 C 70 150, 140 40, 240 4" fill="none" stroke="url(#pay-arc)" strokeWidth="5" opacity="0.35" style={{ filter: 'blur(3px)' }} />
+      <path d="M40 260 C 70 150, 140 40, 240 4" fill="none" stroke="url(#pay-arc)" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+/**
+ * The ask link itself as a QR, for paying from a phone wallet. Encodes the page's
+ * own address (the same link that was shared), drawn after mount; until then, or
+ * if drawing fails, the frame stays empty rather than showing a wrong code.
+ */
+function AskQr() {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const QR = await import('qrcode');
+        if (cancelled || !ref.current) return;
+        await QR.toCanvas(ref.current, window.location.href, {
+          width: 160,
+          margin: 1,
+          errorCorrectionLevel: 'M',
+          color: { dark: '#0a0a0a', light: '#f5f5f5' },
+        });
+      } catch {
+        // Leave the frame empty: no code is better than a wrong one.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return (
+    <span className="block rounded-[12px] border-[1.5px] border-sun p-[5px] shadow-[0_0_18px_-6px_rgba(247,208,71,0.6)]">
+      <canvas ref={ref} width={160} height={160} className="block !h-[72px] !w-[72px] rounded-[6px] bg-[#f5f5f5]" aria-label="QR code for this payment request" />
+    </span>
+  );
+}
+
+/** What External pay is, in three lines, under the card. */
+function AskPoints() {
+  const points: { icon: ReactNode; title: string; text: string }[] = [
+    { icon: <ShieldGlyph />, title: 'Direct payment', text: 'Sent straight to the recipient' },
+    { icon: <BoltGlyph />, title: 'Secure', text: 'You confirm the amount in your wallet' },
+    { icon: <LayersGlyph />, title: 'On testnet', text: 'This is a test network (GIWA Sepolia)' },
+  ];
+  return (
+    <div className="mt-8 grid grid-cols-3 px-1">
+      {points.map((p, i) => (
+        <div key={p.title} className={`min-w-0 px-2.5 sm:px-4 ${i > 0 ? 'border-l border-[#2a2a2e]' : ''}`}>
+          <span className="text-sun">{p.icon}</span>
+          <p className="m-0 mt-2.5 font-sans text-[13.5px] font-semibold leading-tight text-white">{p.title}</p>
+          <p className="m-0 mt-1 font-sans text-[12.5px] leading-snug text-[#9a958c]">{p.text}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LoginGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden>
+      <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
+      <path d="M10 16l4-4-4-4M14 12H4" />
+    </svg>
+  );
+}
+
+function UserPlusGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6" />
+    </svg>
+  );
+}
+
+function ShieldGlyph() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 2.8l7.5 2.8v5.6c0 4.7-3.2 8.6-7.5 10-4.3-1.4-7.5-5.3-7.5-10V5.6z" />
+      <path d="M8.6 12.1l2.4 2.4 4.6-4.8" />
+    </svg>
+  );
+}
+
+function BoltGlyph() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M13 2.5L4.5 13.5H12l-1 8 8.5-11H12z" />
+    </svg>
+  );
+}
+
+function LayersGlyph() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 4l8 4.5-8 4.5-8-4.5L12 4z" />
+      <path d="M4 12.5l8 4.5 8-4.5M4 16.5l8 4.5 8-4.5" />
     </svg>
   );
 }

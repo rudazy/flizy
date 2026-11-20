@@ -166,31 +166,46 @@ describe('who can be paid from an outside wallet', () => {
     assert.match(toggle, /typeof body\?\.enabled !== 'boolean'/);
   });
 
-  it('a signed-out payer sees the amount asked and its note, with or without outside wallets', () => {
+  it('a signed-out payer sees the payment request: amount, note and a QR of the link, with or without External pay', () => {
     const page = read('web/components/PayLanding.tsx');
-    // Gated only on being signed out and the link carrying an amount, never on outsidePay.
-    assert.match(page, /\{loggedIn === false && preset\?\.amount \? \(\s*<div className="min-w-0 rounded-\[14px\]/);
-    assert.match(page, />Amount requested</);
-    assert.match(page, /\{preset\.amount\} \{symbolLabel\(preset\.asset\)\}/);
+    // The request layout is for a signed-out visitor on a link with an amount, never gated on outsidePay.
+    const has = (snippet) => assert.ok(page.includes(snippet), snippet);
+    has('const askView = loggedIn === false && Boolean(preset?.amount);');
+    has("{askView ? 'Payment request' : 'Send payment to'}");
+    has('{askView && preset?.amount ? (\n          <div className="relative grid min-w-0 grid-cols-[minmax(0,1fr)_auto]');
+    has('>Amount requested<');
+    // The amount in white, the asset in gold.
+    has('<span className="text-white">{preset.amount}</span> <span className="text-sun">{symbolLabel(preset.asset)}</span>');
     assert.match(page, /\{note \? <p className="[^"]*break-words[^"]*">For: \{note\}<\/p> : null\}/);
+    // Scan to pay: a QR of this same link, and no code at all rather than a wrong one.
+    assert.match(page, /<AskQr \/>\s*<span[^>]*>Scan to pay<\/span>/);
+    has('await QR.toCanvas(ref.current, window.location.href,');
     // Shown above the sign-in buttons, so it is read first.
     assert.ok(page.indexOf('>Amount requested<') < page.indexOf('Log in to pay'));
   });
 
-  it('on an ask link, paying from your own wallet sits right under the amount, before sign-in', () => {
+  it('on an ask link, External pay sits right under the amount, then sign-in side by side, then three points', () => {
     const page = read('web/components/PayLanding.tsx');
     const amountAt = page.indexOf('>Amount requested<');
     const walletAt = page.indexOf('<ExternalPay refSlug={refSlug} presetAmount={preset.amount} presetAsset={preset.asset} note={note} handle={handle} prominent />');
     const loginAt = page.indexOf('Log in to pay');
     assert.ok(amountAt > 0 && walletAt > amountAt && loginAt > walletAt, 'amount, then wallet pay, then log in');
-    // Sign-in steps back to secondary while wallet pay is the first action.
-    assert.match(page, /className=\{`btn \$\{outsidePay && preset\?\.amount \? 'btn-ghost' : 'btn-primary'\} py-3 font-sans no-underline`\}/);
+    // Sign-in steps back to secondary while wallet pay is the first action, two across with icons.
+    const has = (src, snippet) => assert.ok(src.includes(snippet), snippet);
+    has(page, "<div className={askView ? 'grid grid-cols-2 gap-3' : 'grid gap-2'}>");
+    has(page, "className={`btn ${outsidePay && preset?.amount ? 'btn-ghost' : 'btn-primary'} inline-flex");
+    has(page, '{askView ? <LoginGlyph /> : null}');
+    has(page, '{askView ? <UserPlusGlyph /> : null}');
     // Off for this account: said plainly instead of a missing button.
     assert.match(page, /\{loggedIn === false && !outsidePay && preset\?\.amount \? \(\s*<p[^>]*>\s*\{handle\} does not take payments from other wallets\. Log in to pay with Flizy\./);
-    // Prominent: a gold button, one tap to connect and sign.
+    // Under the card, only where External pay is on: what it is, in three points.
+    has(page, '{askView && outsidePay ? <AskPoints /> : null}');
+    for (const t of ['Direct payment', 'Secure', 'On testnet']) has(page, `title: '${t}'`);
+    // Prominent: a gold button with a wallet icon, one tap to connect and sign.
     const pay = read('web/components/ExternalPay.tsx');
-    assert.match(pay, /className=\{prominent \? 'btn-sun min-h-\[52px\] w-full/);
-    assert.match(pay, /idle: prominent \? `Pay \$\{amount \|\| ''\} \$\{unit\} with your wallet`/);
+    has(pay, "? 'btn-sun min-h-[56px] w-full");
+    has(pay, '{prominent ? <WalletGlyph /> : null}');
+    has(pay, "idle: prominent ? `Pay ${amount || ''} ${unit} with your wallet`");
   });
 });
 

@@ -454,9 +454,9 @@ describe('waiting for the receipt, and the explorer sync', () => {
     assert.equal(await rec.syncWalletScan({ provider: chain({}), supabase: db().client, chainId: 91342, setup: SETUP, explorerUrl: 'https://explorer.test', fetchImpl }), 0);
   });
 
-  it('payments from an outside wallet are named as such', () => {
-    // The same name the receipt uses (web/lib/receiptView.ts), not a second one.
-    assert.equal(historyRow.channelLabel('external'), 'Outside wallet');
+  it('External pay payments are named External pay', () => {
+    // The same name the receipt gives the paying side (web/lib/receiptView.ts), not a second one.
+    assert.equal(historyRow.channelLabel('external'), 'External pay');
   });
 });
 

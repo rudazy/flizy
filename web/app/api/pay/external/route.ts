@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     for (const [index, pay] of recorded.entries()) {
       if (Number(pay.amount) < (pay.asset === 'ETH' ? 0.0001 : 0.01)) continue;
       try {
-        const fromLabel = `an outside wallet (${pay.payer.slice(0, 6)}…${pay.payer.slice(-4)})`;
+        const fromLabel = `${pay.payer.slice(0, 6)}…${pay.payer.slice(-4)} via External pay`;
         await notifyAllChannels(
           merchant.accountId,
           formatPaymentReceived({

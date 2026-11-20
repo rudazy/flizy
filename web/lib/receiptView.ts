@@ -34,7 +34,8 @@ export function receiptHash(hash: string): string {
 }
 
 /** The line under each name: who holds that side of the payment. */
-export function partyNote(kind: 'flizy' | 'wallet', side: 'from' | 'to'): string {
+export function partyNote(kind: 'flizy' | 'external' | 'wallet', side: 'from' | 'to'): string {
+  if (kind === 'external') return 'External pay';
   if (kind === 'wallet') return 'Outside wallet';
   return side === 'from' ? 'Flizy wallet' : 'Flizy user';
 }
