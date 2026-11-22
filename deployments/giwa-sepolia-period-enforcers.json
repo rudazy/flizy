@@ -81,5 +81,45 @@
       "exactRuntimeMatch": true
     }
   },
-  "rejected": {}
+  "rejected": {},
+  "verification": {
+    "verifiedAt": "2026-11-22",
+    "verifier": "blockscout",
+    "verifierUrl": "https://sepolia-explorer.giwa.io/api/",
+    "tool": "forge verify-contract (foundry 1.7.1)",
+    "source": "Unmodified delegation-framework v1.3.0 checkout at the pinned commit.",
+    "compiler": "v0.8.23+commit.f704f362",
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "evmVersion": "london",
+    "viaIR": false,
+    "contracts": {
+      "NativeTokenPeriodTransferEnforcer": {
+        "target": "src/enforcers/NativeTokenPeriodTransferEnforcer.sol:NativeTokenPeriodTransferEnforcer",
+        "address": "0x4AEa7d5c1f46dbBC989bCe6fED1c308969e02B4b",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0x4AEa7d5c1f46dbBC989bCe6fED1c308969e02B4b?tab=contract"
+      },
+      "ERC20PeriodTransferEnforcer": {
+        "target": "src/enforcers/ERC20PeriodTransferEnforcer.sol:ERC20PeriodTransferEnforcer",
+        "address": "0x5f7e9B1133b40b7fE5898952409f5092291F85e1",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0x5f7e9B1133b40b7fE5898952409f5092291F85e1?tab=contract"
+      },
+      "ExactCalldataEnforcer": {
+        "target": "src/enforcers/ExactCalldataEnforcer.sol:ExactCalldataEnforcer",
+        "address": "0x9c2E6f6986eeF48b8E8BD1239EDd231b3e96fe4F",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0x9c2E6f6986eeF48b8E8BD1239EDd231b3e96fe4F?tab=contract"
+      },
+      "ValueLteEnforcer": {
+        "target": "src/enforcers/ValueLteEnforcer.sol:ValueLteEnforcer",
+        "address": "0xCDfF89B4f7D0F44Dc056C33B18f575D7B7fA0505",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0xCDfF89B4f7D0F44Dc056C33B18f575D7B7fA0505?tab=contract"
+      }
+    }
+  }
 }

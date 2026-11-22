@@ -256,5 +256,59 @@
         "raw": "0x220266b6"
       }
     }
+  },
+  "verification": {
+    "verifiedAt": "2026-11-22",
+    "verifier": "blockscout",
+    "verifierUrl": "https://sepolia-explorer.giwa.io/api/",
+    "tool": "forge verify-contract (foundry 1.7.1)",
+    "source": "Unmodified delegation-framework v1.3.0 checkout at the pinned commit.",
+    "compiler": "v0.8.23+commit.f704f362",
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "evmVersion": "london",
+    "viaIR": false,
+    "contracts": {
+      "DelegationManager": {
+        "target": "src/DelegationManager.sol:DelegationManager",
+        "address": "0xB04c9b180d5C0F9854B3f9da5e702d10f0030d4B",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0xB04c9b180d5C0F9854B3f9da5e702d10f0030d4B?tab=contract",
+        "constructorArgs": "0x00000000000000000000000081fb7ed21b9843d2d5c232a7f3e959f91993401b",
+        "constructorArgsMeaning": "owner = deployer"
+      },
+      "HybridDeleGator": {
+        "target": "src/HybridDeleGator.sol:HybridDeleGator",
+        "address": "0xC12F82BBbD43aA77371D9121acDF088224D4cC0c",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0xC12F82BBbD43aA77371D9121acDF088224D4cC0c?tab=contract",
+        "constructorArgs": "0x000000000000000000000000b04c9b180d5c0f9854b3f9da5e702d10f0030d4b0000000000000000000000000000000071727de22e5e9d8baf0edac6f37da032",
+        "constructorArgsMeaning": "delegationManager, entryPoint v0.7",
+        "linkedLibrary": {
+          "lib/SCL/src/lib/libSCL_RIP7212.sol:SCL_RIP7212": "0x2E5d71461951B459aE837714a9EB143c0f2548F9"
+        },
+        "note": "Submitted without a libraries compiler setting, matching the original build which linked at deploy time. Passing the library as a compiler setting changes the metadata hash and gives only a partial match."
+      },
+      "NativeTokenTransferAmountEnforcer": {
+        "target": "src/enforcers/NativeTokenTransferAmountEnforcer.sol:NativeTokenTransferAmountEnforcer",
+        "address": "0x163bD4BDcb68c4913deeFFa265ec54007d6C03CF",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0x163bD4BDcb68c4913deeFFa265ec54007d6C03CF?tab=contract"
+      },
+      "TimestampEnforcer": {
+        "target": "src/enforcers/TimestampEnforcer.sol:TimestampEnforcer",
+        "address": "0x24DD7326ae2275fD9D505526f62a3843d174C2eF",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0x24DD7326ae2275fD9D505526f62a3843d174C2eF?tab=contract"
+      },
+      "AllowedTargetsEnforcer": {
+        "target": "src/enforcers/AllowedTargetsEnforcer.sol:AllowedTargetsEnforcer",
+        "address": "0x6b50AD84c6Ba42d227bD8f88bCdC4B53d3fdA405",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0x6b50AD84c6Ba42d227bD8f88bCdC4B53d3fdA405?tab=contract"
+      }
+    }
   }
 }

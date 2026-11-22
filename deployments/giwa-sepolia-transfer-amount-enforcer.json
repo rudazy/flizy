@@ -29,5 +29,27 @@
       "exactRuntimeMatch": true
     }
   },
-  "rejected": {}
+  "rejected": {},
+  "verification": {
+    "verifiedAt": "2026-11-22",
+    "verifier": "blockscout",
+    "verifierUrl": "https://sepolia-explorer.giwa.io/api/",
+    "tool": "forge verify-contract (foundry 1.7.1)",
+    "source": "Unmodified delegation-framework v1.3.0 checkout at the pinned commit.",
+    "compiler": "v0.8.23+commit.f704f362",
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "evmVersion": "london",
+    "viaIR": false,
+    "contracts": {
+      "ERC20TransferAmountEnforcer": {
+        "target": "src/enforcers/ERC20TransferAmountEnforcer.sol:ERC20TransferAmountEnforcer",
+        "address": "0x90aBb16aED4C6aE5202EaD16D241b4F32297be68",
+        "match": "full",
+        "explorer": "https://sepolia-explorer.giwa.io/address/0x90aBb16aED4C6aE5202EaD16D241b4F32297be68?tab=contract"
+      }
+    }
+  }
 }
