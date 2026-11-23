@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     const raw = String(body.locale || '').trim().toLowerCase();
     if (!isLocaleCode(raw)) {
       return NextResponse.json(
-        { error: 'Unsupported language. Use en, ko, or zh.' },
+        { error: 'Unsupported language. Use en, ko, zh, or id.' },
         { status: 400 }
       );
     }

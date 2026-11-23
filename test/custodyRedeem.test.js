@@ -325,13 +325,17 @@ describe('sending through the permission', () => {
 
 describe('the decision as the engine calls it', () => {
   let lines = [];
+  // trySendWithPermission reads the real clock, so a permission dated from the
+  // fixed NOW expires for it once the wall clock passes NOW plus the expiry.
+  // Each row is given a full validity window from the real time instead.
+  const fresh = (r) => ({ ...r, expires_at: new Date(Date.now() + C.EXPIRY_SECONDS * 1000).toISOString() });
   const call = (rows, p, env) => {
     const saved = process.env.CUSTODY_RELAYER_KEY;
     process.env.CUSTODY_RELAYER_KEY = env;
     lines = [];
     const quiet = { warn: (l) => lines.push(l), info: (l) => lines.push(l) };
     return R.trySendWithPermission({
-      supabase: createFakeSupabase({ custody_delegations: rows }).client,
+      supabase: createFakeSupabase({ custody_delegations: rows.map(fresh) }).client,
       provider: p,
       accountId: ACCOUNT,
       wallet: WALLET,

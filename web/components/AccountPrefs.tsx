@@ -147,6 +147,7 @@ const LANGUAGE_FACE: Record<LocaleCode, { iso: string; english: string }> = {
   en: { iso: 'GB', english: 'English' },
   ko: { iso: 'KR', english: 'Korean' },
   zh: { iso: 'CN', english: 'Chinese' },
+  id: { iso: 'ID', english: 'Indonesian' },
 };
 
 export function LanguagePanel({

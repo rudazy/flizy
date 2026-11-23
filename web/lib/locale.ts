@@ -3,7 +3,7 @@
  * @username stays ASCII; display names and UI copy may be any locale.
  */
 
-export const LOCALES = ['en', 'ko', 'zh'] as const;
+export const LOCALES = ['en', 'ko', 'zh', 'id'] as const;
 export type LocaleCode = (typeof LOCALES)[number];
 
 export const DEFAULT_LOCALE: LocaleCode = 'en';
@@ -12,6 +12,7 @@ export const LOCALE_LABELS: Record<LocaleCode, string> = {
   en: 'English',
   ko: '한국어',
   zh: '中文',
+  id: 'Bahasa Indonesia',
 };
 
 export function normalizeLocale(raw: unknown): LocaleCode {
@@ -22,6 +23,7 @@ export function normalizeLocale(raw: unknown): LocaleCode {
   if (s === 'en' || s.startsWith('en-')) return 'en';
   if (s === 'ko' || s.startsWith('ko-')) return 'ko';
   if (s === 'zh' || s.startsWith('zh-')) return 'zh';
+  if (s === 'id' || s.startsWith('id-')) return 'id';
   return DEFAULT_LOCALE;
 }
 

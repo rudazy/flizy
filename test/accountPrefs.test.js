@@ -4,10 +4,11 @@
  * Run: node --test test/accountPrefs.test.js
  */
 
-const { describe, it } = require('node:test');
+const { describe, it, before } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const WEB = path.join(__dirname, '..', 'web');
 const read = (rel) => fs.readFileSync(path.join(WEB, rel), 'utf8');
@@ -52,14 +53,60 @@ describe('Language', () => {
     assert.match(PREFS, /\{LOCALES\.map\(\(code\) =>/);
     const face = /const LANGUAGE_FACE: Record<LocaleCode, \{ iso: string; english: string \}> = \{([\s\S]*?)\};/.exec(PREFS);
     assert.ok(face, 'LANGUAGE_FACE');
-    assert.deepEqual([...face[1].matchAll(/^\s*([a-z]{2}):/gm)].map((m) => m[1]), ['en', 'ko', 'zh']);
+    assert.deepEqual([...face[1].matchAll(/^\s*([a-z]{2}):/gm)].map((m) => m[1]), ['en', 'ko', 'zh', 'id']);
   });
 
   it('every new label is translated in every locale', () => {
     const messages = read('lib/i18n/messages.ts');
     for (const key of ['account.preferences', 'account.languageCurrent']) {
-      assert.equal(messages.split(`'${key}':`).length - 1, 3, key);
+      assert.equal(messages.split(`'${key}':`).length - 1, 4, key);
     }
+  });
+});
+
+describe('Indonesian', () => {
+  let L;
+  let M;
+  before(async () => {
+    L = await import(pathToFileURL(path.join(WEB, 'lib', 'locale.ts')).href);
+    M = await import(pathToFileURL(path.join(WEB, 'lib', 'i18n', 'messages.ts')).href);
+  });
+
+  it('is offered under its own name, after the existing languages', () => {
+    assert.deepEqual([...L.LOCALES], ['en', 'ko', 'zh', 'id']);
+    assert.equal(L.LOCALE_LABELS.id, 'Bahasa Indonesia');
+    assert.equal(L.isLocaleCode('id'), true);
+  });
+
+  it('reads id and regional id tags as Indonesian', () => {
+    for (const raw of ['id', 'ID', 'id-ID', 'id_ID']) assert.equal(L.normalizeLocale(raw), 'id', raw);
+  });
+
+  it('leaves English the default for anything unchosen or unknown', () => {
+    assert.equal(L.DEFAULT_LOCALE, 'en');
+    for (const raw of [undefined, null, '', 'fr', 'ms', 'in', 'idx', 'jv-ID']) assert.equal(L.normalizeLocale(raw), 'en', String(raw));
+  });
+
+  it('has its own text for every key, not the English fallback', () => {
+    const same = new Set(['auth.signup.email', 'auth.login.email']);
+    for (const key of Object.keys(M.en)) {
+      const text = M.t('id', key);
+      assert.ok(text && text !== key, key);
+      if (!same.has(key)) assert.notEqual(text, M.en[key], key);
+    }
+  });
+
+  it('keeps placeholders and uses no long dashes', () => {
+    assert.match(M.t('id', 'account.usernameCooldown', { date: '1 Des 2026' }), /setelah 1 Des 2026\.$/);
+    for (const key of Object.keys(M.en)) {
+      const text = M.t('id', key);
+      assert.equal(/[\u2013\u2014]/.test(text), false, key);
+    }
+  });
+
+  it('the language API accepts id and names it in the error', () => {
+    const route = read('app/api/account/locale/route.ts');
+    assert.match(route, /Use en, ko, zh, or id\./);
   });
 });
 

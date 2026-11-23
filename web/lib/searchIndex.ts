@@ -50,7 +50,7 @@ export const PLACES: Place[] = [
   { title: 'Profile', subtitle: 'Your name, username and email', href: '/dashboard/account', keywords: ['profile', 'account', 'username', 'name', 'email', 'display name'] },
   { title: 'Projects', subtitle: 'Your projects and their pages', href: '/dashboard/account?s=projects', keywords: ['projects', 'project', 'brand', 'team', 'workspace'], features: ['projects'] },
   { title: 'Pay me', subtitle: 'Your pay link, QR and username', href: '/dashboard/account?s=pay', keywords: ['pay me', 'receive', 'qr', 'pay link', 'get paid', 'request'] },
-  { title: 'Language', subtitle: 'English or Korean', href: '/dashboard/account?s=language', keywords: ['language', 'korean', 'english', 'translate'] },
+  { title: 'Language', subtitle: 'English, Korean, Chinese or Indonesian', href: '/dashboard/account?s=language', keywords: ['language', 'korean', 'english', 'chinese', 'indonesian', 'bahasa', 'translate'] },
   { title: 'Country', subtitle: 'Your phone number country', href: '/dashboard/account?s=country', keywords: ['country', 'region', 'phone code', 'calling code'] },
   { title: 'Chat', subtitle: 'Link WhatsApp and Telegram', href: '/dashboard/account?s=chat', keywords: ['chat', 'whatsapp', 'telegram', 'link', 'bot', 'connect'] },
   { title: 'Platforms', subtitle: 'GitHub, Discord and X', href: '/dashboard/account?s=platforms', keywords: ['platforms', 'github', 'discord', 'x', 'twitter', 'social'] },

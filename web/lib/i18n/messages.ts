@@ -250,10 +250,92 @@ const zh: Record<MessageKey, string> = {
   'home.recent': '最近',
 };
 
+const id: Record<MessageKey, string> = {
+  'auth.signup.kicker': 'Mulai',
+  'auth.signup.title': 'Buat akun Flizy',
+  'auth.signup.blurb':
+    'Setelah mendaftar, dasbor membuka bot Flizy di WhatsApp atau Telegram dengan kode tautan Anda yang sudah terisi.',
+  'auth.signup.step1': 'Akun, @username, dompet Flizy',
+  'auth.signup.step2': 'Atur PIN buka kunci (wajib untuk mengunci dan membuka kunci)',
+  'auth.signup.step3': 'Hubungkan chat dan platform (misalnya GitHub), klaim dana yang ditahan',
+  'auth.signup.displayName': 'Nama tampilan (opsional)',
+  'auth.signup.displayNameHint':
+    'Boleh bahasa apa saja, misalnya Indonesia, Korea, atau Mandarin. Cara kami menyapa Anda. Bukan @username Anda.',
+  'auth.signup.displayNamePh': 'Cara kami menyapa Anda',
+  'auth.signup.username': 'Nama pengguna (wajib)',
+  'auth.signup.usernamePh': 'hanya huruf dan angka',
+  'auth.signup.usernameHint':
+    'Nama Flizy Anda dalam pembayaran (claimed by @you). Hanya a-z dan 0-9. Bisa diganti sekali setiap 30 hari. Tidak dipakai untuk mengarahkan uang.',
+  'auth.signup.email': 'Email',
+  'auth.signup.password': 'Kata sandi',
+  'auth.signup.confirm': 'Ketik ulang kata sandi',
+  'auth.signup.submit': 'Buat akun',
+  'auth.signup.submitting': 'Membuat akun...',
+  'auth.signup.hasAccount': 'Sudah punya akun?',
+  'auth.signup.login': 'Masuk',
+  'auth.signup.language': 'Bahasa',
+
+  'auth.login.kicker': 'Selamat datang kembali',
+  'auth.login.title': 'Masuk',
+  'auth.login.blurb': 'Buka dasbor untuk mengelola orang tepercaya, WhatsApp, dan Telegram.',
+  'auth.login.email': 'Email',
+  'auth.login.password': 'Kata sandi',
+  'auth.login.submit': 'Masuk',
+  'auth.login.submitting': 'Sedang masuk...',
+  'auth.login.newHere': 'Baru di sini?',
+  'auth.login.create': 'Buat akun',
+
+  'nav.home': 'Beranda',
+  'nav.wallet': 'Dompet',
+  'nav.history': 'Riwayat',
+  'nav.explore': 'Jelajah',
+  'nav.account': 'Akun',
+  'nav.swap': 'Tukar',
+
+  'account.profile': 'Profil',
+  'account.profileHelper':
+    'Email, alamat tambahan, undangan, dan kredit. Nama pengguna ada di baris terakhir.',
+  'account.username': 'Nama pengguna',
+  'account.usernameHint':
+    '3 sampai 24 karakter, diawali huruf, hanya a-z dan 0-9. Bisa diganti paling banyak sekali setiap 30 hari.',
+  'account.usernameCooldown': 'Anda bisa mengganti nama pengguna lagi setelah {date}.',
+  'account.usernameSave': 'Simpan',
+  'account.usernameUpdate': 'Perbarui',
+  'account.usernameSaving': 'Menyimpan…',
+  'account.language': 'Bahasa',
+  'account.languageHelper':
+    'Bahasa tampilan untuk akun ini. Bot chat tetap berbahasa Inggris sampai terjemahan untuk chat tersedia.',
+  'account.preferences': 'Preferensi',
+  'account.languageCurrent': 'Saat ini',
+  'account.languageSave': 'Simpan bahasa',
+  'account.languageSaving': 'Menyimpan…',
+  'account.languageSaved': 'Bahasa disimpan.',
+  'account.background': 'Latar belakang',
+  'account.backgroundHint': 'Hanya Anda yang bisa melihat latar belakang Anda.',
+  'account.backgroundDefault': 'Bawaan',
+  'account.backgroundWine': 'Merah anggur',
+  'account.backgroundGreen': 'Hijau',
+  'account.backgroundGold': 'Emas',
+  'account.backgroundYellow': 'Kuning',
+  'account.backgroundWhite': 'Putih',
+  'account.backgroundUpload': 'Unggah gambar',
+  'account.backgroundDim': 'Redupkan',
+  'account.backgroundReset': 'Kembalikan ke bawaan',
+  'account.backgroundSave': 'Simpan gambar',
+  'account.backgroundSaving': 'Menyimpan...',
+  'account.backgroundPreview': 'Pratinjau',
+
+  'home.overview': 'Ringkasan',
+  'home.claims': 'Klaim',
+  'home.go': 'Buka',
+  'home.recent': 'Terbaru',
+};
+
 const TABLE: Record<LocaleCode, Record<MessageKey, string>> = {
   en: en as Record<MessageKey, string>,
   ko,
   zh,
+  id,
 };
 
 export function t(locale: LocaleCode, key: MessageKey, vars?: Record<string, string>): string {
