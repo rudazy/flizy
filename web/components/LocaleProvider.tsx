@@ -115,7 +115,7 @@ export function useLocale() {
   return ctx;
 }
 
-/** Compact language select used on signup / account */
+/** Compact language select used on signup, login and the pay link page */
 export function LanguageSelect({
   value,
   onChange,

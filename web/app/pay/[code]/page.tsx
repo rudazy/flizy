@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { getSupabase } from '../../../lib/supabase';
 import { resolvePayRef } from '../../../lib/payCode.ts';
 import { decodeRouteParam } from '../../../lib/routeParam.ts';
 import { pageMetadata } from '../../../lib/seo';
 import { PayLanding } from '../../../components/PayLanding';
+import { PayNotFound } from '../../../components/PayNotFound';
 import { ExternalWalletProvider } from '../../../components/ExternalWalletProvider';
 import { parsePayPreset } from '../../../lib/payLink.ts';
 import { symbolLabel } from '../../../lib/listedTokens';
@@ -36,17 +36,7 @@ export default async function PayCodePage(props: Props) {
     found = null;
   }
 
-  if (!found) {
-    return (
-      <div className="fade-up mx-auto max-w-md space-y-4">
-        <h1 className="font-sans text-3xl tracking-wide text-paper">Not found</h1>
-        <p className="text-sm text-muted">No Flizy account matches that name or code.</p>
-        <Link href="/" className="text-sm text-lime no-underline hover:text-gold">
-          Home
-        </Link>
-      </div>
-    );
-  }
+  if (!found) return <PayNotFound by="name" />;
 
   // Outside-wallet pay is offered only where the owner turned it on.
   let outsidePay = false;

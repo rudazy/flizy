@@ -4,6 +4,7 @@
  */
 
 import type { LocaleCode } from '../locale';
+import { payEn, payKo, payZh, payId } from './pay.ts';
 
 export type MessageKey = keyof typeof en;
 
@@ -90,6 +91,8 @@ const en = {
   'home.claims': 'Claims',
   'home.go': 'Go',
   'home.recent': 'Recent',
+
+  ...payEn,
 } as const;
 
 const ko: Record<MessageKey, string> = {
@@ -171,6 +174,8 @@ const ko: Record<MessageKey, string> = {
   'home.claims': '클레임',
   'home.go': '바로가기',
   'home.recent': '최근',
+
+  ...payKo,
 };
 
 const zh: Record<MessageKey, string> = {
@@ -248,6 +253,8 @@ const zh: Record<MessageKey, string> = {
   'home.claims': '待领',
   'home.go': '前往',
   'home.recent': '最近',
+
+  ...payZh,
 };
 
 const id: Record<MessageKey, string> = {
@@ -329,6 +336,8 @@ const id: Record<MessageKey, string> = {
   'home.claims': 'Klaim',
   'home.go': 'Buka',
   'home.recent': 'Terbaru',
+
+  ...payId,
 };
 
 const TABLE: Record<LocaleCode, Record<MessageKey, string>> = {
@@ -339,13 +348,11 @@ const TABLE: Record<LocaleCode, Record<MessageKey, string>> = {
 };
 
 export function t(locale: LocaleCode, key: MessageKey, vars?: Record<string, string>): string {
-  let s = TABLE[locale]?.[key] ?? TABLE.en[key] ?? key;
-  if (vars) {
-    for (const [k, v] of Object.entries(vars)) {
-      s = s.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
-    }
-  }
-  return s;
+  const s = TABLE[locale]?.[key] ?? TABLE.en[key] ?? key;
+  if (!vars) return s;
+  // One pass, values inserted as written: a typed amount such as "1$&" or "{unit}"
+  // is shown as typed, never read as a replacement pattern or filled again.
+  return s.replace(/\{(\w+)\}/g, (slot, name: string) => (Object.hasOwn(vars, name) ? vars[name] : slot));
 }
 
 export { en };

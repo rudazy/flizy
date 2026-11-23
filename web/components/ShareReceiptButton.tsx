@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { useLocale } from './LocaleProvider';
 
 /**
  * Makes the receipt link for one confirmed payment and hands it to the phone's
@@ -20,6 +21,7 @@ export function ShareReceiptButton({
   /** Fill the grid cell it sits in instead of hugging its label. */
   wide?: boolean;
 }) {
+  const { t } = useLocale();
   const [state, setState] = useState<'idle' | 'busy' | 'copied' | 'shared' | 'error'>('idle');
   const [error, setError] = useState('');
 
@@ -35,13 +37,13 @@ export function ShareReceiptButton({
       });
       const body = (await res.json().catch(() => ({}))) as { url?: unknown; error?: unknown };
       if (!res.ok || typeof body.url !== 'string') {
-        setError(typeof body.error === 'string' ? body.error : 'Could not make the receipt.');
+        setError(typeof body.error === 'string' ? body.error : t('receipt.error'));
         setState('error');
         return;
       }
       if (typeof navigator.share === 'function') {
         try {
-          await navigator.share({ title: 'Flizy receipt', url: body.url });
+          await navigator.share({ title: t('receipt.title'), url: body.url });
           setState('shared');
           return;
         } catch {
@@ -51,12 +53,13 @@ export function ShareReceiptButton({
       await navigator.clipboard.writeText(body.url);
       setState('copied');
     } catch {
-      setError('Could not make the receipt.');
+      setError(t('receipt.error'));
       setState('error');
     }
   }
 
-  const label = state === 'busy' ? 'Making the receipt' : state === 'copied' ? 'Receipt link copied' : state === 'shared' ? 'Receipt shared' : 'Share receipt';
+  const label =
+    state === 'busy' ? t('receipt.making') : state === 'copied' ? t('receipt.copied') : state === 'shared' ? t('receipt.shared') : t('receipt.share');
   return (
     <span className={wide ? 'grid gap-1' : 'inline-grid gap-1 justify-self-start'}>
       <button type="button" onClick={() => void onShare()} disabled={state === 'busy'} className={className || 'text-sun disabled:opacity-60'}>

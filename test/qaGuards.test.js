@@ -39,6 +39,7 @@ describe('swap quote follows the inputs', () => {
 
 describe('pay link', () => {
   const landing = read('web/components/PayLanding.tsx');
+  const payWords = read('web/lib/i18n/pay.ts');
 
   it('reviews the payment before anything is sent', () => {
     const review = landing.indexOf("setStage('review')");
@@ -46,16 +47,18 @@ describe('pay link', () => {
     assert.ok(review > 0 && execute > 0);
     assert.match(landing, /<form onSubmit=\{onReview\}/);
     assert.match(landing, /disabled=\{busy \|\| \(needsPin && !pinReady\(pin\)\)\}\s*onClick=\{\(\) => void onPay\(\)\}/);
-    assert.match(landing, /Review payment to \{handle\}/);
+    assert.match(landing, /t\('pay\.reviewTo', \{ handle \}\)/);
+    assert.ok(payWords.includes("'pay.reviewTo': 'Review payment to {handle}',"));
   });
 
   it('shows the first payment warning on the review step too', () => {
     const reviewBlock = landing.slice(landing.indexOf("stage === 'review' ? ("), landing.lastIndexOf('{paid ? ('));
     assert.match(reviewBlock, /\{firstPay \? <FirstPayNote handle=\{handle\} review \/> : null\}/);
-    // The note itself, shared with the amount step.
+    // The note itself, shared with the amount step; its English is pinned in the catalog.
     const note = landing.slice(landing.indexOf('function FirstPayNote'));
-    assert.match(note, /First payment\. You have not paid \{handle\} before\./);
-    assert.match(note, /Check this is the right person before you confirm\./);
+    assert.match(note, /\{t\('pay\.firstPay', \{ handle \}\)\} \{review \? t\('pay\.firstPayReview'\) : t\('pay\.firstPayEdit'\)\}/);
+    assert.ok(payWords.includes("'pay.firstPay': 'First payment. You have not paid {handle} before.',"));
+    assert.ok(payWords.includes("'pay.firstPayReview': 'Check this is the right person before you confirm.',"));
   });
 
   it('says Paid once, not again as an error', () => {

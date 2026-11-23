@@ -13,6 +13,7 @@ import type { PayPreset } from '../lib/payLink';
 import { ProfileLink } from './ProfileLink';
 import { ShareReceiptButton } from './ShareReceiptButton';
 import { ExternalPay } from './ExternalPay';
+import { LanguageSelect, useLocale } from './LocaleProvider';
 import {
   ArrowRightIcon,
   CloseIcon,
@@ -21,6 +22,7 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   GiwaMarkIcon,
+  GlobeIcon,
   InfoIcon,
   RefreshIcon,
 } from './ExploreIcons';
@@ -71,6 +73,7 @@ export function PayLanding({
   /** The owner lets wallets outside Flizy pay this link (accounts.accept_outside_pay). */
   outsidePay?: boolean;
 }) {
+  const { t, locale, setLocale } = useLocale();
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [self, setSelf] = useState(false);
   const [payerHandle, setPayerHandle] = useState('');
@@ -114,7 +117,7 @@ export function PayLanding({
   const [usdPerEth, setUsdPerEth] = useState<number | null>(null);
   const [flzEth, setFlzEth] = useState<number | null>(null);
 
-  const handle = username ? `@${username}` : 'this Flizy account';
+  const handle = username ? `@${username}` : t('pay.thisAccount');
   // Sign-in returns to the same ask, not to an empty form.
   const presetQuery = new URLSearchParams({
     ...(preset?.amount ? { amount: preset.amount } : {}),
@@ -145,14 +148,14 @@ export function PayLanding({
       const res = await fetch(`/api/pay/swap?asset=${asset}&amount=${encodeURIComponent(amount)}`, { cache: 'no-store' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || typeof body.maxEth !== 'string') {
-        setMsg(typeof body.error === 'string' ? body.error : 'Could not price this in ETH.');
+        setMsg(typeof body.error === 'string' ? body.error : t('pay.errPriceEth'));
         setWithEth(false);
         return;
       }
       setEthQuote({ maxEth: body.maxEth });
       setWithEth(true);
     } catch {
-      setMsg('Could not price this in ETH.');
+      setMsg(t('pay.errPriceEth'));
       setWithEth(false);
     }
   }
@@ -246,7 +249,7 @@ export function PayLanding({
   async function onReview(e: React.FormEvent) {
     e.preventDefault();
     if (!amountOk) {
-      setMsg('Enter an amount above 0.');
+      setMsg(t('pay.errAmount'));
       return;
     }
     if (quoting) return;
@@ -256,13 +259,13 @@ export function PayLanding({
       const res = await fetch(`/api/pay/fee?ref=${encodeURIComponent(refSlug)}&asset=${asset}&amount=${encodeURIComponent(amount)}`, { cache: 'no-store' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(body.error || 'Could not work out the fee. Try again.');
+        setMsg(body.error || t('pay.errFee'));
         return;
       }
       setFee(body.fee ?? null);
       setStage('review');
     } catch {
-      setMsg('Could not work out the fee. Try again.');
+      setMsg(t('pay.errFee'));
     } finally {
       setQuoting(false);
     }
@@ -302,7 +305,7 @@ export function PayLanding({
       // The fee moved since review: show the new one; nothing was sent.
       if (res.status === 409 && body.fee) setFee(body.fee);
       if (!res.ok) {
-        setMsg(body.error || 'Could not pay.');
+        setMsg(body.error || t('pay.errPay'));
         return;
       }
       setOk(true);
@@ -314,19 +317,27 @@ export function PayLanding({
       if (body.alreadySaved === true) setAlreadySaved(true);
       else setAlreadySaved(false);
     } catch {
-      setMsg('Could not pay. Try again.');
+      setMsg(t('pay.errPayRetry'));
     } finally {
       setBusy(false);
     }
   }
 
-  const fromLabel = payerHandle ? `${payerHandle}, Flizy wallet` : 'Your Flizy wallet';
+  const fromLabel = payerHandle ? t('pay.fromHandle', { handle: payerHandle }) : t('pay.fromYours');
   const paid = loggedIn && !self && ok;
   /** A signed-out visitor on a link that asks for an amount: the payment request layout. */
   const askView = loggedIn === false && Boolean(preset?.amount);
 
   return (
-    <div className="fade-up mx-auto w-full max-w-[560px]">
+    <div lang={locale} className="fade-up mx-auto w-full max-w-[560px]">
+      {/* Anyone can open a pay link, signed in or not, so the language is picked here too. */}
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <GlobeIcon size={16} className="text-[#9a958c]" />
+        <label htmlFor="pay-locale" className="sr-only">
+          {t('account.language')}
+        </label>
+        <LanguageSelect id="pay-locale" value={locale} onChange={setLocale} className="!w-auto min-h-[44px] !py-2 font-sans text-[13.5px]" />
+      </div>
       <div
         className="relative grid grid-cols-[minmax(0,1fr)] gap-5 overflow-hidden rounded-[18px] border border-[#3a3017] px-4 py-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] sm:px-6"
         style={CARD_BG}
@@ -337,7 +348,7 @@ export function PayLanding({
         ) : (
           <div className="relative flex items-start gap-4">
             <div className="min-w-0 flex-1">
-              <p className="m-0 font-mono text-[12px] uppercase tracking-[0.22em] text-sun">{askView ? 'Payment request' : 'Send payment to'}</p>
+              <p className="m-0 font-mono text-[12px] uppercase tracking-[0.22em] text-sun">{askView ? t('pay.eyebrowRequest') : t('pay.eyebrowSendTo')}</p>
               <div className="mt-4 flex items-start gap-3.5">
                 <span
                   className={`flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full border bg-[#14110a] font-sans text-[28px] font-bold ${
@@ -357,11 +368,12 @@ export function PayLanding({
                   ) : null}
                   <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#1f6b45] bg-[#0f2a1d] px-2.5 py-1 font-sans text-[12px] text-[#3ddc84]">
                     <CheckDot />
-                    Flizy user
+                    {t('pay.flizyUser')}
                   </span>
                   {loggedIn && !self ? (
                     <p className="m-0 mt-2.5 font-mono text-[12.5px] leading-relaxed text-[#9a958c]">
-                      {stage === 'edit' && payerHandle ? `Signed in as ${payerHandle}. ` : ''}This send comes from your Flizy wallet.
+                      {stage === 'edit' && payerHandle ? `${t('pay.signedInAs', { handle: payerHandle })} ` : ''}
+                      {t('pay.fromYourWallet')}
                     </p>
                   ) : null}
                 </div>
@@ -378,7 +390,7 @@ export function PayLanding({
           </div>
         )}
 
-        {self ? <p className="m-0 font-sans text-[13px] text-[#9a958c]">This is your pay page. Share the QR or @username.</p> : null}
+        {self ? <p className="m-0 font-sans text-[13px] text-[#9a958c]">{t('pay.self')}</p> : null}
 
         {/*
           A link with an amount says what it asks for before anyone signs in, whether or
@@ -387,15 +399,15 @@ export function PayLanding({
         {askView && preset?.amount ? (
           <div className="relative grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-[14px] border border-[#3a3017] bg-[#100f0d]/90 px-4 py-4 sm:px-5">
             <div className="min-w-0">
-              <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[#b7b1a8] min-[400px]:text-[11px] min-[400px]:tracking-[0.22em]">Amount requested</p>
+              <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.16em] text-[#b7b1a8] min-[400px]:text-[11px] min-[400px]:tracking-[0.22em]">{t('pay.amountRequested')}</p>
               <p className="m-0 mt-2 break-words font-sans text-[28px] font-bold leading-[1.1] min-[400px]:text-[32px]">
                 <span className="text-white">{preset.amount}</span> <span className="text-sun">{symbolLabel(preset.asset)}</span>
               </p>
-              {note ? <p className="m-0 mt-2 break-words font-sans text-[14px] text-[#b7b1a8]">For: {note}</p> : null}
+              {note ? <p className="m-0 mt-2 break-words font-sans text-[14px] text-[#b7b1a8]">{t('pay.forLabel')} {note}</p> : null}
             </div>
             <div className="flex flex-col items-center gap-2 border-l border-[#2e2a1e] pl-3 min-[400px]:pl-4">
               <AskQr />
-              <span className="font-sans text-[12px] text-[#9a958c]">Scan to pay</span>
+              <span className="font-sans text-[12px] text-[#9a958c]">{t('pay.scanToPay')}</span>
             </div>
           </div>
         ) : null}
@@ -410,26 +422,24 @@ export function PayLanding({
           <ExternalPay refSlug={refSlug} presetAmount={preset.amount} presetAsset={preset.asset} note={note} handle={handle} prominent />
         ) : null}
         {loggedIn === false && !outsidePay && preset?.amount ? (
-          <p className="m-0 font-sans text-[13px] leading-relaxed text-[#9a958c]">
-            {handle} does not take payments from other wallets. Log in to pay with Flizy.
-          </p>
+          <p className="m-0 font-sans text-[13px] leading-relaxed text-[#9a958c]">{t('pay.noOutsidePay', { handle })}</p>
         ) : null}
 
         {loggedIn === false ? (
           <div className={askView ? 'grid grid-cols-2 gap-3' : 'grid gap-2'}>
             <Link
               href={`/login?next=${encodeURIComponent(next)}`}
-              className={`btn ${outsidePay && preset?.amount ? 'btn-ghost' : 'btn-primary'} inline-flex items-center justify-center gap-2 whitespace-nowrap !px-2 py-3 font-sans text-[14.5px] no-underline`}
+              className={`btn ${outsidePay && preset?.amount ? 'btn-ghost' : 'btn-primary'} inline-flex items-center justify-center gap-2 text-center leading-tight !px-2 py-3 font-sans text-[14.5px] no-underline`}
             >
               {askView ? <LoginGlyph /> : null}
-              Log in to pay
+              {t('pay.logInToPay')}
             </Link>
             <Link
               href={`/signup?next=${encodeURIComponent(next)}`}
-              className="btn btn-ghost inline-flex items-center justify-center gap-2 whitespace-nowrap !px-2 py-3 font-sans text-[14.5px] no-underline"
+              className="btn btn-ghost inline-flex items-center justify-center gap-2 text-center leading-tight !px-2 py-3 font-sans text-[14.5px] no-underline"
             >
               {askView ? <UserPlusGlyph /> : null}
-              Create account
+              {t('pay.createAccount')}
             </Link>
           </div>
         ) : null}
@@ -444,19 +454,19 @@ export function PayLanding({
             {firstPay ? <FirstPayNote handle={handle} /> : null}
             {note ? (
               <p className="m-0 font-sans text-[13px] text-[#9a958c]">
-                For: <span className="break-words text-white">{note}</span>
-                <span className="block text-[11.5px]">Written by whoever made this link.</span>
+                {t('pay.forLabel')} <span className="break-words text-white">{note}</span>
+                <span className="block text-[11.5px]">{t('pay.noteBy')}</span>
               </p>
             ) : null}
 
             <div className="grid gap-3 rounded-[14px] border border-[#26262a] bg-[#0c0c0d] px-3.5 py-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="m-0 font-mono text-[13px] font-semibold uppercase tracking-[0.08em] text-white" id="pay-asset-label">
-                  Select asset
+                  {t('pay.selectAsset')}
                 </p>
                 <span className="flex items-center gap-2 font-mono text-[12px] text-[#9a958c]">
-                  {balance != null ? `Balance: ${shown(balance, asset)} ${unit}` : 'Balance: ...'}
-                  <button type="button" aria-label="Refresh balance" className="inline-flex text-[#b7b1a8] hover:text-white" onClick={() => void loadBalances()}>
+                  {t('pay.balance', { amount: balance != null ? `${shown(balance, asset)} ${unit}` : '...' })}
+                  <button type="button" aria-label={t('pay.refreshBalance')} className="inline-flex text-[#b7b1a8] hover:text-white" onClick={() => void loadBalances()}>
                     <RefreshIcon size={15} />
                   </button>
                 </span>
@@ -482,7 +492,7 @@ export function PayLanding({
             <div className="grid gap-2.5">
               <div className="flex items-center justify-between gap-2">
                 <label className="font-mono text-[13px] font-semibold uppercase tracking-[0.08em] text-white" htmlFor="pay-amount">
-                  Amount ({unit})
+                  {t('pay.amountLabel', { unit })}
                 </label>
                 <button
                   type="button"
@@ -490,7 +500,7 @@ export function PayLanding({
                   onClick={fillMax}
                   disabled={maxAmount == null || maxAmount <= 0}
                 >
-                  Max
+                  {t('pay.max')}
                 </button>
               </div>
               <div className="flex h-[60px] items-center gap-3 rounded-[12px] border border-sun/70 bg-[#0c0c0d] pl-3 pr-3 shadow-[0_0_0_1px_rgba(247,208,71,0.08)]">
@@ -508,7 +518,7 @@ export function PayLanding({
                 {amount ? (
                   <button
                     type="button"
-                    aria-label="Clear amount"
+                    aria-label={t('pay.clearAmount')}
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#2a2a2c] text-[#b7b1a8] hover:text-white"
                     onClick={() => setAmount('')}
                   >
@@ -520,25 +530,25 @@ export function PayLanding({
 
             <div className="grid grid-cols-3 divide-x divide-[#26262a] rounded-[12px] border border-[#26262a] bg-[#0c0c0d] py-3.5">
               <div className="min-w-0 px-3">
-                <p className="m-0 font-mono text-[11.5px] text-[#8d867c]">You send</p>
+                <p className="m-0 font-mono text-[11.5px] text-[#8d867c]">{t('pay.youSend')}</p>
                 <p className="m-0 mt-1 truncate font-sans text-[16px] font-semibold text-white">
                   {amountOk ? shown(amount, asset) : '0'} {unit}
                 </p>
                 {dollars != null ? <p className="m-0 font-mono text-[11.5px] text-[#8d867c]">≈ {usd(dollars)}</p> : null}
               </div>
               <div className="min-w-0 px-3">
-                <p className="m-0 font-mono text-[11.5px] text-[#8d867c]">To</p>
+                <p className="m-0 font-mono text-[11.5px] text-[#8d867c]">{t('pay.to')}</p>
                 <p className="m-0 mt-1.5 flex items-center gap-1.5 font-sans text-[14.5px] font-semibold text-white">
                   <span className="truncate">{handle}</span>
-                  <CopyButton text={handle} label="Copy recipient" />
+                  <CopyButton text={handle} label={t('pay.copyRecipient')} />
                 </p>
               </div>
               <div className="min-w-0 px-3">
-                <p className="m-0 font-mono text-[11.5px] text-[#8d867c]">Network</p>
+                <p className="m-0 font-mono text-[11.5px] text-[#8d867c]">{t('pay.network')}</p>
                 <p className="m-0 mt-1.5 flex items-center gap-1.5 font-mono text-[13px] text-[#d9d4ca]">
                   <NetworkMark size={22} />
                   GIWA
-                  <span title="GIWA Sepolia, an Ethereum layer 2 testnet" className="inline-flex text-[#8d867c]">
+                  <span title={t('pay.networkInfo')} className="inline-flex text-[#8d867c]">
                     <InfoIcon size={14} />
                   </span>
                 </p>
@@ -547,7 +557,7 @@ export function PayLanding({
 
             {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
             <button type="submit" className="btn btn-primary flex w-full items-center justify-center gap-2.5 py-4 font-sans text-[16px] font-semibold" disabled={!amountOk || quoting}>
-              {quoting ? 'Checking the fee...' : <>Review payment to {handle}</>}
+              {quoting ? t('pay.checkingFee') : t('pay.reviewTo', { handle })}
               <ArrowRightIcon size={18} />
             </button>
           </form>
@@ -557,57 +567,57 @@ export function PayLanding({
           <div className="grid gap-4">
             {firstPay ? <FirstPayNote handle={handle} review /> : null}
             <div className="rounded-[14px] border border-[#26262a] bg-[#0c0c0d] px-4 pb-1 pt-4">
-              <p className="m-0 pb-3 font-mono text-[14px] font-semibold uppercase tracking-[0.08em] text-white">Review payment</p>
+              <p className="m-0 pb-3 font-mono text-[14px] font-semibold uppercase tracking-[0.08em] text-white">{t('pay.reviewTitle')}</p>
               <dl className="m-0">
-                <Row name="To" copyText={handle}>
+                <Row name={t('pay.to')} copyText={handle}>
                   {displayName ? `${displayName} ` : ''}
                   {handle}
                 </Row>
-                <Row name="Amount" copyText={`${amount} ${unit}`}>
+                <Row name={t('pay.amount')} copyText={`${amount} ${unit}`}>
                   {amount} {unit}
                 </Row>
                 {fee && !withEth ? (
                   fee.feeFromAmount ? (
                     <>
-                      <Row name="Fee" info="Your balance covers the amount but not the fee on top, so the fee comes out of the amount.">
-                        {fee.feeHuman} {fee.label} ({fee.feeText}), from the amount
+                      <Row name={t('pay.fee')} info={t('pay.feeFromAmountInfo')}>
+                        {t('pay.feeFromAmount', { fee: fee.feeHuman, unit: fee.label, rate: fee.feeText })}
                       </Row>
-                      <Row name="They get">
+                      <Row name={t('pay.theyGet')}>
                         {fee.sendHuman} {fee.label}
                       </Row>
                     </>
                   ) : (
                     <>
-                      <Row name="Fee" info="Added on top, so they get the full amount. Paid with the payment.">
+                      <Row name={t('pay.fee')} info={t('pay.feeOnTopInfo')}>
                         {fee.feeHuman} {fee.label} ({fee.feeText})
                       </Row>
-                      <Row name="Total">
+                      <Row name={t('pay.total')}>
                         {fee.totalHuman} {fee.label}
                       </Row>
                     </>
                   )
                 ) : null}
                 {note ? (
-                  <Row name="For">
+                  <Row name={t('pay.for')}>
                     <span className="break-words">{note}</span>
                   </Row>
                 ) : null}
-                <Row name="From">
+                <Row name={t('pay.from')}>
                   {fromLabel}
                 </Row>
                 {withEth && ethQuote ? (
-                  <Row name="You pay">
-                    up to {ethQuote.maxEth} ETH
+                  <Row name={t('pay.youPay')}>
+                    {t('pay.upToEth', { amount: ethQuote.maxEth })}
                   </Row>
                 ) : null}
-                <Row name="Network">
+                <Row name={t('pay.network')}>
                   <span className="inline-flex items-center justify-end gap-2">
                     <NetworkMark size={20} />
                     {NETWORK}
                   </span>
                 </Row>
-                <Row name="Network fee" info="Gas for this payment is paid in ETH from your Flizy wallet." last>
-                  Paid in ETH from your wallet
+                <Row name={t('pay.networkFee')} info={t('pay.networkFeeInfo')} last>
+                  {t('pay.networkFeeValue')}
                 </Row>
               </dl>
             </div>
@@ -622,10 +632,9 @@ export function PayLanding({
                   onChange={(e) => (e.target.checked ? void quoteWithEth() : (setWithEth(false), setEthQuote(null)))}
                 />
                 <span className="font-sans">
-                  <span className="block text-[15px] text-white">Pay with ETH instead</span>
+                  <span className="block text-[15px] text-white">{t('pay.withEth')}</span>
                   <span className="mt-1 block text-[13.5px] leading-relaxed text-[#9a958c]">
-                    Your ETH is swapped and {handle} receives at least {amount} {unit}. Anything over that from the price moving
-                    goes to them.
+                    {t('pay.withEthText', { handle, amount, unit })}
                   </span>
                 </span>
               </label>
@@ -634,7 +643,7 @@ export function PayLanding({
             {needsPin ? (
               <PinField id="pay-pin" value={pin} onChange={setPin} />
             ) : txPin.required ? (
-              <p className="text-sm text-muted">Quick send: no PIN for up to {quickSendEth} ETH to someone you have paid before.</p>
+              <p className="text-sm text-muted">{t('pay.quickSend', { amount: quickSendEth })}</p>
             ) : null}
             {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
             <div className="grid grid-cols-[auto_1fr] gap-3">
@@ -651,7 +660,7 @@ export function PayLanding({
                   setStage('edit');
                 }}
               >
-                Back
+                {t('pay.back')}
               </button>
               <button
                 type="button"
@@ -659,7 +668,7 @@ export function PayLanding({
                 disabled={busy || (needsPin && !pinReady(pin))}
                 onClick={() => void onPay()}
               >
-                {busy ? 'Paying...' : `Confirm and pay ${fee && !withEth ? fee.totalHuman : amount} ${unit}`}
+                {busy ? t('pay.paying') : t('pay.confirm', { amount: fee && !withEth ? fee.totalHuman : amount, unit })}
                 {busy ? null : <ArrowRightIcon size={18} />}
               </button>
             </div>
@@ -670,26 +679,26 @@ export function PayLanding({
           <div className="grid gap-4">
             <div className="rounded-[14px] border border-[#26262a] bg-[#0c0c0d] px-3.5 pb-1 pt-2">
               <dl className="m-0">
-                <Row name="To" copyText={handle}>
+                <Row name={t('pay.to')} copyText={handle}>
                   {handle}
                 </Row>
-                <Row name="Amount" copyText={`${paidFee ? paidFee.sendHuman : amount} ${unit}`}>
+                <Row name={t('pay.amount')} copyText={`${paidFee ? paidFee.sendHuman : amount} ${unit}`}>
                   <span className="block">
                     {paidFee ? paidFee.sendHuman : amount} {unit}
                   </span>
                   {dollars != null ? <span className="block font-mono text-[12px] text-[#8d867c]">≈ {usd(dollars)}</span> : null}
                 </Row>
-                <Row name="From" copyText={fromLabel}>
+                <Row name={t('pay.from')} copyText={fromLabel}>
                   {fromLabel}
                 </Row>
-                <Row name="Network" copyText={NETWORK}>
+                <Row name={t('pay.network')} copyText={NETWORK}>
                   <span className="inline-flex items-center justify-end gap-2">
                     <NetworkMark size={20} />
                     {NETWORK}
                   </span>
                 </Row>
                 {txHash ? (
-                  <Row name="Transaction" href={explorer || undefined} last>
+                  <Row name={t('pay.transaction')} href={explorer || undefined} last>
                     <span className="font-mono">{shortHash(txHash)}</span>
                   </Row>
                 ) : null}
@@ -705,7 +714,7 @@ export function PayLanding({
                   className="flex items-center justify-center gap-2 rounded-[10px] border border-sun/70 py-3 font-sans text-[14.5px] font-semibold text-sun no-underline hover:bg-[#1c180c]"
                 >
                   <ExternalLinkIcon size={17} />
-                  View on explorer
+                  {t('pay.viewOnExplorer')}
                 </a>
               ) : null}
               {transferId ? (
@@ -718,16 +727,16 @@ export function PayLanding({
             </div>
 
             {justSaved ? (
-              <div className="alert alert-ok text-sm">Saved {handle} for later send.</div>
+              <div className="alert alert-ok text-sm">{t('pay.saved', { handle })}</div>
             ) : !alreadySaved && !saveSkipped ? (
               <div className="grid gap-4 rounded-[14px] border border-[#3a3017] bg-[#14110a] px-4 py-5">
                 <div>
-                  <p className="m-0 font-sans text-[16px] font-semibold text-white">Save {handle} as a trusted contact</p>
-                  <p className="m-0 mt-0.5 font-sans text-[13.5px] text-[#9a958c]">So the next send is just their name.</p>
+                  <p className="m-0 font-sans text-[16px] font-semibold text-white">{t('pay.saveTitle', { handle })}</p>
+                  <p className="m-0 mt-0.5 font-sans text-[13.5px] text-[#9a958c]">{t('pay.saveText')}</p>
                 </div>
                 <div className="grid gap-2">
                   <label className="font-mono text-[12px] font-semibold uppercase tracking-[0.1em] text-[#b7b1a8]" htmlFor="save-password">
-                    Account password
+                    {t('pay.password')}
                   </label>
                   <div className="flex h-[52px] items-center gap-3 rounded-[10px] border border-[#2a2b30] bg-[#0c0c0d] px-3.5 focus-within:border-sun/70">
                     <span className="text-[#8d867c]">
@@ -738,14 +747,14 @@ export function PayLanding({
                       className="h-full min-w-0 flex-1 bg-transparent font-sans text-[14px] text-white outline-none placeholder:text-[#6a6a6a]"
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
-                      placeholder="Enter your account password"
+                      placeholder={t('pay.passwordPh')}
                       value={savePassword}
                       onChange={(e) => setSavePassword(e.target.value)}
                       required
                     />
                     <button
                       type="button"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showPassword ? t('pay.hidePassword') : t('pay.showPassword')}
                       aria-pressed={showPassword}
                       className="inline-flex text-[#b7b1a8] hover:text-white"
                       onClick={() => setShowPassword((v) => !v)}
@@ -768,21 +777,21 @@ export function PayLanding({
                         body: JSON.stringify({ ref: refSlug, password: savePassword }),
                       });
                       const body = await res.json().catch(() => ({}));
-                      if (!res.ok) throw new Error(body.error || 'Could not save');
+                      if (!res.ok) throw new Error(body.error || t('pay.errSave'));
                       setAlreadySaved(true);
                       setJustSaved(true);
                       setSavePassword('');
                     } catch (err) {
-                      setMsg(err instanceof Error ? err.message : 'Could not save');
+                      setMsg(err instanceof Error ? err.message : t('pay.errSave'));
                     } finally {
                       setSaving(false);
                     }
                   }}
                 >
-                  {saving ? 'Saving…' : `Save ${handle} for later`}
+                  {saving ? t('pay.saving') : t('pay.saveFor', { handle })}
                 </button>
                 <button type="button" className="btn btn-ghost w-full py-3.5 font-sans" disabled={saving} onClick={() => setSaveSkipped(true)}>
-                  Skip for now
+                  {t('pay.skip')}
                 </button>
                 {msg ? <div className="alert alert-error text-sm">{msg}</div> : null}
               </div>
@@ -808,6 +817,7 @@ type PayFeeView = {
 };
 
 function PaidHeader({ amount, unit, handle }: { amount: string; unit: string; handle: string }) {
+  const { t } = useLocale();
   return (
     <div className="grid justify-items-center gap-2 pt-1 text-center">
       <span className="relative flex h-[86px] w-[86px] items-center justify-center rounded-full bg-[#0f2a1d] shadow-[0_0_40px_rgba(61,220,132,0.22)]" aria-hidden>
@@ -817,10 +827,8 @@ function PaidHeader({ amount, unit, handle }: { amount: string; unit: string; ha
           </svg>
         </span>
       </span>
-      <h1 className="m-0 font-sans text-[28px] font-bold text-white">Payment successful!</h1>
-      <p className="m-0 font-sans text-[16px] text-[#b7b1a8]">
-        You&apos;ve sent {amount} {unit} to {handle}.
-      </p>
+      <h1 className="m-0 font-sans text-[28px] font-bold text-white">{t('pay.paidTitle')}</h1>
+      <p className="m-0 font-sans text-[16px] text-[#b7b1a8]">{t('pay.paidText', { amount, unit, handle })}</p>
     </div>
   );
 }
@@ -841,13 +849,14 @@ function Row({
   info?: string;
   last?: boolean;
 }) {
+  const { t } = useLocale();
   return (
     <div className={`flex items-center gap-3 py-3.5 ${last ? '' : 'border-b border-[#1f1f22]'}`}>
       <dt className="w-[108px] shrink-0 font-sans text-[14.5px] text-[#9a958c]">{name}</dt>
       <dd className="m-0 min-w-0 flex-1 text-right font-sans text-[15px] text-white">{children}</dd>
-      {copyText ? <CopyButton text={copyText} label={`Copy ${name.toLowerCase()}`} /> : null}
+      {copyText ? <CopyButton text={copyText} label={t('pay.copyField', { field: name.toLowerCase() })} /> : null}
       {href ? (
-        <a href={href} target="_blank" rel="noreferrer" aria-label="Open on explorer" className="inline-flex shrink-0 text-[#d9d4ca] hover:text-white">
+        <a href={href} target="_blank" rel="noreferrer" aria-label={t('pay.openOnExplorer')} className="inline-flex shrink-0 text-[#d9d4ca] hover:text-white">
           <ExternalLinkIcon size={18} />
         </a>
       ) : null}
@@ -861,11 +870,12 @@ function Row({
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
+  const { t } = useLocale();
   const [copied, setCopied] = useState(false);
   return (
     <button
       type="button"
-      aria-label={copied ? 'Copied' : label}
+      aria-label={copied ? t('pay.copied') : label}
       className={`inline-flex shrink-0 ${copied ? 'text-[#3ddc84]' : 'text-[#9a958c] hover:text-white'}`}
       onClick={() => {
         copy(text);
@@ -879,10 +889,10 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 }
 
 function FirstPayNote({ handle, review = false }: { handle: string; review?: boolean }) {
+  const { t } = useLocale();
   return (
     <div className="rounded-[12px] border border-[#5a4718] bg-[#1c1608] px-4 py-3 font-sans text-[13px] leading-relaxed text-[#e0b070]">
-      First payment. You have not paid {handle} before.{' '}
-      {review ? 'Check this is the right person before you confirm.' : 'Confirm the name before you send.'}
+      {t('pay.firstPay', { handle })} {review ? t('pay.firstPayReview') : t('pay.firstPayEdit')}
     </div>
   );
 }
@@ -974,6 +984,7 @@ function CardArc() {
  * if drawing fails, the frame stays empty rather than showing a wrong code.
  */
 function AskQr() {
+  const { t } = useLocale();
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -997,17 +1008,18 @@ function AskQr() {
   }, []);
   return (
     <span className="block rounded-[12px] border-[1.5px] border-sun p-[5px] shadow-[0_0_18px_-6px_rgba(247,208,71,0.6)]">
-      <canvas ref={ref} width={160} height={160} className="block !h-[72px] !w-[72px] rounded-[6px] bg-[#f5f5f5]" aria-label="QR code for this payment request" />
+      <canvas ref={ref} width={160} height={160} className="block !h-[72px] !w-[72px] rounded-[6px] bg-[#f5f5f5]" aria-label={t('pay.qrLabel')} />
     </span>
   );
 }
 
 /** What External pay is, in three lines, under the card. */
 function AskPoints() {
+  const { t } = useLocale();
   const points: { icon: ReactNode; title: string; text: string }[] = [
-    { icon: <ShieldGlyph />, title: 'Direct payment', text: 'Sent straight to the recipient' },
-    { icon: <BoltGlyph />, title: 'Secure', text: 'You confirm the amount in your wallet' },
-    { icon: <LayersGlyph />, title: 'On testnet', text: 'This is a test network (GIWA Sepolia)' },
+    { icon: <ShieldGlyph />, title: t('pay.pointDirect'), text: t('pay.pointDirectText') },
+    { icon: <BoltGlyph />, title: t('pay.pointSecure'), text: t('pay.pointSecureText') },
+    { icon: <LayersGlyph />, title: t('pay.pointTestnet'), text: t('pay.pointTestnetText') },
   ];
   return (
     <div className="mt-8 grid grid-cols-3 px-1">

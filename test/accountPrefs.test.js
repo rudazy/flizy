@@ -88,7 +88,7 @@ describe('Indonesian', () => {
   });
 
   it('has its own text for every key, not the English fallback', () => {
-    const same = new Set(['auth.signup.email', 'auth.login.email']);
+    const same = new Set(['auth.signup.email', 'auth.login.email', 'pay.total']);
     for (const key of Object.keys(M.en)) {
       const text = M.t('id', key);
       assert.ok(text && text !== key, key);

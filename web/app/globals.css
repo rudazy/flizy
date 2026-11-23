@@ -703,3 +703,8 @@ html[data-flizy-preset='white'] .btn-primary {
     color: #0a0a0a;
   }
 }
+
+/* Korean breaks between words, not inside them, wherever a translated area says lang="ko". */
+:lang(ko) {
+  word-break: keep-all;
+}

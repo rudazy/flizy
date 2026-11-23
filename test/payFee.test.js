@@ -259,11 +259,16 @@ describe('the route and the page', () => {
     const page = read('web/components/PayLanding.tsx');
     // The payee is named: a business payee shows the payer no fee.
     assert.ok(page.includes('fetch(`/api/pay/fee?ref=${encodeURIComponent(refSlug)}&asset=${asset}&amount=${encodeURIComponent(amount)}`'));
-    assert.match(page, /<Row name="Fee" info=/);
-    assert.doesNotMatch(page, /<Row name="Flizy fee"/);
-    assert.match(page, /<Row name="Total">/);
+    // Row names come from the catalog; English is pinned there.
+    const words = read('web/lib/i18n/pay.ts');
+    assert.match(page, /<Row name=\{t\('pay\.fee'\)\} info=/);
+    assert.ok(words.includes("'pay.fee': 'Fee',"));
+    assert.doesNotMatch(words, /Flizy fee/);
+    assert.match(page, /<Row name=\{t\('pay\.total'\)\}>/);
+    assert.ok(words.includes("'pay.total': 'Total',"));
     assert.match(page, /\.\.\.\(fee \? \{ feeUnits: fee\.feeUnits, feeFromAmount: fee\.feeFromAmount \} : \{\}\)/);
-    assert.match(page, /<Row name="They get">/);
+    assert.match(page, /<Row name=\{t\('pay\.theyGet'\)\}>/);
+    assert.ok(words.includes("'pay.theyGet': 'They get',"));
     // Once paid, the screen says what they got.
     assert.match(page, /<PaidHeader amount=\{paidFee \? paidFee\.sendHuman : amount\}/);
     assert.match(page, /if \(res\.status === 409 && body\.fee\) setFee\(body\.fee\)/);

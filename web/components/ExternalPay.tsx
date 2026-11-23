@@ -6,6 +6,7 @@ import { useExternalWallet } from './ExternalWalletProvider';
 import { giwaClients, walletErrorText } from '../lib/walletChain';
 import { listedBySymbol, symbolLabel } from '../lib/listedTokens';
 import { PAY_ASSETS, type PayAsset } from '../lib/payAsset';
+import { useLocale } from './LocaleProvider';
 
 /**
  * Pay a Flizy account from a wallet outside Flizy, connected through the
@@ -50,6 +51,7 @@ export function ExternalPay({
    */
   prominent?: boolean;
 }) {
+  const { t } = useLocale();
   const [amount, setAmount] = useState(presetAmount ?? '');
   const [asset, setAsset] = useState<PayAsset>(presetAsset);
   const [step, setStep] = useState<'idle' | 'connecting' | 'approving' | 'paying' | 'checking' | 'done' | 'error'>('idle');
@@ -74,11 +76,11 @@ export function ExternalPay({
         await new Promise((r) => setTimeout(r, 1500));
         continue;
       }
-      if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Could not check the payment.');
+      if (!res.ok) throw new Error(typeof body.error === 'string' ? body.error : t('ext.errCheck'));
       setExplorer(typeof body.explorerUrl === 'string' ? body.explorerUrl : '');
       return;
     }
-    throw new Error('The payment was sent. It is taking a while to confirm; it will show for them once it lands.');
+    throw new Error(t('ext.errSlow'));
   }
 
   async function pay() {
@@ -88,11 +90,11 @@ export function ExternalPay({
       setStep('connecting');
       const lookup = await fetch(`/api/pay/external?ref=${encodeURIComponent(refSlug)}`);
       const info = (await lookup.json().catch(() => ({}))) as Partial<Payee> & { error?: string };
-      if (!lookup.ok || !info.payee) throw new Error(info.error || 'Could not find who to pay.');
+      if (!lookup.ok || !info.payee) throw new Error(info.error || t('ext.errPayee'));
       const account = wallet.address ?? (await wallet.connect());
-      if (!account) throw new Error('No wallet was connected.');
+      if (!account) throw new Error(t('ext.errNoWallet'));
       const provider = await wallet.provider();
-      if (!provider) throw new Error('Connect your wallet again.');
+      if (!provider) throw new Error(t('ext.errReconnect'));
 
       const [{ wallet: signer, reader, viem }, { invoiceIdFor }] = await Promise.all([
         giwaClients(provider, account),
@@ -116,7 +118,7 @@ export function ExternalPay({
       } else {
         const listed = asset === 'TUSD' ? listedBySymbol('TUSD') : null;
         const token = (listed ? listed.address : info.flz) as `0x${string}` | null;
-        if (!token) throw new Error(`${unit} cannot be paid from an outside wallet yet.`);
+        if (!token) throw new Error(t('ext.errToken', { unit }));
         const units = parseUnits(amount, listed ? listed.decimals : 18);
         const allowed = await reader.readContract({ address: token, abi: erc20Abi, functionName: 'allowance', args: [account, receiver] });
         if (allowed < units) {
@@ -138,7 +140,7 @@ export function ExternalPay({
       await confirm(txHash, nonce);
       setStep('done');
     } catch (err) {
-      setMsg(walletErrorText(err, 'Could not pay.'));
+      setMsg(walletErrorText(err, t('pay.errPay')));
       setStep('error');
     }
   }
@@ -146,12 +148,10 @@ export function ExternalPay({
   if (step === 'done') {
     return (
       <div className="card space-y-3 p-6">
-        <div className="alert alert-ok text-sm">
-          Paid {amount} {unit} to {handle}.
-        </div>
+        <div className="alert alert-ok text-sm">{t('ext.paid', { amount, unit, handle })}</div>
         {explorer ? (
           <a href={explorer} target="_blank" rel="noreferrer noopener" className="text-sm text-sun no-underline hover:opacity-80">
-            View on explorer
+            {t('pay.viewOnExplorer')}
           </a>
         ) : null}
       </div>
@@ -159,21 +159,22 @@ export function ExternalPay({
   }
 
   const busy = step === 'connecting' || step === 'approving' || step === 'paying' || step === 'checking';
+  const payLabel = t(prominent ? 'ext.payWithWallet' : 'ext.payFromOther', { amount: amount || '', unit });
   const label = {
-    idle: prominent ? `Pay ${amount || ''} ${unit} with your wallet` : `Pay ${amount || ''} ${unit} from another wallet`,
-    connecting: 'Connecting your wallet',
-    approving: `Approve ${unit} in your wallet`,
-    paying: 'Confirm in your wallet',
-    checking: 'Checking the payment',
-    error: prominent ? `Pay ${amount || ''} ${unit} with your wallet` : `Pay ${amount || ''} ${unit} from another wallet`,
+    idle: payLabel,
+    connecting: t('ext.connecting'),
+    approving: t('ext.approve', { unit }),
+    paying: t('ext.confirm'),
+    checking: t('ext.checking'),
+    error: payLabel,
   }[step];
 
   return (
     <div className={prominent ? 'grid gap-2' : 'card space-y-3 p-6'}>
-      {prominent ? null : <p className="m-0 text-xs uppercase tracking-[0.18em] text-muted">No Flizy account?</p>}
+      {prominent ? null : <p className="m-0 text-xs uppercase tracking-[0.18em] text-muted">{t('ext.noAccount')}</p>}
       {canPay && !presetAmount ? (
         <div className="grid gap-2">
-          <div className="flex gap-2" role="group" aria-label="Asset">
+          <div className="flex gap-2" role="group" aria-label={t('ext.asset')}>
             {PAY_ASSETS.map((opt) => (
               <button
                 key={opt}
@@ -189,7 +190,7 @@ export function ExternalPay({
           <input
             className="input"
             inputMode="decimal"
-            aria-label={`Amount in ${unit}`}
+            aria-label={t('ext.amountIn', { unit })}
             placeholder={asset === 'TUSD' ? '20' : asset === 'FLZ' ? '10' : '0.01'}
             value={amount}
             onChange={(e) => setAmount(e.target.value.trim())}
@@ -213,14 +214,12 @@ export function ExternalPay({
             {label}
           </button>
           <p className={prominent ? 'm-0 text-center font-sans text-[13px] leading-relaxed text-[#9a958c]' : 'm-0 text-xs text-muted'}>
-            Pays on {PAYMENT_RECEIVER_CHAIN.name} straight to {handle}. Your wallet shows the exact amount before you sign.
-            {asset !== 'ETH' ? ` A token payment asks you to approve ${amount || 'the amount'} ${unit} first.` : ''}
+            {t('ext.paysOn', { chain: PAYMENT_RECEIVER_CHAIN.name, handle })}
+            {asset !== 'ETH' ? ` ${t('ext.approveFirst', { amount: amount || t('ext.theAmount'), unit })}` : ''}
           </p>
         </>
       ) : (
-        <p className="m-0 text-sm text-muted">
-          To pay from your own wallet, open this link in your wallet app&apos;s browser, or on a computer with a wallet extension.
-        </p>
+        <p className="m-0 text-sm text-muted">{t('ext.openInWallet')}</p>
       )}
       {msg ? (
         <div className="alert alert-error text-sm" role="alert">
